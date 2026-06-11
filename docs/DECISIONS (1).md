@@ -31,7 +31,7 @@ PWA de avaliação física e postural para profissionais (avaliadores, personais
 - Fluxo no chat: colar erro (não arquivo inteiro), pedir diff para mudanças pequenas, "ok" quando comando funcionar, agrupar dúvidas.
 
 ## Estado atual
-Etapa 2.1 entregue: 0001_schema.sql e 0002_rls.sql revisados in-place (pré-deploy, sem 0003). Inclusos: gate de consentimento nos inserts; storage de fotos por registro + visibilidade de avaliador; paths canônicos por trigger (cliente não manda path); freeze_columns nas relações (org/pais imutáveis pós-insert; errou o pai, apaga e recria); can_assign_evaluator + check_evaluator. Roteiro de testes ampliado (30 casos, partes A-E) em docs/ETAPA2.md seção 4, cobrindo isolamento entre orgs, consentimento ativo/revogado, integridade, separação entre avaliadores da mesma org e storage.
+Etapa 3.1 concluída: projeto Vite + React + TypeScript criado; Tailwind/shadcn configurados; Supabase criado e linkado; migrations 0001/0002 aplicadas; database.types.ts gerado; página de status funcionando localmente e no Cloudflare Pages; GitHub conectado ao Cloudflare; Auth URL Configuration apontando para localhost e pages.dev.
 
 ## Próximo passo
-Etapa 3, parte 1: setup do projeto (repo, Vite, Tailwind, shadcn, projeto Supabase, aplicar migrations, gerar types, deploy vazio no Cloudflare Pages), com passo a passo completo para CMD/Windows.
+Etapa 3.2: autenticação, sessão, rotas protegidas e onboarding de organização usando a RPC create_organization.
