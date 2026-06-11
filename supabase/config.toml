@@ -1,0 +1,4 @@
+# Config minima para o fluxo remoto do CLI (link, db push, gen types).
+# Se algum comando pedir mais configuracao, rode: npx supabase init
+# (o script write-etapa3-files.mjs nao sobrescreve este arquivo).
+project_id = "bodytrack"

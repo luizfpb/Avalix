@@ -1,0 +1,21 @@
+# Dependencias e build
+node_modules
+dist
+dist-ssr
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Env: nunca commitar chaves
+*.local
+.env
+
+# Editor / SO
+.DS_Store
+*.suo
+*.sw?
+
+# Testes
+coverage
