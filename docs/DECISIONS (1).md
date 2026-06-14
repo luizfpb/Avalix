@@ -31,7 +31,7 @@ PWA de avaliação física e postural para profissionais (avaliadores, personais
 - Fluxo no chat: colar erro (não arquivo inteiro), pedir diff para mudanças pequenas, "ok" quando comando funcionar, agrupar dúvidas.
 
 ## Estado atual
-Etapa 3.1 concluída: projeto Vite + React + TypeScript criado; Tailwind/shadcn configurados; Supabase criado e linkado; migrations 0001/0002 aplicadas; database.types.ts gerado; página de status funcionando localmente e no Cloudflare Pages; GitHub conectado ao Cloudflare; Auth URL Configuration apontando para localhost e pages.dev.
+Etapa 3.2 implementada (código pronto, build e testes passando): auth Supabase (cadastro/login/logout/recuperação), AuthProvider com onAuthStateChange, OrganizationProvider via TanStack Query lendo org_members, roteamento centralizado (resolveRedirect + RouteGuard), onboarding criando org via RPC create_organization(p_name) e gravando subject_term por update, dashboard e páginas placeholder. Tabela de membros é org_members; database.types.ts em src/lib/. Formulários em estado nativo. MFA adiada pra 3.3.
 
 ## Próximo passo
-Etapa 3.2: autenticação, sessão, rotas protegidas e onboarding de organização usando a RPC create_organization.
+Validar a Etapa 3.2 em runtime contra o Supabase (fluxo completo) e resolver: allowlist de redirect URLs, confirmação de e-mail, profiles no signup, RLS de SELECT em org_members/organizations, RLS de UPDATE em organizations. Depois, Etapa 3.3: MFA TOTP (enroll + challenge no login + guard ciente de AAL).
