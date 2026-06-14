@@ -1,13 +1,4 @@
 # BodyTrack — Guia de Trabalho com IA
-
-Arquivo para salvar em `docs/AI_WORKFLOW.md`.
-
-Use este documento no início de conversas com IA sobre o BodyTrack, junto com `docs/DECISIONS.md` e o documento da etapa atual.
-
-Última atualização sugerida: após Etapa 3.1 concluída.
-
----
-
 ## 1. Objetivo deste documento
 
 Este arquivo define como a IA deve trabalhar no projeto BodyTrack.
