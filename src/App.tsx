@@ -7,6 +7,8 @@ import RecuperarSenha from './pages/RecuperarSenha'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Avaliados from './pages/Avaliados'
+import AvaliadoForm from './pages/AvaliadoForm'
+import AvaliadoDetalhe from './pages/AvaliadoDetalhe'
 import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
@@ -20,6 +22,9 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/avaliados" element={<Avaliados />} />
+          <Route path="/avaliados/novo" element={<AvaliadoForm />} />
+          <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
+          <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />

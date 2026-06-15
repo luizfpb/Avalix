@@ -1,16 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
-
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/avaliados', label: 'Avaliados' },
-  { to: '/configuracoes', label: 'Configurações' },
-]
+import { subjectTermLabels } from '../lib/subjectTerm'
 
 export function AppShell() {
   const { user, signOut } = useAuth()
   const { organization } = useOrganization()
+  const navItems = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/avaliados', label: subjectTermLabels(organization?.subject_term).pluralCap },
+    { to: '/configuracoes', label: 'Configurações' },
+  ]
 
   return (
     <div className="min-h-screen bg-background text-foreground">

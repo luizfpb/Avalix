@@ -1,5 +1,5 @@
 # BodyTrack — DECISIONS.md
-Cole este arquivo no início de chats novos sobre o projeto. Última atualização: Etapa 2.1 (hardening) concluída.
+Cole este arquivo no início de chats novos sobre o projeto. Última atualização: Etapa 3.2 (auth + organização) concluída e validada em runtime.
 
 ## O que é
 PWA de avaliação física e postural para profissionais (avaliadores, personais, nutricionistas, academias). V1 para beta com uma avaliadora real. Dev: Luiz, solo, Windows + VSCode + CMD. Sem loja de app, sem domínio próprio por ora.
@@ -31,7 +31,7 @@ PWA de avaliação física e postural para profissionais (avaliadores, personais
 - Fluxo no chat: colar erro (não arquivo inteiro), pedir diff para mudanças pequenas, "ok" quando comando funcionar, agrupar dúvidas.
 
 ## Estado atual
-Etapa 3.2 implementada (código pronto, build e testes passando): auth Supabase (cadastro/login/logout/recuperação), AuthProvider com onAuthStateChange, OrganizationProvider via TanStack Query lendo org_members, roteamento centralizado (resolveRedirect + RouteGuard), onboarding criando org via RPC create_organization(p_name) e gravando subject_term por update, dashboard e páginas placeholder. Tabela de membros é org_members; database.types.ts em src/lib/. Formulários em estado nativo. MFA adiada pra 3.3.
+Etapa 3.2 entregue e validada em runtime: auth Supabase (cadastro/login/logout/recuperação), AuthProvider com onAuthStateChange, OrganizationProvider via TanStack Query lendo org_members, roteamento centralizado (resolveRedirect + RouteGuard), onboarding criando org via RPC create_organization(p_name) e gravando subject_term por update, dashboard e páginas placeholder. Correção de boot: o cliente lia VITE_SUPABASE_ANON_KEY (inexistente) e quebrava; passou a usar VITE_SUPABASE_PUBLISHABLE_KEY, a convenção do projeto (o bug afetava também produção no Cloudflare). Senha mínima 6 (padrão Supabase) adotada como canônica. Tabela de membros é org_members; database.types.ts em src/lib/. Formulários de auth em estado nativo. MFA adiada.
 
 ## Próximo passo
-Validar a Etapa 3.2 em runtime contra o Supabase (fluxo completo) e resolver: allowlist de redirect URLs, confirmação de e-mail, profiles no signup, RLS de SELECT em org_members/organizations, RLS de UPDATE em organizations. Depois, Etapa 3.3: MFA TOTP (enroll + challenge no login + guard ciente de AAL).
+Etapa Avaliados + Consentimento (caminho crítico: o banco barra INSERT de avaliação sem subject e sem consentimento vigente). Inclui: CRUD de subjects com subject_term na UI (formulário com react-hook-form + zod), página de detalhe, e captura de consentimento eletrônico (texto versionado + hash sha256, titular/responsável, revogação). Depois: motor de protocolos (TS puro + testes) e avaliação física; postural; relatórios. MFA TOTP fica pra antes do beta.

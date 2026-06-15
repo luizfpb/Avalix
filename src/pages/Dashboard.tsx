@@ -8,18 +8,20 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
-
-const cards = [
-  { title: 'Avaliados', desc: 'Cadastro e histórico de quem você avalia.', to: '/avaliados', ready: true },
-  { title: 'Nova avaliação', desc: 'Dobras, circunferências e composição.', to: null, ready: false },
-  { title: 'Postural', desc: 'Captura e comparação de fotos posturais.', to: null, ready: false },
-  { title: 'Relatórios', desc: 'PDF e exportações.', to: null, ready: false },
-  { title: 'Configurações', desc: 'Conta, organização e preferências.', to: '/configuracoes', ready: true },
-]
+import { subjectTermLabels } from '../lib/subjectTerm'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const { organization, role } = useOrganization()
+  const labels = subjectTermLabels(organization?.subject_term)
+
+  const cards = [
+    { title: labels.pluralCap, desc: 'Cadastro e histórico de quem você avalia.', to: '/avaliados', ready: true },
+    { title: 'Nova avaliação', desc: 'Dobras, circunferências e composição.', to: null, ready: false },
+    { title: 'Postural', desc: 'Captura e comparação de fotos posturais.', to: null, ready: false },
+    { title: 'Relatórios', desc: 'PDF e exportações.', to: null, ready: false },
+    { title: 'Configurações', desc: 'Conta, organização e preferências.', to: '/configuracoes', ready: true },
+  ]
 
   return (
     <div className="space-y-6">
