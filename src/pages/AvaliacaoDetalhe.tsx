@@ -7,6 +7,7 @@ import { useAuth } from '../features/auth/context'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { protocolLabel } from '../features/assessment/protocols'
+import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { SKINFOLD_LABELS, CIRCUMFERENCE_LABELS } from '../features/assessment/sites'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import type { SkinfoldSite, CircumferenceSite } from '../features/assessment/protocols'
@@ -55,6 +56,10 @@ export default function AvaliacaoDetalhe() {
 
   const { assessment, skinfolds, circumferences } = query.data
   const result = assessment.results as AssessmentResultSnapshot | null
+  // IMC vem das colunas peso/altura da própria avaliação, então existe mesmo
+  // nas avaliações sem protocolo de composição corporal.
+  const bmi = computeBmi(assessment.weight_kg, assessment.height_cm)
+  const bmiCat = bmiCategory(bmi)
 
   async function handlePdf() {
     setPdfBusy(true)
@@ -127,6 +132,25 @@ export default function AvaliacaoDetalhe() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">IMC</CardTitle>
+          <CardDescription>Índice de massa corporal · referência OMS</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-baseline gap-3">
+          <span className="text-2xl font-semibold">{bmi.toFixed(1)}</span>
+          <span
+            className={
+              bmiCat.tone === 'normal'
+                ? 'text-sm text-muted-foreground'
+                : 'text-sm font-medium text-amber-600'
+            }
+          >
+            {bmiCat.label}
+          </span>
+        </CardContent>
+      </Card>
 
       {skinfolds.length > 0 ? (
         <Card>
