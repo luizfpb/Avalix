@@ -6,6 +6,7 @@ import {
   getSession,
   listPhotos,
   listSessions,
+  listSubjectPhotos,
   signedUrls,
   type AddPhotoInput,
   type PosturePhotoRow,
@@ -32,6 +33,14 @@ export function useCreateSession(subjectId: string | undefined) {
   return useMutation({
     mutationFn: (input: Parameters<typeof createSession>[0]) => createSession(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['posture-sessions', subjectId] }),
+  })
+}
+
+export function useSubjectPhotos(subjectId: string | undefined) {
+  return useQuery({
+    queryKey: ['posture-subject-photos', subjectId],
+    queryFn: () => listSubjectPhotos(subjectId as string),
+    enabled: !!subjectId,
   })
 }
 

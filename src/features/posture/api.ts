@@ -76,6 +76,26 @@ export async function listPhotos(sessionId: string): Promise<PosturePhotoRow[]> 
   return data ?? []
 }
 
+export type SubjectPhoto = PosturePhotoRow & { takenAt: string }
+
+// Todas as fotos do avaliado (via join com a sessão), pra comparação entre
+// sessões. A RLS continua valendo foto a foto.
+export async function listSubjectPhotos(subjectId: string): Promise<SubjectPhoto[]> {
+  const { data, error } = await supabase
+    .from('posture_photos')
+    .select('*, posture_sessions!inner(subject_id, taken_at)')
+    .eq('posture_sessions.subject_id', subjectId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Array<
+    PosturePhotoRow & { posture_sessions: { taken_at: string } | { taken_at: string }[] }
+  >
+  return rows.map(({ posture_sessions, ...rest }) => {
+    const sess = Array.isArray(posture_sessions) ? posture_sessions[0] : posture_sessions
+    return { ...rest, takenAt: sess?.taken_at ?? '' }
+  })
+}
+
 export type AddPhotoInput = {
   orgId: string
   sessionId: string

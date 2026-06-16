@@ -142,9 +142,14 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Avaliação postural</h2>
         {hasConsent ? (
-          <Button asChild size="sm">
-            <Link to={`/avaliados/${subjectId}/postural/nova`}>Nova sessão</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link to={`/avaliados/${subjectId}/postural/comparar`}>Comparar</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link to={`/avaliados/${subjectId}/postural/nova`}>Nova sessão</Link>
+            </Button>
+          </div>
         ) : (
           <span className="text-xs text-muted-foreground">
             Registre o consentimento para coletar fotos

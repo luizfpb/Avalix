@@ -13,6 +13,7 @@ import AvaliacaoNova from './pages/AvaliacaoNova'
 import AvaliacaoDetalhe from './pages/AvaliacaoDetalhe'
 import PosturaSessaoNova from './pages/PosturaSessaoNova'
 import PosturaSessaoDetalhe from './pages/PosturaSessaoDetalhe'
+import PosturaComparar from './pages/PosturaComparar'
 import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
             element={<AvaliacaoDetalhe />}
           />
           <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
+          <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
           <Route
             path="/avaliados/:id/postural/:sessionId"
             element={<PosturaSessaoDetalhe />}
