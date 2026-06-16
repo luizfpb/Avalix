@@ -28,4 +28,22 @@ export default defineConfig([
       "react-refresh/only-export-components": "off",
     },
   },
+  {
+    // permite descartar campos com prefixo _ (ex.: const { compute: _c, ...meta })
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
+    // assessmentPdf mistura o gerador de PDF com componentes @react-pdf (nao sao
+    // componentes DOM); fast-refresh nao se aplica.
+    files: ["src/features/reports/**/*.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
 ])

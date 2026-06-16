@@ -68,12 +68,15 @@ export function useDeletePhoto(sessionId: string | undefined) {
   })
 }
 
-// URLs assinadas expiram em 300s; staleTime menor pra renovar antes de vencer.
+// URLs assinadas expiram em 300s; renova a cada 240s pra não quebrar a imagem
+// se a tela ficar aberta parada.
 export function useSignedUrls(paths: string[]) {
   return useQuery({
     queryKey: ['signed-urls', [...paths].sort().join('|')],
     queryFn: () => signedUrls(paths),
     enabled: paths.length > 0,
     staleTime: 200_000,
+    refetchInterval: 240_000,
+    refetchIntervalInBackground: false,
   })
 }

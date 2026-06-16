@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSubjectPhotos, useSignedUrls } from '../features/posture/hooks'
 import { categoryLabel, type SubjectPhoto } from '../features/posture/api'
@@ -20,7 +20,7 @@ function photoLabel(p: SubjectPhoto): string {
 export default function PosturaComparar() {
   const { id } = useParams()
   const photosQuery = useSubjectPhotos(id)
-  const photos = photosQuery.data ?? []
+  const photos = useMemo(() => photosQuery.data ?? [], [photosQuery.data])
   const urls = useSignedUrls(photos.map((p) => p.storage_path)).data ?? {}
 
   const [aId, setAId] = useState('')
