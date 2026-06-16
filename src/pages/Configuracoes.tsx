@@ -1,5 +1,12 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import type { Factor } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
+import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function Configuracoes() {
   const { user } = useAuth()
@@ -11,9 +18,11 @@ export default function Configuracoes() {
       <section className="space-y-1">
         <h2 className="text-sm font-medium">Conta</h2>
         <p className="text-sm text-muted-foreground">E-mail: {user?.email}</p>
-        <p className="text-sm text-muted-foreground">
-          Autenticação em dois fatores (MFA): será adicionada na próxima etapa.
-        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium">Autenticação em dois fatores (2FA)</h2>
+        <MfaSettings />
       </section>
 
       <section className="space-y-1">
@@ -21,6 +30,162 @@ export default function Configuracoes() {
         <p className="text-sm text-muted-foreground">Nome: {organization?.name ?? '-'}</p>
         <p className="text-sm text-muted-foreground">Seu papel: {role ?? '-'}</p>
       </section>
+    </div>
+  )
+}
+
+type Enrolling = { factorId: string; qr: string; secret: string }
+
+function MfaSettings() {
+  const { refreshMfa } = useAuth()
+  const [factors, setFactors] = useState<Factor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [enrolling, setEnrolling] = useState<Enrolling | null>(null)
+  const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function reload() {
+    setLoading(true)
+    const { data } = await supabase.auth.mfa.listFactors()
+    setFactors(data?.totp ?? [])
+    setLoading(false)
+  }
+  useEffect(() => {
+    void reload()
+  }, [])
+
+  const verified = factors.find((f) => f.status === 'verified')
+
+  async function startEnroll() {
+    setError(null)
+    setBusy(true)
+    try {
+      // remove fatores pendentes (não verificados) pra não acumular
+      for (const f of factors.filter((f) => f.status === 'unverified')) {
+        await supabase.auth.mfa.unenroll({ factorId: f.id })
+      }
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'BodyTrack',
+      })
+      if (error || !data) {
+        setError(normalizeAuthError(error))
+        return
+      }
+      setEnrolling({ factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmEnroll(e: FormEvent) {
+    e.preventDefault()
+    if (!enrolling) return
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: enrolling.factorId,
+      code: code.trim(),
+    })
+    setBusy(false)
+    if (error) {
+      setError(normalizeAuthError(error))
+      return
+    }
+    setEnrolling(null)
+    setCode('')
+    await refreshMfa()
+    await reload()
+  }
+
+  async function cancelEnroll() {
+    if (enrolling) await supabase.auth.mfa.unenroll({ factorId: enrolling.factorId })
+    setEnrolling(null)
+    setCode('')
+    setError(null)
+    await reload()
+  }
+
+  async function remove() {
+    if (!verified) return
+    if (!window.confirm('Remover a verificação em dois fatores desta conta?')) return
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: verified.id })
+    setBusy(false)
+    if (error) {
+      setError(normalizeAuthError(error))
+      return
+    }
+    await refreshMfa()
+    await reload()
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Carregando...</p>
+
+  if (enrolling) {
+    return (
+      <div className="max-w-sm space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Escaneie o QR no app autenticador (Google Authenticator, Authy...) e digite o código
+          gerado.
+        </p>
+        <img
+          src={enrolling.qr}
+          alt="QR code do 2FA"
+          className="h-44 w-44 rounded-md border bg-white p-2"
+        />
+        <p className="break-all text-xs text-muted-foreground">
+          Ou use a chave: <span className="font-mono">{enrolling.secret}</span>
+        </p>
+        <form onSubmit={confirmEnroll} className="space-y-2">
+          <Label htmlFor="mfa-code">Código</Label>
+          <Input
+            id="mfa-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="000000"
+          />
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={busy}>
+              {busy ? 'Confirmando...' : 'Confirmar'}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={cancelEnroll} disabled={busy}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  if (verified) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Ativada. O login passa a pedir um código do app autenticador.
+        </p>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <Button size="sm" variant="destructive" onClick={remove} disabled={busy}>
+          {busy ? 'Removendo...' : 'Remover 2FA'}
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">
+        Não ativada. Recomendada para proteger os dados sensíveis dos avaliados.
+      </p>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <Button size="sm" onClick={startEnroll} disabled={busy}>
+        {busy ? 'Gerando...' : 'Ativar 2FA'}
+      </Button>
     </div>
   )
 }

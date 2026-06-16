@@ -18,11 +18,12 @@ export type RedirectInput = {
   orgStatus: OrgStatus
   pathname: string
   isRecovering: boolean
+  mfaRequired?: boolean
 }
 
 // Decide para onde mandar o usuário. null = fica onde está.
 export function resolveRedirect(input: RedirectInput): string | null {
-  const { authStatus, orgStatus, pathname, isRecovering } = input
+  const { authStatus, orgStatus, pathname, isRecovering, mfaRequired = false } = input
 
   if (authStatus === 'loading') return null
 
@@ -32,6 +33,14 @@ export function resolveRedirect(input: RedirectInput): string | null {
 
   if (authStatus === 'signedOut') {
     return isPublicPath(pathname) ? null : '/login'
+  }
+
+  // autenticado, mas com 2FA pendente: bloqueia tudo até concluir o desafio
+  if (mfaRequired) {
+    return pathname === '/mfa' ? null : '/mfa'
+  }
+  if (pathname === '/mfa') {
+    return '/dashboard'
   }
 
   if (orgStatus === 'loading') return null

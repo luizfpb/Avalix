@@ -61,6 +61,42 @@ describe('resolveRedirect', () => {
     expect(resolveRedirect({ ...base, authStatus: 'signedIn', orgStatus: 'present', pathname: '/' })).toBe('/dashboard')
   })
 
+  it('logado com 2FA pendente vai para /mfa', () => {
+    expect(
+      resolveRedirect({
+        ...base,
+        authStatus: 'signedIn',
+        orgStatus: 'present',
+        pathname: '/dashboard',
+        mfaRequired: true,
+      })
+    ).toBe('/mfa')
+  })
+
+  it('logado com 2FA pendente já no /mfa fica', () => {
+    expect(
+      resolveRedirect({
+        ...base,
+        authStatus: 'signedIn',
+        orgStatus: 'present',
+        pathname: '/mfa',
+        mfaRequired: true,
+      })
+    ).toBeNull()
+  })
+
+  it('sai do /mfa quando o 2FA não é mais necessário', () => {
+    expect(
+      resolveRedirect({
+        ...base,
+        authStatus: 'signedIn',
+        orgStatus: 'present',
+        pathname: '/mfa',
+        mfaRequired: false,
+      })
+    ).toBe('/dashboard')
+  })
+
   it('modo recuperação segura na tela de nova senha', () => {
     expect(
       resolveRedirect({ authStatus: 'signedIn', orgStatus: 'present', pathname: '/dashboard', isRecovering: true })

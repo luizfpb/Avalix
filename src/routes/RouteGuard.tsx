@@ -13,14 +13,17 @@ function FullScreen({ children }: { children: ReactNode }) {
 }
 
 export function RouteGuard({ children }: { children: ReactNode }) {
-  const { status: authStatus, isRecovering } = useAuth()
+  const { status: authStatus, isRecovering, mfaStatus } = useAuth()
   const org = useOrganization()
   const location = useLocation()
 
   const authLoading = authStatus === 'loading'
-  const orgLoading = authStatus === 'signedIn' && org.status === 'loading'
+  const mfaUnresolved = authStatus === 'signedIn' && mfaStatus === 'unknown'
+  const mfaRequired = mfaStatus === 'required'
+  // com 2FA pendente não esperamos a org: o destino é o desafio
+  const orgLoading = authStatus === 'signedIn' && !mfaRequired && org.status === 'loading'
 
-  if (authLoading || orgLoading) {
+  if (authLoading || mfaUnresolved || orgLoading) {
     return (
       <FullScreen>
         <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -28,7 +31,7 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  if (authStatus === 'signedIn' && org.status === 'error') {
+  if (authStatus === 'signedIn' && !mfaRequired && org.status === 'error') {
     return (
       <FullScreen>
         <div className="space-y-3">
@@ -53,6 +56,7 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     orgStatus,
     pathname: location.pathname,
     isRecovering,
+    mfaRequired,
   })
 
   if (target && target !== location.pathname) {

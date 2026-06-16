@@ -4,6 +4,7 @@ import { AppShell } from './components/AppShell'
 import Login from './pages/Login'
 import Cadastro from './pages/Cadastro'
 import RecuperarSenha from './pages/RecuperarSenha'
+import DesafioMfa from './pages/DesafioMfa'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Avaliados from './pages/Avaliados'
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro" element={<Cadastro />} />
         <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+        <Route path="/mfa" element={<DesafioMfa />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
