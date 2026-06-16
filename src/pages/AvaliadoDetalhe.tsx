@@ -6,6 +6,9 @@ import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { protocolLabel } from '../features/assessment/protocols'
 import { useSessions } from '../features/posture/hooks'
+import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
+import { csvBlob, downloadBlob } from '../features/reports/download'
+import { logExport } from '../features/reports/audit'
 import {
   useActiveConsent,
   useGrantConsent,
@@ -182,7 +185,24 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
 function AssessmentsSection({ subjectId }: { subjectId: string }) {
   const consentQuery = useActiveConsent(subjectId)
   const assessmentsQuery = useAssessments(subjectId)
+  const { organization } = useOrganization()
+  const { user } = useAuth()
   const hasConsent = !!consentQuery.data
+  const assessments = assessmentsQuery.data ?? []
+
+  function exportCsv(dialect: CsvDialect) {
+    const csv = buildAssessmentsCsv(assessments.map(assessmentCsvRecord), dialect)
+    downloadBlob(csvBlob(csv), `avaliacoes-${dialect}.csv`)
+    if (organization && user) {
+      void logExport({
+        orgId: organization.id,
+        userId: user.id,
+        action: 'EXPORT_CSV',
+        tableName: 'assessments',
+        rowId: null,
+      })
+    }
+  }
 
   return (
     <section className="space-y-3">
@@ -200,30 +220,41 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
       </div>
       {assessmentsQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
-      ) : assessmentsQuery.data && assessmentsQuery.data.length > 0 ? (
-        <ul className="divide-y rounded-md border">
-          {assessmentsQuery.data.map((a) => {
-            const res = a.results as { bodyFatPct?: number } | null
-            return (
-              <li key={a.id}>
-                <Link
-                  to={`/avaliados/${subjectId}/avaliacoes/${a.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
-                >
-                  <span>
-                    {formatDate(a.assessed_at)}{' '}
-                    <span className="text-muted-foreground">
-                      · {protocolLabel(a.protocol_id)}
+      ) : assessments.length > 0 ? (
+        <>
+          <ul className="divide-y rounded-md border">
+            {assessments.map((a) => {
+              const res = a.results as { bodyFatPct?: number } | null
+              return (
+                <li key={a.id}>
+                  <Link
+                    to={`/avaliados/${subjectId}/avaliacoes/${a.id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+                  >
+                    <span>
+                      {formatDate(a.assessed_at)}{' '}
+                      <span className="text-muted-foreground">
+                        · {protocolLabel(a.protocol_id)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    {res?.bodyFatPct != null ? `${res.bodyFatPct.toFixed(1)}%` : '—'}
-                  </span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+                    <span className="text-muted-foreground">
+                      {res?.bodyFatPct != null ? `${res.bodyFatPct.toFixed(1)}%` : '—'}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-muted-foreground">Exportar histórico:</span>
+            <button onClick={() => exportCsv('intl')} className="text-primary hover:underline">
+              CSV
+            </button>
+            <button onClick={() => exportCsv('br')} className="text-primary hover:underline">
+              Excel BR
+            </button>
+          </div>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">Nenhuma avaliação ainda.</p>
       )}

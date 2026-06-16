@@ -1,5 +1,11 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAssessment } from '../features/assessment/hooks'
+import { useSubject } from '../features/subjects/hooks'
+import { useOrganization } from '../features/organization/context'
+import { useAuth } from '../features/auth/context'
+import { downloadBlob } from '../features/reports/download'
+import { logExport } from '../features/reports/audit'
 import { protocolLabel } from '../features/assessment/protocols'
 import { SKINFOLD_LABELS, CIRCUMFERENCE_LABELS } from '../features/assessment/sites'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
@@ -30,6 +36,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function AvaliacaoDetalhe() {
   const { id, assessmentId } = useParams()
   const query = useAssessment(assessmentId)
+  const subjectQuery = useSubject(id)
+  const { organization } = useOrganization()
+  const { user } = useAuth()
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
   if (query.isError || !query.data.assessment) {
@@ -46,20 +56,53 @@ export default function AvaliacaoDetalhe() {
   const { assessment, skinfolds, circumferences } = query.data
   const result = assessment.results as AssessmentResultSnapshot | null
 
+  async function handlePdf() {
+    setPdfBusy(true)
+    try {
+      const { generateAssessmentPdf } = await import('../features/reports/assessmentPdf')
+      const blob = await generateAssessmentPdf({
+        orgName: organization?.name ?? '',
+        subjectName: subjectQuery.data?.full_name ?? '',
+        assessment,
+        skinfolds,
+        circumferences,
+      })
+      downloadBlob(blob, `avaliacao-${assessment.assessed_at}.pdf`)
+      if (organization && user) {
+        void logExport({
+          orgId: organization.id,
+          userId: user.id,
+          action: 'PDF_REPORT',
+          tableName: 'assessments',
+          rowId: assessment.id,
+        })
+      }
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   return (
     <div className="max-w-2xl space-y-6">
-      <div>
-        <Link
-          to={`/avaliados/${id}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Voltar
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold">Avaliação de {formatDate(assessment.assessed_at)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {protocolLabel(assessment.protocol_id)} · {assessment.weight_kg} kg ·{' '}
-          {assessment.height_cm} cm
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Link
+            to={`/avaliados/${id}`}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Voltar
+          </Link>
+          <h1 className="mt-2 text-xl font-semibold">
+            Avaliação de {formatDate(assessment.assessed_at)}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {protocolLabel(assessment.protocol_id)} · {assessment.weight_kg} kg ·{' '}
+            {assessment.height_cm} cm
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy}>
+          {pdfBusy ? 'Gerando...' : 'Baixar PDF'}
+        </Button>
       </div>
 
       {result ? (
