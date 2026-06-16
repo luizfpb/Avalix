@@ -11,6 +11,8 @@ import AvaliadoForm from './pages/AvaliadoForm'
 import AvaliadoDetalhe from './pages/AvaliadoDetalhe'
 import AvaliacaoNova from './pages/AvaliacaoNova'
 import AvaliacaoDetalhe from './pages/AvaliacaoDetalhe'
+import PosturaSessaoNova from './pages/PosturaSessaoNova'
+import PosturaSessaoDetalhe from './pages/PosturaSessaoDetalhe'
 import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
@@ -31,6 +33,11 @@ export default function App() {
           <Route
             path="/avaliados/:id/avaliacoes/:assessmentId"
             element={<AvaliacaoDetalhe />}
+          />
+          <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
+          <Route
+            path="/avaliados/:id/postural/:sessionId"
+            element={<PosturaSessaoDetalhe />}
           />
           <Route path="/configuracoes" element={<Configuracoes />} />
         </Route>

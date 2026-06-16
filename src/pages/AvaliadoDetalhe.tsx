@@ -5,6 +5,7 @@ import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { protocolLabel } from '../features/assessment/protocols'
+import { useSessions } from '../features/posture/hooks'
 import {
   useActiveConsent,
   useGrantConsent,
@@ -126,10 +127,50 @@ export default function AvaliadoDetalhe() {
 
       <AssessmentsSection subjectId={s.id} />
 
-      <p className="text-xs text-muted-foreground">
-        A avaliação postural entra numa próxima etapa.
-      </p>
+      <PosturalSection subjectId={s.id} />
     </div>
+  )
+}
+
+function PosturalSection({ subjectId }: { subjectId: string }) {
+  const consentQuery = useActiveConsent(subjectId)
+  const sessionsQuery = useSessions(subjectId)
+  const hasConsent = !!consentQuery.data
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Avaliação postural</h2>
+        {hasConsent ? (
+          <Button asChild size="sm">
+            <Link to={`/avaliados/${subjectId}/postural/nova`}>Nova sessão</Link>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Registre o consentimento para coletar fotos
+          </span>
+        )}
+      </div>
+      {sessionsQuery.isPending ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : sessionsQuery.data && sessionsQuery.data.length > 0 ? (
+        <ul className="divide-y rounded-md border">
+          {sessionsQuery.data.map((sess) => (
+            <li key={sess.id}>
+              <Link
+                to={`/avaliados/${subjectId}/postural/${sess.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+              >
+                <span>{formatDate(sess.taken_at)}</span>
+                <span className="text-muted-foreground">ver fotos</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">Nenhuma sessão postural ainda.</p>
+      )}
+    </section>
   )
 }
 
