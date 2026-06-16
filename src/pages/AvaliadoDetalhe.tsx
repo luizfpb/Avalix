@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
+import { useAssessments } from '../features/assessment/hooks'
+import { protocolLabel } from '../features/assessment/protocols'
 import {
   useActiveConsent,
   useGrantConsent,
@@ -122,10 +124,64 @@ export default function AvaliadoDetalhe() {
         controllerName={organization?.name ?? null}
       />
 
+      <AssessmentsSection subjectId={s.id} />
+
       <p className="text-xs text-muted-foreground">
-        As avaliações física e postural entram nas próximas etapas.
+        A avaliação postural entra numa próxima etapa.
       </p>
     </div>
+  )
+}
+
+function AssessmentsSection({ subjectId }: { subjectId: string }) {
+  const consentQuery = useActiveConsent(subjectId)
+  const assessmentsQuery = useAssessments(subjectId)
+  const hasConsent = !!consentQuery.data
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Avaliações</h2>
+        {hasConsent ? (
+          <Button asChild size="sm">
+            <Link to={`/avaliados/${subjectId}/avaliacoes/nova`}>Nova avaliação</Link>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Registre o consentimento para avaliar
+          </span>
+        )}
+      </div>
+      {assessmentsQuery.isPending ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : assessmentsQuery.data && assessmentsQuery.data.length > 0 ? (
+        <ul className="divide-y rounded-md border">
+          {assessmentsQuery.data.map((a) => {
+            const res = a.results as { bodyFatPct?: number } | null
+            return (
+              <li key={a.id}>
+                <Link
+                  to={`/avaliados/${subjectId}/avaliacoes/${a.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+                >
+                  <span>
+                    {formatDate(a.assessed_at)}{' '}
+                    <span className="text-muted-foreground">
+                      · {protocolLabel(a.protocol_id)}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {res?.bodyFatPct != null ? `${res.bodyFatPct.toFixed(1)}%` : '—'}
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">Nenhuma avaliação ainda.</p>
+      )}
+    </section>
   )
 }
 

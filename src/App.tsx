@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard'
 import Avaliados from './pages/Avaliados'
 import AvaliadoForm from './pages/AvaliadoForm'
 import AvaliadoDetalhe from './pages/AvaliadoDetalhe'
+import AvaliacaoNova from './pages/AvaliacaoNova'
+import AvaliacaoDetalhe from './pages/AvaliacaoDetalhe'
 import Configuracoes from './pages/Configuracoes'
 
 export default function App() {
@@ -25,6 +27,11 @@ export default function App() {
           <Route path="/avaliados/novo" element={<AvaliadoForm />} />
           <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
           <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
+          <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
+          <Route
+            path="/avaliados/:id/avaliacoes/:assessmentId"
+            element={<AvaliacaoDetalhe />}
+          />
           <Route path="/configuracoes" element={<Configuracoes />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />
