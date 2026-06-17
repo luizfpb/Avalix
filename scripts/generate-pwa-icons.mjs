@@ -55,8 +55,8 @@ function pngFromRGBA(size, rgba) {
 
 function drawIcon(size) {
   const rgba = Buffer.alloc(size * size * 4)
-  const bg = [0x17, 0x17, 0x17]
-  const fg = [0xfa, 0xfa, 0xfa]
+  const bg = [0x4f, 0x46, 0xe5] // indigo-600 (cor de marca)
+  const fg = [0xff, 0xff, 0xff]
   const cx = size / 2
   const headCy = size * 0.36
   const headR = size * 0.12

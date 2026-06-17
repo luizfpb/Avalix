@@ -17,14 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping REST API
+        # Secrets via env (nao interpolar ${{ }} direto no shell): mais seguro e,
+        # se faltarem, dao erro claro em vez do enigmatico "exit code 3" do curl
+        # (URL vazia = URL malformada).
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_PUBLISHABLE_KEY:-}" ]; then
+            echo 'Erro: configure os secrets SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY'
+            echo '(repo > Settings > Secrets and variables > Actions).'
+            exit 1
+          fi
           code=$(curl -s -o /dev/null -w '%{http_code}' \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/plans?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}")
+            "${SUPABASE_URL%/}/rest/v1/plans?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}")
           echo "HTTP $code"
           # qualquer resposta do servidor (2xx/4xx) conta como atividade
           case "$code" in
             2*|4*) echo 'ok: projeto respondeu' ;;
-            *) echo 'falha: sem resposta do servidor'; exit 1 ;;
+            *) echo "falha: sem resposta do servidor (HTTP $code)"; exit 1 ;;
           esac

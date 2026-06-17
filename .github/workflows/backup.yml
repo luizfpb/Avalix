@@ -30,6 +30,11 @@ jobs:
           PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
+          if [ -z "${DB_URL:-}" ] || [ -z "${PASSPHRASE:-}" ]; then
+            echo 'Erro: configure os secrets SUPABASE_DB_URL e BACKUP_PASSPHRASE'
+            echo '(repo > Settings > Secrets and variables > Actions).'
+            exit 1
+          fi
           stamp=$(date -u +%Y%m%d-%H%M%S)
           # pg_dump 17 via docker: roda contra servidores 15+ sem mismatch de versao
           docker run --rm -i postgres:17-alpine \

@@ -19,11 +19,14 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
+import { Pencil } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
+import { initials } from '../lib/initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Card,
   CardHeader,
@@ -88,23 +91,29 @@ export default function AvaliadoDetalhe() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Link to="/avaliados" className="text-sm text-muted-foreground hover:text-foreground">
-            ← {labels.pluralCap}
-          </Link>
-          <h1 className="mt-2 text-xl font-semibold">
-            {s.full_name}
-            {!s.is_active ? (
-              <span className="ml-2 rounded bg-muted px-2 py-0.5 align-middle text-xs text-muted-foreground">
-                Inativo
-              </span>
-            ) : null}
-          </h1>
+      <div>
+        <Link to="/avaliados" className="text-sm text-muted-foreground hover:text-foreground">
+          ← {labels.pluralCap}
+        </Link>
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+              {initials(s.full_name)}
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-semibold">{s.full_name}</h1>
+              <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
+                <span>{age !== null ? `${age} anos` : 'idade -'}</span>
+                {!s.is_active ? <Badge variant="secondary">Inativo</Badge> : null}
+              </div>
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/avaliados/${s.id}/editar`}>
+              <Pencil /> Editar
+            </Link>
+          </Button>
         </div>
-        <Button asChild variant="outline">
-          <Link to={`/avaliados/${s.id}/editar`}>Editar</Link>
-        </Button>
       </div>
 
       <Card>
@@ -341,8 +350,10 @@ function ConsentSection({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Consentimento</CardTitle>
-          <CardDescription>Vigente. A coleta de dados está liberada.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Consentimento <Badge variant="success">Vigente</Badge>
+          </CardTitle>
+          <CardDescription>A coleta de dados está liberada.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">

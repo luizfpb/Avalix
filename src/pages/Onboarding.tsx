@@ -52,15 +52,18 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="text-lg font-semibold">Quase lá</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <span className="mb-3 grid size-12 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm">
+            B
+          </span>
+          <h1 className="text-xl font-semibold tracking-tight">Quase lá</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Crie sua organização para começar a usar o BodyTrack.
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
           <div className="space-y-1.5">
             <Label htmlFor="nome">Nome da organização ou profissional</Label>
             <Input

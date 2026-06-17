@@ -1,53 +1,67 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RouteGuard } from './routes/RouteGuard'
 import { AppShell } from './components/AppShell'
-import Login from './pages/Login'
-import Cadastro from './pages/Cadastro'
-import RecuperarSenha from './pages/RecuperarSenha'
-import DesafioMfa from './pages/DesafioMfa'
-import Onboarding from './pages/Onboarding'
-import Dashboard from './pages/Dashboard'
-import Avaliados from './pages/Avaliados'
-import AvaliadoForm from './pages/AvaliadoForm'
-import AvaliadoDetalhe from './pages/AvaliadoDetalhe'
-import AvaliacaoNova from './pages/AvaliacaoNova'
-import AvaliacaoDetalhe from './pages/AvaliacaoDetalhe'
-import PosturaSessaoNova from './pages/PosturaSessaoNova'
-import PosturaSessaoDetalhe from './pages/PosturaSessaoDetalhe'
-import PosturaComparar from './pages/PosturaComparar'
-import Configuracoes from './pages/Configuracoes'
+
+// Telas carregadas sob demanda: cada rota vira um chunk separado, deixando o
+// bundle inicial enxuto (importante no celular).
+const Login = lazy(() => import('./pages/Login'))
+const Cadastro = lazy(() => import('./pages/Cadastro'))
+const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'))
+const DesafioMfa = lazy(() => import('./pages/DesafioMfa'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Avaliados = lazy(() => import('./pages/Avaliados'))
+const AvaliadoForm = lazy(() => import('./pages/AvaliadoForm'))
+const AvaliadoDetalhe = lazy(() => import('./pages/AvaliadoDetalhe'))
+const AvaliacaoNova = lazy(() => import('./pages/AvaliacaoNova'))
+const AvaliacaoDetalhe = lazy(() => import('./pages/AvaliacaoDetalhe'))
+const PosturaSessaoNova = lazy(() => import('./pages/PosturaSessaoNova'))
+const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
+const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
+const Configuracoes = lazy(() => import('./pages/Configuracoes'))
+
+function PageFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <span className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
+    </div>
+  )
+}
 
 export default function App() {
   return (
     <RouteGuard>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/cadastro" element={<Cadastro />} />
-        <Route path="/recuperar-senha" element={<RecuperarSenha />} />
-        <Route path="/mfa" element={<DesafioMfa />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route element={<AppShell />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/avaliados" element={<Avaliados />} />
-          <Route path="/avaliados/novo" element={<AvaliadoForm />} />
-          <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
-          <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
-          <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
-          <Route
-            path="/avaliados/:id/avaliacoes/:assessmentId"
-            element={<AvaliacaoDetalhe />}
-          />
-          <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
-          <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
-          <Route
-            path="/avaliados/:id/postural/:sessionId"
-            element={<PosturaSessaoDetalhe />}
-          />
-          <Route path="/configuracoes" element={<Configuracoes />} />
-        </Route>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Cadastro />} />
+          <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+          <Route path="/mfa" element={<DesafioMfa />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route element={<AppShell />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/avaliados" element={<Avaliados />} />
+            <Route path="/avaliados/novo" element={<AvaliadoForm />} />
+            <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
+            <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
+            <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
+            <Route
+              path="/avaliados/:id/avaliacoes/:assessmentId"
+              element={<AvaliacaoDetalhe />}
+            />
+            <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
+            <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
+            <Route
+              path="/avaliados/:id/postural/:sessionId"
+              element={<PosturaSessaoDetalhe />}
+            />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+          </Route>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </RouteGuard>
   )
 }

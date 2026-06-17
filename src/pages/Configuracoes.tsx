@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Factor } from '@supabase/supabase-js'
+import { User, ShieldCheck, Building2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
@@ -7,29 +8,59 @@ import { useOrganization } from '../features/organization/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 export default function Configuracoes() {
   const { user } = useAuth()
   const { organization, role } = useOrganization()
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Configurações</h1>
+    <div className="max-w-2xl space-y-5">
+      <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
 
-      <section className="space-y-1">
-        <h2 className="text-sm font-medium">Conta</h2>
-        <p className="text-sm text-muted-foreground">E-mail: {user?.email}</p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <User className="size-4 text-muted-foreground" /> Conta
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Info label="E-mail" value={user?.email ?? '-'} />
+        </CardContent>
+      </Card>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium">Autenticação em dois fatores (2FA)</h2>
-        <MfaSettings />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="size-4 text-muted-foreground" /> Verificação em dois fatores
+            (2FA)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MfaSettings />
+        </CardContent>
+      </Card>
 
-      <section className="space-y-1">
-        <h2 className="text-sm font-medium">Organização</h2>
-        <p className="text-sm text-muted-foreground">Nome: {organization?.name ?? '-'}</p>
-        <p className="text-sm text-muted-foreground">Seu papel: {role ?? '-'}</p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="size-4 text-muted-foreground" /> Organização
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <Info label="Nome" value={organization?.name ?? '-'} />
+          <Info label="Seu papel" value={role ?? '-'} />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="block text-xs text-muted-foreground">{label}</span>
+      <span className="block text-sm">{value}</span>
     </div>
   )
 }
@@ -165,10 +196,15 @@ function MfaSettings() {
 
   if (verified) {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          Ativada. O login passa a pedir um código do app autenticador.
-        </p>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Badge variant="success">
+            <ShieldCheck /> Ativada
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            O login passa a pedir um código do app autenticador.
+          </span>
+        </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button size="sm" variant="destructive" onClick={remove} disabled={busy}>
           {busy ? 'Removendo...' : 'Remover 2FA'}
