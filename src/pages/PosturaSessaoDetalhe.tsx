@@ -1,11 +1,12 @@
 import { useState, type ChangeEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useOrganization } from '../features/organization/context'
 import {
   useSession,
   usePhotos,
   useAddPhoto,
   useDeletePhoto,
+  useDeleteSession,
   useSignedUrls,
 } from '../features/posture/hooks'
 import {
@@ -29,11 +30,13 @@ const controlClass =
 
 export default function PosturaSessaoDetalhe() {
   const { id, sessionId } = useParams()
+  const navigate = useNavigate()
   const { organization } = useOrganization()
   const sessionQuery = useSession(sessionId)
   const photosQuery = usePhotos(sessionId)
   const addMut = useAddPhoto(sessionId)
   const deleteMut = useDeletePhoto(sessionId)
+  const deleteSessionMut = useDeleteSession(id)
 
   const photos = photosQuery.data ?? []
   const thumbUrlsQuery = useSignedUrls(photos.map((p) => p.thumb_path))
@@ -83,6 +86,20 @@ export default function PosturaSessaoDetalhe() {
     deleteMut.mutate(photo)
   }
 
+  async function onDeleteSession() {
+    if (!sessionId) return
+    if (
+      !window.confirm('Excluir esta sessão inteira e todas as fotos dela? Esta ação é definitiva.')
+    )
+      return
+    try {
+      await deleteSessionMut.mutateAsync(sessionId)
+      navigate(`/avaliados/${id}`)
+    } catch {
+      // erro mostrado abaixo
+    }
+  }
+
   if (sessionQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
@@ -101,17 +118,35 @@ export default function PosturaSessaoDetalhe() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold">
-          Sessão postural de {formatDate(session.taken_at)}
-        </h1>
-        {session.notes ? (
-          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{session.notes}</p>
-        ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Link
+            to={`/avaliados/${id}`}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Voltar
+          </Link>
+          <h1 className="mt-2 text-xl font-semibold">
+            Sessão postural de {formatDate(session.taken_at)}
+          </h1>
+          {session.notes ? (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{session.notes}</p>
+          ) : null}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive"
+          disabled={deleteSessionMut.isPending}
+          onClick={onDeleteSession}
+        >
+          {deleteSessionMut.isPending ? 'Excluindo...' : 'Excluir sessão'}
+        </Button>
       </div>
+
+      {deleteSessionMut.error ? (
+        <p className="text-sm text-destructive">{(deleteSessionMut.error as Error).message}</p>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-3 rounded-md border p-4">
         <div className="space-y-1.5">

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createSubject,
+  deleteSubjectCompletely,
   getSubject,
   listSubjects,
   updateSubject,
@@ -41,6 +42,16 @@ export function useUpdateSubject(id: string | undefined, orgId: string | null | 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['subjects', orgId] })
       qc.invalidateQueries({ queryKey: ['subject', id] })
+    },
+  })
+}
+
+export function useDeleteSubject(orgId: string | null | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteSubjectCompletely(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subjects', orgId] })
     },
   })
 }

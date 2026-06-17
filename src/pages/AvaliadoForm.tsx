@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -13,7 +13,12 @@ import {
   formToUpdate,
   type SubjectFormValues,
 } from '../features/subjects/schema'
-import { useSubject, useCreateSubject, useUpdateSubject } from '../features/subjects/hooks'
+import {
+  useSubject,
+  useCreateSubject,
+  useUpdateSubject,
+  useDeleteSubject,
+} from '../features/subjects/hooks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -181,6 +186,78 @@ export default function AvaliadoForm() {
           </Button>
         </div>
       </form>
+
+      {isEdit && subjectQuery.data ? (
+        <DangerZone
+          subjectId={subjectQuery.data.id}
+          subjectName={subjectQuery.data.full_name}
+          orgId={organization?.id}
+          termSingular={labels.singular}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+// Exclusão definitiva (LGPD). Fica fora do <form> pra não disparar submit e
+// exige digitar o nome exato como trava contra clique acidental.
+function DangerZone({
+  subjectId,
+  subjectName,
+  orgId,
+  termSingular,
+}: {
+  subjectId: string
+  subjectName: string
+  orgId: string | undefined
+  termSingular: string
+}) {
+  const navigate = useNavigate()
+  const del = useDeleteSubject(orgId)
+  const [confirmName, setConfirmName] = useState('')
+  const matches = confirmName.trim() === subjectName.trim()
+  const error = del.error as Error | null
+
+  async function onDelete() {
+    if (!matches) return
+    try {
+      await del.mutateAsync(subjectId)
+      navigate('/avaliados')
+    } catch {
+      // erro mostrado abaixo
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-destructive/40 p-4">
+      <div>
+        <h2 className="text-sm font-semibold text-destructive">Excluir definitivamente</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Apaga este {termSingular} e todos os dados ligados a ele — avaliações, medidas, sessões,
+          fotos e o registro de consentimento. As fotos são removidas do armazenamento. Esta ação é
+          irreversível e atende ao direito de eliminação (LGPD).
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label>
+          Para confirmar, digite o nome exato: <span className="font-semibold">{subjectName}</span>
+        </Label>
+        <Input
+          value={confirmName}
+          onChange={(e) => setConfirmName(e.target.value)}
+          placeholder={subjectName}
+        />
+      </div>
+      {error ? <p className="text-xs text-destructive">{error.message}</p> : null}
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        disabled={!matches || del.isPending}
+        onClick={onDelete}
+      >
+        {del.isPending ? 'Excluindo...' : 'Excluir definitivamente'}
+      </Button>
     </div>
   )
 }

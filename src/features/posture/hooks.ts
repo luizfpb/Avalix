@@ -3,6 +3,7 @@ import {
   addPhoto,
   createSession,
   deletePhoto,
+  deleteSession,
   getSession,
   listPhotos,
   listSessions,
@@ -65,6 +66,14 @@ export function useDeletePhoto(sessionId: string | undefined) {
   return useMutation({
     mutationFn: (photo: PosturePhotoRow) => deletePhoto(photo),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['posture-photos', sessionId] }),
+  })
+}
+
+export function useDeleteSession(subjectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => deleteSession(sessionId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['posture-sessions', subjectId] }),
   })
 }
 

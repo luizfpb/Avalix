@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../lib/database.types'
+import { listSubjectPhotos } from '../posture/api'
 
 export type SubjectRow = Database['public']['Tables']['subjects']['Row']
 export type SubjectInsert = Database['public']['Tables']['subjects']['Insert']
@@ -41,4 +42,21 @@ export async function updateSubject(id: string, patch: SubjectUpdate): Promise<S
     .single()
   if (error) throw error
   return data
+}
+
+// Exclusão definitiva (direito de eliminação, LGPD). Ordem do DECISIONS:
+// remover os arquivos do Storage ANTES das linhas — a policy do Storage resolve
+// o objeto pela linha de posture_photos, então apagar a linha primeiro deixaria
+// o arquivo órfão e inacessível. Depois apaga o avaliado: o FK on delete cascade
+// leva avaliações, leituras, sessões, fotos, anotações e consentimentos; o
+// trigger de auditoria registra os DELETE automaticamente.
+export async function deleteSubjectCompletely(subjectId: string): Promise<void> {
+  const photos = await listSubjectPhotos(subjectId)
+  const paths = photos.flatMap((p) => [p.storage_path, p.thumb_path])
+  if (paths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from('photos').remove(paths)
+    if (rmErr) throw rmErr
+  }
+  const { error } = await supabase.from('subjects').delete().eq('id', subjectId)
+  if (error) throw error
 }

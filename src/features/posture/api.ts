@@ -148,6 +148,20 @@ export async function deletePhoto(photo: PosturePhotoRow): Promise<void> {
   if (error) throw error
 }
 
+// Exclusão da sessão inteira (também resolve sessões vazias abandonadas).
+// Remove os arquivos de todas as fotos ANTES de apagar a sessão; o FK on delete
+// cascade leva as linhas de posture_photos e suas anotações.
+export async function deleteSession(sessionId: string): Promise<void> {
+  const photos = await listPhotos(sessionId)
+  const paths = photos.flatMap((p) => [p.storage_path, p.thumb_path])
+  if (paths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from(BUCKET).remove(paths)
+    if (rmErr) throw rmErr
+  }
+  const { error } = await supabase.from('posture_sessions').delete().eq('id', sessionId)
+  if (error) throw error
+}
+
 export async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   if (paths.length === 0) return {}
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(paths, SIGNED_TTL)

@@ -8,6 +8,7 @@ import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
+import { classifyBodyFat } from '../features/assessment/bodyFat'
 import { SKINFOLD_LABELS, CIRCUMFERENCE_LABELS } from '../features/assessment/sites'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import type { SkinfoldSite, CircumferenceSite } from '../features/assessment/protocols'
@@ -123,6 +124,18 @@ export default function AvaliacaoDetalhe() {
             ) : null}
             <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1)} kg`} />
             <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1)} kg`} />
+            {(() => {
+              const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct)
+              return (
+                <p className="col-span-2 text-xs sm:col-span-4">
+                  <span className="text-muted-foreground">Classificação: </span>
+                  <span className={cat.tone === 'normal' ? 'font-medium' : 'font-medium text-amber-600'}>
+                    {cat.label}
+                  </span>
+                  <span className="text-muted-foreground"> · referência ACE por sexo</span>
+                </p>
+              )
+            })()}
             {result.conversions ? (
               <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
                 Siri {result.conversions.siri.toFixed(1)}% · Brozek{' '}
