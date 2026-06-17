@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/card'
 
 const controlClass =
-  'w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 // Recharts é pesado: carrega num chunk separado, só quando há histórico pra
 // mostrar (mesmo padrão do PDF).
@@ -183,7 +183,7 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
       {sessionsQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : sessionsQuery.data && sessionsQuery.data.length > 0 ? (
-        <ul className="divide-y rounded-md border">
+        <ul className="divide-y rounded-md border bg-card">
           {sessionsQuery.data.map((sess) => (
             <li key={sess.id}>
               <Link
@@ -275,7 +275,7 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
       ) : assessments.length > 0 ? (
         <>
           {assessments.length >= 2 ? <EvolutionCard assessments={assessments} /> : null}
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y rounded-md border bg-card">
             {assessments.map((a) => {
               const res = a.results as { bodyFatPct?: number } | null
               return (

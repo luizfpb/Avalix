@@ -21,6 +21,7 @@ export type CreateAssessmentInput = {
   protocolId: string
   weightKg: number
   heightCm: number
+  medications: string | null
   notes: string | null
   result: AssessmentResultSnapshot
   skinfolds: NewSkinfoldReading[]
@@ -40,6 +41,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       protocol_id: input.protocolId,
       weight_kg: input.weightKg,
       height_cm: input.heightCm,
+      medications: input.medications,
       notes: input.notes,
       results: input.result as unknown as Json,
       engine_version: input.result.engineVersion,

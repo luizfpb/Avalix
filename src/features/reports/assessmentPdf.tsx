@@ -122,6 +122,13 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
           </View>
         ) : null}
 
+        {assessment.medications ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Medicamentos em uso</Text>
+            <Text>{assessment.medications}</Text>
+          </View>
+        ) : null}
+
         {assessment.notes ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Observações</Text>

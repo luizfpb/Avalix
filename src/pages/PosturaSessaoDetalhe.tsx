@@ -30,7 +30,7 @@ function formatDate(iso: string): string {
 }
 
 const controlClass =
-  'rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+  'rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 export default function PosturaSessaoDetalhe() {
   const { id, sessionId } = useParams()

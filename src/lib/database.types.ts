@@ -47,6 +47,7 @@ export type Database = {
           evaluator_id: string
           height_cm: number
           id: string
+          medications: string | null
           notes: string | null
           org_id: string
           protocol_id: string | null
@@ -62,6 +63,7 @@ export type Database = {
           evaluator_id?: string
           height_cm: number
           id?: string
+          medications?: string | null
           notes?: string | null
           org_id: string
           protocol_id?: string | null
@@ -77,6 +79,7 @@ export type Database = {
           evaluator_id?: string
           height_cm?: number
           id?: string
+          medications?: string | null
           notes?: string | null
           org_id?: string
           protocol_id?: string | null

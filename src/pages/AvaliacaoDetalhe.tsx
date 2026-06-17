@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Pill } from 'lucide-react'
 import { useAssessment } from '../features/assessment/hooks'
 import { useSubject } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
@@ -207,6 +208,17 @@ export default function AvaliacaoDetalhe() {
             ))}
           </CardContent>
         </Card>
+      ) : null}
+
+      {assessment.medications ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800">
+            <Pill className="size-4" /> Medicamentos em uso
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">
+            {assessment.medications}
+          </p>
+        </div>
       ) : null}
 
       {assessment.notes ? (

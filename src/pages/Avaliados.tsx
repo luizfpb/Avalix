@@ -53,7 +53,7 @@ export default function Avaliados() {
       ) : null}
 
       {isPending ? (
-        <ul className="divide-y rounded-xl border">
+        <ul className="divide-y rounded-xl border bg-card">
           {[0, 1, 2].map((i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-3">
               <span className="size-9 animate-pulse rounded-full bg-muted" />
@@ -69,7 +69,7 @@ export default function Avaliados() {
           </Button>
         </div>
       ) : filtered.length > 0 ? (
-        <ul className="divide-y overflow-hidden rounded-xl border">
+        <ul className="divide-y overflow-hidden rounded-xl border bg-card">
           {filtered.map((s) => {
             const age = ageFromBirthDate(s.birth_date)
             return (

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pill } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/card'
 
 const controlClass =
-  'w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 function todayLocal(): string {
   const d = new Date()
@@ -110,6 +111,7 @@ function Form({ subject }: { subject: SubjectRow }) {
   const [height, setHeight] = useState(() =>
     subject.height_cm != null ? String(subject.height_cm) : ''
   )
+  const [medications, setMedications] = useState('')
   const [notes, setNotes] = useState('')
   const [skinfolds, setSkinfolds] = useState<Record<string, [string, string, string]>>({})
   const [circumferences, setCircumferences] = useState<Record<string, string>>({})
@@ -202,6 +204,7 @@ function Form({ subject }: { subject: SubjectRow }) {
         protocolId: protocol.id,
         weightKg,
         heightCm,
+        medications: medications.trim() || null,
         notes: notes.trim() || null,
         result: snapshot,
         skinfolds: skinfoldRows,
@@ -346,6 +349,22 @@ function Form({ subject }: { subject: SubjectRow }) {
           Preencha peso, altura e as medidas do protocolo para ver o resultado.
         </p>
       )}
+
+      <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50/60 p-3">
+        <Label className="flex items-center gap-1.5 font-medium text-amber-800">
+          <Pill className="size-4" /> Medicamentos em uso
+        </Label>
+        <textarea
+          rows={2}
+          className={controlClass}
+          value={medications}
+          onChange={(e) => setMedications(e.target.value)}
+          placeholder="Liste os medicamentos que o avaliado usa atualmente. Deixe em branco se não usa."
+        />
+        <p className="text-xs text-amber-700/80">
+          Importante para interpretar os resultados (ex.: medicação que afeta peso ou retenção).
+        </p>
+      </div>
 
       <Field label="Observações (opcional)">
         <textarea

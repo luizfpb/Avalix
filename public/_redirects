@@ -1,0 +1,3 @@
+# SPA: qualquer rota cai no index.html (o react-router resolve no cliente).
+# Arquivos estáticos reais (assets, sw.js, manifest) são servidos antes desta regra.
+/*    /index.html   200
