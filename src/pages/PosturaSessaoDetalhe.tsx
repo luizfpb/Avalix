@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { PenLine } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
   useSession,
@@ -7,6 +8,8 @@ import {
   useAddPhoto,
   useDeletePhoto,
   useDeleteSession,
+  useAnnotatedPhotoIds,
+  useAnnotation,
   useSignedUrls,
 } from '../features/posture/hooks'
 import {
@@ -17,6 +20,7 @@ import {
   type PosturePhotoRow,
 } from '../features/posture/api'
 import { processImage } from '../features/posture/image'
+import { AnnotationCanvas } from '../components/AnnotationCanvas'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -41,12 +45,15 @@ export default function PosturaSessaoDetalhe() {
   const photos = photosQuery.data ?? []
   const thumbUrlsQuery = useSignedUrls(photos.map((p) => p.thumb_path))
   const thumbUrls = thumbUrlsQuery.data ?? {}
+  const annotatedQuery = useAnnotatedPhotoIds(sessionId, photos.map((p) => p.id))
+  const annotated = annotatedQuery.data ?? new Set<string>()
 
   const [category, setCategory] = useState<PhotoCategory>('frente')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<PosturePhotoRow | null>(null)
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
+  const selectedAnnotation = useAnnotation(selected?.id)
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -195,7 +202,7 @@ export default function PosturaSessaoDetalhe() {
               <button
                 type="button"
                 onClick={() => openPhoto(photo)}
-                className="block w-full overflow-hidden rounded-md border bg-muted"
+                className="relative block w-full overflow-hidden rounded-md border bg-muted"
               >
                 {thumbUrls[photo.thumb_path] ? (
                   <img
@@ -208,16 +215,34 @@ export default function PosturaSessaoDetalhe() {
                     ...
                   </div>
                 )}
+                {annotated.has(photo.id) ? (
+                  <span
+                    title="Tem anotações"
+                    className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-amber-500 text-white shadow"
+                  >
+                    <PenLine className="size-3.5" />
+                  </span>
+                ) : null}
               </button>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{categoryLabel(photo.category)}</span>
-                <button
-                  type="button"
-                  onClick={() => onDelete(photo)}
-                  className="text-xs text-destructive hover:underline"
-                >
-                  Excluir
-                </button>
+                <span className="truncate text-xs text-muted-foreground">
+                  {categoryLabel(photo.category)}
+                </span>
+                <div className="flex shrink-0 items-center gap-2 text-xs">
+                  <Link
+                    to={`/avaliados/${id}/postural/${sessionId}/foto/${photo.id}`}
+                    className="text-primary hover:underline"
+                  >
+                    Anotar
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(photo)}
+                    className="text-destructive hover:underline"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -235,19 +260,28 @@ export default function PosturaSessaoDetalhe() {
         >
           <div className="max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
             {selectedUrl ? (
-              <img
+              <AnnotationCanvas
                 src={selectedUrl}
-                alt={categoryLabel(selected.category)}
-                className="max-h-[85vh] w-auto rounded-md"
+                shapes={selectedAnnotation.data?.doc.shapes ?? []}
+                readOnly
+                imgClassName="block max-h-[85vh] w-auto max-w-full rounded-md"
               />
             ) : (
               <p className="text-sm text-white">Carregando...</p>
             )}
             <div className="mt-2 flex items-center justify-between gap-3 text-sm text-white">
               <span>{categoryLabel(selected.category)}</span>
-              <button type="button" onClick={() => setSelected(null)} className="hover:underline">
-                Fechar
-              </button>
+              <div className="flex items-center gap-4">
+                <Link
+                  to={`/avaliados/${id}/postural/${sessionId}/foto/${selected.id}`}
+                  className="inline-flex items-center gap-1 hover:underline"
+                >
+                  <PenLine className="size-4" /> Anotar
+                </Link>
+                <button type="button" onClick={() => setSelected(null)} className="hover:underline">
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>

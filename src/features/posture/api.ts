@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
-import type { Database } from '../../lib/database.types'
+import type { Database, Json } from '../../lib/database.types'
 import type { ProcessedImage } from './image'
+import { parseDoc, type AnnotationDoc, type Shape } from './annotations'
 
 export type PostureSessionRow = Database['public']['Tables']['posture_sessions']['Row']
 export type PosturePhotoRow = Database['public']['Tables']['posture_photos']['Row']
@@ -59,6 +60,16 @@ export async function listSessions(subjectId: string): Promise<PostureSessionRow
 export async function getSession(id: string): Promise<PostureSessionRow | null> {
   const { data, error } = await supabase
     .from('posture_sessions')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function getPhoto(id: string): Promise<PosturePhotoRow | null> {
+  const { data, error } = await supabase
+    .from('posture_photos')
     .select('*')
     .eq('id', id)
     .maybeSingle()
@@ -160,6 +171,68 @@ export async function deleteSession(sessionId: string): Promise<void> {
   }
   const { error } = await supabase.from('posture_sessions').delete().eq('id', sessionId)
   if (error) throw error
+}
+
+export type PostureAnnotationRow = Database['public']['Tables']['posture_annotations']['Row']
+
+// Uma "folha" de anotações por foto: tudo num único registro (payload jsonb).
+// Retorna as formas já parseadas e o id do registro (null se ainda não existe).
+export async function getAnnotation(
+  photoId: string
+): Promise<{ rowId: string | null; doc: AnnotationDoc }> {
+  const { data, error } = await supabase
+    .from('posture_annotations')
+    .select('id, payload')
+    .eq('photo_id', photoId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return { rowId: data?.id ?? null, doc: parseDoc(data?.payload) }
+}
+
+// Insere no primeiro save (a RLS exige consentimento vigente) e atualiza nos
+// seguintes. Limpar tudo = salvar lista vazia; não apaga o registro pra não
+// reexigir consentimento numa anotação futura.
+export async function saveAnnotation(input: {
+  photoId: string
+  orgId: string
+  rowId: string | null
+  shapes: Shape[]
+}): Promise<string> {
+  const payload = { version: 1, shapes: input.shapes } as unknown as Json
+  if (input.rowId) {
+    const { error } = await supabase
+      .from('posture_annotations')
+      .update({ payload })
+      .eq('id', input.rowId)
+    if (error) throw error
+    return input.rowId
+  }
+  // org_id é recopiado do photo pelo trigger org_from_photo; mandamos mesmo
+  // assim porque o tipo Insert exige.
+  const { data, error } = await supabase
+    .from('posture_annotations')
+    .insert({ photo_id: input.photoId, org_id: input.orgId, payload })
+    .select('id')
+    .single()
+  if (error) throw error
+  return data.id
+}
+
+// Quais fotos da lista têm anotações de fato (pra marcar na grade).
+export async function listAnnotatedPhotoIds(photoIds: string[]): Promise<Set<string>> {
+  if (photoIds.length === 0) return new Set()
+  const { data, error } = await supabase
+    .from('posture_annotations')
+    .select('photo_id, payload')
+    .in('photo_id', photoIds)
+  if (error) throw error
+  const set = new Set<string>()
+  for (const r of data ?? []) {
+    if (parseDoc(r.payload).shapes.length > 0) set.add(r.photo_id)
+  }
+  return set
 }
 
 export async function signedUrls(paths: string[]): Promise<Record<string, string>> {

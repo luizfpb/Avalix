@@ -18,6 +18,7 @@ const AvaliacaoNova = lazy(() => import('./pages/AvaliacaoNova'))
 const AvaliacaoDetalhe = lazy(() => import('./pages/AvaliacaoDetalhe'))
 const PosturaSessaoNova = lazy(() => import('./pages/PosturaSessaoNova'))
 const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
+const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 
@@ -52,6 +53,11 @@ export default function App() {
             />
             <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
             <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
+            <Route
+              path="/avaliados/:id/postural/:sessionId/foto/:photoId"
+              element={<PosturaFoto />}
+            />
+
             <Route
               path="/avaliados/:id/postural/:sessionId"
               element={<PosturaSessaoDetalhe />}

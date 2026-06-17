@@ -4,14 +4,19 @@ import {
   createSession,
   deletePhoto,
   deleteSession,
+  getAnnotation,
+  getPhoto,
   getSession,
+  listAnnotatedPhotoIds,
   listPhotos,
   listSessions,
   listSubjectPhotos,
+  saveAnnotation,
   signedUrls,
   type AddPhotoInput,
   type PosturePhotoRow,
 } from './api'
+import type { Shape } from './annotations'
 
 export function useSessions(subjectId: string | undefined) {
   return useQuery({
@@ -50,6 +55,43 @@ export function usePhotos(sessionId: string | undefined) {
     queryKey: ['posture-photos', sessionId],
     queryFn: () => listPhotos(sessionId as string),
     enabled: !!sessionId,
+  })
+}
+
+export function usePhoto(photoId: string | undefined) {
+  return useQuery({
+    queryKey: ['posture-photo', photoId],
+    queryFn: () => getPhoto(photoId as string),
+    enabled: !!photoId,
+  })
+}
+
+export function useAnnotation(photoId: string | undefined) {
+  return useQuery({
+    queryKey: ['posture-annotation', photoId],
+    queryFn: () => getAnnotation(photoId as string),
+    enabled: !!photoId,
+  })
+}
+
+export function useSaveAnnotation(photoId: string | undefined, sessionId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { orgId: string; rowId: string | null; shapes: Shape[] }) =>
+      saveAnnotation({ photoId: photoId as string, ...input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['posture-annotation', photoId] })
+      qc.invalidateQueries({ queryKey: ['posture-annotated', sessionId] })
+    },
+  })
+}
+
+// Conjunto de fotos da sessão que têm anotações (pra marcar na grade).
+export function useAnnotatedPhotoIds(sessionId: string | undefined, photoIds: string[]) {
+  return useQuery({
+    queryKey: ['posture-annotated', sessionId],
+    queryFn: () => listAnnotatedPhotoIds(photoIds),
+    enabled: !!sessionId && photoIds.length > 0,
   })
 }
 
