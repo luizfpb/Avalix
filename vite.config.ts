@@ -17,8 +17,8 @@ export default defineConfig({
         short_name: "BodyTrack",
         description: "Avaliação física e postural para profissionais",
         lang: "pt-BR",
-        theme_color: "#4f46e5",
-        background_color: "#ffffff",
+        theme_color: "#2A0E52",
+        background_color: "#130A20",
         display: "standalone",
         start_url: "/",
         icons: [

@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Factor } from '@supabase/supabase-js'
-import { User, ShieldCheck, Building2 } from 'lucide-react'
+import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
+import { useTheme, type Theme } from '../features/theme/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +18,8 @@ export default function Configuracoes() {
   return (
     <div className="max-w-2xl space-y-5">
       <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+
+      <AppearanceCard />
 
       <Card>
         <CardHeader>
@@ -62,6 +65,44 @@ function Info({ label, value }: { label: string; value: string }) {
       <span className="block text-xs text-muted-foreground">{label}</span>
       <span className="block text-sm">{value}</span>
     </div>
+  )
+}
+
+const THEME_OPTS: { v: Theme; label: string; icon: typeof Sun }[] = [
+  { v: 'light', label: 'Claro', icon: Sun },
+  { v: 'dark', label: 'Escuro', icon: Moon },
+  { v: 'system', label: 'Sistema', icon: Monitor },
+]
+
+function AppearanceCard() {
+  const { theme, setTheme } = useTheme()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Palette className="size-4 text-muted-foreground" /> Aparência
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="inline-flex rounded-md border bg-card p-1">
+          {THEME_OPTS.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => setTheme(o.v)}
+              className={[
+                'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
+                theme === o.v
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              ].join(' ')}
+            >
+              <o.icon className="size-4" /> {o.label}
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

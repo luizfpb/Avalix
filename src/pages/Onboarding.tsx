@@ -6,6 +6,7 @@ import { useOrganization } from '../features/organization/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { BrandLogo } from '../components/BrandLogo'
 
 const SUBJECT_TERMS = [
   { value: 'aluno', label: 'Aluno' },
@@ -52,18 +53,22 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
+    <div
+      className="flex min-h-screen items-center justify-center px-4 py-10"
+      style={{ backgroundColor: '#2A0E52' }}
+    >
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span className="mb-3 grid size-12 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm">
-            B
-          </span>
-          <h1 className="text-xl font-semibold tracking-tight">Quase lá</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
+          <BrandLogo height={26} className="mb-4 text-[#ECE3FA]" />
+          <h1 className="text-xl font-semibold tracking-tight text-[#ECE3FA]">Quase lá</h1>
+          <p className="mt-1.5 text-sm text-[#ECE3FA]/70">
             Crie sua organização para começar a usar o BodyTrack.
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-xl border bg-card p-6 text-card-foreground shadow-xl"
+        >
           <div className="space-y-1.5">
             <Label htmlFor="nome">Nome da organização ou profissional</Label>
             <Input
@@ -103,7 +108,7 @@ export default function Onboarding() {
         </form>
         <button
           onClick={() => signOut()}
-          className="mt-4 block w-full text-center text-xs text-muted-foreground hover:text-foreground"
+          className="mt-4 block w-full text-center text-xs text-[#ECE3FA]/60 hover:text-[#ECE3FA]"
         >
           Sair
         </button>

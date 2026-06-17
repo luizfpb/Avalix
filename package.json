@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/black-ops-one": "^5.2.8",
     "@hookform/resolvers": "^5.0.0",
     "@radix-ui/react-slot": "^1.2.0",
     "@react-pdf/renderer": "^4.0.0",
@@ -44,6 +45,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
+    "opentype.js": "^2.0.0",
     "supabase": "^2.0.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0",

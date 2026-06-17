@@ -167,7 +167,7 @@ export default function PosturaComparar() {
                   <figcaption className="text-center text-xs text-muted-foreground">
                     {photoLabel(p)}
                     {showAnn && shapes.length > 0 ? (
-                      <span className="ml-1 text-amber-600">· anotada</span>
+                      <span className="ml-1 text-amber-600 dark:text-amber-400">· anotada</span>
                     ) : null}
                   </figcaption>
                 </figure>

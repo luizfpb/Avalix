@@ -3,6 +3,7 @@ import { LayoutDashboard, Users, Settings, LogOut, type LucideIcon } from 'lucid
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
+import { BrandLogo, BrandMark } from './BrandLogo'
 
 type NavItem = { to: string; label: string; icon: LucideIcon }
 
@@ -20,12 +21,10 @@ export function AppShell() {
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
           <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              B
-            </span>
+            <BrandMark size={32} />
             <span className="min-w-0">
-              <span className="block text-sm font-semibold leading-none">BodyTrack</span>
-              <span className="block truncate text-xs text-muted-foreground">
+              <BrandLogo height={14} className="block text-foreground" />
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
                 {organization?.name ?? 'Sem organização'}
               </span>
             </span>

@@ -350,8 +350,8 @@ function Form({ subject }: { subject: SubjectRow }) {
         </p>
       )}
 
-      <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50/60 p-3">
-        <Label className="flex items-center gap-1.5 font-medium text-amber-800">
+      <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+        <Label className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
           <Pill className="size-4" /> Medicamentos em uso
         </Label>
         <textarea
@@ -361,7 +361,7 @@ function Form({ subject }: { subject: SubjectRow }) {
           onChange={(e) => setMedications(e.target.value)}
           placeholder="Liste os medicamentos que o avaliado usa atualmente. Deixe em branco se não usa."
         />
-        <p className="text-xs text-amber-700/80">
+        <p className="text-xs text-amber-700/80 dark:text-amber-300/70">
           Importante para interpretar os resultados (ex.: medicação que afeta peso ou retenção).
         </p>
       </div>

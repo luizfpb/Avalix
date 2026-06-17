@@ -19,8 +19,21 @@ export type AssessmentPdfData = {
 
 const styles = StyleSheet.create({
   page: { padding: 36, fontSize: 10, color: '#1a1a1a', fontFamily: 'Helvetica' },
+  // plaqueta da marca: campo roxo com o wordmark claro (não letras claras sobre
+  // branco). Black Ops One não é registrada no PDF; usamos Helvetica-Bold
+  // espaçada dentro da plaqueta, mantendo a cor da marca.
+  plate: {
+    backgroundColor: '#2A0E52',
+    color: '#ECE3FA',
+    alignSelf: 'flex-start',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  plateText: { fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 2, color: '#ECE3FA' },
   org: { fontSize: 9, color: '#666' },
-  h1: { fontSize: 16, marginTop: 2, marginBottom: 12 },
+  h1: { fontSize: 16, marginTop: 2, marginBottom: 12, color: '#2A0E52' },
   meta: { marginBottom: 14, lineHeight: 1.4 },
   section: { marginBottom: 14 },
   sectionTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
@@ -54,6 +67,9 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.plate}>
+          <Text style={styles.plateText}>BODYTRACK</Text>
+        </View>
         <Text style={styles.org}>{data.orgName}</Text>
         <Text style={styles.h1}>Relatório de Avaliação Física</Text>
 

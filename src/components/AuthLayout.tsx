@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
+import { BrandLogo } from './BrandLogo'
 
+// Campo da marca: fundo roxo profundo (#2A0E52) com o logo claro, e o conteúdo
+// num card. Vale para login, cadastro, recuperação e desafio de 2FA.
 export function AuthLayout({
   title,
   subtitle,
@@ -10,19 +13,14 @@ export function AuthLayout({
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10" style={{ backgroundColor: '#2A0E52' }}>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span className="mb-3 grid size-12 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-sm">
-            B
-          </span>
-          <span className="text-sm font-medium text-muted-foreground">BodyTrack</span>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">{title}</h1>
-          {subtitle ? (
-            <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
-          ) : null}
+          <BrandLogo height={28} className="mb-4 text-[#ECE3FA]" />
+          <h1 className="text-xl font-semibold tracking-tight text-[#ECE3FA]">{title}</h1>
+          {subtitle ? <p className="mt-1.5 text-sm text-[#ECE3FA]/70">{subtitle}</p> : null}
         </div>
-        <div className="rounded-xl border bg-card p-6 shadow-sm">{children}</div>
+        <div className="rounded-xl border bg-card p-6 text-card-foreground shadow-xl">{children}</div>
       </div>
     </div>
   )

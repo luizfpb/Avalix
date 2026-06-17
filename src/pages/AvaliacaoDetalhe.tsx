@@ -211,11 +211,11 @@ export default function AvaliacaoDetalhe() {
       ) : null}
 
       {assessment.medications ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800">
+        <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
             <Pill className="size-4" /> Medicamentos em uso
           </p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">
+          <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
             {assessment.medications}
           </p>
         </div>
