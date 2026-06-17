@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useSubjectPhotos, useSignedUrls } from '../features/posture/hooks'
+import { PenLine } from 'lucide-react'
+import { useSubjectPhotos, useSignedUrls, useAnnotation } from '../features/posture/hooks'
 import { categoryLabel, type SubjectPhoto } from '../features/posture/api'
+import { AnnotationCanvas } from '../components/AnnotationCanvas'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
@@ -27,6 +29,15 @@ export default function PosturaComparar() {
   const [bId, setBId] = useState('')
   const [mode, setMode] = useState<'lado' | 'sobre'>('lado')
   const [opacity, setOpacity] = useState(50)
+  const [showAnn, setShowAnn] = useState(true)
+
+  // anotações das duas fotos escolhidas (hooks antes de qualquer return)
+  const annA = useAnnotation(aId || undefined)
+  const annB = useAnnotation(bId || undefined)
+  const shapesById: Record<string, ReturnType<typeof useAnnotation>['data']> = {
+    [aId]: annA.data,
+    [bId]: annB.data,
+  }
 
   useEffect(() => {
     if (photos.length > 0 && !aId) setAId(photos[0].id)
@@ -61,7 +72,7 @@ export default function PosturaComparar() {
     <div className="max-w-4xl space-y-6">
       <div>
         {back}
-        <h1 className="mt-2 text-xl font-semibold">Comparar fotos</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Comparar fotos</h1>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -104,6 +115,15 @@ export default function PosturaComparar() {
             Sobreposição
           </Button>
         </div>
+        {mode === 'lado' ? (
+          <Button
+            size="sm"
+            variant={showAnn ? 'default' : 'outline'}
+            onClick={() => setShowAnn((v) => !v)}
+          >
+            <PenLine /> Anotações
+          </Button>
+        ) : null}
         {mode === 'sobre' ? (
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Opacidade B
@@ -122,22 +142,37 @@ export default function PosturaComparar() {
       {a && b ? (
         mode === 'lado' ? (
           <div className="grid grid-cols-2 gap-3">
-            {[a, b].map((p, i) => (
-              <figure key={i} className="space-y-1">
-                <div className="overflow-hidden rounded-md border bg-muted">
-                  {urls[p.storage_path] ? (
-                    <img src={urls[p.storage_path]} alt={photoLabel(p)} className="w-full" />
-                  ) : (
-                    <div className="flex aspect-[3/4] items-center justify-center text-xs text-muted-foreground">
-                      ...
-                    </div>
-                  )}
-                </div>
-                <figcaption className="text-center text-xs text-muted-foreground">
-                  {photoLabel(p)}
-                </figcaption>
-              </figure>
-            ))}
+            {[a, b].map((p, i) => {
+              const url = urls[p.storage_path]
+              const shapes = shapesById[p.id]?.doc.shapes ?? []
+              return (
+                <figure key={i} className="space-y-1">
+                  <div className="overflow-hidden rounded-md border bg-muted">
+                    {!url ? (
+                      <div className="flex aspect-[3/4] items-center justify-center text-xs text-muted-foreground">
+                        ...
+                      </div>
+                    ) : showAnn ? (
+                      <AnnotationCanvas
+                        src={url}
+                        shapes={shapes}
+                        readOnly
+                        containerClassName="relative block w-full"
+                        imgClassName="block h-auto w-full"
+                      />
+                    ) : (
+                      <img src={url} alt={photoLabel(p)} className="w-full" />
+                    )}
+                  </div>
+                  <figcaption className="text-center text-xs text-muted-foreground">
+                    {photoLabel(p)}
+                    {showAnn && shapes.length > 0 ? (
+                      <span className="ml-1 text-amber-600">· anotada</span>
+                    ) : null}
+                  </figcaption>
+                </figure>
+              )
+            })}
           </div>
         ) : (
           <div className="space-y-2">

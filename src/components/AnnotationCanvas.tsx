@@ -19,6 +19,7 @@ type Props = {
   onChange?: (shapes: Shape[]) => void
   onSelect?: (id: string | null) => void
   imgClassName?: string
+  containerClassName?: string
 }
 
 const COLOR = '#f59e0b' // amber-500: contraste alto sobre pele/fundos variados
@@ -36,6 +37,7 @@ export function AnnotationCanvas({
   onChange,
   onSelect,
   imgClassName = 'block max-h-[70vh] w-auto max-w-full select-none rounded-md',
+  containerClassName = 'relative inline-block leading-none',
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -133,7 +135,7 @@ export function AnnotationCanvas({
   const interactive = !readOnly && !!onChange
 
   return (
-    <div ref={boxRef} className="relative inline-block leading-none">
+    <div ref={boxRef} className={containerClassName}>
       <img src={src} alt="" draggable={false} className={imgClassName} />
       <svg
         ref={svgRef}
