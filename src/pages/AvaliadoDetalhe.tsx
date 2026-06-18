@@ -20,7 +20,7 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
-import { Pencil } from 'lucide-react'
+import { Pencil, TrendingUp } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -326,6 +326,11 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
       ) : assessments.length > 0 ? (
         <>
           {assessments.length >= 2 ? <EvolutionCard assessments={assessments} /> : null}
+          <Button asChild variant="outline" size="sm" className="w-full">
+            <Link to={`/avaliados/${subjectId}/evolucao`}>
+              <TrendingUp /> Ver evolução e gráficos
+            </Link>
+          </Button>
           <ul className="divide-y rounded-md border bg-card">
             {assessments.map((a) => {
               const res = a.results as { bodyFatPct?: number } | null

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Pill } from 'lucide-react'
-import { useAssessment } from '../features/assessment/hooks'
+import { useAssessment, useAssessments } from '../features/assessment/hooks'
 import { useSubject } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
@@ -40,6 +40,7 @@ export default function AvaliacaoDetalhe() {
   const { id, assessmentId } = useParams()
   const query = useAssessment(assessmentId)
   const subjectQuery = useSubject(id)
+  const assessmentsQuery = useAssessments(id)
   const { organization } = useOrganization()
   const { user } = useAuth()
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -67,12 +68,20 @@ export default function AvaliacaoDetalhe() {
     setPdfBusy(true)
     try {
       const { generateAssessmentPdf } = await import('../features/reports/assessmentPdf')
+      const history = [...(assessmentsQuery.data ?? [])]
+        .sort((x, y) => x.assessed_at.localeCompare(y.assessed_at))
+        .map((x) => {
+          const rr = x.results as { bodyFatPct?: number } | null
+          const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.assessed_at)
+          return { date: m ? `${m[3]}/${m[2]}` : x.assessed_at, bodyFatPct: rr?.bodyFatPct ?? null }
+        })
       const blob = await generateAssessmentPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
         assessment,
         skinfolds,
         circumferences,
+        history,
       })
       downloadBlob(blob, `avaliacao-${assessment.assessed_at}.pdf`)
       if (organization && user) {

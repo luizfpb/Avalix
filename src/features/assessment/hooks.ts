@@ -3,8 +3,17 @@ import {
   createAssessment,
   getAssessment,
   listAssessments,
+  listSubjectCircumferences,
   type CreateAssessmentInput,
 } from './api'
+
+export function useSubjectCircumferences(subjectId: string | undefined) {
+  return useQuery({
+    queryKey: ['subject-circumferences', subjectId],
+    queryFn: () => listSubjectCircumferences(subjectId as string),
+    enabled: !!subjectId,
+  })
+}
 
 export function useAssessments(subjectId: string | undefined) {
   return useQuery({

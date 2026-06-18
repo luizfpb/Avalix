@@ -80,6 +80,27 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
   return assessment
 }
 
+export type SubjectCircumference = { assessedAt: string; site: string; valueCm: number }
+
+// Todas as circunferências do avaliado ao longo das avaliações (via join),
+// pra montar a evolução por ponto. RLS continua valendo por avaliação.
+export async function listSubjectCircumferences(subjectId: string): Promise<SubjectCircumference[]> {
+  const { data, error } = await supabase
+    .from('circumference_readings')
+    .select('site, value_cm, assessments!inner(subject_id, assessed_at)')
+    .eq('assessments.subject_id', subjectId)
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Array<{
+    site: string
+    value_cm: number
+    assessments: { assessed_at: string } | { assessed_at: string }[]
+  }>
+  return rows.map(({ site, value_cm, assessments }) => {
+    const a = Array.isArray(assessments) ? assessments[0] : assessments
+    return { assessedAt: a?.assessed_at ?? '', site, valueCm: value_cm }
+  })
+}
+
 export async function listAssessments(subjectId: string): Promise<AssessmentRow[]> {
   const { data, error } = await supabase
     .from('assessments')

@@ -18,6 +18,7 @@ const AvaliacaoNova = lazy(() => import('./pages/AvaliacaoNova'))
 const AvaliacaoDetalhe = lazy(() => import('./pages/AvaliacaoDetalhe'))
 const AnamneseNova = lazy(() => import('./pages/AnamneseNova'))
 const AnamneseDetalhe = lazy(() => import('./pages/AnamneseDetalhe'))
+const Evolucao = lazy(() => import('./pages/Evolucao'))
 const PosturaSessaoNova = lazy(() => import('./pages/PosturaSessaoNova'))
 const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
 const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/avaliados/novo" element={<AvaliadoForm />} />
             <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
             <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
+            <Route path="/avaliados/:id/evolucao" element={<Evolucao />} />
             <Route path="/avaliados/:id/anamnese/nova" element={<AnamneseNova />} />
             <Route path="/avaliados/:id/anamnese/:anamneseId" element={<AnamneseDetalhe />} />
             <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
