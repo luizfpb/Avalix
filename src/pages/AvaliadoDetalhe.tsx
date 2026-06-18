@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
@@ -6,9 +6,6 @@ import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { protocolLabel } from '../features/assessment/protocols'
-import { computeBmi } from '../features/assessment/bmi'
-import type { EvolutionPoint } from '../features/assessment/EvolutionChart'
-import type { AssessmentRow } from '../features/assessment/api'
 import { useSessions } from '../features/posture/hooks'
 import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
 import { csvBlob, downloadBlob } from '../features/reports/download'
@@ -39,18 +36,9 @@ import {
 const controlClass =
   'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
-// Recharts é pesado: carrega num chunk separado, só quando há histórico pra
-// mostrar (mesmo padrão do PDF).
-const EvolutionChart = lazy(() => import('../features/assessment/EvolutionChart'))
-
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
-}
-
-function formatDateShort(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  return m ? `${m[3]}/${m[2]}` : iso
 }
 
 function formatDateTime(iso: string): string {
@@ -206,37 +194,6 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
   )
 }
 
-function EvolutionCard({ assessments }: { assessments: AssessmentRow[] }) {
-  // a lista chega do mais recente pro mais antigo; o gráfico precisa cronológico
-  const points: EvolutionPoint[] = [...assessments]
-    .sort((a, b) => a.assessed_at.localeCompare(b.assessed_at))
-    .map((a) => {
-      const res = a.results as { bodyFatPct?: number } | null
-      return {
-        date: formatDateShort(a.assessed_at),
-        bodyFatPct: res?.bodyFatPct ?? null,
-        weightKg: a.weight_kg,
-        bmi: computeBmi(a.weight_kg, a.height_cm),
-      }
-    })
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Evolução</CardTitle>
-        <CardDescription>% gordura, IMC e peso ao longo das avaliações</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Suspense
-          fallback={<p className="text-sm text-muted-foreground">Carregando gráfico...</p>}
-        >
-          <EvolutionChart data={points} />
-        </Suspense>
-      </CardContent>
-    </Card>
-  )
-}
-
 function AnamneseSection({ subjectId }: { subjectId: string }) {
   const consentQuery = useActiveConsent(subjectId)
   const anamnesesQuery = useAnamneses(subjectId)
@@ -325,7 +282,6 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : assessments.length > 0 ? (
         <>
-          {assessments.length >= 2 ? <EvolutionCard assessments={assessments} /> : null}
           <Button asChild variant="outline" size="sm" className="w-full">
             <Link to={`/avaliados/${subjectId}/evolucao`}>
               <TrendingUp /> Ver evolução e gráficos

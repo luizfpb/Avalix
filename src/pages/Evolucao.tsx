@@ -5,8 +5,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   LineChart,
@@ -15,7 +13,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from 'recharts'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments, useSubjectCircumferences } from '../features/assessment/hooks'
@@ -26,15 +23,9 @@ import { classifyBodyFat } from '../features/assessment/bodyFat'
 import { circumferenceLabel } from '../features/assessment/sites'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 
-const COLORS = [
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-  'var(--color-chart-5)',
-  'var(--color-brand-magenta)',
-]
-const tick = { fill: 'var(--color-muted-foreground)', fontSize: 11 }
+const LEAN = 'var(--color-chart-1)'
+const FAT = 'var(--color-chart-2)'
+const tick = { fill: 'var(--color-muted-foreground)', fontSize: 10 }
 const axis = { stroke: 'var(--color-border)' }
 const tooltipStyle = {
   contentStyle: {
@@ -50,15 +41,9 @@ function dateShort(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   return m ? `${m[3]}/${m[2]}` : iso
 }
+const round1 = (n: number) => Math.round(n * 10) / 10
 
-type Point = {
-  date: string
-  bodyFatPct: number | null
-  weightKg: number
-  bmi: number
-  fatMassKg: number | null
-  leanMassKg: number | null
-}
+type SeriesPoint = { date: string; value: number | null }
 
 export default function Evolucao() {
   const { id } = useParams()
@@ -70,7 +55,6 @@ export default function Evolucao() {
     () => [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
     [assessmentsQuery.data]
   )
-  const points: Point[] = useMemo(() => assessments.map(toPoint), [assessments])
 
   if (subjectQuery.isPending || assessmentsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -98,8 +82,19 @@ export default function Evolucao() {
   const lastRes = last.results as AssessmentResultSnapshot | null
   const sex = subject?.sex === 'F' ? 'F' : 'M'
 
+  // séries por métrica (uma por gráfico)
+  const dates = assessments.map((a) => dateShort(a.assessed_at))
+  const series = (pick: (a: AssessmentRow) => number | null): SeriesPoint[] =>
+    assessments.map((a, i) => ({ date: dates[i], value: pick(a) }))
+
+  const fatPct = series((a) => (a.results as AssessmentResultSnapshot | null)?.bodyFatPct ?? null)
+  const bmiSeries = series((a) => round1(computeBmi(a.weight_kg, a.height_cm)))
+  const weight = series((a) => a.weight_kg)
+  const leanMass = series((a) => (a.results as AssessmentResultSnapshot | null)?.leanMassKg ?? null)
+  const fatMass = series((a) => (a.results as AssessmentResultSnapshot | null)?.fatMassKg ?? null)
+
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div>
         {back}
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Evolução e gráficos</h1>
@@ -116,7 +111,11 @@ export default function Evolucao() {
           <CardDescription>Última avaliação · {dateShort(last.assessed_at)}</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {lastRes ? <BodyCompDonut res={lastRes} /> : <p className="text-sm text-muted-foreground">Avaliação sem composição corporal.</p>}
+          {lastRes ? (
+            <BodyCompDonut res={lastRes} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Avaliação sem composição corporal.</p>
+          )}
           <div className="grid grid-cols-2 gap-3 self-center">
             {lastRes ? (
               <>
@@ -139,43 +138,18 @@ export default function Evolucao() {
         </CardContent>
       </Card>
 
-      {/* ===== EVOLUÇÃO COMPOSIÇÃO ===== */}
-      {points.length >= 2 ? (
-        <>
-          <ChartCard title="% de gordura e IMC" desc="ao longo das avaliações">
-            <LineChart data={points} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
-              <YAxis tick={tick} width={36} axisLine={axis} tickLine={axis} />
-              <Tooltip {...tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-muted-foreground)' }} />
-              <Line type="monotone" dataKey="bodyFatPct" name="% Gordura" stroke={COLORS[1]} strokeWidth={2} connectNulls dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="bmi" name="IMC" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ChartCard>
-
-          <ChartCard title="Massa magra e gorda (kg)" desc="composição ao longo do tempo">
-            <AreaChart data={points} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
-              <YAxis tick={tick} width={36} axisLine={axis} tickLine={axis} />
-              <Tooltip {...tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-muted-foreground)' }} />
-              <Area type="monotone" dataKey="leanMassKg" name="Massa magra" stackId="m" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.5} />
-              <Area type="monotone" dataKey="fatMassKg" name="Massa gorda" stackId="m" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.5} />
-            </AreaChart>
-          </ChartCard>
-
-          <ChartCard title="Peso (kg)" desc="ao longo das avaliações">
-            <LineChart data={points} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
-              <YAxis tick={tick} width={36} domain={['dataMin - 2', 'dataMax + 2']} axisLine={axis} tickLine={axis} />
-              <Tooltip {...tooltipStyle} />
-              <Line type="monotone" dataKey="weightKg" name="Peso" stroke={COLORS[4]} strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ChartCard>
-        </>
+      {/* ===== EVOLUÇÃO — UM GRÁFICO POR MÉTRICA, COM ZOOM NO EIXO ===== */}
+      {assessments.length >= 2 ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">Evolução da composição</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <MetricChart title="% de gordura" unit="%" color={FAT} series={fatPct} betterDown />
+            <MetricChart title="Peso" unit="kg" color="var(--color-chart-5)" series={weight} />
+            <MetricChart title="IMC" unit="" color="var(--color-chart-3)" series={bmiSeries} />
+            <MetricChart title="Massa magra" unit="kg" color={LEAN} series={leanMass} betterUp />
+            <MetricChart title="Massa gorda" unit="kg" color={FAT} series={fatMass} betterDown />
+          </div>
+        </section>
       ) : (
         <p className="text-sm text-muted-foreground">
           As linhas de evolução aparecem a partir da 2ª avaliação.
@@ -183,21 +157,9 @@ export default function Evolucao() {
       )}
 
       {/* ===== CIRCUNFERÊNCIAS ===== */}
-      <CircumferencesCharts subjectId={id} loading={circsQuery.isPending} rows={circsQuery.data ?? []} />
+      <CircumferencesCharts loading={circsQuery.isPending} rows={circsQuery.data ?? []} />
     </div>
   )
-}
-
-function toPoint(a: AssessmentRow): Point {
-  const res = a.results as AssessmentResultSnapshot | null
-  return {
-    date: dateShort(a.assessed_at),
-    bodyFatPct: res?.bodyFatPct ?? null,
-    weightKg: a.weight_kg,
-    bmi: computeBmi(a.weight_kg, a.height_cm),
-    fatMassKg: res?.fatMassKg ?? null,
-    leanMassKg: res?.leanMassKg ?? null,
-  }
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -210,10 +172,74 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   )
 }
 
+// Gráfico de uma única métrica. O eixo Y faz "zoom" na faixa dos dados (com
+// folga), então variações pequenas ficam visíveis. Mostra o Δ início→fim.
+function MetricChart({
+  title,
+  unit,
+  color,
+  series,
+  betterUp,
+  betterDown,
+}: {
+  title: string
+  unit: string
+  color: string
+  series: SeriesPoint[]
+  betterUp?: boolean
+  betterDown?: boolean
+}) {
+  const valid = series.filter((s) => s.value != null) as { date: string; value: number }[]
+  if (valid.length < 2) return null
+  const vals = valid.map((s) => s.value)
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  const range = max - min
+  const pad = range > 0 ? range * 0.25 : Math.max(1, Math.abs(max) * 0.05)
+  const domain: [number, number] = [round1(min - pad), round1(max + pad)]
+
+  const first = valid[0].value
+  const lastV = valid[valid.length - 1].value
+  const delta = round1(lastV - first)
+  const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '–'
+  // cor do Δ: verde quando melhora (depende da métrica), âmbar quando piora
+  let deltaClass = 'text-muted-foreground'
+  if (delta !== 0 && (betterUp || betterDown)) {
+    const improved = betterUp ? delta > 0 : delta < 0
+    deltaClass = improved ? 'text-success' : 'text-warning'
+  }
+  const u = unit ? ` ${unit}` : ''
+
+  return (
+    <div className="rounded-xl border bg-card p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium">{title}</span>
+        <span className={`text-xs font-semibold ${deltaClass}`}>
+          {arrow} {Math.abs(delta).toFixed(1)}
+          {u}
+        </span>
+      </div>
+      <p className="mb-1 text-xs text-muted-foreground">
+        {first.toFixed(1)} → {lastV.toFixed(1)}
+        {u}
+      </p>
+      <ResponsiveContainer width="100%" height={150}>
+        <LineChart data={series} margin={{ top: 6, right: 8, left: -14, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
+          <YAxis domain={domain} tick={tick} width={40} axisLine={axis} tickLine={axis} allowDecimals />
+          <Tooltip {...tooltipStyle} formatter={(value) => [`${value}${u}`, title]} />
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function BodyCompDonut({ res }: { res: AssessmentResultSnapshot }) {
   const data = [
-    { name: 'Massa magra', value: res.leanMassKg, fill: COLORS[0] },
-    { name: 'Massa gorda', value: res.fatMassKg, fill: COLORS[1] },
+    { name: 'Massa magra', value: res.leanMassKg, fill: LEAN },
+    { name: 'Massa gorda', value: res.fatMassKg, fill: FAT },
   ]
   return (
     <div className="relative h-44">
@@ -224,7 +250,7 @@ function BodyCompDonut({ res }: { res: AssessmentResultSnapshot }) {
               <Cell key={i} fill={d.fill} />
             ))}
           </Pie>
-          <Tooltip {...tooltipStyle} formatter={(value, name) => [`${Number(value).toFixed(1)} kg`, name]} />
+          <Tooltip {...tooltipStyle} formatter={(value, n) => [`${Number(value).toFixed(1)} kg`, n]} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -235,32 +261,14 @@ function BodyCompDonut({ res }: { res: AssessmentResultSnapshot }) {
   )
 }
 
-function ChartCard({ title, desc, children }: { title: string; desc?: string; children: React.ReactElement }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        {desc ? <CardDescription>{desc}</CardDescription> : null}
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={220}>
-          {children}
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  )
-}
-
 function CircumferencesCharts({
-  subjectId,
   loading,
   rows,
 }: {
-  subjectId: string | undefined
   loading: boolean
   rows: { assessedAt: string; site: string; valueCm: number }[]
 }) {
-  const { dates, sites, evolution, current } = useMemo(() => buildCircData(rows), [rows])
+  const { current, siteSeries } = useMemo(() => buildCircData(rows), [rows])
   if (loading) return <p className="text-sm text-muted-foreground">Carregando circunferências...</p>
   if (rows.length === 0) {
     return (
@@ -276,7 +284,6 @@ function CircumferencesCharts({
       </Card>
     )
   }
-  void subjectId
   return (
     <>
       <Card>
@@ -297,52 +304,51 @@ function CircumferencesCharts({
         </CardContent>
       </Card>
 
-      {dates.length >= 2 && sites.length > 0 ? (
-        <ChartCard title="Evolução das circunferências (cm)" desc="principais pontos medidos">
-          <LineChart data={evolution} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
-            <YAxis tick={tick} width={36} domain={['dataMin - 2', 'dataMax + 2']} axisLine={axis} tickLine={axis} />
-            <Tooltip {...tooltipStyle} />
-            <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-muted-foreground)' }} />
-            {sites.map((s, i) => (
-              <Line key={s} type="monotone" dataKey={s} name={circumferenceLabel(s)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} connectNulls dot={{ r: 2 }} />
+      {siteSeries.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">Evolução das circunferências</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {siteSeries.map((s, i) => (
+              <MetricChart
+                key={s.site}
+                title={circumferenceLabel(s.site)}
+                unit="cm"
+                color={`var(--color-chart-${(i % 5) + 1})`}
+                series={s.series}
+                betterDown
+              />
             ))}
-          </LineChart>
-        </ChartCard>
+          </div>
+        </section>
       ) : null}
     </>
   )
 }
 
-// Agrupa as circunferências por data e por ponto, escolhe os mais medidos.
+// Agrupa as circunferências: barras do estado atual + uma série por ponto medido.
 function buildCircData(rows: { assessedAt: string; site: string; valueCm: number }[]) {
   const dates = [...new Set(rows.map((r) => r.assessedAt))].sort()
-  const byDateSite = new Map<string, number>() // `${date}|${site}` -> value
-  const count = new Map<string, number>() // site -> nº de medidas
+  const byDateSite = new Map<string, number>()
+  const count = new Map<string, number>()
   for (const r of rows) {
     byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
     count.set(r.site, (count.get(r.site) ?? 0) + 1)
   }
-  // sites com ≥2 medidas, os 6 mais frequentes
+  // um gráfico por ponto com ≥2 medidas
   const sites = [...count.entries()]
     .filter(([, c]) => c >= 2)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
     .map(([s]) => s)
+  const siteSeries = sites.map((site) => ({
+    site,
+    series: dates.map((d) => ({ date: dateShort(d), value: byDateSite.get(`${d}|${site}`) ?? null })),
+  }))
 
-  const evolution = dates.map((d) => {
-    const row: Record<string, string | number | null> = { date: dateShort(d) }
-    for (const s of sites) row[s] = byDateSite.get(`${d}|${s}`) ?? null
-    return row
-  })
-
-  // barras do estado atual: último date
   const lastDate = dates[dates.length - 1]
   const current = rows
     .filter((r) => r.assessedAt === lastDate)
     .map((r) => ({ label: circumferenceLabel(r.site), value: r.valueCm }))
     .sort((a, b) => b.value - a.value)
 
-  return { dates, sites, evolution, current }
+  return { current, siteSeries }
 }
