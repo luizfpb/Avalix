@@ -44,12 +44,12 @@ function r(n) {
   return Math.round(n * 100) / 100
 }
 
-const logo = wordmark('BODYTRACK')
-const mark = wordmark('B')
+const logo = wordmark('AVALIX')
+const mark = wordmark('A')
 
 mkdirSync('src/brand', { recursive: true })
-writeFileSync('src/brand/logo-bodytrack.svg', svgFile(logo, 'BODYTRACK'))
-writeFileSync('src/brand/mark-b.svg', svgFile(mark, 'B'))
+writeFileSync('src/brand/logo-avalix.svg', svgFile(logo, 'AVALIX'))
+writeFileSync('src/brand/mark-a.svg', svgFile(mark, 'A'))
 
 // Módulo TS pros componentes desenharem o SVG inline (fill=currentColor),
 // sem depender de máscara CSS nem de carregar o arquivo .svg.
@@ -59,4 +59,4 @@ const ts =
   `export const BRAND_MARK = { viewBox: '${mark.viewBox}', d: '${mark.d}' }\n`
 writeFileSync('src/brand/paths.ts', ts)
 
-console.log('gerados: src/brand/logo-bodytrack.svg, mark-b.svg, paths.ts')
+console.log('gerados: src/brand/logo-avalix.svg, mark-a.svg, paths.ts')

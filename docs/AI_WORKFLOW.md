@@ -168,6 +168,7 @@ git add .
 git commit -m "etapa 3.2: auth e onboarding"
 git push
 ```
+Nunca adicionar nada ao github, sempre passar os comandos para que eu mesmo faça manualmente
 
 ## 5.5 Checklist de teste manual
 

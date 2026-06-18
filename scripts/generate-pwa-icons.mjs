@@ -60,7 +60,7 @@ function pngFromRGBA(size, rgba) {
 
 // ---- glifo B -> polígonos (flatten das curvas) -------------------------
 function glyphPolys() {
-  const path = font.charToGlyph('B').getPath(0, 0, 1000)
+  const path = font.charToGlyph('A').getPath(0, 0, 1000)
   const bez2 = (a, b, c, t) => {
     const u = 1 - t
     return u * u * a + 2 * u * t * b + t * t * c
@@ -217,7 +217,7 @@ function ico(size) {
 
 function faviconSvg() {
   const box = 64, target = 40
-  const path = font.charToGlyph('B').getPath(0, 0, 1000)
+  const path = font.charToGlyph('A').getPath(0, 0, 1000)
   const s = target / Math.max(GB.w, GB.h)
   const tx = box / 2 - s * GB.cx
   const ty = box / 2 - s * GB.cy

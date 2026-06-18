@@ -62,7 +62,7 @@ export default function Onboarding() {
           <BrandLogo height={26} className="mb-4 text-[#ECE3FA]" />
           <h1 className="text-xl font-semibold tracking-tight text-[#ECE3FA]">Quase lá</h1>
           <p className="mt-1.5 text-sm text-[#ECE3FA]/70">
-            Crie sua organização para começar a usar o BodyTrack.
+            Crie sua organização para começar a usar o Avalix.
           </p>
         </div>
         <form

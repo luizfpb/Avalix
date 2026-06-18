@@ -5,7 +5,7 @@ function ratio(viewBox: string): number {
   return w / h
 }
 
-// Wordmark BODYTRACK inline (fill=currentColor): legível em qualquer fundo —
+// Wordmark AVALIX inline (fill=currentColor): legível em qualquer fundo —
 // no campo da marca fica #ECE3FA (text-[#ECE3FA]); no header, a cor do texto.
 export function BrandLogo({ height = 20, className = '' }: { height?: number; className?: string }) {
   return (
@@ -15,7 +15,7 @@ export function BrandLogo({ height = 20, className = '' }: { height?: number; cl
       width={height * ratio(BRAND_LOGO.viewBox)}
       fill="currentColor"
       role="img"
-      aria-label="BODYTRACK"
+      aria-label="AVALIX"
       className={className}
     >
       <path d={BRAND_LOGO.d} />

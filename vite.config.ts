@@ -13,8 +13,8 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "BodyTrack",
-        short_name: "BodyTrack",
+        name: "AvalixFit",
+        short_name: "Avalix",
         description: "Avaliação física e postural para profissionais",
         lang: "pt-BR",
         theme_color: "#2A0E52",

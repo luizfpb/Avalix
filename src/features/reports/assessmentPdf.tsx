@@ -68,7 +68,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.plate}>
-          <Text style={styles.plateText}>BODYTRACK</Text>
+          <Text style={styles.plateText}>AVALIX</Text>
         </View>
         <Text style={styles.org}>{data.orgName}</Text>
         <Text style={styles.h1}>Relatório de Avaliação Física</Text>
@@ -153,7 +153,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
         ) : null}
 
         <Text style={styles.footer}>
-          Gerado pelo BodyTrack{r ? ` · motor de cálculo ${r.engineVersion}` : ''}. Resultado
+          Gerado pelo Avalix{r ? ` · motor de cálculo ${r.engineVersion}` : ''}. Resultado
           reproduzível a partir das medidas registradas. Documento de uso profissional.
         </Text>
       </Page>

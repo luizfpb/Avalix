@@ -139,7 +139,7 @@ function MfaSettings() {
       }
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: 'BodyTrack',
+        friendlyName: 'AvalixFit',
       })
       if (error || !data) {
         setError(normalizeAuthError(error))

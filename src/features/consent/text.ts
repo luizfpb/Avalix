@@ -13,7 +13,7 @@
 // organizations.name). Como o nome entra no texto, o hash varia por org: o
 // registro de aceite prova exatamente o texto, com o nome, que a pessoa leu.
 
-export const CONSENT_VERSION = '0.1-rascunho'
+export const CONSENT_VERSION = '0.2-rascunho'
 
 function controllerLabel(name: string | null | undefined): string {
   const n = name?.trim()
@@ -25,7 +25,7 @@ export function consentText(controllerName: string | null | undefined): string {
   return `Termo de Consentimento para Tratamento de Dados Pessoais e de Saúde
 
 1. O que este termo autoriza
-Ao confirmar, você autoriza ${controller} (o "Controlador") a coletar e tratar seus dados pessoais e seus dados pessoais sensíveis de saúde, por meio do aplicativo BodyTrack, para as finalidades descritas abaixo.
+Ao confirmar, você autoriza ${controller} (o "Controlador") a coletar e tratar seus dados pessoais e seus dados pessoais sensíveis de saúde, por meio do aplicativo Avalix, para as finalidades descritas abaixo.
 
 2. Dados tratados
 - Identificação e contato: nome, data de nascimento, sexo biológico, telefone e e-mail.
@@ -40,7 +40,7 @@ Os dados são usados para realizar e registrar avaliações físicas e posturais
 O tratamento dos dados de saúde se baseia no seu consentimento, nos termos da Lei nº 13.709/2018 (LGPD), art. 7º, inciso IX, e art. 11, inciso I.
 
 5. Compartilhamento
-Seus dados não são vendidos nem compartilhados com terceiros, exceto quando necessário para a prestação do serviço (por exemplo, a infraestrutura que armazena os dados) ou por obrigação legal. O BodyTrack atua como operador, tratando os dados em nome do Controlador.
+Seus dados não são vendidos nem compartilhados com terceiros, exceto quando necessário para a prestação do serviço (por exemplo, a infraestrutura que armazena os dados) ou por obrigação legal. O Avalix atua como operador, tratando os dados em nome do Controlador.
 
 6. Armazenamento e segurança
 Os dados ficam em ambiente de acesso restrito, protegidos por controle de acesso. As fotografias têm a localização (GPS) removida antes do envio.
