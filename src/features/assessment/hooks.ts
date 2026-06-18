@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createAssessment,
+  deleteAssessment,
   getAssessment,
   listAssessments,
   listSubjectCircumferences,
+  updateAssessment,
   type CreateAssessmentInput,
 } from './api'
 
@@ -37,6 +39,33 @@ export function useCreateAssessment(subjectId: string | undefined) {
     mutationFn: (input: CreateAssessmentInput) => createAssessment(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
+      qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
+    },
+  })
+}
+
+export function useUpdateAssessment(
+  subjectId: string | undefined,
+  assessmentId: string | undefined
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateAssessmentInput) => updateAssessment(assessmentId as string, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
+      qc.invalidateQueries({ queryKey: ['assessment', assessmentId] })
+      qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
+    },
+  })
+}
+
+export function useDeleteAssessment(subjectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteAssessment(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
+      qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
     },
   })
 }

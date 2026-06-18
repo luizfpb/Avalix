@@ -80,6 +80,71 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
   return assessment
 }
 
+// Atualiza a avaliação e substitui as leituras. org_id/subject_id são
+// congelados por trigger; assessed_at, protocolo, peso, altura, results e
+// medicamentos/observações podem mudar. Reinserir leituras exige consentimento
+// vigente (mesma regra do create), por isso o editar é gated por consentimento.
+export async function updateAssessment(
+  id: string,
+  input: CreateAssessmentInput
+): Promise<AssessmentRow> {
+  const { data: assessment, error } = await supabase
+    .from('assessments')
+    .update({
+      assessed_at: input.assessedAt,
+      protocol_id: input.protocolId,
+      weight_kg: input.weightKg,
+      height_cm: input.heightCm,
+      medications: input.medications,
+      notes: input.notes,
+      results: input.result as unknown as Json,
+      engine_version: input.result.engineVersion,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw error
+
+  const delSk = await supabase.from('skinfold_readings').delete().eq('assessment_id', id)
+  if (delSk.error) throw delSk.error
+  const delCi = await supabase.from('circumference_readings').delete().eq('assessment_id', id)
+  if (delCi.error) throw delCi.error
+
+  if (input.skinfolds.length > 0) {
+    const { error: skErr } = await supabase.from('skinfold_readings').insert(
+      input.skinfolds.map((s) => ({
+        org_id: input.orgId,
+        assessment_id: id,
+        site: s.site,
+        reading_1: s.reading_1,
+        reading_2: s.reading_2,
+        reading_3: s.reading_3,
+      }))
+    )
+    if (skErr) throw skErr
+  }
+  if (input.circumferences.length > 0) {
+    const { error: ciErr } = await supabase.from('circumference_readings').insert(
+      input.circumferences.map((c) => ({
+        org_id: input.orgId,
+        assessment_id: id,
+        site: c.site,
+        value_cm: c.value_cm,
+        is_custom: c.is_custom ?? false,
+      }))
+    )
+    if (ciErr) throw ciErr
+  }
+  return assessment
+}
+
+// Exclusão da avaliação. O FK on delete cascade leva as leituras; a auditoria
+// registra o DELETE.
+export async function deleteAssessment(id: string): Promise<void> {
+  const { error } = await supabase.from('assessments').delete().eq('id', id)
+  if (error) throw error
+}
+
 export type SubjectCircumference = { assessedAt: string; site: string; valueCm: number }
 
 // Todas as circunferências do avaliado ao longo das avaliações (via join),

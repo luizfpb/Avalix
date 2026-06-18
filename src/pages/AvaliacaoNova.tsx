@@ -4,7 +4,11 @@ import { Pill, Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
-import { useCreateAssessment } from '../features/assessment/hooks'
+import {
+  useCreateAssessment,
+  useUpdateAssessment,
+  useAssessment,
+} from '../features/assessment/hooks'
 import type { SubjectRow } from '../features/subjects/api'
 import {
   listProtocols,
@@ -21,8 +25,11 @@ import {
 } from '../features/assessment/sites'
 import { buildAssessmentResult, type AssessmentResultSnapshot } from '../features/assessment/result'
 import type {
+  AssessmentRow,
+  CircumferenceReadingRow,
   NewCircumferenceReading,
   NewSkinfoldReading,
+  SkinfoldReadingRow,
 } from '../features/assessment/api'
 import { ageFromBirthDate } from '../lib/age'
 import { Button } from '@/components/ui/button'
@@ -50,12 +57,22 @@ function asSex(s: string): Sex {
   return s === 'F' ? 'F' : 'M'
 }
 
+type ExistingAssessment = {
+  assessment: AssessmentRow
+  skinfolds: SkinfoldReadingRow[]
+  circumferences: CircumferenceReadingRow[]
+}
+
+const CATALOG_KEYS = new Set(CIRCUMFERENCE_CATALOG.flatMap((g) => g.items.map((i) => i.key)))
+
 export default function AvaliacaoNova() {
-  const { id } = useParams()
+  const { id, assessmentId } = useParams()
+  const isEdit = !!assessmentId
   const subjectQuery = useSubject(id)
   const consentQuery = useActiveConsent(id)
+  const assessmentQuery = useAssessment(assessmentId)
 
-  if (subjectQuery.isPending || consentQuery.isPending) {
+  if (subjectQuery.isPending || consentQuery.isPending || (isEdit && assessmentQuery.isPending)) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
   if (subjectQuery.isError || !subjectQuery.data) {
@@ -71,9 +88,9 @@ export default function AvaliacaoNova() {
   if (!consentQuery.data) {
     return (
       <div className="max-w-xl space-y-3">
-        <h1 className="text-xl font-semibold">Nova avaliação</h1>
+        <h1 className="text-xl font-semibold">{isEdit ? 'Editar avaliação' : 'Nova avaliação'}</h1>
         <p className="text-sm text-muted-foreground">
-          É preciso registrar o consentimento do avaliado antes de criar avaliações.
+          É preciso ter consentimento vigente do avaliado para registrar ou editar avaliações.
         </p>
         <Button asChild variant="outline">
           <Link to={`/avaliados/${subjectQuery.data.id}`}>Ir para o cadastro e registrar</Link>
@@ -81,8 +98,27 @@ export default function AvaliacaoNova() {
       </div>
     )
   }
+  if (isEdit && (!assessmentQuery.data || !assessmentQuery.data.assessment)) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-destructive">Não foi possível carregar a avaliação.</p>
+        <Button asChild variant="outline">
+          <Link to={`/avaliados/${subjectQuery.data.id}`}>Voltar</Link>
+        </Button>
+      </div>
+    )
+  }
 
-  return <Form subject={subjectQuery.data} />
+  const existing: ExistingAssessment | undefined =
+    isEdit && assessmentQuery.data?.assessment
+      ? {
+          assessment: assessmentQuery.data.assessment,
+          skinfolds: assessmentQuery.data.skinfolds,
+          circumferences: assessmentQuery.data.circumferences,
+        }
+      : undefined
+
+  return <Form subject={subjectQuery.data} existing={existing} />
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -197,24 +233,48 @@ function CircumferencesCard({
   )
 }
 
-function Form({ subject }: { subject: SubjectRow }) {
+function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingAssessment }) {
   const { organization } = useOrganization()
   const navigate = useNavigate()
+  const isEdit = !!existing
+  const ea = existing?.assessment
   const createMut = useCreateAssessment(subject.id)
+  const updateMut = useUpdateAssessment(subject.id, ea?.id)
+  const mut = isEdit ? updateMut : createMut
   const sex = asSex(subject.sex)
   const protocols = listProtocols(sex)
 
-  const [assessedAt, setAssessedAt] = useState(todayLocal)
-  const [protocolId, setProtocolId] = useState(() => protocols[0]?.id ?? '')
-  const [weight, setWeight] = useState('')
+  const [assessedAt, setAssessedAt] = useState(() => ea?.assessed_at ?? todayLocal())
+  const [protocolId, setProtocolId] = useState(() => ea?.protocol_id ?? protocols[0]?.id ?? '')
+  const [weight, setWeight] = useState(() => (ea ? String(ea.weight_kg) : ''))
   const [height, setHeight] = useState(() =>
-    subject.height_cm != null ? String(subject.height_cm) : ''
+    ea ? String(ea.height_cm) : subject.height_cm != null ? String(subject.height_cm) : ''
   )
-  const [medications, setMedications] = useState('')
-  const [notes, setNotes] = useState('')
-  const [skinfolds, setSkinfolds] = useState<Record<string, [string, string, string]>>({})
-  const [circumferences, setCircumferences] = useState<Record<string, string>>({})
-  const [customCircs, setCustomCircs] = useState<{ site: string; value: string }[]>([])
+  const [medications, setMedications] = useState(() => ea?.medications ?? '')
+  const [notes, setNotes] = useState(() => ea?.notes ?? '')
+  const [skinfolds, setSkinfolds] = useState<Record<string, [string, string, string]>>(() => {
+    const m: Record<string, [string, string, string]> = {}
+    for (const s of existing?.skinfolds ?? []) {
+      m[s.site] = [
+        s.reading_1 != null ? String(s.reading_1) : '',
+        s.reading_2 != null ? String(s.reading_2) : '',
+        s.reading_3 != null ? String(s.reading_3) : '',
+      ]
+    }
+    return m
+  })
+  const [circumferences, setCircumferences] = useState<Record<string, string>>(() => {
+    const m: Record<string, string> = {}
+    for (const c of existing?.circumferences ?? []) {
+      if (CATALOG_KEYS.has(c.site)) m[c.site] = String(c.value_cm)
+    }
+    return m
+  })
+  const [customCircs, setCustomCircs] = useState<{ site: string; value: string }[]>(() =>
+    (existing?.circumferences ?? [])
+      .filter((c) => !CATALOG_KEYS.has(c.site))
+      .map((c) => ({ site: c.site, value: String(c.value_cm) }))
+  )
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const protocol = protocols.find((p) => p.id === protocolId) ?? protocols[0]
@@ -312,7 +372,7 @@ function Form({ subject }: { subject: SubjectRow }) {
     if (!snapshot) return setSubmitError('Preencha as medidas necessárias para o protocolo escolhido.')
 
     try {
-      const assessment = await createMut.mutateAsync({
+      const assessment = await mut.mutateAsync({
         orgId: organization.id,
         subjectId: subject.id,
         assessedAt,
@@ -340,7 +400,9 @@ function Form({ subject }: { subject: SubjectRow }) {
         >
           ← {subject.full_name}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">Nova avaliação</h1>
+        <h1 className="mt-2 text-xl font-semibold">
+          {isEdit ? 'Editar avaliação' : 'Nova avaliação'}
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -481,8 +543,8 @@ function Form({ subject }: { subject: SubjectRow }) {
       {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
 
       <div className="flex gap-3">
-        <Button onClick={handleSave} disabled={createMut.isPending || !result}>
-          {createMut.isPending ? 'Salvando...' : 'Salvar avaliação'}
+        <Button onClick={handleSave} disabled={mut.isPending || !result}>
+          {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar avaliação'}
         </Button>
         <Button variant="outline" asChild>
           <Link to={`/avaliados/${subject.id}`}>Cancelar</Link>

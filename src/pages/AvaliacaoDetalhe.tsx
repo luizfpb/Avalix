@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Pill } from 'lucide-react'
-import { useAssessment, useAssessments } from '../features/assessment/hooks'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pill, Pencil, Trash2 } from 'lucide-react'
+import { useAssessment, useAssessments, useDeleteAssessment } from '../features/assessment/hooks'
 import { useSubject } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
@@ -43,6 +43,8 @@ export default function AvaliacaoDetalhe() {
   const assessmentsQuery = useAssessments(id)
   const { organization } = useOrganization()
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const deleteMut = useDeleteAssessment(id)
   const [pdfBusy, setPdfBusy] = useState(false)
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -98,6 +100,16 @@ export default function AvaliacaoDetalhe() {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm('Excluir esta avaliação e suas medidas? Esta ação é definitiva.')) return
+    try {
+      await deleteMut.mutateAsync(assessment.id)
+      navigate(`/avaliados/${id}`)
+    } catch {
+      // erro exibido abaixo
+    }
+  }
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -116,10 +128,30 @@ export default function AvaliacaoDetalhe() {
             {assessment.height_cm} cm
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy}>
-          {pdfBusy ? 'Gerando...' : 'Baixar PDF'}
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/avaliados/${id}/avaliacoes/${assessment.id}/editar`}>
+              <Pencil /> Editar
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy}>
+            {pdfBusy ? 'Gerando...' : 'Baixar PDF'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive"
+            onClick={handleDelete}
+            disabled={deleteMut.isPending}
+          >
+            <Trash2 /> {deleteMut.isPending ? 'Excluindo...' : 'Excluir'}
+          </Button>
+        </div>
       </div>
+
+      {deleteMut.error ? (
+        <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
+      ) : null}
 
       {result ? (
         <Card>

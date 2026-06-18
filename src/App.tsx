@@ -57,6 +57,10 @@ export default function App() {
               path="/avaliados/:id/avaliacoes/:assessmentId"
               element={<AvaliacaoDetalhe />}
             />
+            <Route
+              path="/avaliados/:id/avaliacoes/:assessmentId/editar"
+              element={<AvaliacaoNova />}
+            />
             <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
             <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
             <Route
