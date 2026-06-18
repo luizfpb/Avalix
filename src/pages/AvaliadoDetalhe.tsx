@@ -4,6 +4,7 @@ import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
+import { useAnamneses } from '../features/anamnesis/hooks'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi } from '../features/assessment/bmi'
 import type { EvolutionPoint } from '../features/assessment/EvolutionChart'
@@ -149,6 +150,8 @@ export default function AvaliadoDetalhe() {
         controllerName={organization?.name ?? null}
       />
 
+      <AnamneseSection subjectId={s.id} />
+
       <AssessmentsSection subjectId={s.id} />
 
       <PosturalSection subjectId={s.id} />
@@ -231,6 +234,54 @@ function EvolutionCard({ assessments }: { assessments: AssessmentRow[] }) {
         </Suspense>
       </CardContent>
     </Card>
+  )
+}
+
+function AnamneseSection({ subjectId }: { subjectId: string }) {
+  const consentQuery = useActiveConsent(subjectId)
+  const anamnesesQuery = useAnamneses(subjectId)
+  const hasConsent = !!consentQuery.data
+  const items = anamnesesQuery.data ?? []
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Anamnese e triagem</h2>
+        {hasConsent ? (
+          <Button asChild size="sm">
+            <Link to={`/avaliados/${subjectId}/anamnese/nova`}>Nova anamnese</Link>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Registre o consentimento para preencher
+          </span>
+        )}
+      </div>
+      {anamnesesQuery.isPending ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : items.length > 0 ? (
+        <ul className="divide-y rounded-md border bg-card">
+          {items.map((an) => {
+            const ok = an.liberado && !an.flag_encaminhamento
+            return (
+              <li key={an.id}>
+                <Link
+                  to={`/avaliados/${subjectId}/anamnese/${an.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent"
+                >
+                  <span>{formatDate(an.assessed_at)}</span>
+                  <Badge variant={ok ? 'success' : 'warn'}>
+                    {ok ? 'Liberado' : 'Encaminhamento'}
+                  </Badge>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">Nenhuma anamnese ainda.</p>
+      )}
+    </section>
   )
 }
 

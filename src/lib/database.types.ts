@@ -39,6 +39,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      anamneses: {
+        Row: {
+          assessed_at: string
+          created_at: string
+          evaluator_id: string
+          flag_encaminhamento: boolean
+          id: string
+          liberado: boolean
+          nivel_encaminhamento: string
+          org_id: string
+          payload: Json
+          spec_version: string
+          subject_id: string
+          updated_at: string
+        }
+        Insert: {
+          assessed_at?: string
+          created_at?: string
+          evaluator_id?: string
+          flag_encaminhamento: boolean
+          id?: string
+          liberado: boolean
+          nivel_encaminhamento: string
+          org_id: string
+          payload: Json
+          spec_version: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          assessed_at?: string
+          created_at?: string
+          evaluator_id?: string
+          flag_encaminhamento?: boolean
+          id?: string
+          liberado?: boolean
+          nivel_encaminhamento?: string
+          org_id?: string
+          payload?: Json
+          spec_version?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assessments: {
         Row: {
           assessed_at: string
