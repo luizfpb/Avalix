@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pill } from 'lucide-react'
+import { Pill, Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
@@ -13,7 +13,12 @@ import {
   type Sex,
   type SkinfoldSite,
 } from '../features/assessment/protocols'
-import { SKINFOLD_LABELS, CIRCUMFERENCE_LABELS, meanReading } from '../features/assessment/sites'
+import {
+  SKINFOLD_LABELS,
+  CIRCUMFERENCE_CATALOG,
+  circumferenceLabel,
+  meanReading,
+} from '../features/assessment/sites'
 import { buildAssessmentResult, type AssessmentResultSnapshot } from '../features/assessment/result'
 import type {
   NewCircumferenceReading,
@@ -98,6 +103,100 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+type CustomCirc = { site: string; value: string }
+
+function CircumferencesCard({
+  values,
+  onChange,
+  neededCircs,
+  custom,
+  setCustom,
+}: {
+  values: Record<string, string>
+  onChange: (key: string, v: string) => void
+  neededCircs: CircumferenceSite[]
+  custom: CustomCirc[]
+  setCustom: (updater: (prev: CustomCirc[]) => CustomCirc[]) => void
+}) {
+  const needed = new Set<string>(neededCircs)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Circunferências (cm)</CardTitle>
+        <CardDescription>
+          Opcionais — registre quantas quiser para acompanhar a evolução.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {CIRCUMFERENCE_CATALOG.map((group) => (
+          <div key={group.group} className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">{group.group}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {group.items.map((item) => (
+                <Field key={item.key} label={needed.has(item.key) ? `${item.label} *` : item.label}>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={values[item.key] ?? ''}
+                    onChange={(e) => onChange(item.key, e.target.value)}
+                  />
+                </Field>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground">Outras (personalizadas)</p>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => setCustom((p) => [...p, { site: '', value: '' }])}
+            >
+              <Plus /> Adicionar
+            </Button>
+          </div>
+          {custom.map((c, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input
+                placeholder="Nome (ex.: Tornozelo D)"
+                value={c.site}
+                onChange={(e) =>
+                  setCustom((p) => p.map((x, idx) => (idx === i ? { ...x, site: e.target.value } : x)))
+                }
+              />
+              <Input
+                className="w-24"
+                type="number"
+                inputMode="decimal"
+                placeholder="cm"
+                value={c.value}
+                onChange={(e) =>
+                  setCustom((p) => p.map((x, idx) => (idx === i ? { ...x, value: e.target.value } : x)))
+                }
+              />
+              <button
+                type="button"
+                onClick={() => setCustom((p) => p.filter((_, idx) => idx !== i))}
+                className="text-destructive"
+                title="Remover"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {neededCircs.length > 0 ? (
+          <p className="text-xs text-muted-foreground">* necessário para o protocolo selecionado.</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
 function Form({ subject }: { subject: SubjectRow }) {
   const { organization } = useOrganization()
   const navigate = useNavigate()
@@ -115,6 +214,7 @@ function Form({ subject }: { subject: SubjectRow }) {
   const [notes, setNotes] = useState('')
   const [skinfolds, setSkinfolds] = useState<Record<string, [string, string, string]>>({})
   const [circumferences, setCircumferences] = useState<Record<string, string>>({})
+  const [customCircs, setCustomCircs] = useState<{ site: string; value: string }[]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const protocol = protocols.find((p) => p.id === protocolId) ?? protocols[0]
@@ -184,13 +284,28 @@ function Form({ subject }: { subject: SubjectRow }) {
     }
 
     const circRows: NewCircumferenceReading[] = []
-    for (const site of neededCircs) {
-      const v = Number(circumferences[site])
+    // todas as circunferências do catálogo que foram preenchidas (não só as do
+    // protocolo) — pra acompanhar a evolução
+    for (const [site, raw] of Object.entries(circumferences)) {
+      const v = Number(raw)
       if (!(v > 0)) continue
       if (v < 10 || v > 250) {
-        return setSubmitError(`Circunferência ${CIRCUMFERENCE_LABELS[site]} deve estar entre 10 e 250 cm.`)
+        return setSubmitError(`Circunferência ${circumferenceLabel(site)} deve estar entre 10 e 250 cm.`)
       }
       circRows.push({ site, value_cm: v })
+    }
+    // customizadas (texto livre)
+    const seen = new Set(circRows.map((c) => c.site))
+    for (const c of customCircs) {
+      const name = c.site.trim()
+      const v = Number(c.value)
+      if (!name || !(v > 0)) continue
+      if (seen.has(name)) return setSubmitError(`Circunferência "${name}" está duplicada.`)
+      if (v < 10 || v > 250) {
+        return setSubmitError(`Circunferência "${name}" deve estar entre 10 e 250 cm.`)
+      }
+      seen.add(name)
+      circRows.push({ site: name, value_cm: v, is_custom: true })
     }
 
     const snapshot = currentResult()
@@ -299,27 +414,15 @@ function Form({ subject }: { subject: SubjectRow }) {
             })}
           </CardContent>
         </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Circunferências (cm)</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {neededCircs.map((site) => (
-              <Field label={CIRCUMFERENCE_LABELS[site]} key={site}>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  value={circumferences[site] ?? ''}
-                  onChange={(e) =>
-                    setCircumferences((prev) => ({ ...prev, [site]: e.target.value }))
-                  }
-                />
-              </Field>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      ) : null}
+
+      <CircumferencesCard
+        values={circumferences}
+        onChange={(key, v) => setCircumferences((prev) => ({ ...prev, [key]: v }))}
+        neededCircs={neededCircs}
+        custom={customCircs}
+        setCustom={setCustomCircs}
+      />
 
       {result ? (
         <Card>

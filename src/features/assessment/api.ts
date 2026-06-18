@@ -12,7 +12,7 @@ export type NewSkinfoldReading = {
   reading_2: number | null
   reading_3: number | null
 }
-export type NewCircumferenceReading = { site: string; value_cm: number }
+export type NewCircumferenceReading = { site: string; value_cm: number; is_custom?: boolean }
 
 export type CreateAssessmentInput = {
   orgId: string
@@ -71,6 +71,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
         assessment_id: assessment.id,
         site: c.site,
         value_cm: c.value_cm,
+        is_custom: c.is_custom ?? false,
       }))
     )
     if (ciErr) throw ciErr

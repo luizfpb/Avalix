@@ -10,9 +10,9 @@ import { logExport } from '../features/reports/audit'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
-import { SKINFOLD_LABELS, CIRCUMFERENCE_LABELS } from '../features/assessment/sites'
+import { SKINFOLD_LABELS, circumferenceLabel } from '../features/assessment/sites'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
-import type { SkinfoldSite, CircumferenceSite } from '../features/assessment/protocols'
+import type { SkinfoldSite } from '../features/assessment/protocols'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -200,9 +200,7 @@ export default function AvaliacaoDetalhe() {
           <CardContent className="space-y-1 text-sm">
             {circumferences.map((c) => (
               <div key={c.id} className="flex justify-between gap-3">
-                <span className="text-muted-foreground">
-                  {CIRCUMFERENCE_LABELS[c.site as CircumferenceSite] ?? c.site}
-                </span>
+                <span className="text-muted-foreground">{circumferenceLabel(c.site)}</span>
                 <span>{c.value_cm}</span>
               </div>
             ))}
