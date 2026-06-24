@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil, Trash2, Copy } from 'lucide-react'
+import { Pencil, Trash2, Copy, Share2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
 import { useSubject, useSubjects } from '../features/subjects/hooks'
@@ -27,6 +27,7 @@ import {
   type ExerciseMeta,
 } from '../features/workout/builder'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
+import { planShareText, whatsappUrl } from '../features/workout/share'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
@@ -77,6 +78,8 @@ export default function TreinoDetalhe() {
   const sessionsQ = useSessions(id)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [showDup, setShowDup] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const exerciseNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -122,40 +125,86 @@ export default function TreinoDetalhe() {
     ]),
   ].sort((a, b) => a - b)
 
+  const shareText = planShareText({
+    orgName: organization?.name ?? '',
+    plan,
+    days,
+    exercises,
+    exerciseNames,
+  })
+  const pdfFilename = `treino-${plan.name.replace(/\s+/g, '-').toLowerCase()}.pdf`
+  const canShareFiles = (() => {
+    if (typeof navigator === 'undefined') return false
+    const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean }
+    try {
+      return !!nav.canShare?.({ files: [new File([''], 'x.pdf', { type: 'application/pdf' })] })
+    } catch {
+      return false
+    }
+  })()
+
+  async function buildPdfBlob(): Promise<Blob> {
+    const { generateWorkoutPdf } = await import('../features/reports/workoutPdf')
+    const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
+    return generateWorkoutPdf({
+      orgName: organization?.name ?? '',
+      subjectName: subjectQuery.data?.full_name ?? '',
+      logoUrl,
+      plan,
+      days,
+      exercises,
+      weeks,
+      overrides,
+      exerciseNames,
+      source:
+        srcAssessment || srcSession
+          ? {
+              assessmentDate: srcAssessment ? srcAssessment.assessed_at : null,
+              bodyFatPct: srcBodyFat,
+              postureDate: srcSession ? srcSession.taken_at : null,
+            }
+          : undefined,
+    })
+  }
+
+  function logPdf() {
+    if (organization && user) {
+      void logExport({
+        orgId: organization.id,
+        userId: user.id,
+        action: 'PDF_REPORT',
+        tableName: 'workout_plans',
+        rowId: plan.id,
+      })
+    }
+  }
+
   async function handlePdf() {
     setPdfBusy(true)
     try {
-      const { generateWorkoutPdf } = await import('../features/reports/workoutPdf')
-      const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
-      const blob = await generateWorkoutPdf({
-        orgName: organization?.name ?? '',
-        subjectName: subjectQuery.data?.full_name ?? '',
-        logoUrl,
-        plan,
-        days,
-        exercises,
-        weeks,
-        overrides,
-        exerciseNames,
-        source:
-          srcAssessment || srcSession
-            ? {
-                assessmentDate: srcAssessment ? srcAssessment.assessed_at : null,
-                bodyFatPct: srcBodyFat,
-                postureDate: srcSession ? srcSession.taken_at : null,
-              }
-            : undefined,
-      })
-      downloadBlob(blob, `treino-${plan.name.replace(/\s+/g, '-').toLowerCase()}.pdf`)
-      if (organization && user) {
-        void logExport({
-          orgId: organization.id,
-          userId: user.id,
-          action: 'PDF_REPORT',
-          tableName: 'workout_plans',
-          rowId: plan.id,
-        })
+      const blob = await buildPdfBlob()
+      downloadBlob(blob, pdfFilename)
+      logPdf()
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  async function handleSharePdf() {
+    setPdfBusy(true)
+    try {
+      const blob = await buildPdfBlob()
+      const file = new File([blob], pdfFilename, { type: 'application/pdf' })
+      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean }
+      if (nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], title: plan.name, text: shareText })
+        logPdf()
+      } else {
+        downloadBlob(blob, pdfFilename)
+        logPdf()
       }
+    } catch {
+      // share cancelado pelo usuário ou indisponível — ignora
     } finally {
       setPdfBusy(false)
     }
@@ -228,6 +277,9 @@ export default function TreinoDetalhe() {
           <Button variant="outline" size="sm" onClick={() => setShowDup((s) => !s)}>
             <Copy /> Duplicar
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowShare((s) => !s)}>
+            <Share2 /> Compartilhar
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -252,6 +304,53 @@ export default function TreinoDetalhe() {
           defaultName={`Cópia de ${plan.name}`}
           onClose={() => setShowDup(false)}
         />
+      ) : null}
+
+      {showShare ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Compartilhar plano</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <textarea readOnly rows={8} value={shareText} className={controlClass} />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() =>
+                  window.open(whatsappUrl(shareText, subjectQuery.data?.phone), '_blank')
+                }
+              >
+                Enviar no WhatsApp
+              </Button>
+              {canShareFiles ? (
+                <Button size="sm" variant="outline" onClick={handleSharePdf} disabled={pdfBusy}>
+                  {pdfBusy ? 'Gerando...' : 'Compartilhar PDF'}
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(shareText)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  } catch {
+                    // sem permissão de clipboard — ignora
+                  }
+                }}
+              >
+                {copied ? 'Copiado!' : 'Copiar texto'}
+              </Button>
+            </div>
+            {!canShareFiles ? (
+              <p className="text-xs text-muted-foreground">
+                O WhatsApp abre com o resumo pronto. Para anexar o PDF, baixe-o e anexe no WhatsApp
+                Web; no celular, "Compartilhar PDF" usa o compartilhamento nativo.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       {srcAssessment || srcSession ? (
