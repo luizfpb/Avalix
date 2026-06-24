@@ -85,6 +85,9 @@ export type VolumeOverride = {
 export type VolumePlanInput = {
   weeks: number
   days: VolumeDay[]
+  // sequencia de sessoes da semana por rotulo de divisao (ex.: ['A','B','A']);
+  // vazio = cada divisao uma vez, na ordem. Divisao repetida conta o volume 2x.
+  weeklySchedule?: string[]
   // overrides[weekNumber][exerciseKey]
   overrides?: Record<number, Record<string, VolumeOverride>>
   // semanas marcadas como deload (so influem na escolha da semana "tipica")

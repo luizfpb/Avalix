@@ -67,7 +67,9 @@ export default function Execucao() {
 
   const plan = detail.plan
   const logs = logsQuery.data ?? []
-  const planned = plannedSessions(plan.weeks, detail.days.length)
+  const sessionsPerWeek =
+    plan.weekly_schedule.length > 0 ? plan.weekly_schedule.length : detail.days.length
+  const planned = plannedSessions(plan.weeks, sessionsPerWeek)
   const done = logs.length
   const pct = adherencePct(done, planned)
   const progress = exerciseProgression(historyQuery.data ?? [])
@@ -100,8 +102,8 @@ export default function Execucao() {
             <div className="h-2 rounded bg-primary" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
           </div>
           <p className="text-xs text-muted-foreground">
-            Previsto = {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'} × {detail.days.length}{' '}
-            {detail.days.length === 1 ? 'divisão' : 'divisões'}.
+            Previsto = {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'} × {sessionsPerWeek}{' '}
+            {sessionsPerWeek === 1 ? 'sessão' : 'sessões'} por semana.
           </p>
         </CardContent>
       </Card>

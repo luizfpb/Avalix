@@ -66,6 +66,16 @@ describe('buildVolumeSnapshot', () => {
     ],
   }
 
+  it('sequência semanal repete a divisão e dobra o volume dela (ABA)', () => {
+    const snap = buildVolumeSnapshot({ ...basePlan, weeklySchedule: ['A', 'B', 'A'] })
+    const w = snap.perWeek[0]
+    expect(w.byMuscle.chest).toBe(8) // A duas vezes: 4 * 1.0 * 2
+    expect(w.byMuscle.triceps).toBe(4) // 4 * 0.5 * 2
+    expect(w.byMuscle.biceps).toBe(6) // 3 * 2
+    expect(w.byMuscle.quads).toBe(5) // B uma vez
+    expect(w.totalSets).toBe(19) // (4+3)*2 + 5
+  })
+
   it('expande todas as semanas com o template quando nao ha override', () => {
     const snap = buildVolumeSnapshot(basePlan)
     expect(snap.perWeek).toHaveLength(4)

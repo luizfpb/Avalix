@@ -63,6 +63,9 @@ export type EditorPlan = {
   status: string
   sourceAssessmentId: string | null
   sourcePostureSessionId: string | null
+  // sequencia de sessoes da semana por rotulo (ex.: ['A','B','A']); vazio = cada
+  // divisao uma vez
+  weeklySchedule: string[]
   days: EditorDay[]
   overrides: EditorOverride[]
   weeksMeta: EditorWeek[]
@@ -81,6 +84,7 @@ export function emptyEditorPlan(): EditorPlan {
     status: 'draft',
     sourceAssessmentId: null,
     sourcePostureSessionId: null,
+    weeklySchedule: [],
     days: [],
     overrides: [],
     weeksMeta: [],
@@ -106,6 +110,7 @@ export function editorToVolumePlan(
   }
   return {
     weeks: plan.weeks,
+    weeklySchedule: plan.weeklySchedule,
     days: plan.days.map((d) => ({
       label: d.label,
       exercises: d.exercises.flatMap((ex) => {
@@ -181,6 +186,7 @@ export function editorToSaveInput(
     status: plan.status,
     sourceAssessmentId: plan.sourceAssessmentId,
     sourcePostureSessionId: plan.sourcePostureSessionId,
+    weeklySchedule: plan.weeklySchedule,
     volume,
     days,
     overrides,
@@ -229,6 +235,7 @@ export function planDetailToEditor(detail: WorkoutPlanDetail): EditorPlan {
     status: plan.status,
     sourceAssessmentId: plan.source_assessment_id,
     sourcePostureSessionId: plan.source_posture_session_id,
+    weeklySchedule: plan.weekly_schedule,
     days: days.map((d) => ({
       key: d.id,
       label: d.label,

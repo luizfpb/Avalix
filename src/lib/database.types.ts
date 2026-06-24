@@ -1099,6 +1099,7 @@ export type Database = {
           updated_at: string
           volume: Json | null
           volume_engine_version: string | null
+          weekly_schedule: string[]
           weeks: number
         }
         Insert: {
@@ -1117,6 +1118,7 @@ export type Database = {
           updated_at?: string
           volume?: Json | null
           volume_engine_version?: string | null
+          weekly_schedule?: string[]
           weeks?: number
         }
         Update: {
@@ -1135,6 +1137,7 @@ export type Database = {
           updated_at?: string
           volume?: Json | null
           volume_engine_version?: string | null
+          weekly_schedule?: string[]
           weeks?: number
         }
         Relationships: [

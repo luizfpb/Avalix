@@ -103,6 +103,8 @@ export default function TreinoDetalhe() {
   const snapshot = plan.volume as VolumeSnapshot | null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = formatDate(plan.starts_on)
+  const schedule =
+    plan.weekly_schedule.length > 0 ? plan.weekly_schedule : orderedDays.map((d) => d.label)
 
   const srcAssessment = plan.source_assessment_id
     ? (assessmentsQ.data ?? []).find((a) => a.id === plan.source_assessment_id) ?? null
@@ -232,6 +234,12 @@ export default function TreinoDetalhe() {
             {goalLabel(plan.goal)} · {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
             {startsOn ? ` · início ${startsOn}` : ''}
           </p>
+          {schedule.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Sequência semanal: {schedule.join(' · ')} ({schedule.length}{' '}
+              {schedule.length === 1 ? 'sessão' : 'sessões'})
+            </p>
+          ) : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
             <Badge variant={plan.status === 'active' ? 'success' : 'secondary'}>
               {STATUS_LABELS[plan.status] ?? plan.status}

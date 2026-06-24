@@ -227,6 +227,7 @@ export type SaveWorkoutPlanInput = {
   status: string
   sourceAssessmentId: string | null
   sourcePostureSessionId: string | null
+  weeklySchedule: string[] // sequencia de sessoes da semana por rotulo (ex.: ABA)
   volume: VolumeSnapshot // snapshot calculado pelo motor no editor
   days: PlanDayInput[] // ordem do array = position
   overrides: PlanWeekOverrideInput[]
@@ -339,6 +340,7 @@ function planColumns(input: SaveWorkoutPlanInput) {
     status: input.status,
     source_assessment_id: input.sourceAssessmentId,
     source_posture_session_id: input.sourcePostureSessionId,
+    weekly_schedule: input.weeklySchedule,
     volume: input.volume as unknown as Json,
     volume_engine_version: input.volume.engineVersion,
   }

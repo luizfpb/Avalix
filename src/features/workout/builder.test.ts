@@ -109,7 +109,7 @@ describe('planDetailToEditor', () => {
         id: 'p1', org_id: 'o1', subject_id: 's1', evaluator_id: 'e1',
         name: 'Plano', goal: 'hypertrophy', weeks: 6, starts_on: null, notes: null,
         status: 'active', source_assessment_id: null, source_posture_session_id: null,
-        volume: null, volume_engine_version: null,
+        weekly_schedule: [], volume: null, volume_engine_version: null,
         created_at: '2026-01-01', updated_at: '2026-01-01',
       },
       days: [
@@ -143,7 +143,7 @@ describe('duplicatePlanEditor', () => {
       id: 'p1', org_id: 'o1', subject_id: 's1', evaluator_id: 'e1',
       name: 'Hipertrofia ABC', goal: 'hypertrophy', weeks: 4, starts_on: null, notes: 'obs',
       status: 'active', source_assessment_id: 'a1', source_posture_session_id: null,
-      volume: null, volume_engine_version: null,
+      weekly_schedule: [], volume: null, volume_engine_version: null,
       created_at: '2026-01-01', updated_at: '2026-01-01',
     },
     days: [{ id: 'd1', org_id: 'o1', plan_id: 'p1', label: 'A', name: 'Peito', position: 0, created_at: 'x' }],

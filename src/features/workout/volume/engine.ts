@@ -58,15 +58,25 @@ export function buildVolumeSnapshot(plan: VolumePlanInput): VolumeSnapshot {
   const deload = new Set(plan.deloadWeeks ?? [])
   const perWeek: WeekVolume[] = []
 
+  // expande as sessoes da semana pela sequencia (ex.: ABA conta A duas vezes);
+  // vazio = cada divisao uma vez, na ordem.
+  const dayByLabel = new Map(plan.days.map((d) => [d.label, d]))
+  const sessions =
+    plan.weeklySchedule && plan.weeklySchedule.length > 0
+      ? plan.weeklySchedule
+      : plan.days.map((d) => d.label)
+
   for (let week = 1; week <= weeksCount; week++) {
     const weekOverrides = plan.overrides?.[week] ?? {}
-    const resolved = plan.days.flatMap((day) =>
-      day.exercises.map((ex) => ({
+    const resolved = sessions.flatMap((label) => {
+      const day = dayByLabel.get(label)
+      if (!day) return []
+      return day.exercises.map((ex) => ({
         primaryMuscle: ex.primaryMuscle,
         secondaryMuscles: ex.secondaryMuscles,
         sets: effectiveSets(ex, weekOverrides[ex.key]),
       }))
-    )
+    })
     const { byMuscle, totalSets } = countWeekVolume(resolved)
     perWeek.push({ week, byMuscle, totalSets })
   }

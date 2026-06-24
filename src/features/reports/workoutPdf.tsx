@@ -245,6 +245,8 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   const snapshot = plan.volume as VolumeSnapshot | null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = fmtDate(plan.starts_on)
+  const schedule =
+    plan.weekly_schedule.length > 0 ? plan.weekly_schedule : orderedDays.map((d) => d.label)
 
   return (
     <Document>
@@ -267,6 +269,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
             Mesociclo: {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
             {startsOn ? ` · início ${startsOn}` : ''}
           </Text>
+          {schedule.length > 0 ? <Text>Sequência semanal: {schedule.join(' · ')}</Text> : null}
           {data.source ? (
             <Text style={styles.muted}>
               Base:{' '}

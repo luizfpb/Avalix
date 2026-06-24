@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Calculator } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Calculator, X } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import {
@@ -275,6 +275,29 @@ function Builder({
     })
   }
 
+  // ---- sequencia semanal (repetir divisao na semana) ------------------
+  function baseSchedule(p: EditorPlan): string[] {
+    const labels = p.days.map((d) => d.label)
+    const cur = p.weeklySchedule.length > 0 ? p.weeklySchedule : labels
+    return cur.filter((l) => labels.includes(l))
+  }
+  function setScheduleSlot(i: number, label: string) {
+    setPlan((p) => {
+      const s = baseSchedule(p).slice()
+      s[i] = label
+      return { ...p, weeklySchedule: s }
+    })
+  }
+  function removeScheduleSlot(i: number) {
+    setPlan((p) => ({ ...p, weeklySchedule: baseSchedule(p).filter((_, idx) => idx !== i) }))
+  }
+  function addScheduleSlot() {
+    setPlan((p) => {
+      const labels = p.days.map((d) => d.label)
+      return { ...p, weeklySchedule: [...baseSchedule(p), labels[0] ?? ''] }
+    })
+  }
+
   // ---- salvar ---------------------------------------------------------
   async function handleSave() {
     setSubmitError(null)
@@ -308,6 +331,8 @@ function Builder({
       templateRest: ex.restSeconds,
     }))
   )
+  const dayLabels = plan.days.map((d) => d.label)
+  const weekSchedule = baseSchedule(plan)
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -493,6 +518,56 @@ function Builder({
           </Card>
         ))}
       </div>
+
+      {/* Sequência semanal (repetir divisão na semana, ex.: ABA) */}
+      {plan.days.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Sequência semanal</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Ordem das sessões na semana. Repita uma divisão para treiná-la mais de uma vez (ex.:
+              A, B, A) — o volume conta as repetições.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {weekSchedule.map((label, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-1 rounded-md border bg-card py-1 pl-2 pr-1"
+                >
+                  <span className="text-xs text-muted-foreground">{i + 1}</span>
+                  <select
+                    className="bg-transparent text-sm outline-none"
+                    value={label}
+                    onChange={(e) => setScheduleSlot(i, e.target.value)}
+                  >
+                    {dayLabels.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeScheduleSlot(i)}
+                    className="text-muted-foreground hover:text-destructive"
+                    title="Remover sessão"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              <Button type="button" size="xs" variant="outline" onClick={addScheduleSlot}>
+                <Plus /> Sessão
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {weekSchedule.length} {weekSchedule.length === 1 ? 'sessão' : 'sessões'} por semana
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Semanas / overrides */}
       {plan.days.length > 0 ? (
