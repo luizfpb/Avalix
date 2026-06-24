@@ -38,6 +38,12 @@ export type WorkoutPdfData = {
   overrides: WorkoutWeekOverrideRow[]
   // exercise_id -> nome (montado na página a partir do catálogo)
   exerciseNames: Record<string, string>
+  // avaliação/postura de origem (a ponte avaliação->prescrição), se vinculadas
+  source?: {
+    assessmentDate?: string | null
+    bodyFatPct?: number | null
+    postureDate?: string | null
+  }
 }
 
 const styles = StyleSheet.create({
@@ -254,6 +260,20 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
             Mesociclo: {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
             {startsOn ? ` · início ${startsOn}` : ''}
           </Text>
+          {data.source ? (
+            <Text style={styles.muted}>
+              Base:{' '}
+              {data.source.assessmentDate
+                ? `avaliação ${fmtDate(data.source.assessmentDate)}${
+                    data.source.bodyFatPct != null
+                      ? ` · ${data.source.bodyFatPct.toFixed(1)}% gordura`
+                      : ''
+                  }`
+                : ''}
+              {data.source.assessmentDate && data.source.postureDate ? ' · ' : ''}
+              {data.source.postureDate ? `postura ${fmtDate(data.source.postureDate)}` : ''}
+            </Text>
+          ) : null}
         </View>
 
         {snapshot ? <VolumeChart snapshot={snapshot} /> : null}

@@ -356,3 +356,16 @@ export async function deleteWorkoutPlan(id: string): Promise<void> {
   const { error } = await supabase.from('workout_plans').delete().eq('id', id)
   if (error) throw error
 }
+
+// Muda so o status (rascunho/ativo/arquivado) sem reescrever a estrutura. org_id/
+// subject_id sao congelados por trigger; status e livre.
+export async function setWorkoutPlanStatus(id: string, status: string): Promise<WorkoutPlanRow> {
+  const { data, error } = await supabase
+    .from('workout_plans')
+    .update({ status })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}

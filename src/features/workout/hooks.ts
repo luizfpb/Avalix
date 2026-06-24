@@ -7,6 +7,7 @@ import {
   getWorkoutPlan,
   listExercises,
   listWorkoutPlans,
+  setWorkoutPlanStatus,
   updateWorkoutPlan,
   type CreateExerciseInput,
   type SaveWorkoutPlanInput,
@@ -88,6 +89,20 @@ export function useDeleteWorkoutPlan(subjectId: string | undefined) {
     mutationFn: (id: string) => deleteWorkoutPlan(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
+    },
+  })
+}
+
+export function useSetWorkoutPlanStatus(
+  subjectId: string | undefined,
+  planId: string | undefined
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (status: string) => setWorkoutPlanStatus(planId as string, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
+      qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
     },
   })
 }

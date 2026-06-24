@@ -36,6 +36,10 @@ import {
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { useAnamneses } from '../features/anamnesis/hooks'
+import { useAssessments } from '../features/assessment/hooks'
+import { useSessions } from '../features/posture/hooks'
+import { classifyBodyFat } from '../features/assessment/bodyFat'
+import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,6 +51,11 @@ const controlClass =
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
   return c?.randomUUID ? c.randomUUID() : `k-${Math.random().toString(36).slice(2)}`
+}
+
+function fmtDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -299,6 +308,9 @@ function Builder({
       tag: `${d.label}${i + 1}`,
       name: nameOf(ex.exerciseId),
       templateSets: ex.sets,
+      templateReps: ex.reps,
+      templateRir: ex.rir,
+      templateRest: ex.restSeconds,
     }))
   )
 
@@ -351,7 +363,25 @@ function Builder({
             onChange={(e) => setPlan((p) => ({ ...p, startsOn: e.target.value || null }))}
           />
         </Field>
+        <Field label="Situação">
+          <select
+            className={controlClass}
+            value={plan.status}
+            onChange={(e) => setPlan((p) => ({ ...p, status: e.target.value }))}
+          >
+            <option value="draft">Rascunho</option>
+            <option value="active">Ativo</option>
+            <option value="archived">Arquivado</option>
+          </select>
+        </Field>
       </div>
+
+      <SourceCard
+        subjectId={subjectId}
+        assessmentId={plan.sourceAssessmentId}
+        sessionId={plan.sourcePostureSessionId}
+        onChange={(patch) => setPlan((p) => ({ ...p, ...patch }))}
+      />
 
       {/* Volume ao vivo, contra os landmarks (MEV/MAV/MRV) */}
       <VolumeLandmarkPanel
@@ -530,6 +560,99 @@ function AnamneseFlag({ subjectId }: { subjectId: string }) {
         Ver anamnese
       </Link>
     </div>
+  )
+}
+
+function SourceCard({
+  subjectId,
+  assessmentId,
+  sessionId,
+  onChange,
+}: {
+  subjectId: string
+  assessmentId: string | null
+  sessionId: string | null
+  onChange: (patch: Partial<EditorPlan>) => void
+}) {
+  const assessmentsQ = useAssessments(subjectId)
+  const sessionsQ = useSessions(subjectId)
+  const assessments = assessmentsQ.data ?? []
+  const sessions = sessionsQ.data ?? []
+  const selected = assessments.find((a) => a.id === assessmentId)
+  const r = (selected?.results ?? null) as AssessmentResultSnapshot | null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          Base da prescrição <span className="font-normal text-muted-foreground">· opcional</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Avaliação física de origem">
+            <select
+              className={controlClass}
+              value={assessmentId ?? ''}
+              onChange={(e) => onChange({ sourceAssessmentId: e.target.value || null })}
+            >
+              <option value="">Nenhuma</option>
+              {assessments.map((a) => {
+                const rr = a.results as { bodyFatPct?: number } | null
+                return (
+                  <option key={a.id} value={a.id}>
+                    {fmtDate(a.assessed_at)}
+                    {rr?.bodyFatPct != null ? ` · ${rr.bodyFatPct.toFixed(1)}% gordura` : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </Field>
+          <Field label="Avaliação postural de origem">
+            <select
+              className={controlClass}
+              value={sessionId ?? ''}
+              onChange={(e) => onChange({ sourcePostureSessionId: e.target.value || null })}
+            >
+              <option value="">Nenhuma</option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {fmtDate(s.taken_at)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        {r && selected ? (
+          <div className="rounded-md border bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              Achados da avaliação de {fmtDate(selected.assessed_at)} — orientam a prescrição
+            </p>
+            <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              <span>
+                <span className="text-muted-foreground">% gordura </span>
+                <b>{r.bodyFatPct.toFixed(1)}%</b>{' '}
+                <span className="text-muted-foreground">
+                  ({classifyBodyFat(r.inputs.sex, r.bodyFatPct).label})
+                </span>
+              </span>
+              <span>
+                <span className="text-muted-foreground">Massa magra </span>
+                <b>{r.leanMassKg.toFixed(1)} kg</b>
+              </span>
+              <span>
+                <span className="text-muted-foreground">Massa gorda </span>
+                <b>{r.fatMassKg.toFixed(1)} kg</b>
+              </span>
+              <span>
+                <span className="text-muted-foreground">Peso </span>
+                <b>{selected.weight_kg} kg</b>
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -760,7 +883,15 @@ function WeeksCard({
   onOverride,
 }: {
   plan: EditorPlan
-  flatExercises: { key: string; tag: string; name: string; templateSets: number }[]
+  flatExercises: {
+    key: string
+    tag: string
+    name: string
+    templateSets: number
+    templateReps: string
+    templateRir: number | null
+    templateRest: number | null
+  }[]
   onWeekMeta: (week: number, patch: Partial<{ label: string | null; isDeload: boolean }>) => void
   onOverride: (week: number, exKey: string, patch: Partial<EditorOverride>) => void
 }) {
@@ -810,38 +941,87 @@ function WeeksCard({
                 />
               </div>
               {isOpen ? (
-                <div className="space-y-1 border-t p-2">
+                <div className="space-y-1.5 border-t p-2">
                   <p className="text-xs text-muted-foreground">
-                    Ajuste séries ou marque para pular nesta semana. Vazio = igual ao template.
+                    Ajuste séries/reps/RIR/descanso ou marque pular. Em branco = igual ao template.
                   </p>
+                  <div className="hidden items-center gap-2 px-1 text-[11px] text-muted-foreground sm:flex">
+                    <span className="w-36">Exercício</span>
+                    <span className="w-14 text-center">séries</span>
+                    <span className="w-16 text-center">reps</span>
+                    <span className="w-12 text-center">RIR</span>
+                    <span className="w-16 text-center">desc (s)</span>
+                    <span className="w-10 text-center">pular</span>
+                  </div>
                   {flatExercises.map((ex) => {
                     const ov = overrideOf(week, ex.key)
+                    const skip = ov?.isSkipped ?? false
                     return (
-                      <div key={ex.key} className="flex items-center gap-2 text-sm">
-                        <span className="w-40 shrink-0 truncate">
+                      <div
+                        key={ex.key}
+                        className="flex flex-wrap items-center gap-2 text-sm sm:flex-nowrap"
+                      >
+                        <span className="w-full truncate sm:w-36">
                           <span className="text-muted-foreground">{ex.tag}</span> {ex.name}
                         </span>
                         <Input
-                          className="h-8 w-20"
+                          className="h-8 w-14"
                           type="number"
                           min={1}
                           max={20}
-                          placeholder={`${ex.templateSets} séries`}
+                          placeholder={String(ex.templateSets)}
                           value={ov?.sets ?? ''}
-                          disabled={ov?.isSkipped ?? false}
+                          disabled={skip}
                           onChange={(e) =>
                             onOverride(week, ex.key, {
                               sets: e.target.value === '' ? null : Number(e.target.value),
                             })
                           }
                         />
-                        <label className="flex items-center gap-1 text-xs">
+                        <Input
+                          className="h-8 w-16"
+                          placeholder={ex.templateReps}
+                          value={ov?.reps ?? ''}
+                          disabled={skip}
+                          onChange={(e) => onOverride(week, ex.key, { reps: e.target.value || null })}
+                        />
+                        <Input
+                          className="h-8 w-12"
+                          type="number"
+                          min={0}
+                          max={10}
+                          placeholder={ex.templateRir != null ? String(ex.templateRir) : '—'}
+                          value={ov?.rir ?? ''}
+                          disabled={skip}
+                          onChange={(e) =>
+                            onOverride(week, ex.key, {
+                              rir: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <Input
+                          className="h-8 w-16"
+                          type="number"
+                          min={0}
+                          max={600}
+                          placeholder={ex.templateRest != null ? String(ex.templateRest) : '—'}
+                          value={ov?.restSeconds ?? ''}
+                          disabled={skip}
+                          onChange={(e) =>
+                            onOverride(week, ex.key, {
+                              restSeconds: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                        />
+                        <label
+                          className="flex w-10 items-center justify-center"
+                          title="Pular nesta semana"
+                        >
                           <input
                             type="checkbox"
-                            checked={ov?.isSkipped ?? false}
+                            checked={skip}
                             onChange={(e) => onOverride(week, ex.key, { isSkipped: e.target.checked })}
                           />
-                          pular
                         </label>
                       </div>
                     )

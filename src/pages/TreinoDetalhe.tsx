@@ -7,8 +7,11 @@ import { useSubject } from '../features/subjects/hooks'
 import {
   useDeleteWorkoutPlan,
   useExercises,
+  useSetWorkoutPlanStatus,
   useWorkoutPlan,
 } from '../features/workout/hooks'
+import { useAssessments } from '../features/assessment/hooks'
+import { useSessions } from '../features/posture/hooks'
 import type { WorkoutExerciseRow } from '../features/workout/api'
 import { goalLabel, snapshotVolumeItems, type VolumeSnapshot } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
@@ -28,6 +31,12 @@ function fmtSets(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Rascunho',
+  active: 'Ativo',
+  archived: 'Arquivado',
+}
+
 function exerciseMeta(ex: WorkoutExerciseRow): string {
   const parts: string[] = []
   if (ex.rir != null) parts.push(`RIR ${fmtSets(ex.rir)}`)
@@ -45,6 +54,9 @@ export default function TreinoDetalhe() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const deleteMut = useDeleteWorkoutPlan(id)
+  const statusMut = useSetWorkoutPlanStatus(id, planId)
+  const assessmentsQ = useAssessments(id)
+  const sessionsQ = useSessions(id)
   const [pdfBusy, setPdfBusy] = useState(false)
 
   const exerciseNames = useMemo(() => {
@@ -70,6 +82,17 @@ export default function TreinoDetalhe() {
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = formatDate(plan.starts_on)
 
+  const srcAssessment = plan.source_assessment_id
+    ? (assessmentsQ.data ?? []).find((a) => a.id === plan.source_assessment_id) ?? null
+    : null
+  const srcSession = plan.source_posture_session_id
+    ? (sessionsQ.data ?? []).find((s) => s.id === plan.source_posture_session_id) ?? null
+    : null
+  const srcBodyFat =
+    srcAssessment != null
+      ? (srcAssessment.results as { bodyFatPct?: number } | null)?.bodyFatPct ?? null
+      : null
+
   const exNameByWorkoutExerciseId = new Map(
     exercises.map((e) => [e.id, exerciseNames[e.exercise_id] ?? 'Exercício'])
   )
@@ -93,6 +116,14 @@ export default function TreinoDetalhe() {
         weeks,
         overrides,
         exerciseNames,
+        source:
+          srcAssessment || srcSession
+            ? {
+                assessmentDate: srcAssessment ? srcAssessment.assessed_at : null,
+                bodyFatPct: srcBodyFat,
+                postureDate: srcSession ? srcSession.taken_at : null,
+              }
+            : undefined,
       })
       downloadBlob(blob, `treino-${plan.name.replace(/\s+/g, '-').toLowerCase()}.pdf`)
       if (organization && user) {
@@ -131,6 +162,38 @@ export default function TreinoDetalhe() {
             {goalLabel(plan.goal)} · {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
             {startsOn ? ` · início ${startsOn}` : ''}
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+            <Badge variant={plan.status === 'active' ? 'success' : 'secondary'}>
+              {STATUS_LABELS[plan.status] ?? plan.status}
+            </Badge>
+            {plan.status !== 'active' ? (
+              <button
+                onClick={() => statusMut.mutate('active')}
+                disabled={statusMut.isPending}
+                className="text-primary hover:underline"
+              >
+                Ativar
+              </button>
+            ) : null}
+            {plan.status !== 'archived' ? (
+              <button
+                onClick={() => statusMut.mutate('archived')}
+                disabled={statusMut.isPending}
+                className="text-muted-foreground hover:underline"
+              >
+                Arquivar
+              </button>
+            ) : null}
+            {plan.status !== 'draft' ? (
+              <button
+                onClick={() => statusMut.mutate('draft')}
+                disabled={statusMut.isPending}
+                className="text-muted-foreground hover:underline"
+              >
+                Voltar a rascunho
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <Button asChild variant="outline" size="sm">
@@ -155,6 +218,45 @@ export default function TreinoDetalhe() {
 
       {deleteMut.error ? (
         <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
+      ) : null}
+
+      {srcAssessment || srcSession ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Base da prescrição</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            {srcAssessment ? (
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="text-muted-foreground">Avaliação física: </span>
+                  {formatDate(srcAssessment.assessed_at)}
+                  {srcBodyFat != null ? ` · ${srcBodyFat.toFixed(1)}% gordura` : ''}
+                </span>
+                <Link
+                  to={`/avaliados/${id}/avaliacoes/${srcAssessment.id}`}
+                  className="shrink-0 text-xs text-primary hover:underline"
+                >
+                  ver
+                </Link>
+              </div>
+            ) : null}
+            {srcSession ? (
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="text-muted-foreground">Avaliação postural: </span>
+                  {formatDate(srcSession.taken_at)}
+                </span>
+                <Link
+                  to={`/avaliados/${id}/postural/${srcSession.id}`}
+                  className="shrink-0 text-xs text-primary hover:underline"
+                >
+                  ver
+                </Link>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       {snapshot ? (
