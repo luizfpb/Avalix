@@ -899,6 +899,125 @@ export type Database = {
           },
         ]
       }
+      workout_log_sets: {
+        Row: {
+          created_at: string
+          exercise_id: string
+          id: string
+          log_id: string
+          org_id: string
+          reps: number | null
+          rir: number | null
+          set_number: number
+          weight_kg: number | null
+        }
+        Insert: {
+          created_at?: string
+          exercise_id: string
+          id?: string
+          log_id: string
+          org_id: string
+          reps?: number | null
+          rir?: number | null
+          set_number: number
+          weight_kg?: number | null
+        }
+        Update: {
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          log_id?: string
+          org_id?: string
+          reps?: number | null
+          rir?: number | null
+          set_number?: number
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_log_sets_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_log_sets_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_log_sets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_logs: {
+        Row: {
+          created_at: string
+          day_label: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          performed_at: string
+          plan_id: string
+          subject_id: string
+          updated_at: string
+          week_number: number | null
+        }
+        Insert: {
+          created_at?: string
+          day_label?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          performed_at?: string
+          plan_id: string
+          subject_id: string
+          updated_at?: string
+          week_number?: number | null
+        }
+        Update: {
+          created_at?: string
+          day_label?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          performed_at?: string
+          plan_id?: string
+          subject_id?: string
+          updated_at?: string
+          week_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_plans: {
         Row: {
           created_at: string

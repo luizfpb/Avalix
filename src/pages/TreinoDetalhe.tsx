@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil, Trash2, Copy, Share2 } from 'lucide-react'
+import { Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
 import { useSubject, useSubjects } from '../features/subjects/hooks'
@@ -266,6 +266,11 @@ export default function TreinoDetalhe() {
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Button asChild size="sm">
+            <Link to={`/avaliados/${id}/treinos/${plan.id}/execucao`}>
+              <ClipboardList /> Execução
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link to={`/avaliados/${id}/treinos/${plan.id}/editar`}>
               <Pencil /> Editar

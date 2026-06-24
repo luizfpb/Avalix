@@ -1,16 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createCustomExercise,
+  createWorkoutLog,
   createWorkoutPlan,
   deleteCustomExercise,
+  deleteWorkoutLog,
   deleteWorkoutPlan,
   getWorkoutPlan,
   listExercises,
+  listPlanSetHistory,
+  listWorkoutLogs,
   listWorkoutPlans,
   setWorkoutPlanStatus,
   updateCustomExercise,
   updateWorkoutPlan,
   type CreateExerciseInput,
+  type CreateWorkoutLogInput,
   type SaveWorkoutPlanInput,
   type UpdateExerciseInput,
 } from './api'
@@ -114,6 +119,44 @@ export function useDuplicateWorkoutPlan() {
     mutationFn: (input: SaveWorkoutPlanInput) => createWorkoutPlan(input),
     onSuccess: (plan) => {
       qc.invalidateQueries({ queryKey: ['workout-plans', plan.subject_id] })
+    },
+  })
+}
+
+export function useWorkoutLogs(planId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-logs', planId],
+    queryFn: () => listWorkoutLogs(planId as string),
+    enabled: !!planId,
+  })
+}
+
+export function usePlanSetHistory(planId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-set-history', planId],
+    queryFn: () => listPlanSetHistory(planId as string),
+    enabled: !!planId,
+  })
+}
+
+export function useCreateWorkoutLog(planId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateWorkoutLogInput) => createWorkoutLog(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
+      qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
+    },
+  })
+}
+
+export function useDeleteWorkoutLog(planId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteWorkoutLog(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
+      qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
     },
   })
 }

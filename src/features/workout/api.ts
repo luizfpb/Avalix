@@ -8,6 +8,8 @@ export type WorkoutDayRow = Database['public']['Tables']['workout_days']['Row']
 export type WorkoutExerciseRow = Database['public']['Tables']['workout_exercises']['Row']
 export type WorkoutWeekOverrideRow = Database['public']['Tables']['workout_week_overrides']['Row']
 export type WorkoutWeekRow = Database['public']['Tables']['workout_weeks']['Row']
+export type WorkoutLogRow = Database['public']['Tables']['workout_logs']['Row']
+export type WorkoutLogSetRow = Database['public']['Tables']['workout_log_sets']['Row']
 
 // =====================================================================
 // BIBLIOTECA DE EXERCICIOS
@@ -389,6 +391,117 @@ export async function deleteWorkoutPlan(id: string): Promise<void> {
   // registra o DELETE do plano.
   const { error } = await supabase.from('workout_plans').delete().eq('id', id)
   if (error) throw error
+}
+
+// =====================================================================
+// LOG DE EXECUCAO (fecha o ciclo prescrever -> executar -> medir)
+// =====================================================================
+
+export type NewLogSet = {
+  exerciseId: string
+  setNumber: number
+  weightKg: number | null
+  reps: number | null
+  rir: number | null
+}
+
+export type CreateWorkoutLogInput = {
+  orgId: string
+  subjectId: string
+  planId: string
+  dayLabel: string | null
+  weekNumber: number | null
+  performedAt: string
+  notes: string | null
+  sets: NewLogSet[]
+}
+
+// Cria a sessao executada + as series. org_id/subject_id sao recopiados do
+// plano pelos triggers; os valores enviados sao so pra satisfazer o tipo.
+export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<WorkoutLogRow> {
+  const { data: log, error } = await supabase
+    .from('workout_logs')
+    .insert({
+      org_id: input.orgId,
+      subject_id: input.subjectId,
+      plan_id: input.planId,
+      day_label: input.dayLabel,
+      week_number: input.weekNumber,
+      performed_at: input.performedAt,
+      notes: input.notes,
+    })
+    .select('*')
+    .single()
+  if (error) throw error
+
+  if (input.sets.length > 0) {
+    const { error: setErr } = await supabase.from('workout_log_sets').insert(
+      input.sets.map((s) => ({
+        org_id: input.orgId,
+        log_id: log.id,
+        exercise_id: s.exerciseId,
+        set_number: s.setNumber,
+        weight_kg: s.weightKg,
+        reps: s.reps,
+        rir: s.rir,
+      }))
+    )
+    if (setErr) throw setErr
+  }
+  return log
+}
+
+export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> {
+  const { data, error } = await supabase
+    .from('workout_logs')
+    .select('*')
+    .eq('plan_id', planId)
+    .order('performed_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function listWorkoutLogSets(logId: string): Promise<WorkoutLogSetRow[]> {
+  const { data, error } = await supabase
+    .from('workout_log_sets')
+    .select('*')
+    .eq('log_id', logId)
+    .order('set_number')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function deleteWorkoutLog(id: string): Promise<void> {
+  // cascade leva as series; a auditoria registra o DELETE do log
+  const { error } = await supabase.from('workout_logs').delete().eq('id', id)
+  if (error) throw error
+}
+
+export type SetHistoryPoint = {
+  exerciseId: string
+  performedAt: string
+  weightKg: number | null
+  reps: number | null
+}
+
+// Todas as series executadas do plano com a data da sessao (via join), pra
+// montar a progressao de carga / e1RM por exercicio. RLS continua valendo.
+export async function listPlanSetHistory(planId: string): Promise<SetHistoryPoint[]> {
+  const { data, error } = await supabase
+    .from('workout_log_sets')
+    .select('exercise_id, weight_kg, reps, workout_logs!inner(plan_id, performed_at)')
+    .eq('workout_logs.plan_id', planId)
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Array<{
+    exercise_id: string
+    weight_kg: number | null
+    reps: number | null
+    workout_logs: { performed_at: string } | { performed_at: string }[]
+  }>
+  return rows.map(({ exercise_id, weight_kg, reps, workout_logs }) => {
+    const l = Array.isArray(workout_logs) ? workout_logs[0] : workout_logs
+    return { exerciseId: exercise_id, performedAt: l?.performed_at ?? '', weightKg: weight_kg, reps }
+  })
 }
 
 // Muda so o status (rascunho/ativo/arquivado) sem reescrever a estrutura. org_id/
