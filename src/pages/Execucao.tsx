@@ -10,8 +10,14 @@ import {
   useWorkoutLogs,
   useWorkoutPlan,
 } from '../features/workout/hooks'
-import type { NewLogSet, WorkoutPlanDetail } from '../features/workout/api'
+import type { NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
 import { adherencePct, exerciseProgression, plannedSessions } from '../features/workout/progress'
+import {
+  latestBestByExercise,
+  parseRepRange,
+  suggestProgression,
+  type ProgressionKind,
+} from '../features/workout/progression'
 import { roundToIncrement } from '../features/workout/oneRm'
 import { linePath } from '../features/reports/charts'
 import { Button } from '@/components/ui/button'
@@ -105,6 +111,7 @@ export default function Execucao() {
         orgId={organization?.id ?? ''}
         subjectId={plan.subject_id}
         names={names}
+        history={historyQuery.data ?? []}
       />
 
       <section className="space-y-3">
@@ -186,18 +193,29 @@ export default function Execucao() {
 
 type Row = { weight: string; reps: string; rir: string }
 
+const KIND_LABEL: Record<ProgressionKind, string> = {
+  increase_load: 'subir carga',
+  add_reps: '+1 rep',
+  hold: 'manter',
+  reduce: 'reduzir',
+  insufficient: '',
+}
+
 function LogForm({
   detail,
   orgId,
   subjectId,
   names,
+  history,
 }: {
   detail: WorkoutPlanDetail
   orgId: string
   subjectId: string
   names: Record<string, string>
+  history: SetHistoryPoint[]
 }) {
   const planId = detail.plan?.id ?? ''
+  const lastByExercise = useMemo(() => latestBestByExercise(history), [history])
   const days = useMemo(
     () => detail.days.slice().sort((a, b) => a.position - b.position),
     [detail.days]
@@ -334,6 +352,26 @@ function LogForm({
                   plano: {ex.sets}×{ex.reps}
                 </span>
               </div>
+              {(() => {
+                const last = lastByExercise.get(ex.exercise_id)
+                if (!last) return null
+                const s = suggestProgression({
+                  last,
+                  repRange: parseRepRange(ex.reps),
+                  targetRir: ex.rir,
+                })
+                if (s.kind === 'insufficient') return null
+                return (
+                  <p className="mt-1 text-xs text-primary" title={s.reason}>
+                    última {last.weightKg}×{last.reps}
+                    {last.rir != null ? ` (RIR ${last.rir})` : ''} → sugestão{' '}
+                    {s.suggestedWeightKg != null
+                      ? `${roundToIncrement(s.suggestedWeightKg).toFixed(1)} kg`
+                      : ''}
+                    {s.suggestedReps != null ? ` × ${s.suggestedReps}` : ''} · {KIND_LABEL[s.kind]}
+                  </p>
+                )
+              })()}
               <div className="mt-2 space-y-1">
                 <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
                   <span className="w-6" />

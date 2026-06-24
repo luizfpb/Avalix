@@ -482,25 +482,33 @@ export type SetHistoryPoint = {
   performedAt: string
   weightKg: number | null
   reps: number | null
+  rir: number | null
 }
 
 // Todas as series executadas do plano com a data da sessao (via join), pra
-// montar a progressao de carga / e1RM por exercicio. RLS continua valendo.
+// montar a progressao de carga / e1RM e as sugestoes por exercicio. RLS vale.
 export async function listPlanSetHistory(planId: string): Promise<SetHistoryPoint[]> {
   const { data, error } = await supabase
     .from('workout_log_sets')
-    .select('exercise_id, weight_kg, reps, workout_logs!inner(plan_id, performed_at)')
+    .select('exercise_id, weight_kg, reps, rir, workout_logs!inner(plan_id, performed_at)')
     .eq('workout_logs.plan_id', planId)
   if (error) throw error
   const rows = (data ?? []) as unknown as Array<{
     exercise_id: string
     weight_kg: number | null
     reps: number | null
+    rir: number | null
     workout_logs: { performed_at: string } | { performed_at: string }[]
   }>
-  return rows.map(({ exercise_id, weight_kg, reps, workout_logs }) => {
+  return rows.map(({ exercise_id, weight_kg, reps, rir, workout_logs }) => {
     const l = Array.isArray(workout_logs) ? workout_logs[0] : workout_logs
-    return { exerciseId: exercise_id, performedAt: l?.performed_at ?? '', weightKg: weight_kg, reps }
+    return {
+      exerciseId: exercise_id,
+      performedAt: l?.performed_at ?? '',
+      weightKg: weight_kg,
+      reps,
+      rir,
+    }
   })
 }
 

@@ -17,14 +17,14 @@ describe('plannedSessions / adherencePct', () => {
 describe('exerciseProgression', () => {
   const history: SetHistoryPoint[] = [
     // supino, sessão 1: melhor série 100x5 -> e1RM 116.67
-    { exerciseId: 'sup', performedAt: '2026-01-01', weightKg: 90, reps: 8 },
-    { exerciseId: 'sup', performedAt: '2026-01-01', weightKg: 100, reps: 5 },
+    { exerciseId: 'sup', performedAt: '2026-01-01', weightKg: 90, reps: 8, rir: 3 },
+    { exerciseId: 'sup', performedAt: '2026-01-01', weightKg: 100, reps: 5, rir: 1 },
     // supino, sessão 2: 105x5 -> 122.5
-    { exerciseId: 'sup', performedAt: '2026-01-08', weightKg: 105, reps: 5 },
+    { exerciseId: 'sup', performedAt: '2026-01-08', weightKg: 105, reps: 5, rir: 1 },
     // agacho, uma sessão
-    { exerciseId: 'agacho', performedAt: '2026-01-02', weightKg: 140, reps: 5 },
+    { exerciseId: 'agacho', performedAt: '2026-01-02', weightKg: 140, reps: 5, rir: 2 },
     // série sem carga/reps é ignorada
-    { exerciseId: 'abdominal', performedAt: '2026-01-02', weightKg: null, reps: 20 },
+    { exerciseId: 'abdominal', performedAt: '2026-01-02', weightKg: null, reps: 20, rir: null },
   ]
 
   it('agrupa por exercício e guarda o melhor e1RM por dia', () => {
