@@ -5,6 +5,8 @@ import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useAnamneses } from '../features/anamnesis/hooks'
+import { useWorkoutPlans } from '../features/workout/hooks'
+import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
 import { useSessions } from '../features/posture/hooks'
 import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
@@ -142,8 +144,52 @@ export default function AvaliadoDetalhe() {
 
       <AssessmentsSection subjectId={s.id} />
 
+      <WorkoutSection subjectId={s.id} />
+
       <PosturalSection subjectId={s.id} />
     </div>
+  )
+}
+
+function WorkoutSection({ subjectId }: { subjectId: string }) {
+  const plansQuery = useWorkoutPlans(subjectId)
+  const plans = plansQuery.data ?? []
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Treinos</h2>
+        <Button asChild size="sm">
+          <Link to={`/avaliados/${subjectId}/treinos/nova`}>Novo plano</Link>
+        </Button>
+      </div>
+      {plansQuery.isPending ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : plans.length > 0 ? (
+        <ul className="divide-y rounded-md border bg-card">
+          {plans.map((p) => (
+            <li key={p.id}>
+              <Link
+                to={`/avaliados/${subjectId}/treinos/${p.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+              >
+                <span className="min-w-0 truncate">
+                  {p.name}{' '}
+                  <span className="text-muted-foreground">
+                    · {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'sem' : 'sems'}
+                  </span>
+                </span>
+                {p.status !== 'active' ? (
+                  <Badge variant="secondary">{p.status === 'draft' ? 'Rascunho' : 'Arquivado'}</Badge>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">Nenhum plano de treino ainda.</p>
+      )}
+    </section>
   )
 }
 

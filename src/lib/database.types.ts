@@ -82,7 +82,29 @@ export type Database = {
           subject_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "anamneses_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamneses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamneses_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       assessments: {
         Row: {
@@ -292,6 +314,66 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cues: string | null
+          equipment: string
+          id: string
+          is_unilateral: boolean
+          movement_pattern: string
+          name: string
+          org_id: string | null
+          primary_muscle: string
+          secondary_muscles: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cues?: string | null
+          equipment: string
+          id?: string
+          is_unilateral?: boolean
+          movement_pattern: string
+          name: string
+          org_id?: string | null
+          primary_muscle: string
+          secondary_muscles?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cues?: string | null
+          equipment?: string
+          id?: string
+          is_unilateral?: boolean
+          movement_pattern?: string
+          name?: string
+          org_id?: string | null
+          primary_muscle?: string
+          secondary_muscles?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercises_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercises_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -701,6 +783,326 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_days: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          name: string | null
+          org_id: string
+          plan_id: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          name?: string | null
+          org_id: string
+          plan_id: string
+          position: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          name?: string | null
+          org_id?: string
+          plan_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_days_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_days_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_exercises: {
+        Row: {
+          created_at: string
+          day_id: string
+          exercise_id: string
+          id: string
+          notes: string | null
+          org_id: string
+          position: number
+          reps: string
+          rest_seconds: number | null
+          rir: number | null
+          sets: number
+          tempo: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_id: string
+          exercise_id: string
+          id?: string
+          notes?: string | null
+          org_id: string
+          position: number
+          reps: string
+          rest_seconds?: number | null
+          rir?: number | null
+          sets: number
+          tempo?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_id?: string
+          exercise_id?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          position?: number
+          reps?: string
+          rest_seconds?: number | null
+          rir?: number | null
+          sets?: number
+          tempo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_exercises_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "workout_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercises_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_plans: {
+        Row: {
+          created_at: string
+          evaluator_id: string
+          goal: string | null
+          id: string
+          name: string
+          notes: string | null
+          org_id: string
+          source_assessment_id: string | null
+          source_posture_session_id: string | null
+          starts_on: string | null
+          status: string
+          subject_id: string
+          updated_at: string
+          volume: Json | null
+          volume_engine_version: string | null
+          weeks: number
+        }
+        Insert: {
+          created_at?: string
+          evaluator_id?: string
+          goal?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          org_id: string
+          source_assessment_id?: string | null
+          source_posture_session_id?: string | null
+          starts_on?: string | null
+          status?: string
+          subject_id: string
+          updated_at?: string
+          volume?: Json | null
+          volume_engine_version?: string | null
+          weeks?: number
+        }
+        Update: {
+          created_at?: string
+          evaluator_id?: string
+          goal?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          org_id?: string
+          source_assessment_id?: string | null
+          source_posture_session_id?: string | null
+          starts_on?: string | null
+          status?: string
+          subject_id?: string
+          updated_at?: string
+          volume?: Json | null
+          volume_engine_version?: string | null
+          weeks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_plans_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_plans_source_assessment_id_fkey"
+            columns: ["source_assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_plans_source_posture_session_id_fkey"
+            columns: ["source_posture_session_id"]
+            isOneToOne: false
+            referencedRelation: "posture_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_plans_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_week_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          is_skipped: boolean
+          notes: string | null
+          org_id: string
+          plan_id: string
+          reps: string | null
+          rest_seconds: number | null
+          rir: number | null
+          sets: number | null
+          week_number: number
+          workout_exercise_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          org_id: string
+          plan_id: string
+          reps?: string | null
+          rest_seconds?: number | null
+          rir?: number | null
+          sets?: number | null
+          week_number: number
+          workout_exercise_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          org_id?: string
+          plan_id?: string
+          reps?: string | null
+          rest_seconds?: number | null
+          rir?: number | null
+          sets?: number | null
+          week_number?: number
+          workout_exercise_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_week_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_week_overrides_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_week_overrides_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_weeks: {
+        Row: {
+          created_at: string
+          id: string
+          is_deload: boolean
+          label: string | null
+          notes: string | null
+          org_id: string
+          plan_id: string
+          week_number: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_deload?: boolean
+          label?: string | null
+          notes?: string | null
+          org_id: string
+          plan_id: string
+          week_number: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_deload?: boolean
+          label?: string | null
+          notes?: string | null
+          org_id?: string
+          plan_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_weeks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_weeks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
             referencedColumns: ["id"]
           },
         ]

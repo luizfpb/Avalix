@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { donutSlices, linePath } from './charts'
+import { barLayout, donutSlices, linePath } from './charts'
 
 describe('donutSlices', () => {
   it('duas fatias iguais → 50% cada', () => {
@@ -27,5 +27,34 @@ describe('linePath', () => {
     expect(l.coords).toHaveLength(3)
     expect(l.coords[1].valid).toBe(false)
     expect(l.points.split(' ')).toHaveLength(2)
+  })
+})
+
+describe('barLayout', () => {
+  it('escala pelo maior valor: o maior vira barra cheia', () => {
+    const { bars, max } = barLayout([
+      { label: 'a', value: 5 },
+      { label: 'b', value: 10 },
+    ], 200, 8, 4)
+    expect(max).toBe(10)
+    expect(bars[1].pct).toBe(1)
+    expect(bars[1].width).toBe(200)
+    expect(bars[0].pct).toBe(0.5)
+    expect(bars[0].width).toBe(100)
+    // empilhamento vertical
+    expect(bars[0].y).toBe(0)
+    expect(bars[1].y).toBe(12) // 8 + 4 de gap
+  })
+
+  it('respeita maxValue fixo e zera negativos', () => {
+    const { bars } = barLayout([{ label: 'a', value: -3 }, { label: 'b', value: 5 }], 100, 8, 4, 10)
+    expect(bars[0].pct).toBe(0)
+    expect(bars[1].pct).toBe(0.5)
+  })
+
+  it('série vazia ou max zero não quebra', () => {
+    expect(barLayout([], 100, 8).bars).toEqual([])
+    const { bars } = barLayout([{ label: 'a', value: 0 }], 100, 8)
+    expect(bars[0].pct).toBe(0)
   })
 })

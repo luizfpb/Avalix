@@ -93,3 +93,45 @@ export function linePath(
     .join(' ')
   return { points, coords, min, max }
 }
+
+export type BarLayout = {
+  bars: {
+    label: string
+    value: number
+    pct: number // 0..1, fração do maior valor (ou de maxValue)
+    x: number
+    y: number
+    width: number
+    height: number
+  }[]
+  max: number
+  height: number // altura total ocupada
+}
+
+// Barras horizontais a partir de pares (rótulo, valor). Escala pelo maior valor
+// da série, ou por maxValue fixo. Empilhadas verticalmente, origem no topo. A UI
+// pode usar `pct` (largura em %) ou a geometria em px (Svg). Valores negativos
+// viram 0. Geometria pura, sem DOM — testável como donutSlices/linePath.
+export function barLayout(
+  items: { label: string; value: number }[],
+  width: number,
+  barHeight: number,
+  gap = 4,
+  maxValue?: number
+): BarLayout {
+  const max = maxValue ?? items.reduce((m, it) => Math.max(m, it.value), 0)
+  const bars = items.map((it, i) => {
+    const pct = max > 0 ? Math.max(0, it.value) / max : 0
+    return {
+      label: it.label,
+      value: it.value,
+      pct,
+      x: 0,
+      y: i * (barHeight + gap),
+      width: r2(pct * width),
+      height: barHeight,
+    }
+  })
+  const height = items.length > 0 ? items.length * barHeight + (items.length - 1) * gap : 0
+  return { bars, max, height }
+}
