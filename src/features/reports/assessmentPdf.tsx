@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Svg, Path, Polyline, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Svg, Path, Polyline, Image, pdf } from '@react-pdf/renderer'
 import type {
   AssessmentRow,
   CircumferenceReadingRow,
@@ -18,6 +18,8 @@ const FAT = '#d4537e'
 export type AssessmentPdfData = {
   orgName: string
   subjectName: string
+  // logo da org como data URL (branding); ausente = plaqueta AVALIX
+  logoUrl?: string | null
   assessment: AssessmentRow
   skinfolds: SkinfoldReadingRow[]
   circumferences: CircumferenceReadingRow[]
@@ -40,6 +42,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   plateText: { fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 2, color: '#ECE3FA' },
+  logo: { height: 40, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 10 },
   org: { fontSize: 9, color: '#666' },
   h1: { fontSize: 16, marginTop: 2, marginBottom: 12, color: '#2A0E52' },
   meta: { marginBottom: 14, lineHeight: 1.4 },
@@ -122,9 +125,13 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.plate}>
-          <Text style={styles.plateText}>AVALIX</Text>
-        </View>
+        {data.logoUrl ? (
+          <Image src={data.logoUrl} style={styles.logo} />
+        ) : (
+          <View style={styles.plate}>
+            <Text style={styles.plateText}>AVALIX</Text>
+          </View>
+        )}
         <Text style={styles.org}>{data.orgName}</Text>
         <Text style={styles.h1}>Relatório de Avaliação Física</Text>
 

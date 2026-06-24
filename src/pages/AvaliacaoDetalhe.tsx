@@ -7,6 +7,7 @@ import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
+import { loadOrgLogoDataUrl } from '../features/organization/logo'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -77,9 +78,11 @@ export default function AvaliacaoDetalhe() {
           const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.assessed_at)
           return { date: m ? `${m[3]}/${m[2]}` : x.assessed_at, bodyFatPct: rr?.bodyFatPct ?? null }
         })
+      const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
       const blob = await generateAssessmentPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
+        logoUrl,
         assessment,
         skinfolds,
         circumferences,

@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
 import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -51,9 +52,12 @@ export default function Configuracoes() {
             <Building2 className="size-4 text-muted-foreground" /> Organização
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <Info label="Nome" value={organization?.name ?? '-'} />
-          <Info label="Seu papel" value={role ?? '-'} />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Info label="Nome" value={organization?.name ?? '-'} />
+            <Info label="Seu papel" value={role ?? '-'} />
+          </div>
+          <LogoSettings />
         </CardContent>
       </Card>
 
@@ -109,6 +113,75 @@ function Info({ label, value }: { label: string; value: string }) {
     <div>
       <span className="block text-xs text-muted-foreground">{label}</span>
       <span className="block text-sm">{value}</span>
+    </div>
+  )
+}
+
+function LogoSettings() {
+  const { organization, role, refresh } = useOrganization()
+  const canManage = role === 'owner' || role === 'admin'
+  const [preview, setPreview] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const logoPath = organization?.logo_path
+
+  useEffect(() => {
+    let active = true
+    setPreview(null)
+    if (logoPath) {
+      void signedLogoUrl(logoPath).then((url) => {
+        if (active) setPreview(url)
+      })
+    }
+    return () => {
+      active = false
+    }
+  }, [logoPath])
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !organization) return
+    setBusy(true)
+    setError(null)
+    try {
+      await uploadOrgLogo(organization.id, file)
+      await refresh()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <span className="block text-xs text-muted-foreground">Logo (aparece no PDF dos relatórios)</span>
+      <div className="flex items-center gap-3">
+        <div className="grid h-14 w-28 place-items-center overflow-hidden rounded-md border bg-card">
+          {preview ? (
+            <img src={preview} alt="Logo da organização" className="max-h-12 max-w-24 object-contain" />
+          ) : (
+            <span className="text-xs text-muted-foreground">sem logo</span>
+          )}
+        </div>
+        {canManage ? (
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={onFile}
+              disabled={busy}
+            />
+            <span className="inline-flex items-center rounded-md border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-accent">
+              {busy ? 'Enviando...' : logoPath ? 'Trocar logo' : 'Enviar logo'}
+            </span>
+          </label>
+        ) : null}
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <p className="text-[11px] text-muted-foreground">PNG, JPEG ou WebP, até 1 MB.</p>
     </div>
   )
 }

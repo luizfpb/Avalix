@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, pdf } from '@react-pdf/renderer'
 import type {
   WorkoutDayRow,
   WorkoutExerciseRow,
@@ -44,6 +44,8 @@ export type WorkoutPdfData = {
     bodyFatPct?: number | null
     postureDate?: string | null
   }
+  // logo da org como data URL (branding); ausente = plaqueta AVALIX
+  logoUrl?: string | null
 }
 
 const styles = StyleSheet.create({
@@ -58,6 +60,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   plateText: { fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 2, color: '#ECE3FA' },
+  logo: { height: 40, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 10 },
   org: { fontSize: 9, color: '#666' },
   h1: { fontSize: 16, marginTop: 2, marginBottom: 12, color: PLUM },
   meta: { marginBottom: 14, lineHeight: 1.4 },
@@ -246,9 +249,13 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.plate}>
-          <Text style={styles.plateText}>AVALIX</Text>
-        </View>
+        {data.logoUrl ? (
+          <Image src={data.logoUrl} style={styles.logo} />
+        ) : (
+          <View style={styles.plate}>
+            <Text style={styles.plateText}>AVALIX</Text>
+          </View>
+        )}
         <Text style={styles.org}>{data.orgName}</Text>
         <Text style={styles.h1}>Plano de Treino</Text>
 

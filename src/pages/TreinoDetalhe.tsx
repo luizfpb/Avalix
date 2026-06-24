@@ -29,6 +29,7 @@ import {
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
+import { loadOrgLogoDataUrl } from '../features/organization/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -125,9 +126,11 @@ export default function TreinoDetalhe() {
     setPdfBusy(true)
     try {
       const { generateWorkoutPdf } = await import('../features/reports/workoutPdf')
+      const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
       const blob = await generateWorkoutPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
+        logoUrl,
         plan,
         days,
         exercises,
