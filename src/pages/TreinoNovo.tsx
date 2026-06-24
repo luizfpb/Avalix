@@ -1,6 +1,16 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Calculator, X } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  AlertTriangle,
+  Calculator,
+  X,
+  GripVertical,
+} from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import {
@@ -50,6 +60,14 @@ function newKey(): string {
 function fmtDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
+}
+
+// move um item de uma posicao para outra (reordenar dias/exercicios)
+function arrayMove<T>(arr: T[], from: number, to: number): T[] {
+  const next = arr.slice()
+  const [item] = next.splice(from, 1)
+  next.splice(Math.max(0, Math.min(next.length, to)), 0, item)
+  return next
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -136,6 +154,8 @@ function Builder({
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [showCalc, setShowCalc] = useState(false)
+  const [dragDay, setDragDay] = useState<number | null>(null)
+  const [dragEx, setDragEx] = useState<{ dayKey: string; idx: number } | null>(null)
 
   const exercisesById = useMemo(
     () => new Map(exercises.map((e) => [e.id, e])),
@@ -171,6 +191,18 @@ function Builder({
   }
   function removeDay(dayKey: string) {
     setPlan((p) => ({ ...p, days: p.days.filter((d) => d.key !== dayKey) }))
+  }
+  function moveDay(from: number, to: number) {
+    if (to < 0 || to >= plan.days.length) return
+    setPlan((p) => ({ ...p, days: arrayMove(p.days, from, to) }))
+  }
+  function moveExercise(dayKey: string, from: number, to: number) {
+    setPlan((p) => ({
+      ...p,
+      days: p.days.map((d) =>
+        d.key === dayKey ? { ...d, exercises: arrayMove(d.exercises, from, to) } : d
+      ),
+    }))
   }
   function patchDay(dayKey: string, patch: Partial<{ label: string; name: string | null }>) {
     setPlan((p) => ({
@@ -423,9 +455,31 @@ function Builder({
             Nenhuma divisão ainda. Crie A, B, C... e adicione exercícios.
           </p>
         ) : null}
-        {plan.days.map((day) => (
-          <Card key={day.key}>
+        {plan.days.map((day, dayIndex) => (
+          <Card
+            key={day.key}
+            onDragOver={(e) => {
+              if (dragDay !== null) e.preventDefault()
+            }}
+            onDrop={(e) => {
+              if (dragDay !== null) {
+                e.preventDefault()
+                moveDay(dragDay, dayIndex)
+                setDragDay(null)
+              }
+            }}
+            className={dragDay !== null && dragDay !== dayIndex ? 'border-dashed border-primary/60' : ''}
+          >
             <CardHeader className="flex-row items-center gap-2 space-y-0">
+              <span
+                draggable
+                onDragStart={() => setDragDay(dayIndex)}
+                onDragEnd={() => setDragDay(null)}
+                className="cursor-grab text-muted-foreground"
+                title="Arraste para reordenar a divisão"
+              >
+                <GripVertical className="size-4" />
+              </span>
               <Input
                 className="w-16"
                 value={day.label}
@@ -437,6 +491,26 @@ function Builder({
                 onChange={(e) => patchDay(day.key, { name: e.target.value || null })}
                 placeholder="Nome (ex.: Peito e tríceps)"
               />
+              <div className="flex shrink-0 items-center">
+                <button
+                  type="button"
+                  onClick={() => moveDay(dayIndex, dayIndex - 1)}
+                  disabled={dayIndex === 0}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  title="Subir"
+                >
+                  <ChevronUp className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveDay(dayIndex, dayIndex + 1)}
+                  disabled={dayIndex === plan.days.length - 1}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  title="Descer"
+                >
+                  <ChevronDown className="size-4" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => removeDay(day.key)}
@@ -448,11 +522,53 @@ function Builder({
             </CardHeader>
             <CardContent className="space-y-3">
               {day.exercises.map((ex, i) => (
-                <div key={ex.key} className="rounded-md border bg-muted/20 p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">
+                <div
+                  key={ex.key}
+                  onDragOver={(e) => {
+                    if (dragEx?.dayKey === day.key) e.preventDefault()
+                  }}
+                  onDrop={(e) => {
+                    if (dragEx?.dayKey === day.key) {
+                      e.preventDefault()
+                      moveExercise(day.key, dragEx.idx, i)
+                      setDragEx(null)
+                    }
+                  }}
+                  className={`rounded-md border bg-muted/20 p-2 ${
+                    dragEx?.dayKey === day.key && dragEx.idx !== i ? 'border-dashed border-primary/60' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      draggable
+                      onDragStart={() => setDragEx({ dayKey: day.key, idx: i })}
+                      onDragEnd={() => setDragEx(null)}
+                      className="cursor-grab text-muted-foreground"
+                      title="Arraste para reordenar"
+                    >
+                      <GripVertical className="size-4" />
+                    </span>
+                    <span className="flex-1 text-sm font-medium">
                       {i + 1}. {nameOf(ex.exerciseId)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(day.key, i, i - 1)}
+                      disabled={i === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title="Subir"
+                    >
+                      <ChevronUp className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(day.key, i, i + 1)}
+                      disabled={i === day.exercises.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title="Descer"
+                    >
+                      <ChevronDown className="size-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeExercise(day.key, ex.key)}
