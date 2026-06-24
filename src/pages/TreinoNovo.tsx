@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -29,13 +29,13 @@ import {
   exerciseFormToInput,
 } from '../features/workout/schema'
 import {
-  MUSCLE_LABELS,
-  VOLUME_METHOD_NOTE,
   equipmentLabel,
   muscleLabel,
+  snapshotVolumeItems,
   type MuscleGroup,
 } from '../features/workout/volume'
-import { barLayout } from '../features/reports/charts'
+import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
+import { useAnamneses } from '../features/anamnesis/hooks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -314,6 +314,8 @@ function Builder({
         <h1 className="mt-2 text-xl font-semibold">{isEdit ? 'Editar plano' : 'Novo plano de treino'}</h1>
       </div>
 
+      <AnamneseFlag subjectId={subjectId} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nome do plano">
           <Input value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
@@ -351,8 +353,12 @@ function Builder({
         </Field>
       </div>
 
-      {/* Volume ao vivo */}
-      <VolumePanel snapshot={snapshot} />
+      {/* Volume ao vivo, contra os landmarks (MEV/MAV/MRV) */}
+      <VolumeLandmarkPanel
+        items={snapshotVolumeItems(snapshot)}
+        typicalWeek={snapshot.typicalWeek}
+        emptyHint="Adicione exercícios para ver o volume por grupo muscular."
+      />
 
       {/* Divisões */}
       <div className="space-y-3">
@@ -496,41 +502,34 @@ function Builder({
   )
 }
 
-function VolumePanel({ snapshot }: { snapshot: ReturnType<typeof snapshotFromEditor> }) {
-  const items = Object.entries(snapshot.typicalByMuscle)
-    .filter(([, v]) => (v ?? 0) > 0)
-    .map(([m, v]) => ({ label: MUSCLE_LABELS[m as MuscleGroup], value: v as number }))
-    .sort((a, b) => b.value - a.value)
-  const layout = barLayout(items, 1, 8)
-
+function AnamneseFlag({ subjectId }: { subjectId: string }) {
+  const { data } = useAnamneses(subjectId)
+  const latest = data?.[0]
+  if (!latest || (latest.liberado && !latest.flag_encaminhamento)) return null
+  const nivel =
+    latest.nivel_encaminhamento === 'antes_iniciar'
+      ? 'Avaliação médica recomendada antes de iniciar exercício.'
+      : latest.nivel_encaminhamento === 'antes_vigorosa'
+        ? 'Avaliação médica recomendada antes de atividade vigorosa.'
+        : null
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          Volume semanal por grupo (semana {snapshot.typicalWeek})
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {layout.bars.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Adicione exercícios para ver o volume por grupo muscular.
-          </p>
-        ) : (
-          layout.bars.map((b) => (
-            <div key={b.label} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 text-xs">{b.label}</span>
-              <div className="h-2 flex-1 rounded bg-muted">
-                <div className="h-2 rounded bg-primary" style={{ width: `${(b.pct * 100).toFixed(1)}%` }} />
-              </div>
-              <span className="w-8 text-right text-xs font-semibold tabular-nums">
-                {Number.isInteger(b.value) ? b.value : b.value.toFixed(1)}
-              </span>
-            </div>
-          ))
-        )}
-        <p className="text-xs text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
-      </CardContent>
-    </Card>
+    <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-400/30 dark:bg-amber-400/10">
+      <p className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
+        <AlertTriangle className="size-4" /> Anamnese sinaliza atenção
+      </p>
+      {nivel ? <p className="text-amber-900 dark:text-amber-100">{nivel}</p> : null}
+      {latest.flag_encaminhamento ? (
+        <p className="text-amber-900 dark:text-amber-100">
+          Há sinais que pedem encaminhamento profissional. Revise antes de prescrever.
+        </p>
+      ) : null}
+      <Link
+        to={`/avaliados/${subjectId}/anamnese/${latest.id}`}
+        className="inline-block text-xs text-amber-800 underline-offset-4 hover:underline dark:text-amber-300"
+      >
+        Ver anamnese
+      </Link>
+    </div>
   )
 }
 

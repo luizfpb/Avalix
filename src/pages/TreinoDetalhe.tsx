@@ -10,14 +10,8 @@ import {
   useWorkoutPlan,
 } from '../features/workout/hooks'
 import type { WorkoutExerciseRow } from '../features/workout/api'
-import {
-  MUSCLE_LABELS,
-  VOLUME_METHOD_NOTE,
-  goalLabel,
-  type MuscleGroup,
-  type VolumeSnapshot,
-} from '../features/workout/volume'
-import { barLayout } from '../features/reports/charts'
+import { goalLabel, snapshotVolumeItems, type VolumeSnapshot } from '../features/workout/volume'
+import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { Button } from '@/components/ui/button'
@@ -75,14 +69,6 @@ export default function TreinoDetalhe() {
   const snapshot = plan.volume as VolumeSnapshot | null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = formatDate(plan.starts_on)
-
-  const volumeItems = snapshot
-    ? Object.entries(snapshot.typicalByMuscle)
-        .filter(([, v]) => (v ?? 0) > 0)
-        .map(([mm, v]) => ({ label: MUSCLE_LABELS[mm as MuscleGroup], value: v as number }))
-        .sort((a, b) => b.value - a.value)
-    : []
-  const volumeLayout = barLayout(volumeItems, 1, 8)
 
   const exNameByWorkoutExerciseId = new Map(
     exercises.map((e) => [e.id, exerciseNames[e.exercise_id] ?? 'Exercício'])
@@ -171,26 +157,11 @@ export default function TreinoDetalhe() {
         <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
       ) : null}
 
-      {snapshot && volumeLayout.bars.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Volume semanal por grupo (semana {snapshot.typicalWeek})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {volumeLayout.bars.map((b) => (
-              <div key={b.label} className="flex items-center gap-2">
-                <span className="w-28 shrink-0 text-xs">{b.label}</span>
-                <div className="h-2 flex-1 rounded bg-muted">
-                  <div className="h-2 rounded bg-primary" style={{ width: `${(b.pct * 100).toFixed(1)}%` }} />
-                </div>
-                <span className="w-8 text-right text-xs font-semibold tabular-nums">{fmtSets(b.value)}</span>
-              </div>
-            ))}
-            <p className="text-xs text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
-          </CardContent>
-        </Card>
+      {snapshot ? (
+        <VolumeLandmarkPanel
+          items={snapshotVolumeItems(snapshot)}
+          typicalWeek={snapshot.typicalWeek}
+        />
       ) : null}
 
       <section className="space-y-3">

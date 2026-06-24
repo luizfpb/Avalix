@@ -6,12 +6,27 @@ import type {
   WorkoutWeekOverrideRow,
   WorkoutWeekRow,
 } from '../workout/api'
-import type { VolumeSnapshot, MuscleGroup } from '../workout/volume'
-import { MUSCLE_LABELS, MUSCLE_ORDER, VOLUME_METHOD_NOTE, goalLabel } from '../workout/volume'
-import { barLayout } from './charts'
+import type { VolumeSnapshot, LandmarkZone } from '../workout/volume'
+import {
+  MUSCLE_LABELS,
+  MUSCLE_ORDER,
+  VOLUME_METHOD_NOTE,
+  VOLUME_LANDMARKS_NOTE,
+  ZONE_LABELS,
+  goalLabel,
+  landmarkBar,
+} from '../workout/volume'
 
 const PLUM = '#2A0E52'
-const LEAN = '#8b5cf6'
+
+// cor da zona de volume no PDF (hex; sem CSS var aqui)
+const ZONE_HEX: Record<LandmarkZone, string> = {
+  below: '#d97706',
+  effective: '#b9a3f0',
+  optimal: '#8b5cf6',
+  high: '#d4537e',
+  above: '#dc2626',
+}
 
 export type WorkoutPdfData = {
   orgName: string
@@ -48,12 +63,15 @@ const styles = StyleSheet.create({
   exPrescription: { fontFamily: 'Helvetica-Bold' },
   exMeta: { fontSize: 8, color: '#666', marginBottom: 3 },
   muted: { color: '#666' },
-  // barras de volume
+  // barras de volume (com faixa MAV e teto MRV)
   barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  barLabel: { width: 110, fontSize: 9 },
-  barTrack: { flex: 1, height: 8, backgroundColor: '#eee', borderRadius: 2 },
-  barFill: { height: 8, backgroundColor: LEAN, borderRadius: 2 },
-  barValue: { width: 30, textAlign: 'right', fontSize: 9, fontFamily: 'Helvetica-Bold' },
+  barLabel: { width: 92, fontSize: 8 },
+  barTrack: { position: 'relative', width: 270, height: 7, backgroundColor: '#eee', borderRadius: 2 },
+  barBand: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#efe9fb' },
+  barFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 2 },
+  barMrv: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: '#9a8fb0' },
+  barValue: { width: 18, textAlign: 'right', fontSize: 8, fontFamily: 'Helvetica-Bold' },
+  barZone: { width: 64, textAlign: 'right', fontSize: 7, color: '#666' },
   method: { fontSize: 8, color: '#666', marginTop: 6, lineHeight: 1.4 },
   weekRow: { paddingVertical: 1 },
   footer: { marginTop: 20, fontSize: 8, color: '#888', lineHeight: 1.4 },
@@ -72,28 +90,47 @@ function fmtSets(n: number): string {
 
 function VolumeChart({ snapshot }: { snapshot: VolumeSnapshot }) {
   const items = MUSCLE_ORDER.map((m) => ({
+    muscle: m,
     label: MUSCLE_LABELS[m],
-    value: snapshot.typicalByMuscle[m as MuscleGroup] ?? 0,
+    value: snapshot.typicalByMuscle[m] ?? 0,
   })).filter((it) => it.value > 0)
-
   if (items.length === 0) return null
-  const layout = barLayout(items, 1, 8) // width=1: usamos só o pct (largura em %)
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>
         Volume semanal por grupo muscular (semana {snapshot.typicalWeek})
       </Text>
-      {layout.bars.map((b) => (
-        <View key={b.label} style={styles.barRow}>
-          <Text style={styles.barLabel}>{b.label}</Text>
-          <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${(b.pct * 100).toFixed(1)}%` }]} />
+      {items.map((it) => {
+        const bar = landmarkBar(it.muscle, it.value)
+        const color = bar.zone ? ZONE_HEX[bar.zone] : '#b9a3f0'
+        return (
+          <View key={it.muscle} style={styles.barRow}>
+            <Text style={styles.barLabel}>{it.label}</Text>
+            <View style={styles.barTrack}>
+              {bar.zone ? (
+                <View
+                  style={[
+                    styles.barBand,
+                    {
+                      left: `${bar.mavLowPct * 100}%`,
+                      width: `${Math.max(0, bar.mavHighPct - bar.mavLowPct) * 100}%`,
+                    },
+                  ]}
+                />
+              ) : null}
+              <View style={[styles.barFill, { width: `${bar.fillPct * 100}%`, backgroundColor: color }]} />
+              {bar.zone && bar.mrvPct < 1 ? (
+                <View style={[styles.barMrv, { left: `${bar.mrvPct * 100}%` }]} />
+              ) : null}
+            </View>
+            <Text style={styles.barValue}>{fmtSets(it.value)}</Text>
+            <Text style={styles.barZone}>{bar.zone ? ZONE_LABELS[bar.zone] : 'sem ref.'}</Text>
           </View>
-          <Text style={styles.barValue}>{fmtSets(b.value)}</Text>
-        </View>
-      ))}
+        )
+      })}
       <Text style={styles.method}>{VOLUME_METHOD_NOTE}</Text>
+      <Text style={styles.method}>{VOLUME_LANDMARKS_NOTE}</Text>
     </View>
   )
 }

@@ -1,4 +1,4 @@
-import type { Equipment, MovementPattern, MuscleGroup } from './types'
+import type { Equipment, MovementPattern, MuscleGroup, VolumeSnapshot } from './types'
 
 // Rotulos pt-BR da taxonomia (a UI e o PDF leem daqui; o banco guarda as chaves
 // em ingles). Espelha o papel de assessment/sites.ts.
@@ -101,4 +101,16 @@ export const GOAL_LABELS: Record<string, string> = {
 export function goalLabel(goal: string | null): string {
   if (!goal) return 'Sem objetivo definido'
   return GOAL_LABELS[goal] ?? goal
+}
+
+// Linhas de volume (grupo + rótulo + séries) da semana típica, na ordem
+// anatômica, só os grupos com volume > 0. Usado pelo painel e pelo PDF.
+export type VolumeItem = { muscle: MuscleGroup; label: string; sets: number }
+
+export function snapshotVolumeItems(snapshot: VolumeSnapshot): VolumeItem[] {
+  return MUSCLE_ORDER.map((m) => ({
+    muscle: m,
+    label: MUSCLE_LABELS[m],
+    sets: snapshot.typicalByMuscle[m] ?? 0,
+  })).filter((it) => it.sets > 0)
 }
