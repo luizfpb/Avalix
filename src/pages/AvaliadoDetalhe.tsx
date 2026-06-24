@@ -19,7 +19,7 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
-import { Pencil, TrendingUp } from 'lucide-react'
+import { Pencil, TrendingUp, CalendarPlus } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -99,11 +99,18 @@ export default function AvaliadoDetalhe() {
               </div>
             </div>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/avaliados/${s.id}/editar`}>
-              <Pencil /> Editar
-            </Link>
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/agenda?subject=${s.id}`}>
+                <CalendarPlus /> Agendar
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/avaliados/${s.id}/editar`}>
+                <Pencil /> Editar
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
