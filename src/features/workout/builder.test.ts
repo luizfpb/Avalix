@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  duplicatePlanEditor,
   editorToSaveInput,
   editorToVolumePlan,
   emptyEditorPlan,
@@ -133,5 +134,36 @@ describe('planDetailToEditor', () => {
     // override referencia a chave do exercicio (= workout_exercise_id)
     expect(ed.overrides[0].exerciseKey).toBe('we-1')
     expect(ed.weeksMeta[0]).toMatchObject({ week: 6, isDeload: true, label: 'Deload' })
+  })
+})
+
+describe('duplicatePlanEditor', () => {
+  const detail: WorkoutPlanDetail = {
+    plan: {
+      id: 'p1', org_id: 'o1', subject_id: 's1', evaluator_id: 'e1',
+      name: 'Hipertrofia ABC', goal: 'hypertrophy', weeks: 4, starts_on: null, notes: 'obs',
+      status: 'active', source_assessment_id: 'a1', source_posture_session_id: null,
+      volume: null, volume_engine_version: null,
+      created_at: '2026-01-01', updated_at: '2026-01-01',
+    },
+    days: [{ id: 'd1', org_id: 'o1', plan_id: 'p1', label: 'A', name: 'Peito', position: 0, created_at: 'x' }],
+    exercises: [
+      { id: 'we-1', org_id: 'o1', day_id: 'd1', exercise_id: 'ex-sup', position: 0, sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null, created_at: 'x' },
+    ],
+    overrides: [],
+    weeks: [],
+  }
+
+  it('novo nome, sempre rascunho, conteúdo preservado', () => {
+    const ed = duplicatePlanEditor(detail, { name: 'Cópia ABC', keepSources: true })
+    expect(ed.name).toBe('Cópia ABC')
+    expect(ed.status).toBe('draft')
+    expect(ed.weeks).toBe(4)
+    expect(ed.days[0].exercises[0].exerciseId).toBe('ex-sup')
+  })
+
+  it('mantém a origem no mesmo aluno e limpa ao duplicar para outro', () => {
+    expect(duplicatePlanEditor(detail, { name: 'x', keepSources: true }).sourceAssessmentId).toBe('a1')
+    expect(duplicatePlanEditor(detail, { name: 'x', keepSources: false }).sourceAssessmentId).toBeNull()
   })
 })

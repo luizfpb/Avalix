@@ -106,6 +106,18 @@ export function useDeleteWorkoutPlan(subjectId: string | undefined) {
   })
 }
 
+// Duplica um plano (mesmo ou outro avaliado). Invalida a lista do avaliado de
+// destino, lido da linha criada (subject_id pode diferir do plano de origem).
+export function useDuplicateWorkoutPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SaveWorkoutPlanInput) => createWorkoutPlan(input),
+    onSuccess: (plan) => {
+      qc.invalidateQueries({ queryKey: ['workout-plans', plan.subject_id] })
+    },
+  })
+}
+
 export function useSetWorkoutPlanStatus(
   subjectId: string | undefined,
   planId: string | undefined

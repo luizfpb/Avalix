@@ -1,23 +1,37 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, Copy } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
-import { useSubject } from '../features/subjects/hooks'
+import { useSubject, useSubjects } from '../features/subjects/hooks'
 import {
   useDeleteWorkoutPlan,
+  useDuplicateWorkoutPlan,
   useExercises,
   useSetWorkoutPlanStatus,
   useWorkoutPlan,
 } from '../features/workout/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
-import type { WorkoutExerciseRow } from '../features/workout/api'
-import { goalLabel, snapshotVolumeItems, type VolumeSnapshot } from '../features/workout/volume'
+import type { WorkoutExerciseRow, WorkoutPlanDetail } from '../features/workout/api'
+import {
+  goalLabel,
+  snapshotVolumeItems,
+  type MuscleGroup,
+  type VolumeSnapshot,
+} from '../features/workout/volume'
+import {
+  duplicatePlanEditor,
+  editorToSaveInput,
+  snapshotFromEditor,
+  type ExerciseMeta,
+} from '../features/workout/builder'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -36,6 +50,9 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Ativo',
   archived: 'Arquivado',
 }
+
+const controlClass =
+  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 function exerciseMeta(ex: WorkoutExerciseRow): string {
   const parts: string[] = []
@@ -58,6 +75,7 @@ export default function TreinoDetalhe() {
   const assessmentsQ = useAssessments(id)
   const sessionsQ = useSessions(id)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [showDup, setShowDup] = useState(false)
 
   const exerciseNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -204,6 +222,9 @@ export default function TreinoDetalhe() {
           <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy}>
             {pdfBusy ? 'Gerando...' : 'Baixar PDF'}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowDup((s) => !s)}>
+            <Copy /> Duplicar
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -218,6 +239,16 @@ export default function TreinoDetalhe() {
 
       {deleteMut.error ? (
         <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
+      ) : null}
+
+      {showDup ? (
+        <DuplicatePanel
+          detail={query.data}
+          orgId={organization?.id ?? ''}
+          currentSubjectId={plan.subject_id}
+          defaultName={`Cópia de ${plan.name}`}
+          onClose={() => setShowDup(false)}
+        />
       ) : null}
 
       {srcAssessment || srcSession ? (
@@ -347,5 +378,100 @@ export default function TreinoDetalhe() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function DuplicatePanel({
+  detail,
+  orgId,
+  currentSubjectId,
+  defaultName,
+  onClose,
+}: {
+  detail: WorkoutPlanDetail
+  orgId: string
+  currentSubjectId: string
+  defaultName: string
+  onClose: () => void
+}) {
+  const navigate = useNavigate()
+  const subjectsQ = useSubjects(orgId)
+  const exercisesQ = useExercises(orgId)
+  const dupMut = useDuplicateWorkoutPlan()
+  const [name, setName] = useState(defaultName)
+  const [targetSubjectId, setTargetSubjectId] = useState(currentSubjectId)
+  const [error, setError] = useState<string | null>(null)
+
+  const metaById = useMemo(
+    () =>
+      new Map<string, ExerciseMeta>(
+        (exercisesQ.data ?? []).map((e) => [
+          e.id,
+          {
+            primaryMuscle: e.primary_muscle as MuscleGroup,
+            secondaryMuscles: e.secondary_muscles as MuscleGroup[],
+          },
+        ])
+      ),
+    [exercisesQ.data]
+  )
+
+  async function confirm() {
+    setError(null)
+    if (!name.trim()) return setError('Informe o nome do novo plano.')
+    if (!orgId) return setError('Organização não carregada.')
+    const keepSources = targetSubjectId === currentSubjectId
+    const editor = duplicatePlanEditor(detail, { name: name.trim(), keepSources })
+    const snapshot = snapshotFromEditor(editor, metaById)
+    const save = editorToSaveInput(editor, { orgId, subjectId: targetSubjectId }, snapshot)
+    try {
+      const created = await dupMut.mutateAsync(save)
+      navigate(`/avaliados/${targetSubjectId}/treinos/${created.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Duplicar plano</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1.5">
+          <Label>Nome do novo plano</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Para qual avaliado</Label>
+          <select
+            className={controlClass}
+            value={targetSubjectId}
+            onChange={(e) => setTargetSubjectId(e.target.value)}
+          >
+            {(subjectsQ.data ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.full_name}
+                {s.id === currentSubjectId ? ' (este)' : ''}
+              </option>
+            ))}
+          </select>
+          {targetSubjectId !== currentSubjectId ? (
+            <p className="text-xs text-muted-foreground">
+              A avaliação/postura de origem não é copiada para outro avaliado.
+            </p>
+          ) : null}
+        </div>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <div className="flex gap-2">
+          <Button size="sm" onClick={confirm} disabled={dupMut.isPending}>
+            {dupMut.isPending ? 'Duplicando...' : 'Duplicar'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={onClose} disabled={dupMut.isPending}>
+            Cancelar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

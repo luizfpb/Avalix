@@ -190,6 +190,23 @@ export function editorToSaveInput(
 
 // ---- plano persistido -> editor (carregar pra edicao) -----------------
 
+// Clona um plano persistido para um novo plano editavel: mesmo conteudo, novo
+// nome, sempre como rascunho. keepSources=false (duplicar para OUTRO avaliado)
+// limpa as FKs de avaliacao/postura de origem, validadas por mesmo subject.
+export function duplicatePlanEditor(
+  detail: WorkoutPlanDetail,
+  opts: { name: string; keepSources: boolean }
+): EditorPlan {
+  const base = planDetailToEditor(detail)
+  return {
+    ...base,
+    name: opts.name,
+    status: 'draft',
+    sourceAssessmentId: opts.keepSources ? base.sourceAssessmentId : null,
+    sourcePostureSessionId: opts.keepSources ? base.sourcePostureSessionId : null,
+  }
+}
+
 // As chaves do editor passam a ser os ids do banco; os overrides referenciam
 // workout_exercise_id, que casa exatamente com a chave do exercicio no editor.
 export function planDetailToEditor(detail: WorkoutPlanDetail): EditorPlan {
