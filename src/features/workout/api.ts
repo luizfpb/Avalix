@@ -61,6 +61,40 @@ export async function createCustomExercise(input: CreateExerciseInput): Promise<
   return data
 }
 
+export type UpdateExerciseInput = {
+  name: string
+  primaryMuscle: string
+  secondaryMuscles: string[]
+  equipment: string
+  movementPattern: string
+  isUnilateral?: boolean
+  cues?: string | null
+}
+
+// Edita um exercicio custom. org_id e congelado por trigger; o resto e livre.
+// A RLS so deixa atualizar linha custom da org (global e read-only pro usuario).
+export async function updateCustomExercise(
+  id: string,
+  input: UpdateExerciseInput
+): Promise<ExerciseRow> {
+  const { data, error } = await supabase
+    .from('exercises')
+    .update({
+      name: input.name,
+      primary_muscle: input.primaryMuscle,
+      secondary_muscles: input.secondaryMuscles,
+      equipment: input.equipment,
+      movement_pattern: input.movementPattern,
+      is_unilateral: input.isUnilateral ?? false,
+      cues: input.cues ?? null,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function deleteCustomExercise(id: string): Promise<void> {
   // on delete restrict: o banco recusa se o exercicio estiver em uso por um plano
   const { error } = await supabase.from('exercises').delete().eq('id', id)

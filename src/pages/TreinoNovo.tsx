@@ -2,10 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
-import { useAuth } from '../features/auth/context'
 import { useSubject } from '../features/subjects/hooks'
 import {
-  useCreateCustomExercise,
   useCreateWorkoutPlan,
   useExercises,
   useUpdateWorkoutPlan,
@@ -21,13 +19,7 @@ import {
   type EditorPlan,
   type ExerciseMeta,
 } from '../features/workout/builder'
-import {
-  EQUIPMENT_OPTIONS,
-  GOAL_OPTIONS,
-  MOVEMENT_OPTIONS,
-  MUSCLE_OPTIONS,
-  exerciseFormToInput,
-} from '../features/workout/schema'
+import { GOAL_OPTIONS, MUSCLE_OPTIONS } from '../features/workout/schema'
 import {
   equipmentLabel,
   muscleLabel,
@@ -35,6 +27,7 @@ import {
   type MuscleGroup,
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
+import { ExerciseForm } from '../features/workout/ExerciseForm'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
@@ -737,141 +730,30 @@ function ExercisePicker({
         ) : null}
       </ul>
 
-      <button
-        type="button"
-        onClick={() => setCreating((v) => !v)}
-        className="flex items-center gap-1 text-xs text-primary hover:underline"
-      >
-        {creating ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        Criar exercício (está faltando no catálogo)
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setCreating((v) => !v)}
+          className="flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          {creating ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          Criar exercício (está faltando no catálogo)
+        </button>
+        <Link to="/exercicios" className="text-xs text-muted-foreground hover:underline">
+          Gerenciar biblioteca
+        </Link>
+      </div>
       {creating ? (
-        <CustomExerciseForm
+        <ExerciseForm
           orgId={orgId}
-          onCreated={(exerciseId) => {
-            onPick(exerciseId)
+          onSaved={(row) => {
+            onPick(row.id)
             setCreating(false)
             setOpen(false)
           }}
+          onCancel={() => setCreating(false)}
         />
       ) : null}
-    </div>
-  )
-}
-
-function CustomExerciseForm({
-  orgId,
-  onCreated,
-}: {
-  orgId: string
-  onCreated: (exerciseId: string) => void
-}) {
-  const { user } = useAuth()
-  const createMut = useCreateCustomExercise(orgId)
-  const [name, setName] = useState('')
-  const [primary, setPrimary] = useState('')
-  const [secondary, setSecondary] = useState<string[]>([])
-  const [equipment, setEquipment] = useState('')
-  const [movement, setMovement] = useState('')
-  const [unilateral, setUnilateral] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit() {
-    setError(null)
-    if (!name.trim()) return setError('Informe o nome.')
-    if (!primary || !equipment || !movement) {
-      return setError('Músculo principal, equipamento e padrão são obrigatórios.')
-    }
-    if (secondary.includes(primary)) {
-      return setError('O músculo principal não deve aparecer nos secundários.')
-    }
-    try {
-      const created = await createMut.mutateAsync(
-        exerciseFormToInput(
-          {
-            name,
-            primary_muscle: primary,
-            secondary_muscles: secondary as never,
-            equipment,
-            movement_pattern: movement,
-            is_unilateral: unilateral,
-            cues: '',
-          },
-          orgId,
-          user?.id ?? null
-        )
-      )
-      onCreated(created.id)
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  return (
-    <div className="space-y-2 rounded-md border bg-muted/20 p-2">
-      <Input placeholder="Nome do exercício" value={name} onChange={(e) => setName(e.target.value)} />
-      <div className="grid grid-cols-2 gap-2">
-        <select className={controlClass} value={primary} onChange={(e) => setPrimary(e.target.value)}>
-          <option value="">Músculo principal</option>
-          {MUSCLE_OPTIONS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <select className={controlClass} value={equipment} onChange={(e) => setEquipment(e.target.value)}>
-          <option value="">Equipamento</option>
-          {EQUIPMENT_OPTIONS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <select className={controlClass} value={movement} onChange={(e) => setMovement(e.target.value)}>
-          <option value="">Padrão de movimento</option>
-          {MOVEMENT_OPTIONS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={unilateral}
-            onChange={(e) => setUnilateral(e.target.checked)}
-          />
-          Unilateral
-        </label>
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Músculos secundários</Label>
-        <div className="flex flex-wrap gap-1">
-          {MUSCLE_OPTIONS.map((m) => {
-            const on = secondary.includes(m.value)
-            return (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() =>
-                  setSecondary((prev) =>
-                    on ? prev.filter((x) => x !== m.value) : [...prev, m.value]
-                  )
-                }
-                className={`rounded-full border px-2 py-0.5 text-xs ${
-                  on ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'
-                }`}
-              >
-                {m.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <Button type="button" size="sm" onClick={submit} disabled={createMut.isPending}>
-        {createMut.isPending ? 'Criando...' : 'Criar e adicionar'}
-      </Button>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { CreateExerciseInput } from './api'
+import type { CreateExerciseInput, ExerciseRow, UpdateExerciseInput } from './api'
 import type { Equipment, MovementPattern, MuscleGroup } from './volume'
 import {
   EQUIPMENT_LABELS,
@@ -95,6 +95,30 @@ export function exerciseFormToInput(
     isUnilateral: v.is_unilateral ?? false,
     cues: v.cues?.trim() ? v.cues.trim() : null,
     createdBy,
+  }
+}
+
+export function exerciseFormToUpdate(v: ExerciseFormValues): UpdateExerciseInput {
+  return {
+    name: v.name.trim(),
+    primaryMuscle: v.primary_muscle,
+    secondaryMuscles: v.secondary_muscles,
+    equipment: v.equipment,
+    movementPattern: v.movement_pattern,
+    isUnilateral: v.is_unilateral ?? false,
+    cues: v.cues?.trim() ? v.cues.trim() : null,
+  }
+}
+
+export function exerciseRowToForm(r: ExerciseRow): ExerciseFormValues {
+  return {
+    name: r.name,
+    primary_muscle: r.primary_muscle,
+    secondary_muscles: r.secondary_muscles as MuscleGroup[],
+    equipment: r.equipment,
+    movement_pattern: r.movement_pattern,
+    is_unilateral: r.is_unilateral,
+    cues: r.cues ?? '',
   }
 }
 

@@ -8,9 +8,11 @@ import {
   listExercises,
   listWorkoutPlans,
   setWorkoutPlanStatus,
+  updateCustomExercise,
   updateWorkoutPlan,
   type CreateExerciseInput,
   type SaveWorkoutPlanInput,
+  type UpdateExerciseInput,
 } from './api'
 
 export function useExercises(orgId: string | undefined) {
@@ -27,6 +29,17 @@ export function useCreateCustomExercise(orgId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateExerciseInput) => createCustomExercise(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['exercises', orgId] })
+    },
+  })
+}
+
+export function useUpdateCustomExercise(orgId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateExerciseInput }) =>
+      updateCustomExercise(id, input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exercises', orgId] })
     },

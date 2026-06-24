@@ -20,6 +20,7 @@ const AnamneseNova = lazy(() => import('./pages/AnamneseNova'))
 const AnamneseDetalhe = lazy(() => import('./pages/AnamneseDetalhe'))
 const TreinoNovo = lazy(() => import('./pages/TreinoNovo'))
 const TreinoDetalhe = lazy(() => import('./pages/TreinoDetalhe'))
+const ExerciciosBiblioteca = lazy(() => import('./pages/ExerciciosBiblioteca'))
 const Evolucao = lazy(() => import('./pages/Evolucao'))
 const PosturaSessaoNova = lazy(() => import('./pages/PosturaSessaoNova'))
 const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
@@ -78,6 +79,7 @@ export default function App() {
               element={<PosturaSessaoDetalhe />}
             />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/exercicios" element={<ExerciciosBiblioteca />} />
           </Route>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
