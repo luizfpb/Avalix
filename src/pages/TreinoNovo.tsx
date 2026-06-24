@@ -34,12 +34,15 @@ import {
   equipmentLabel,
   muscleLabel,
   snapshotVolumeItems,
+  type MovementPattern,
   type MuscleGroup,
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
 import { OneRmCalculator } from '../features/workout/OneRmCalculator'
+import { exerciseCautions, posturalEmphasis } from '../features/workout/contraindications'
 import { useAnamneses } from '../features/anamnesis/hooks'
+import type { AnamnesisAnswers } from '../features/anamnesis/spec'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -150,6 +153,7 @@ function Builder({
   const createMut = useCreateWorkoutPlan(subjectId)
   const updateMut = useUpdateWorkoutPlan(subjectId, planId)
   const mut = isEdit ? updateMut : createMut
+  const anamneseQ = useAnamneses(subjectId)
 
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -180,6 +184,24 @@ function Builder({
   function nameOf(exerciseId: string): string {
     return exercisesById.get(exerciseId)?.name ?? 'Exercício'
   }
+
+  // inteligência avaliação→prescrição: sinais da anamnese mais recente do aluno
+  const anamneseAnswers = (anamneseQ.data?.[0]?.payload ?? null) as AnamnesisAnswers | null
+  const posturalNotes = anamneseAnswers ? posturalEmphasis(anamneseAnswers) : []
+  function cautionsFor(exerciseId: string): string[] {
+    if (!anamneseAnswers) return []
+    const e = exercisesById.get(exerciseId)
+    if (!e) return []
+    return exerciseCautions(anamneseAnswers, {
+      primaryMuscle: e.primary_muscle as MuscleGroup,
+      secondaryMuscles: e.secondary_muscles as MuscleGroup[],
+      movementPattern: e.movement_pattern as MovementPattern,
+    })
+  }
+  const totalCautions = plan.days.reduce(
+    (acc, d) => acc + d.exercises.filter((ex) => cautionsFor(ex.exerciseId).length > 0).length,
+    0
+  )
 
   // ---- mutadores do editor -------------------------------------------
   function addDay() {
@@ -380,6 +402,25 @@ function Builder({
 
       <AnamneseFlag subjectId={subjectId} />
 
+      {totalCautions > 0 || posturalNotes.length > 0 ? (
+        <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-400/30 dark:bg-amber-400/10">
+          <p className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="size-4" /> Atenção pela anamnese
+          </p>
+          {totalCautions > 0 ? (
+            <p className="text-amber-900 dark:text-amber-100">
+              {totalCautions} exercício{totalCautions > 1 ? 's' : ''} deste plano merece
+              {totalCautions > 1 ? 'm' : ''} revisão pela queixa do aluno (marcados com ⚠ abaixo).
+            </p>
+          ) : null}
+          {posturalNotes.map((n, i) => (
+            <p key={i} className="text-amber-900 dark:text-amber-100">
+              {n}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nome do plano">
           <Input value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
@@ -548,8 +589,16 @@ function Builder({
                     >
                       <GripVertical className="size-4" />
                     </span>
-                    <span className="flex-1 text-sm font-medium">
+                    <span className="flex flex-1 items-center gap-1.5 text-sm font-medium">
                       {i + 1}. {nameOf(ex.exerciseId)}
+                      {cautionsFor(ex.exerciseId).length > 0 ? (
+                        <span
+                          className="text-amber-500"
+                          title={`Revisar: ${cautionsFor(ex.exerciseId).join(' · ')}`}
+                        >
+                          <AlertTriangle className="size-3.5" />
+                        </span>
+                      ) : null}
                     </span>
                     <button
                       type="button"
