@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Factor } from '@supabase/supabase-js'
-import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, ChevronRight } from 'lucide-react'
+import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
@@ -72,6 +72,28 @@ export default function Configuracoes() {
               Gerenciar exercícios
               <span className="block text-xs text-muted-foreground">
                 Catálogo global + os exercícios criados pela sua organização
+              </span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Calculator className="size-4 text-muted-foreground" /> Ferramentas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Link
+            to="/ferramentas/1rm"
+            className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+          >
+            <span>
+              Calculadora de carga (1RM)
+              <span className="block text-xs text-muted-foreground">
+                Estima 1RM por carga×reps e gera a tabela de %1RM
               </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Calculator } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import {
@@ -28,6 +28,7 @@ import {
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
+import { OneRmCalculator } from '../features/workout/OneRmCalculator'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
@@ -134,6 +135,7 @@ function Builder({
 
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [showCalc, setShowCalc] = useState(false)
 
   const exercisesById = useMemo(
     () => new Map(exercises.map((e) => [e.id, e])),
@@ -501,6 +503,26 @@ function Builder({
           onOverride={upsertOverride}
         />
       ) : null}
+
+      <Card>
+        <CardHeader className="py-0">
+          <button
+            type="button"
+            onClick={() => setShowCalc((s) => !s)}
+            className="flex w-full items-center justify-between py-4"
+          >
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calculator className="size-4 text-muted-foreground" /> Calculadora de carga (1RM)
+            </CardTitle>
+            {showCalc ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          </button>
+        </CardHeader>
+        {showCalc ? (
+          <CardContent>
+            <OneRmCalculator />
+          </CardContent>
+        ) : null}
+      </Card>
 
       <Field label="Observações (opcional)">
         <textarea
