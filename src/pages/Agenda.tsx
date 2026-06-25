@@ -15,6 +15,7 @@ import {
   type CalendarEvent,
 } from '../features/appointments/calendar'
 import { downloadBlob } from '../features/reports/download'
+import { relativeDayLabel } from '../lib/reminders'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -253,7 +254,20 @@ function AppointmentItem({
     <li className={`rounded-md border bg-card p-3 ${muted ? 'opacity-70' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium">{fmtDateTime(appt.starts_at)}</p>
+          <p className="flex items-center gap-2 text-sm font-medium">
+            {fmtDateTime(appt.starts_at)}
+            {(() => {
+              const rel = relativeDayLabel(appt.starts_at, new Date())
+              const soon = rel === 'Hoje' || rel === 'Amanhã'
+              return (
+                <span
+                  className={`text-xs ${soon ? 'font-semibold text-primary' : 'font-normal text-muted-foreground'}`}
+                >
+                  · {rel}
+                </span>
+              )
+            })()}
+          </p>
           <p className="truncate text-sm">
             {appt.subjectName}
             <span className="text-muted-foreground"> · {appt.title}</span>

@@ -166,6 +166,22 @@ export async function listSubjectCircumferences(subjectId: string): Promise<Subj
   })
 }
 
+// Última avaliação (data) por avaliado da org — pro gatilho de reavaliação no
+// dashboard. Vem ordenado desc, então o 1º de cada subject é o mais recente.
+export async function listLastAssessmentBySubject(orgId: string): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('subject_id, assessed_at')
+    .eq('org_id', orgId)
+    .order('assessed_at', { ascending: false })
+  if (error) throw error
+  const map: Record<string, string> = {}
+  for (const r of data ?? []) {
+    if (!map[r.subject_id]) map[r.subject_id] = r.assessed_at
+  }
+  return map
+}
+
 export async function listAssessments(subjectId: string): Promise<AssessmentRow[]> {
   const { data, error } = await supabase
     .from('assessments')

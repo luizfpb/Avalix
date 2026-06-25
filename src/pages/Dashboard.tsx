@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
-import { Users, UserPlus, Settings, ShieldCheck, ArrowRight } from 'lucide-react'
+import { Users, UserPlus, Settings, ShieldCheck, ArrowRight, CalendarDays, Bell } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
+import { useAppointments } from '../features/appointments/hooks'
+import { useLastAssessmentBySubject } from '../features/assessment/hooks'
+import { relativeDayLabel, dueForReassessment, REASSESS_DAYS } from '../lib/reminders'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { subjectTermLabels } from '../lib/subjectTerm'
@@ -14,6 +17,22 @@ export default function Dashboard() {
   const total = subjects?.length ?? 0
   const ativos = subjects?.filter((s) => s.is_active).length ?? 0
   const isEmpty = !isPending && total === 0
+
+  const apptsQ = useAppointments(organization?.id)
+  const lastAssessQ = useLastAssessmentBySubject(organization?.id)
+  const now = new Date()
+  const sod = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const upcoming = (apptsQ.data ?? [])
+    .filter((a) => {
+      const t = new Date(a.starts_at).getTime()
+      return t >= sod && t <= now.getTime() + 7 * 86400000
+    })
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+  const lastMap = lastAssessQ.data ?? {}
+  const dueList = (subjects ?? []).filter(
+    (s) => s.is_active && dueForReassessment(lastMap[s.id] ?? null, now)
+  )
+  const hasReminders = upcoming.length > 0 || dueList.length > 0
 
   return (
     <div className="space-y-6">
@@ -51,6 +70,70 @@ export default function Dashboard() {
           <StatCard label="Ativos" value={isPending ? '—' : ativos} />
         </section>
       )}
+
+      {hasReminders ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Lembretes</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Card>
+              <CardContent className="py-1">
+                <div className="flex items-center justify-between">
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <CalendarDays className="size-4 text-primary" /> Próximas sessões
+                  </p>
+                  <Link to="/agenda" className="text-xs text-primary hover:underline">
+                    Agenda
+                  </Link>
+                </div>
+                {upcoming.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">Nada nos próximos 7 dias.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {upcoming.slice(0, 3).map((a) => (
+                      <li key={a.id} className="flex justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          {a.subjectName} <span className="text-muted-foreground">· {a.title}</span>
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {relativeDayLabel(a.starts_at, now)}
+                        </span>
+                      </li>
+                    ))}
+                    {upcoming.length > 3 ? (
+                      <li className="text-xs text-muted-foreground">+{upcoming.length - 3} mais</li>
+                    ) : null}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+
+            {dueList.length > 0 ? (
+              <Card>
+                <CardContent className="py-1">
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <Bell className="size-4 text-amber-500" /> Para reavaliar
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Sem avaliação há {REASSESS_DAYS}+ dias (ou nunca).
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {dueList.slice(0, 4).map((s) => (
+                      <li key={s.id}>
+                        <Link to={`/avaliados/${s.id}`} className="hover:underline">
+                          {s.full_name}
+                        </Link>
+                      </li>
+                    ))}
+                    {dueList.length > 4 ? (
+                      <li className="text-xs text-muted-foreground">+{dueList.length - 4} mais</li>
+                    ) : null}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">Atalhos</h2>

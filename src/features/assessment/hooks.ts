@@ -4,10 +4,19 @@ import {
   deleteAssessment,
   getAssessment,
   listAssessments,
+  listLastAssessmentBySubject,
   listSubjectCircumferences,
   updateAssessment,
   type CreateAssessmentInput,
 } from './api'
+
+export function useLastAssessmentBySubject(orgId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['last-assessment-by-subject', orgId],
+    queryFn: () => listLastAssessmentBySubject(orgId as string),
+    enabled: !!orgId,
+  })
+}
 
 export function useSubjectCircumferences(subjectId: string | undefined) {
   return useQuery({
