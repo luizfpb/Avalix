@@ -27,6 +27,7 @@ import {
   type ExerciseMeta,
 } from '../features/workout/builder'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
+import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { planShareText, whatsappUrl } from '../features/workout/share'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
@@ -36,6 +37,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { controlClass } from '@/lib/ui'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -52,9 +54,6 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Ativo',
   archived: 'Arquivado',
 }
-
-const controlClass =
-  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 function exerciseMeta(ex: WorkoutExerciseRow): string {
   const parts: string[] = []
@@ -430,17 +429,21 @@ export default function TreinoDetalhe() {
               <CardContent className="space-y-1 text-sm">
                 {rows.map((ex, i) => {
                   const meta = exerciseMeta(ex)
+                  const exName = exerciseNames[ex.exercise_id] ?? 'Exercício'
                   return (
                     <div key={ex.id} className="flex flex-col border-b py-1 last:border-0">
                       <div className="flex justify-between gap-3">
                         <span>
-                          {i + 1}. {exerciseNames[ex.exercise_id] ?? 'Exercício'}
+                          {i + 1}. {exName}
                         </span>
                         <span className="font-semibold tabular-nums">
                           {ex.sets}×{ex.reps}
                         </span>
                       </div>
-                      {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
+                      <div className="flex items-center justify-between gap-3">
+                        {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
+                        <ExerciseDemoLink name={exName} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" />
+                      </div>
                     </div>
                   )
                 })}

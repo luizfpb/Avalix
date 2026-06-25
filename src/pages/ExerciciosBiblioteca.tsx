@@ -4,14 +4,14 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useExercises, useDeleteCustomExercise } from '../features/workout/hooks'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
+import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { equipmentLabel, muscleLabel, type Equipment, type MuscleGroup } from '../features/workout/volume'
 import { MUSCLE_OPTIONS } from '../features/workout/schema'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
-const controlClass =
-  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+import { controlClass } from '@/lib/ui'
 
 export default function ExerciciosBiblioteca() {
   const { organization, role } = useOrganization()
@@ -124,27 +124,30 @@ export default function ExerciciosBiblioteca() {
                       : ''}
                   </p>
                 </div>
-                {custom ? (
-                  <div className="flex shrink-0 items-center gap-3 text-xs">
-                    <button
-                      onClick={() => setEditingId(e.id)}
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
-                    >
-                      <Pencil className="size-3.5" /> Editar
-                    </button>
-                    {canDelete ? (
+                <div className="flex shrink-0 items-center gap-3 text-xs">
+                  <ExerciseDemoLink name={e.name} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground" />
+                  {custom ? (
+                    <>
                       <button
-                        onClick={() => handleDelete(e.id)}
-                        disabled={deleteMut.isPending}
-                        className="inline-flex items-center gap-1 text-destructive hover:underline"
+                        onClick={() => setEditingId(e.id)}
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
                       >
-                        <Trash2 className="size-3.5" /> Excluir
+                        <Pencil className="size-3.5" /> Editar
                       </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <span className="shrink-0 text-xs text-muted-foreground">global</span>
-                )}
+                      {canDelete ? (
+                        <button
+                          onClick={() => handleDelete(e.id)}
+                          disabled={deleteMut.isPending}
+                          className="inline-flex items-center gap-1 text-destructive hover:underline"
+                        >
+                          <Trash2 className="size-3.5" /> Excluir
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">global</span>
+                  )}
+                </div>
               </li>
             )
           })}

@@ -9,8 +9,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-const controlClass =
-  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+import { controlClass } from '@/lib/ui'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

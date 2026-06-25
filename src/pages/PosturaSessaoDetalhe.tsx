@@ -23,14 +23,13 @@ import { processImage } from '../features/posture/image'
 import { AnnotationCanvas } from '../components/AnnotationCanvas'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { controlClass } from '@/lib/ui'
+import { cn } from '@/lib/utils'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
 }
-
-const controlClass =
-  'rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 export default function PosturaSessaoDetalhe() {
   const { id, sessionId } = useParams()
@@ -159,7 +158,7 @@ export default function PosturaSessaoDetalhe() {
         <div className="space-y-1.5">
           <Label>Categoria</Label>
           <select
-            className={controlClass}
+            className={cn(controlClass, 'w-auto')}
             value={category}
             onChange={(e) => setCategory(e.target.value as PhotoCategory)}
           >

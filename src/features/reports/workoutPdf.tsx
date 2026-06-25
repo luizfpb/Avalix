@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Image, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
 import type {
   WorkoutDayRow,
   WorkoutExerciseRow,
@@ -16,15 +16,25 @@ import {
   goalLabel,
   landmarkBar,
 } from '../workout/volume'
+import {
+  InfoCard,
+  ReportFooter,
+  ReportHeader,
+  SectionTitle,
+  fmtDate,
+  palette,
+  pdfTheme,
+  type InfoItem,
+} from './pdfTheme'
 
-const PLUM = '#2A0E52'
+const PLUM = palette.plum
 
 // cor da zona de volume no PDF (hex; sem CSS var aqui)
 const ZONE_HEX: Record<LandmarkZone, string> = {
   below: '#d97706',
   effective: '#b9a3f0',
-  optimal: '#8b5cf6',
-  high: '#d4537e',
+  optimal: palette.violet,
+  high: palette.magenta,
   above: '#dc2626',
 }
 
@@ -49,29 +59,13 @@ export type WorkoutPdfData = {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 10, color: '#1a1a1a', fontFamily: 'Helvetica' },
-  plate: {
-    backgroundColor: PLUM,
-    color: '#ECE3FA',
-    alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  plateText: { fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 2, color: '#ECE3FA' },
-  logo: { height: 40, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 10 },
-  org: { fontSize: 9, color: '#666' },
-  h1: { fontSize: 16, marginTop: 2, marginBottom: 12, color: PLUM },
-  meta: { marginBottom: 14, lineHeight: 1.4 },
   section: { marginBottom: 14 },
-  sectionTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
   dayTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: PLUM, marginBottom: 4, marginTop: 6 },
   exRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
   exName: { flex: 1, paddingRight: 8 },
-  exPrescription: { fontFamily: 'Helvetica-Bold' },
-  exMeta: { fontSize: 8, color: '#666', marginBottom: 3 },
-  muted: { color: '#666' },
+  exPrescription: { fontFamily: 'Helvetica-Bold', color: PLUM },
+  exMeta: { fontSize: 8, color: palette.muted, marginBottom: 3 },
+  muted: { color: palette.muted },
   // barras de volume (com faixa MAV e teto MRV)
   barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
   barLabel: { width: 92, fontSize: 8 },
@@ -80,17 +74,11 @@ const styles = StyleSheet.create({
   barFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 2 },
   barMrv: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: '#9a8fb0' },
   barValue: { width: 18, textAlign: 'right', fontSize: 8, fontFamily: 'Helvetica-Bold' },
-  barZone: { width: 64, textAlign: 'right', fontSize: 7, color: '#666' },
-  method: { fontSize: 8, color: '#666', marginTop: 6, lineHeight: 1.4 },
+  barZone: { width: 64, textAlign: 'right', fontSize: 7, color: palette.muted },
+  method: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
   weekRow: { paddingVertical: 1 },
-  footer: { marginTop: 20, fontSize: 8, color: '#888', lineHeight: 1.4 },
+  reproNote: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
 })
-
-function fmtDate(iso: string | null): string | null {
-  if (!iso) return null
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
-}
 
 // inteiro sem casas; fracionado com 1 casa (séries fracionadas: 2.5, 13)
 function fmtSets(n: number): string {
@@ -107,9 +95,9 @@ function VolumeChart({ snapshot }: { snapshot: VolumeSnapshot }) {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
+      <SectionTitle>
         Volume semanal por grupo muscular (semana {snapshot.typicalWeek})
-      </Text>
+      </SectionTitle>
       {items.map((it) => {
         const bar = landmarkBar(it.muscle, it.value)
         const color = bar.zone ? ZONE_HEX[bar.zone] : '#b9a3f0'
@@ -217,7 +205,7 @@ function WeeksSection({ data }: { data: WorkoutPdfData }) {
 
   return (
     <View style={styles.section} wrap={false}>
-      <Text style={styles.sectionTitle}>Organização por semana</Text>
+      <SectionTitle>Organização por semana</SectionTitle>
       {allWeeks.map((n) => {
         const meta = weekLabel.get(n)
         const ovs = overrides.filter((o) => o.week_number === n)
@@ -248,48 +236,51 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   const schedule =
     plan.weekly_schedule.length > 0 ? plan.weekly_schedule : orderedDays.map((d) => d.label)
 
+  const sourceText = data.source
+    ? [
+        data.source.assessmentDate
+          ? `avaliação ${fmtDate(data.source.assessmentDate)}${
+              data.source.bodyFatPct != null ? ` · ${data.source.bodyFatPct.toFixed(1)}% gordura` : ''
+            }`
+          : '',
+        data.source.postureDate ? `postura ${fmtDate(data.source.postureDate)}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : ''
+
+  const info: InfoItem[] = [
+    { label: 'Avaliado', value: data.subjectName },
+    { label: 'Plano', value: plan.name },
+    { label: 'Objetivo', value: goalLabel(plan.goal) },
+    {
+      label: 'Mesociclo',
+      value: `${plan.weeks} ${plan.weeks === 1 ? 'semana' : 'semanas'}${
+        startsOn ? ` · início ${startsOn}` : ''
+      }`,
+    },
+    ...(schedule.length > 0
+      ? [{ label: 'Sequência semanal', value: schedule.join(' · '), wide: true }]
+      : []),
+    ...(sourceText ? [{ label: 'Base da prescrição', value: sourceText, wide: true }] : []),
+  ]
+
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        {data.logoUrl ? (
-          <Image src={data.logoUrl} style={styles.logo} />
-        ) : (
-          <View style={styles.plate}>
-            <Text style={styles.plateText}>AVALIX</Text>
-          </View>
-        )}
-        <Text style={styles.org}>{data.orgName}</Text>
-        <Text style={styles.h1}>Plano de Treino</Text>
+      <Page size="A4" style={pdfTheme.page}>
+        <ReportHeader
+          logoUrl={data.logoUrl}
+          orgName={data.orgName}
+          title="Plano de Treino"
+          subtitle={plan.name}
+        />
 
-        <View style={styles.meta}>
-          <Text>Avaliado: {data.subjectName}</Text>
-          <Text>Plano: {plan.name}</Text>
-          <Text>Objetivo: {goalLabel(plan.goal)}</Text>
-          <Text>
-            Mesociclo: {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
-            {startsOn ? ` · início ${startsOn}` : ''}
-          </Text>
-          {schedule.length > 0 ? <Text>Sequência semanal: {schedule.join(' · ')}</Text> : null}
-          {data.source ? (
-            <Text style={styles.muted}>
-              Base:{' '}
-              {data.source.assessmentDate
-                ? `avaliação ${fmtDate(data.source.assessmentDate)}${
-                    data.source.bodyFatPct != null
-                      ? ` · ${data.source.bodyFatPct.toFixed(1)}% gordura`
-                      : ''
-                  }`
-                : ''}
-              {data.source.assessmentDate && data.source.postureDate ? ' · ' : ''}
-              {data.source.postureDate ? `postura ${fmtDate(data.source.postureDate)}` : ''}
-            </Text>
-          ) : null}
-        </View>
+        <InfoCard items={info} />
 
         {snapshot ? <VolumeChart snapshot={snapshot} /> : null}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Divisões</Text>
+          <SectionTitle>Divisões</SectionTitle>
           {orderedDays.map((day) => (
             <DayBlock key={day.id} day={day} exercises={exercises} names={exerciseNames} />
           ))}
@@ -299,16 +290,18 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
 
         {plan.notes ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Observações</Text>
+            <SectionTitle>Observações</SectionTitle>
             <Text>{plan.notes}</Text>
           </View>
         ) : null}
 
-        <Text style={styles.footer}>
-          Gerado pelo Avalix
-          {snapshot ? ` · motor de volume ${snapshot.engineVersion}` : ''}. Plano reproduzível a
-          partir do snapshot registrado. Documento de uso profissional.
+        <Text style={styles.reproNote}>
+          Plano reproduzível a partir do snapshot registrado. Documento de uso profissional.
         </Text>
+
+        <ReportFooter
+          note={`Gerado pelo Avalix${snapshot ? ` · motor de volume ${snapshot.engineVersion}` : ''}`}
+        />
       </Page>
     </Document>
   )

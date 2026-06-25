@@ -35,8 +35,7 @@ import {
   CardContent,
 } from '@/components/ui/card'
 
-const controlClass =
-  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+import { controlClass } from '@/lib/ui'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)

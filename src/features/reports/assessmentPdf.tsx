@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Svg, Path, Polyline, Image, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Svg, Path, Polyline, pdf } from '@react-pdf/renderer'
 import type {
   AssessmentRow,
   CircumferenceReadingRow,
@@ -11,9 +11,19 @@ import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
 import { donutSlices, linePath } from './charts'
+import {
+  InfoCard,
+  ReportFooter,
+  ReportHeader,
+  SectionTitle,
+  fmtDate,
+  palette,
+  pdfTheme,
+  type InfoItem,
+} from './pdfTheme'
 
-const LEAN = '#8b5cf6'
-const FAT = '#d4537e'
+const LEAN = palette.violet
+const FAT = palette.magenta
 
 export type AssessmentPdfData = {
   orgName: string
@@ -28,35 +38,22 @@ export type AssessmentPdfData = {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 10, color: '#1a1a1a', fontFamily: 'Helvetica' },
-  // plaqueta da marca: campo roxo com o wordmark claro (não letras claras sobre
-  // branco). Black Ops One não é registrada no PDF; usamos Helvetica-Bold
-  // espaçada dentro da plaqueta, mantendo a cor da marca.
-  plate: {
-    backgroundColor: '#2A0E52',
-    color: '#ECE3FA',
-    alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  plateText: { fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 2, color: '#ECE3FA' },
-  logo: { height: 40, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 10 },
-  org: { fontSize: 9, color: '#666' },
-  h1: { fontSize: 16, marginTop: 2, marginBottom: 12, color: '#2A0E52' },
-  meta: { marginBottom: 14, lineHeight: 1.4 },
   section: { marginBottom: 14 },
-  sectionTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap' },
   stat: { width: '25%', marginBottom: 6 },
-  statLabel: { fontSize: 8, color: '#666' },
-  statValue: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  muted: { color: '#666' },
-  footer: { marginTop: 24, fontSize: 8, color: '#888', lineHeight: 1.4 },
+  statLabel: { fontSize: 8, color: palette.muted },
+  statValue: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: palette.plum },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2.5,
+    borderBottomWidth: 0.5,
+    borderBottomColor: palette.hairline,
+  },
+  muted: { color: palette.muted },
   legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
   legendSwatch: { width: 8, height: 8, borderRadius: 2, marginRight: 5 },
+  reproNote: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
 })
 
 function Donut({ lean, fat }: { lean: number; fat: number }) {
@@ -92,7 +89,7 @@ function Evolution({ history }: { history: { date: string; bodyFatPct: number | 
   )
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Evolução da % de gordura</Text>
+      <SectionTitle>Evolução da % de gordura</SectionTitle>
       <Svg width={w} height={h}>
         <Polyline points={l.points} fill="none" stroke={LEAN} strokeWidth={1.5} />
       </Svg>
@@ -102,11 +99,6 @@ function Evolution({ history }: { history: { date: string; bodyFatPct: number | 
       </Text>
     </View>
   )
-}
-
-function fmtDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -122,31 +114,29 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   const { assessment, skinfolds, circumferences } = data
   const r = assessment.results as AssessmentResultSnapshot | null
 
+  const info: InfoItem[] = [
+    { label: 'Avaliado', value: data.subjectName, wide: true },
+    { label: 'Data', value: fmtDate(assessment.assessed_at) ?? '—' },
+    { label: 'Protocolo', value: protocolLabel(assessment.protocol_id) },
+    { label: 'Peso', value: `${assessment.weight_kg} kg` },
+    { label: 'Altura', value: `${assessment.height_cm} cm` },
+  ]
+
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        {data.logoUrl ? (
-          <Image src={data.logoUrl} style={styles.logo} />
-        ) : (
-          <View style={styles.plate}>
-            <Text style={styles.plateText}>AVALIX</Text>
-          </View>
-        )}
-        <Text style={styles.org}>{data.orgName}</Text>
-        <Text style={styles.h1}>Relatório de Avaliação Física</Text>
+      <Page size="A4" style={pdfTheme.page}>
+        <ReportHeader
+          logoUrl={data.logoUrl}
+          orgName={data.orgName}
+          title="Relatório de Avaliação Física"
+          subtitle={fmtDate(assessment.assessed_at)}
+        />
 
-        <View style={styles.meta}>
-          <Text>Avaliado: {data.subjectName}</Text>
-          <Text>Data: {fmtDate(assessment.assessed_at)}</Text>
-          <Text>Protocolo: {protocolLabel(assessment.protocol_id)}</Text>
-          <Text>
-            Peso: {assessment.weight_kg} kg · Altura: {assessment.height_cm} cm
-          </Text>
-        </View>
+        <InfoCard items={info} />
 
         {r ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Resultado</Text>
+            <SectionTitle>Resultado</SectionTitle>
             <View style={styles.statsRow}>
               <Stat label="% Gordura" value={`${r.bodyFatPct.toFixed(1)}%`} />
               {r.bodyDensity != null ? (
@@ -166,7 +156,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 
         {r ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Composição corporal</Text>
+            <SectionTitle>Composição corporal</SectionTitle>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ marginRight: 16 }}>
                 <Donut lean={r.leanMassKg} fat={r.fatMassKg} />
@@ -191,7 +181,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 
         {skinfolds.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Dobras cutâneas (mm)</Text>
+            <SectionTitle>Dobras cutâneas (mm)</SectionTitle>
             {skinfolds.map((s) => {
               const vals = [s.reading_1, s.reading_2, s.reading_3].filter(
                 (v): v is number => v != null
@@ -213,7 +203,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 
         {circumferences.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Circunferências (cm)</Text>
+            <SectionTitle>Circunferências (cm)</SectionTitle>
             {circumferences.map((c) => (
               <View key={c.id} style={styles.row}>
                 <Text style={styles.muted}>{circumferenceLabel(c.site)}</Text>
@@ -225,22 +215,25 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 
         {assessment.medications ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Medicamentos em uso</Text>
+            <SectionTitle>Medicamentos em uso</SectionTitle>
             <Text>{assessment.medications}</Text>
           </View>
         ) : null}
 
         {assessment.notes ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Observações</Text>
+            <SectionTitle>Observações</SectionTitle>
             <Text>{assessment.notes}</Text>
           </View>
         ) : null}
 
-        <Text style={styles.footer}>
-          Gerado pelo Avalix{r ? ` · motor de cálculo ${r.engineVersion}` : ''}. Resultado
-          reproduzível a partir das medidas registradas. Documento de uso profissional.
+        <Text style={styles.reproNote}>
+          Resultado reproduzível a partir das medidas registradas. Documento de uso profissional.
         </Text>
+
+        <ReportFooter
+          note={`Gerado pelo Avalix${r ? ` · motor de cálculo ${r.engineVersion}` : ''}`}
+        />
       </Page>
     </Document>
   )

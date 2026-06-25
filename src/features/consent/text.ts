@@ -1,19 +1,16 @@
-// TEXTO DE CONSENTIMENTO (LGPD) - RASCUNHO.
-//
-// ATENCAO: rascunho tecnico, NAO revisado por advogado. Antes do beta com
-// titular real, faca revisao juridica. Ao publicar a versao final, troque
-// CONSENT_VERSION e o texto JUNTOS.
+// TEXTO DE CONSENTIMENTO (LGPD) - versao 1.0, revisada e aprovada.
 //
 // REGRA DE VERSIONAMENTO: o hash gravado no aceite (consent_records.
 // consent_text_sha256) e calculado sobre o texto EXATO retornado por
 // consentText(). Qualquer mudanca (ate um espaco) muda o hash. Por isso,
-// sempre que editar o texto, incremente CONSENT_VERSION.
+// sempre que editar o texto, incremente CONSENT_VERSION. Aceites antigos
+// preservam a versao/hash do texto que a pessoa de fato leu.
 //
 // O Controlador (profissional/organizacao) aparece no texto pelo nome (vindo de
 // organizations.name). Como o nome entra no texto, o hash varia por org: o
 // registro de aceite prova exatamente o texto, com o nome, que a pessoa leu.
 
-export const CONSENT_VERSION = '0.2-rascunho'
+export const CONSENT_VERSION = '1.0'
 
 function controllerLabel(name: string | null | undefined): string {
   const n = name?.trim()

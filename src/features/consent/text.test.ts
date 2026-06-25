@@ -3,8 +3,9 @@ import { CONSENT_VERSION, consentText, consentContent } from './text'
 import { sha256Hex } from '../../lib/hash'
 
 describe('consentimento', () => {
-  it('tem versão não vazia e texto substancial', () => {
+  it('tem versão final (não rascunho) e texto substancial', () => {
     expect(CONSENT_VERSION).toMatch(/\S/)
+    expect(CONSENT_VERSION).not.toMatch(/rascunho/i)
     expect(consentText('Clínica X').length).toBeGreaterThan(200)
   })
 

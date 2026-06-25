@@ -39,6 +39,7 @@ import {
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
+import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { OneRmCalculator } from '../features/workout/OneRmCalculator'
 import { exerciseCautions, posturalEmphasis } from '../features/workout/contraindications'
 import { useAnamneses } from '../features/anamnesis/hooks'
@@ -52,8 +53,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const controlClass =
-  'w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+import { controlClass } from '@/lib/ui'
 
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
@@ -968,14 +968,14 @@ function ExercisePicker({
 
       <ul className="max-h-56 divide-y overflow-y-auto rounded-md border bg-card">
         {filtered.map((e) => (
-          <li key={e.id}>
+          <li key={e.id} className="flex items-center hover:bg-accent">
             <button
               type="button"
               onClick={() => {
                 onPick(e.id)
                 setOpen(false)
               }}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm"
             >
               <span>
                 {e.name}
@@ -985,6 +985,7 @@ function ExercisePicker({
                 {muscleLabel(e.primary_muscle as MuscleGroup)} · {equipmentLabel(e.equipment as never)}
               </span>
             </button>
+            <ExerciseDemoLink name={e.name} label="" className="shrink-0 px-2 text-muted-foreground hover:text-foreground" />
           </li>
         ))}
         {filtered.length === 0 ? (
