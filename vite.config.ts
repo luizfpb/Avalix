@@ -9,8 +9,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      // prompt (nao autoUpdate): o SW novo espera; quem aplica e o usuario, por
+      // um toque no aviso (PwaUpdatePrompt) — sem reload surpresa no meio de um
+      // formulario. injectRegister null porque registramos no componente.
+      registerType: "prompt",
+      injectRegister: null,
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "AvalixFit",
