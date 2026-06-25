@@ -30,6 +30,7 @@ const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Agenda = lazy(() => import('./pages/Agenda'))
+const Carteira = lazy(() => import('./pages/Carteira'))
 
 function PageFallback() {
   return (
@@ -84,6 +85,7 @@ export default function App() {
             />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/agenda" element={<Agenda />} />
+            <Route path="/carteira" element={<Carteira />} />
             <Route path="/exercicios" element={<ExerciciosBiblioteca />} />
             <Route path="/ferramentas/1rm" element={<Calculadora1RM />} />
           </Route>

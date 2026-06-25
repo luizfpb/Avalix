@@ -1,5 +1,13 @@
 import { NavLink, Link, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Users, CalendarDays, Settings, LogOut, type LucideIcon } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  CalendarDays,
+  Settings,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
@@ -13,6 +21,7 @@ export function AppShell() {
   const navItems: NavItem[] = [
     { to: '/dashboard', label: 'Início', icon: LayoutDashboard },
     { to: '/avaliados', label: subjectTermLabels(organization?.subject_term).pluralCap, icon: Users },
+    { to: '/carteira', label: 'Carteira', icon: ClipboardList },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/configuracoes', label: 'Ajustes', icon: Settings },
   ]

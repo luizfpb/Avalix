@@ -8,6 +8,8 @@ import {
   deleteWorkoutPlan,
   getWorkoutPlan,
   listExercises,
+  listOrgActivePlans,
+  listOrgWorkoutLogSummary,
   listPlanSetHistory,
   listWorkoutLogs,
   listWorkoutPlans,
@@ -120,6 +122,22 @@ export function useDuplicateWorkoutPlan() {
     onSuccess: (plan) => {
       qc.invalidateQueries({ queryKey: ['workout-plans', plan.subject_id] })
     },
+  })
+}
+
+export function useOrgActivePlans(orgId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['org-active-plans', orgId],
+    queryFn: () => listOrgActivePlans(orgId as string),
+    enabled: !!orgId,
+  })
+}
+
+export function useOrgWorkoutLogSummary(orgId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['org-log-summary', orgId],
+    queryFn: () => listOrgWorkoutLogSummary(orgId as string),
+    enabled: !!orgId,
   })
 }
 

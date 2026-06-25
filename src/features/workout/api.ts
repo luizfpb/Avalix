@@ -514,6 +514,67 @@ export async function listPlanSetHistory(planId: string): Promise<SetHistoryPoin
   })
 }
 
+// =====================================================================
+// CARTEIRA (visao org-wide pro dashboard do treinador)
+// =====================================================================
+
+export type ActivePlanSummary = {
+  planId: string
+  subjectId: string
+  name: string
+  weeks: number
+  sessionsPerWeek: number // weekly_schedule.length, ou nº de divisoes se vazio
+}
+
+// Planos ativos da org com sessoes/semana (embed do count de divisoes). RLS vale.
+export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSummary[]> {
+  const { data, error } = await supabase
+    .from('workout_plans')
+    .select('id, subject_id, name, weeks, weekly_schedule, workout_days(count)')
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Array<{
+    id: string
+    subject_id: string
+    name: string
+    weeks: number
+    weekly_schedule: string[] | null
+    workout_days: { count: number }[]
+  }>
+  return rows.map((p) => {
+    const dayCount = p.workout_days?.[0]?.count ?? 0
+    const ws = p.weekly_schedule ?? []
+    return {
+      planId: p.id,
+      subjectId: p.subject_id,
+      name: p.name,
+      weeks: p.weeks,
+      sessionsPerWeek: ws.length > 0 ? ws.length : dayCount,
+    }
+  })
+}
+
+export type LogSummary = { count: number; lastDate: string | null }
+
+// Resumo de execucao por plano da org (qtde de sessoes + ultima data). RLS vale.
+export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<string, LogSummary>> {
+  const { data, error } = await supabase
+    .from('workout_logs')
+    .select('plan_id, performed_at')
+    .eq('org_id', orgId)
+  if (error) throw error
+  const map: Record<string, LogSummary> = {}
+  for (const r of data ?? []) {
+    const cur = map[r.plan_id] ?? { count: 0, lastDate: null }
+    cur.count += 1
+    if (!cur.lastDate || r.performed_at > cur.lastDate) cur.lastDate = r.performed_at
+    map[r.plan_id] = cur
+  }
+  return map
+}
+
 // Muda so o status (rascunho/ativo/arquivado) sem reescrever a estrutura. org_id/
 // subject_id sao congelados por trigger; status e livre.
 export async function setWorkoutPlanStatus(id: string, status: string): Promise<WorkoutPlanRow> {
