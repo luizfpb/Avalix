@@ -3,6 +3,7 @@ import type {
   AssessmentRow,
   CircumferenceReadingRow,
   SkinfoldReadingRow,
+  SubjectCircumference,
 } from '../assessment/api'
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { protocolLabel } from '../assessment/protocols'
@@ -46,6 +47,33 @@ export type AssessmentPdfData = {
   circumferences: CircumferenceReadingRow[]
   // histórico cronológico (opcional) para os gráficos de evolução
   history?: AssessmentHistoryPoint[]
+  // todas as circunferências do avaliado ao longo das avaliações (opcional),
+  // pra evolução dos perímetros mais medidos
+  circumferenceHistory?: SubjectCircumference[]
+}
+
+// agrupa as circunferências por ponto: uma série (alinhada às datas) por site
+// com >=2 medidas, ordenadas por nº de medidas. Limita a maxSites pra não
+// inflar o PDF. Puro — espelha o buildCircData da tela de evolução.
+function buildCircSeries(
+  rows: SubjectCircumference[],
+  maxSites: number
+): { site: string; values: (number | null)[] }[] {
+  const dates = [...new Set(rows.map((r) => r.assessedAt))].sort()
+  const byDateSite = new Map<string, number>()
+  const count = new Map<string, number>()
+  for (const r of rows) {
+    byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
+    count.set(r.site, (count.get(r.site) ?? 0) + 1)
+  }
+  return [...count.entries()]
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxSites)
+    .map(([site]) => ({
+      site,
+      values: dates.map((d) => byDateSite.get(`${d}|${site}`) ?? null),
+    }))
 }
 
 // métricas plotadas na evolução, na ordem de exibição. key bate com o ponto.
@@ -158,6 +186,27 @@ function EvolutionSection({ history }: { history: AssessmentHistoryPoint[] }) {
   )
 }
 
+function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
+  const series = buildCircSeries(rows, 6)
+  if (series.length === 0) return null
+  return (
+    <View style={styles.section}>
+      <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
+      <View style={styles.evoGrid}>
+        {series.map((s) => (
+          <MiniTrend
+            key={s.site}
+            title={circumferenceLabel(s.site)}
+            unit=" cm"
+            color={palette.plum}
+            values={s.values}
+          />
+        ))}
+      </View>
+    </View>
+  )
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
@@ -235,6 +284,10 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
         ) : null}
 
         {data.history ? <EvolutionSection history={data.history} /> : null}
+
+        {data.circumferenceHistory ? (
+          <CircumferenceEvolution rows={data.circumferenceHistory} />
+        ) : null}
 
         {skinfolds.length > 0 ? (
           <View style={styles.section}>

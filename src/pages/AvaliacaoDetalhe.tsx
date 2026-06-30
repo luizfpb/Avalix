@@ -8,6 +8,7 @@ import { useAuth } from '../features/auth/context'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
+import { listSubjectCircumferences } from '../features/assessment/api'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -86,6 +87,7 @@ export default function AvaliacaoDetalhe() {
           }
         })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
+      const circumferenceHistory = await listSubjectCircumferences(assessment.subject_id)
       const blob = await generateAssessmentPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
@@ -94,6 +96,7 @@ export default function AvaliacaoDetalhe() {
         skinfolds,
         circumferences,
         history,
+        circumferenceHistory,
       })
       downloadBlob(blob, `avaliacao-${assessment.assessed_at}.pdf`)
       if (organization && user) {
