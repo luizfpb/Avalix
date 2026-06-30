@@ -25,6 +25,17 @@ import {
 const LEAN = palette.violet
 const FAT = palette.magenta
 
+// um ponto do histórico cronológico do avaliado (uma avaliação). peso/IMC
+// existem sempre; %gordura/massas só quando houve protocolo de composição.
+export type AssessmentHistoryPoint = {
+  date: string
+  weightKg: number | null
+  bmi: number | null
+  bodyFatPct: number | null
+  leanMassKg: number | null
+  fatMassKg: number | null
+}
+
 export type AssessmentPdfData = {
   orgName: string
   subjectName: string
@@ -33,9 +44,19 @@ export type AssessmentPdfData = {
   assessment: AssessmentRow
   skinfolds: SkinfoldReadingRow[]
   circumferences: CircumferenceReadingRow[]
-  // histórico cronológico (opcional) para a evolução
-  history?: { date: string; bodyFatPct: number | null }[]
+  // histórico cronológico (opcional) para os gráficos de evolução
+  history?: AssessmentHistoryPoint[]
 }
+
+// métricas plotadas na evolução, na ordem de exibição. key bate com o ponto.
+type TrendKey = 'bodyFatPct' | 'weightKg' | 'bmi' | 'leanMassKg' | 'fatMassKg'
+const TREND_METRICS: { key: TrendKey; title: string; unit: string; color: string }[] = [
+  { key: 'bodyFatPct', title: '% de gordura', unit: '%', color: FAT },
+  { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.plum },
+  { key: 'bmi', title: 'IMC', unit: '', color: palette.violet },
+  { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN },
+  { key: 'fatMassKg', title: 'Massa gorda', unit: ' kg', color: FAT },
+]
 
 const styles = StyleSheet.create({
   section: { marginBottom: 14 },
@@ -54,6 +75,10 @@ const styles = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
   legendSwatch: { width: 8, height: 8, borderRadius: 2, marginRight: 5 },
   reproNote: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
+  evoGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  trendCard: { width: '48%', marginBottom: 8 },
+  trendTitle: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: palette.plum, marginBottom: 2 },
+  trendCaption: { fontSize: 7.5, color: palette.muted, marginTop: 1 },
 })
 
 function Donut({ lean, fat }: { lean: number; fat: number }) {
@@ -77,25 +102,57 @@ function Legend({ color, text }: { color: string; text: string }) {
   )
 }
 
-function Evolution({ history }: { history: { date: string; bodyFatPct: number | null }[] }) {
-  const w = 240
-  const h = 56
-  const l = linePath(
-    history.map((p) => p.bodyFatPct),
-    w,
-    h,
-    2,
-    6
+// minigráfico de uma métrica ao longo do tempo. Só desenha com >=2 pontos
+// válidos (a linha pula buracos: avaliação sem composição não tem %gordura/massas).
+function MiniTrend({
+  title,
+  unit,
+  color,
+  values,
+}: {
+  title: string
+  unit: string
+  color: string
+  values: (number | null)[]
+}) {
+  const valid = values.filter((v): v is number => v != null)
+  if (valid.length < 2) return null
+  const w = 226
+  const h = 46
+  const l = linePath(values, w, h, 3, 6)
+  const first = valid[0]
+  const last = valid[valid.length - 1]
+  return (
+    <View style={styles.trendCard}>
+      <Text style={styles.trendTitle}>{title}</Text>
+      <Svg width={w} height={h}>
+        <Polyline points={l.points} fill="none" stroke={color} strokeWidth={1.5} />
+      </Svg>
+      <Text style={styles.trendCaption}>
+        {first.toFixed(1)}
+        {unit} → {last.toFixed(1)}
+        {unit} · faixa {l.min.toFixed(1)}–{l.max.toFixed(1)}
+      </Text>
+    </View>
   )
+}
+
+function EvolutionSection({ history }: { history: AssessmentHistoryPoint[] }) {
+  if (history.length < 2) return null
+  const charts = TREND_METRICS.map((m) => ({ m, values: history.map((p) => p[m.key]) })).filter(
+    ({ values }) => values.filter((v) => v != null).length >= 2
+  )
+  if (charts.length === 0) return null
   return (
     <View style={styles.section}>
-      <SectionTitle>Evolução da % de gordura</SectionTitle>
-      <Svg width={w} height={h}>
-        <Polyline points={l.points} fill="none" stroke={LEAN} strokeWidth={1.5} />
-      </Svg>
+      <SectionTitle>Evolução ao longo das avaliações</SectionTitle>
+      <View style={styles.evoGrid}>
+        {charts.map(({ m, values }) => (
+          <MiniTrend key={m.key} title={m.title} unit={m.unit} color={m.color} values={values} />
+        ))}
+      </View>
       <Text style={styles.muted}>
-        {history[0].date} → {history[history.length - 1].date} · {l.min.toFixed(1)}%–
-        {l.max.toFixed(1)}%
+        {history[0].date} → {history[history.length - 1].date} · {history.length} avaliações
       </Text>
     </View>
   )
@@ -177,7 +234,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
           </View>
         ) : null}
 
-        {data.history && data.history.length >= 2 ? <Evolution history={data.history} /> : null}
+        {data.history ? <EvolutionSection history={data.history} /> : null}
 
         {skinfolds.length > 0 ? (
           <View style={styles.section}>

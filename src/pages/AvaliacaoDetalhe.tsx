@@ -74,9 +74,16 @@ export default function AvaliacaoDetalhe() {
       const history = [...(assessmentsQuery.data ?? [])]
         .sort((x, y) => x.assessed_at.localeCompare(y.assessed_at))
         .map((x) => {
-          const rr = x.results as { bodyFatPct?: number } | null
+          const rr = x.results as AssessmentResultSnapshot | null
           const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.assessed_at)
-          return { date: m ? `${m[3]}/${m[2]}` : x.assessed_at, bodyFatPct: rr?.bodyFatPct ?? null }
+          return {
+            date: m ? `${m[3]}/${m[2]}` : x.assessed_at,
+            weightKg: x.weight_kg ?? null,
+            bmi: x.weight_kg && x.height_cm ? computeBmi(x.weight_kg, x.height_cm) : null,
+            bodyFatPct: rr?.bodyFatPct ?? null,
+            leanMassKg: rr?.leanMassKg ?? null,
+            fatMassKg: rr?.fatMassKg ?? null,
+          }
         })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
       const blob = await generateAssessmentPdf({
