@@ -143,13 +143,15 @@ const styles = StyleSheet.create({
   trendDelta: { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
 })
 
-// dimensões e margens internas do minigráfico (espaço pra rótulos e datas)
+// dimensões e margens internas do gráfico (espaço pra escala, rótulos e datas)
 const CHART_W = 250
-const CHART_H = 92
-const PX0 = 28 // gutter esquerdo (escala y)
-const PX1 = 238 // borda direita do plot
-const PY0 = 16 // topo (espaço pro rótulo de valor sobre o ponto)
-const PY1 = 76 // base (acima da linha de datas)
+const CHART_H = 104
+const PX0 = 34 // gutter esquerdo (escala y)
+const PX1 = 244 // borda direita do plot
+const PY0 = 18 // topo (espaço pro rótulo de valor sobre o ponto)
+const PY1 = 84 // base do plot (acima da linha de datas)
+const AXIS_COLOR = '#5b5570' // escala/datas: cinza-roxo legível (não apagado)
+const GRID_COLOR = '#d3cae8' // linhas de referência
 
 function Donut({ lean, fat }: { lean: number; fat: number }) {
   const slices = donutSlices([lean, fat], 50, 50, 46, 28)
@@ -206,6 +208,12 @@ function TrendChart({
   const last = coords[coords.length - 1]
   const delta = last.value - first.value
   const deltaTxt = `${delta > 0 ? '+' : ''}${fmtNum(delta)}${unit}`
+  // 3 referências: máximo (topo), meio e mínimo (base), com a escala à esquerda
+  const grid = [
+    { v: max, y: PY0 },
+    { v: (max + min) / 2, y: (PY0 + PY1) / 2 },
+    { v: min, y: PY1 },
+  ]
 
   return (
     <View style={styles.trendCard}>
@@ -214,40 +222,45 @@ function TrendChart({
         <Text style={[styles.trendDelta, { color }]}>{deltaTxt}</Text>
       </View>
       <Svg width={CHART_W} height={CHART_H}>
-        {/* referência mín/máx */}
-        <Line x1={PX0} y1={PY0} x2={PX1} y2={PY0} stroke={palette.hairline} strokeWidth={0.5} />
-        <Line x1={PX0} y1={PY1} x2={PX1} y2={PY1} stroke={palette.hairline} strokeWidth={0.5} />
-        <Text x={PX0 - 3} y={PY0 + 2} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
-          {fmtNum(max)}
-        </Text>
-        <Text x={PX0 - 3} y={PY1 + 2} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
-          {fmtNum(min)}
-        </Text>
-        {/* linha + pontos */}
-        <Polyline points={polyPoints} fill="none" stroke={color} strokeWidth={1.5} />
-        {coords.map((c, i) => (
-          <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 2.6 : 1.8} fill={color} />
+        {/* linhas de referência + escala (máx / meio / mín) */}
+        {grid.map((g, i) => (
+          <Line key={`g${i}`} x1={PX0} y1={g.y} x2={PX1} y2={g.y} stroke={GRID_COLOR} strokeWidth={0.6} />
         ))}
-        {/* valor inicial e final sobre os pontos */}
+        {grid.map((g, i) => (
+          <Text
+            key={`s${i}`}
+            x={PX0 - 4}
+            y={g.y + 2.4}
+            style={{ fontSize: 7, fill: AXIS_COLOR, textAnchor: 'end' }}
+          >
+            {fmtNum(g.v)}
+          </Text>
+        ))}
+        {/* linha + pontos */}
+        <Polyline points={polyPoints} fill="none" stroke={color} strokeWidth={1.8} />
+        {coords.map((c, i) => (
+          <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.2 : 2.2} fill={color} />
+        ))}
+        {/* valor inicial (à direita do 1º ponto) e final em destaque (à esquerda do último) */}
         <Text
-          x={first.x}
+          x={first.x + 4}
           y={first.y - 5}
-          style={{ fontSize: 7, fill: palette.muted, textAnchor: 'middle' }}
+          style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', fill: AXIS_COLOR, textAnchor: 'start' }}
         >
           {fmtNum(first.value)}
         </Text>
         <Text
-          x={last.x}
-          y={last.y - 5}
-          style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'middle' }}
+          x={last.x - 4}
+          y={last.y - 6}
+          style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'end' }}
         >
           {fmtNum(last.value)}
         </Text>
         {/* datas das pontas */}
-        <Text x={PX0} y={CHART_H - 3} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'start' }}>
+        <Text x={PX0} y={CHART_H - 4} style={{ fontSize: 6.5, fill: AXIS_COLOR, textAnchor: 'start' }}>
           {first.date}
         </Text>
-        <Text x={PX1} y={CHART_H - 3} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
+        <Text x={PX1} y={CHART_H - 4} style={{ fontSize: 6.5, fill: AXIS_COLOR, textAnchor: 'end' }}>
           {last.date}
         </Text>
       </Svg>

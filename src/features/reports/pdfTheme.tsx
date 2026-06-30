@@ -45,26 +45,32 @@ export const pdfTheme = StyleSheet.create({
   org: { fontSize: 9, color: palette.muted, marginTop: 5 },
   title: { fontSize: 17, fontFamily: 'Helvetica-Bold', color: palette.plum, textAlign: 'right' },
   subtitle: { fontSize: 9, color: palette.muted, marginTop: 3, textAlign: 'right' },
-  // filete duplo sob o cabeçalho (grosso na cor da marca + fino claro)
-  ruleThick: { height: 2.5, backgroundColor: palette.plum, marginTop: 10 },
-  ruleThin: { height: 0.6, backgroundColor: palette.violet, marginTop: 1.5, marginBottom: 16 },
+  // filete único sob o cabeçalho, na cor da marca
+  ruleThick: { height: 2.5, backgroundColor: palette.plum, marginTop: 10, marginBottom: 16 },
 
-  // Cartão de informações: grade de pares rótulo/valor sobre fundo sutil.
+  // Cartão de informações: nome em destaque no topo + grade de pares abaixo.
   infoCard: {
     backgroundColor: palette.surface,
     borderRadius: 6,
     borderLeftWidth: 3,
     borderLeftColor: palette.violet,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    padding: 12,
     marginBottom: 16,
   },
-  infoItem: { width: '50%', marginBottom: 6, paddingRight: 8 },
-  infoItemWide: { width: '100%', marginBottom: 6, paddingRight: 8 },
-  infoLabel: { fontSize: 7.5, color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  infoValue: { fontSize: 10.5, fontFamily: 'Helvetica-Bold', marginTop: 1 },
+  infoHead: { marginBottom: 8 },
+  infoHeadLabel: { fontSize: 7.5, color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoHeadValue: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: palette.plum, marginTop: 1 },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    borderTopWidth: 0.7,
+    borderTopColor: '#ddd4f0',
+    paddingTop: 8,
+  },
+  infoCell: { width: '50%', marginBottom: 6, paddingRight: 10 },
+  infoCellWide: { width: '100%', marginBottom: 6, paddingRight: 10 },
+  infoLabel: { fontSize: 7, color: palette.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoValue: { fontSize: 10, fontFamily: 'Helvetica-Bold', marginTop: 1 },
 
   // Título de seção: rótulo da marca com filete inferior de acento.
   sectionTitle: {
@@ -126,21 +132,32 @@ export function ReportHeader({
         </View>
       </View>
       <View style={pdfTheme.ruleThick} />
-      <View style={pdfTheme.ruleThin} />
     </View>
   )
 }
 
-// Cartão com os dados-chave do documento (avaliado, data, etc.).
+// Cartão com os dados-chave: o 1º item (nome do avaliado) vira destaque no
+// topo; os demais formam uma grade rótulo/valor abaixo de um filete.
 export function InfoCard({ items }: { items: InfoItem[] }) {
+  const [head, ...rest] = items
   return (
     <View style={pdfTheme.infoCard}>
-      {items.map((it, i) => (
-        <View key={i} style={it.wide ? pdfTheme.infoItemWide : pdfTheme.infoItem}>
-          <Text style={pdfTheme.infoLabel}>{it.label}</Text>
-          <Text style={pdfTheme.infoValue}>{it.value}</Text>
+      {head ? (
+        <View style={pdfTheme.infoHead}>
+          <Text style={pdfTheme.infoHeadLabel}>{head.label}</Text>
+          <Text style={pdfTheme.infoHeadValue}>{head.value}</Text>
         </View>
-      ))}
+      ) : null}
+      {rest.length > 0 ? (
+        <View style={pdfTheme.infoGrid}>
+          {rest.map((it, i) => (
+            <View key={i} style={it.wide ? pdfTheme.infoCellWide : pdfTheme.infoCell}>
+              <Text style={pdfTheme.infoLabel}>{it.label}</Text>
+              <Text style={pdfTheme.infoValue}>{it.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   )
 }
