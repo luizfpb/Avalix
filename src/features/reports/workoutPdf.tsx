@@ -299,9 +299,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
           Plano reproduzível a partir do snapshot registrado. Documento de uso profissional.
         </Text>
 
-        <ReportFooter
-          note={`Gerado pelo Avalix${snapshot ? ` · motor de volume ${snapshot.engineVersion}` : ''}`}
-        />
+        <ReportFooter note="Montado no Avalix" />
       </Page>
     </Document>
   )

@@ -216,7 +216,7 @@ function TrendChart({
   ]
 
   return (
-    <View style={styles.trendCard}>
+    <View style={styles.trendCard} wrap={false}>
       <View style={styles.trendHeader}>
         <Text style={styles.trendTitle}>{title}</Text>
         <Text style={[styles.trendDelta, { color }]}>{deltaTxt}</Text>
@@ -449,9 +449,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
           Resultado reproduzível a partir das medidas registradas. Documento de uso profissional.
         </Text>
 
-        <ReportFooter
-          note={`Gerado pelo Avalix${r ? ` · motor de cálculo ${r.engineVersion}` : ''}`}
-        />
+        <ReportFooter note="Calculado pelo motor Avalix" />
       </Page>
     </Document>
   )
