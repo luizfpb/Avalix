@@ -1,4 +1,16 @@
-import { Document, Page, Text, View, StyleSheet, Svg, Path, Polyline, pdf } from '@react-pdf/renderer'
+import {
+  Circle,
+  Document,
+  Line,
+  Page,
+  Path,
+  Polyline,
+  Svg,
+  StyleSheet,
+  Text,
+  View,
+  pdf,
+} from '@react-pdf/renderer'
 import type {
   AssessmentRow,
   CircumferenceReadingRow,
@@ -11,7 +23,7 @@ import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
-import { donutSlices, linePath } from './charts'
+import { donutSlices } from './charts'
 import {
   InfoCard,
   ReportFooter,
@@ -52,17 +64,33 @@ export type AssessmentPdfData = {
   circumferenceHistory?: SubjectCircumference[]
 }
 
-// agrupa as circunferências por ponto: uma série (alinhada às datas) por site
-// com >=2 medidas, ordenadas por nº de medidas. Limita a maxSites pra não
-// inflar o PDF. Puro — espelha o buildCircData da tela de evolução.
+type TrendPoint = { value: number | null; date: string }
+
+// inteiro sem casa decimal; senão 1 casa (80.0 -> "80", 18.23 -> "18.2")
+function fmtNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+}
+
+// ISO (aaaa-mm-dd) -> dd/mm pro eixo do gráfico
+function shortDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  return m ? `${m[3]}/${m[2]}` : iso
+}
+
+// agrupa as circunferências por ponto: uma série por site com >=2 medidas,
+// ordenadas por nº de medidas e limitadas a maxSites. Janela aos últimos
+// maxPoints registros (PDF enxuto). Puro — espelha o buildCircData da tela.
 function buildCircSeries(
   rows: SubjectCircumference[],
-  maxSites: number
-): { site: string; values: (number | null)[] }[] {
-  const dates = [...new Set(rows.map((r) => r.assessedAt))].sort()
+  maxSites: number,
+  maxPoints: number
+): { site: string; points: TrendPoint[] }[] {
+  const dates = [...new Set(rows.map((r) => r.assessedAt))].sort().slice(-maxPoints)
+  const dateSet = new Set(dates)
   const byDateSite = new Map<string, number>()
   const count = new Map<string, number>()
   for (const r of rows) {
+    if (!dateSet.has(r.assessedAt)) continue
     byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
     count.set(r.site, (count.get(r.site) ?? 0) + 1)
   }
@@ -72,7 +100,7 @@ function buildCircSeries(
     .slice(0, maxSites)
     .map(([site]) => ({
       site,
-      values: dates.map((d) => byDateSite.get(`${d}|${site}`) ?? null),
+      points: dates.map((d) => ({ value: byDateSite.get(`${d}|${site}`) ?? null, date: shortDate(d) })),
     }))
 }
 
@@ -104,10 +132,24 @@ const styles = StyleSheet.create({
   legendSwatch: { width: 8, height: 8, borderRadius: 2, marginRight: 5 },
   reproNote: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
   evoGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  trendCard: { width: '48%', marginBottom: 8 },
-  trendTitle: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: palette.plum, marginBottom: 2 },
-  trendCaption: { fontSize: 7.5, color: palette.muted, marginTop: 1 },
+  trendCard: { width: '48%', marginBottom: 10 },
+  trendHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 1,
+  },
+  trendTitle: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: palette.plum },
+  trendDelta: { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
 })
+
+// dimensões e margens internas do minigráfico (espaço pra rótulos e datas)
+const CHART_W = 250
+const CHART_H = 92
+const PX0 = 28 // gutter esquerdo (escala y)
+const PX1 = 238 // borda direita do plot
+const PY0 = 16 // topo (espaço pro rótulo de valor sobre o ponto)
+const PY1 = 76 // base (acima da linha de datas)
 
 function Donut({ lean, fat }: { lean: number; fat: number }) {
   const slices = donutSlices([lean, fat], 50, 50, 46, 28)
@@ -130,76 +172,128 @@ function Legend({ color, text }: { color: string; text: string }) {
   )
 }
 
-// minigráfico de uma métrica ao longo do tempo. Só desenha com >=2 pontos
-// válidos (a linha pula buracos: avaliação sem composição não tem %gordura/massas).
-function MiniTrend({
+// Cartão de evolução de uma métrica: linha com pontos marcados, valor inicial
+// e final sobre os pontos, variação (Δ) no cabeçalho, linhas de referência
+// mín/máx com a escala, e datas das pontas. Só desenha com >=2 pontos válidos
+// (a linha pula buracos: avaliação sem composição não tem %gordura/massas).
+function TrendChart({
   title,
   unit,
   color,
-  values,
+  points,
 }: {
   title: string
   unit: string
   color: string
-  values: (number | null)[]
+  points: TrendPoint[]
 }) {
-  const valid = values.filter((v): v is number => v != null)
+  const valid = points
+    .map((p, i) => ({ value: p.value, date: p.date, i }))
+    .filter((p): p is { value: number; date: string; i: number } => p.value != null)
   if (valid.length < 2) return null
-  const w = 226
-  const h = 46
-  const l = linePath(values, w, h, 3, 6)
-  const first = valid[0]
-  const last = valid[valid.length - 1]
+
+  const nums = valid.map((p) => p.value)
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  const span = max - min || 1
+  const n = points.length
+  const xOf = (i: number) => (n <= 1 ? (PX0 + PX1) / 2 : PX0 + (i / (n - 1)) * (PX1 - PX0))
+  const yOf = (v: number) => PY1 - ((v - min) / span) * (PY1 - PY0)
+
+  const coords = valid.map((p) => ({ x: xOf(p.i), y: yOf(p.value), value: p.value, date: p.date }))
+  const polyPoints = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')
+  const first = coords[0]
+  const last = coords[coords.length - 1]
+  const delta = last.value - first.value
+  const deltaTxt = `${delta > 0 ? '+' : ''}${fmtNum(delta)}${unit}`
+
   return (
     <View style={styles.trendCard}>
-      <Text style={styles.trendTitle}>{title}</Text>
-      <Svg width={w} height={h}>
-        <Polyline points={l.points} fill="none" stroke={color} strokeWidth={1.5} />
+      <View style={styles.trendHeader}>
+        <Text style={styles.trendTitle}>{title}</Text>
+        <Text style={[styles.trendDelta, { color }]}>{deltaTxt}</Text>
+      </View>
+      <Svg width={CHART_W} height={CHART_H}>
+        {/* referência mín/máx */}
+        <Line x1={PX0} y1={PY0} x2={PX1} y2={PY0} stroke={palette.hairline} strokeWidth={0.5} />
+        <Line x1={PX0} y1={PY1} x2={PX1} y2={PY1} stroke={palette.hairline} strokeWidth={0.5} />
+        <Text x={PX0 - 3} y={PY0 + 2} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
+          {fmtNum(max)}
+        </Text>
+        <Text x={PX0 - 3} y={PY1 + 2} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
+          {fmtNum(min)}
+        </Text>
+        {/* linha + pontos */}
+        <Polyline points={polyPoints} fill="none" stroke={color} strokeWidth={1.5} />
+        {coords.map((c, i) => (
+          <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 2.6 : 1.8} fill={color} />
+        ))}
+        {/* valor inicial e final sobre os pontos */}
+        <Text
+          x={first.x}
+          y={first.y - 5}
+          style={{ fontSize: 7, fill: palette.muted, textAnchor: 'middle' }}
+        >
+          {fmtNum(first.value)}
+        </Text>
+        <Text
+          x={last.x}
+          y={last.y - 5}
+          style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'middle' }}
+        >
+          {fmtNum(last.value)}
+        </Text>
+        {/* datas das pontas */}
+        <Text x={PX0} y={CHART_H - 3} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'start' }}>
+          {first.date}
+        </Text>
+        <Text x={PX1} y={CHART_H - 3} style={{ fontSize: 6, fill: palette.muted, textAnchor: 'end' }}>
+          {last.date}
+        </Text>
       </Svg>
-      <Text style={styles.trendCaption}>
-        {first.toFixed(1)}
-        {unit} → {last.toFixed(1)}
-        {unit} · faixa {l.min.toFixed(1)}–{l.max.toFixed(1)}
-      </Text>
     </View>
   )
 }
 
 function EvolutionSection({ history }: { history: AssessmentHistoryPoint[] }) {
   if (history.length < 2) return null
-  const charts = TREND_METRICS.map((m) => ({ m, values: history.map((p) => p[m.key]) })).filter(
-    ({ values }) => values.filter((v) => v != null).length >= 2
-  )
+  // PDF: últimos 10 pontos pra leitura limpa (no app a tela mostra todos)
+  const recent = history.slice(-10)
+  const charts = TREND_METRICS.map((m) => ({
+    m,
+    points: recent.map((p) => ({ value: p[m.key], date: p.date })),
+  })).filter((c) => c.points.filter((p) => p.value != null).length >= 2)
   if (charts.length === 0) return null
   return (
     <View style={styles.section}>
       <SectionTitle>Evolução ao longo das avaliações</SectionTitle>
       <View style={styles.evoGrid}>
-        {charts.map(({ m, values }) => (
-          <MiniTrend key={m.key} title={m.title} unit={m.unit} color={m.color} values={values} />
+        {charts.map(({ m, points }) => (
+          <TrendChart key={m.key} title={m.title} unit={m.unit} color={m.color} points={points} />
         ))}
       </View>
-      <Text style={styles.muted}>
-        {history[0].date} → {history[history.length - 1].date} · {history.length} avaliações
+      <Text style={[styles.muted, { fontSize: 8 }]}>
+        de {recent[0].date} a {recent[recent.length - 1].date} · {recent.length} avaliações
+        {history.length > recent.length ? ` (de ${history.length} no total)` : ''}
       </Text>
     </View>
   )
 }
 
 function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
-  const series = buildCircSeries(rows, 6)
+  const series = buildCircSeries(rows, 6, 10)
   if (series.length === 0) return null
   return (
     <View style={styles.section}>
       <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
       <View style={styles.evoGrid}>
         {series.map((s) => (
-          <MiniTrend
+          <TrendChart
             key={s.site}
             title={circumferenceLabel(s.site)}
             unit=" cm"
             color={palette.plum}
-            values={s.values}
+            points={s.points}
           />
         ))}
       </View>
