@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
 const CHART_W = 250
 const CHART_H = 104
 const PX0 = 34 // gutter esquerdo (escala y)
-const PX1 = 244 // borda direita do plot
+const PX1 = 212 // borda direita do plot (deixa margem à direita pro valor atual)
 const PY0 = 18 // topo (espaço pro rótulo de valor sobre o ponto)
 const PY1 = 84 // base do plot (acima da linha de datas)
 const AXIS_COLOR = '#5b5570' // escala/datas: cinza-roxo legível (não apagado)
@@ -241,18 +241,19 @@ function TrendChart({
         {coords.map((c, i) => (
           <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.2 : 2.2} fill={color} />
         ))}
-        {/* valor inicial (à direita do 1º ponto) e final em destaque (à esquerda do último) */}
+        {/* valor inicial: pequeno, acima do 1º ponto (referência) */}
         <Text
           x={first.x + 4}
           y={first.y - 5}
-          style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', fill: AXIS_COLOR, textAnchor: 'start' }}
+          style={{ fontSize: 7.5, fill: AXIS_COLOR, textAnchor: 'start' }}
         >
           {fmtNum(first.value)}
         </Text>
+        {/* valor atual: em destaque, FORA do plot, ao lado do último ponto */}
         <Text
-          x={last.x - 4}
-          y={last.y - 6}
-          style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'end' }}
+          x={PX1 + 6}
+          y={last.y + 2.5}
+          style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'start' }}
         >
           {fmtNum(last.value)}
         </Text>
