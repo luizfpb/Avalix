@@ -14,6 +14,10 @@ export default defineConfig({
       // formulario. injectRegister null porque registramos no componente.
       registerType: "prompt",
       injectRegister: null,
+      // Emergency PWA reset: publishes a service worker that unregisters
+      // itself and clears same-origin caches on the client's next SW update.
+      // Remove this and deploy again after affected clients recover.
+      selfDestroying: true,
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "AvalixFit",
