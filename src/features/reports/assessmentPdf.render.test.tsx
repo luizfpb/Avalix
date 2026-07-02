@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { generateAssessmentPdf, type AssessmentPdfData } from './assessmentPdf'
-import type { AssessmentRow } from '../assessment/api'
+import { generateAssessmentPdf, buildCircSeries, type AssessmentPdfData } from './assessmentPdf'
+import type { AssessmentRow, SubjectCircumference } from '../assessment/api'
 
 // Render de fumaça: garante que o PDF (com os gráficos de evolução em SVG:
 // Line/Polyline/Circle/Text) gera sem lançar e produz bytes. Não valida o
@@ -43,9 +43,9 @@ const data: AssessmentPdfData = {
     { date: '01/06', weightKg: 80, bmi: 25.3, bodyFatPct: 18, leanMassKg: 65.6, fatMassKg: 14.4 },
   ],
   circumferenceHistory: [
-    { assessedAt: '2026-01-01', site: 'cintura', valueCm: 92 },
-    { assessedAt: '2026-03-01', site: 'cintura', valueCm: 89 },
-    { assessedAt: '2026-06-01', site: 'cintura', valueCm: 86 },
+    { assessedAt: '2026-01-01', site: 'waist', valueCm: 92 },
+    { assessedAt: '2026-03-01', site: 'waist', valueCm: 89 },
+    { assessedAt: '2026-06-01', site: 'waist', valueCm: 86 },
     { assessedAt: '2026-01-01', site: 'abdomen', valueCm: 95 },
     { assessedAt: '2026-06-01', site: 'abdomen', valueCm: 90 },
   ],
@@ -55,5 +55,36 @@ describe('render do PDF de avaliação', () => {
   it('gera um PDF não-vazio com os gráficos de evolução', async () => {
     const blob = await generateAssessmentPdf(data)
     expect(blob.size).toBeGreaterThan(1000)
+  })
+})
+
+describe('buildCircSeries', () => {
+  const rows: SubjectCircumference[] = [
+    // coxa medial bilateral (D/E) em 2 datas
+    { assessedAt: '2026-01-01', site: 'thigh_mid_r', valueCm: 60 },
+    { assessedAt: '2026-01-01', site: 'thigh_mid_l', valueCm: 62 },
+    { assessedAt: '2026-06-01', site: 'thigh_mid_r', valueCm: 58 },
+    { assessedAt: '2026-06-01', site: 'thigh_mid_l', valueCm: 60 },
+    // panturrilha só um lado
+    { assessedAt: '2026-01-01', site: 'calf_r', valueCm: 40 },
+    { assessedAt: '2026-06-01', site: 'calf_r', valueCm: 39 },
+    // tronco
+    { assessedAt: '2026-01-01', site: 'waist', valueCm: 92 },
+    { assessedAt: '2026-06-01', site: 'waist', valueCm: 86 },
+  ]
+
+  it('inclui membros inferiores e tira a média dos lados D/E', () => {
+    const labels = buildCircSeries(rows, 12, 10).map((s) => s.label)
+    expect(labels).toContain('Cintura')
+    expect(labels).toContain('Coxa medial')
+    expect(labels).toContain('Panturrilha')
+    const coxa = buildCircSeries(rows, 12, 10).find((s) => s.label === 'Coxa medial')!
+    expect(coxa.points.map((p) => p.value)).toEqual([61, 59]) // (60+62)/2 e (58+60)/2
+  })
+
+  it('mantém a prioridade (tronco antes dos membros) e respeita maxCharts', () => {
+    const series = buildCircSeries(rows, 2, 10)
+    expect(series).toHaveLength(2)
+    expect(series[0].label).toBe('Cintura')
   })
 })

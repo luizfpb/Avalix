@@ -77,31 +77,81 @@ function shortDate(iso: string): string {
   return m ? `${m[3]}/${m[2]}` : iso
 }
 
-// agrupa as circunferências por ponto: uma série por site com >=2 medidas,
-// ordenadas por nº de medidas e limitadas a maxSites. Janela aos últimos
-// maxPoints registros (PDF enxuto). Puro — espelha o buildCircData da tela.
-function buildCircSeries(
+// Grupos de circunferências plotados no PDF, em ordem de prioridade (tronco
+// central → membros inferiores → superiores → resto). Bilateral (D/E) entra
+// como MÉDIA dos lados medidos, pra um gráfico por região em vez de dois. As
+// chaves batem com o CIRCUMFERENCE_CATALOG.
+const CIRC_TREND_GROUPS: { label: string; keys: string[] }[] = [
+  { label: 'Cintura', keys: ['waist'] },
+  { label: 'Abdômen', keys: ['abdomen'] },
+  { label: 'Quadril', keys: ['hip'] },
+  { label: 'Coxa proximal', keys: ['thigh_proximal_r', 'thigh_proximal_l'] },
+  { label: 'Coxa medial', keys: ['thigh_mid_r', 'thigh_mid_l'] },
+  { label: 'Coxa distal', keys: ['thigh_distal_r', 'thigh_distal_l'] },
+  { label: 'Panturrilha', keys: ['calf_r', 'calf_l'] },
+  { label: 'Braço contraído', keys: ['arm_flexed_r', 'arm_flexed_l'] },
+  { label: 'Braço relaxado', keys: ['arm_relaxed_r', 'arm_relaxed_l'] },
+  { label: 'Antebraço', keys: ['forearm_r', 'forearm_l'] },
+  { label: 'Tórax', keys: ['chest'] },
+  { label: 'Pescoço', keys: ['neck'] },
+  { label: 'Ombro', keys: ['shoulder'] },
+]
+
+// Séries de evolução das circunferências pro PDF. Cobre tronco E membros
+// (coxas/panturrilha, braços/antebraço) por prioridade; bilateral vira média
+// dos lados medidos. Janela aos últimos maxPoints registros e limita a
+// maxCharts gráficos. Sites fora do catálogo (customizados) entram no fim,
+// por nº de medidas, pra não sumir. Puro/testável.
+export function buildCircSeries(
   rows: SubjectCircumference[],
-  maxSites: number,
+  maxCharts: number,
   maxPoints: number
-): { site: string; points: TrendPoint[] }[] {
+): { label: string; points: TrendPoint[] }[] {
   const dates = [...new Set(rows.map((r) => r.assessedAt))].sort().slice(-maxPoints)
   const dateSet = new Set(dates)
   const byDateSite = new Map<string, number>()
-  const count = new Map<string, number>()
+  const seen = new Set<string>()
   for (const r of rows) {
     if (!dateSet.has(r.assessedAt)) continue
     byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
-    count.set(r.site, (count.get(r.site) ?? 0) + 1)
+    seen.add(r.site)
   }
-  return [...count.entries()]
-    .filter(([, c]) => c >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, maxSites)
-    .map(([site]) => ({
-      site,
-      points: dates.map((d) => ({ value: byDateSite.get(`${d}|${site}`) ?? null, date: shortDate(d) })),
+
+  // média dos lados medidos numa data, pra um conjunto de chaves
+  const meanAt = (d: string, keys: string[]): number | null => {
+    const vals = keys
+      .map((k) => byDateSite.get(`${d}|${k}`))
+      .filter((v): v is number => v != null)
+    if (vals.length === 0) return null
+    return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+  }
+
+  const out: { label: string; points: TrendPoint[] }[] = []
+  const consumed = new Set<string>()
+  for (const g of CIRC_TREND_GROUPS) {
+    if (out.length >= maxCharts) return out
+    if (!g.keys.some((k) => seen.has(k))) continue
+    g.keys.forEach((k) => consumed.add(k))
+    const points = dates.map((d) => ({ value: meanAt(d, g.keys), date: shortDate(d) }))
+    if (points.filter((p) => p.value != null).length >= 2) out.push({ label: g.label, points })
+  }
+
+  // sobrou espaço? sites medidos fora do catálogo (customizados), por nº de medidas
+  const counts = new Map<string, number>()
+  for (const r of rows) {
+    if (dateSet.has(r.assessedAt) && !consumed.has(r.site)) {
+      counts.set(r.site, (counts.get(r.site) ?? 0) + 1)
+    }
+  }
+  for (const [site] of [...counts.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1])) {
+    if (out.length >= maxCharts) break
+    const points = dates.map((d) => ({
+      value: byDateSite.get(`${d}|${site}`) ?? null,
+      date: shortDate(d),
     }))
+    out.push({ label: circumferenceLabel(site), points })
+  }
+  return out
 }
 
 // métricas plotadas na evolução, na ordem de exibição. key bate com o ponto.
@@ -295,20 +345,14 @@ function EvolutionSection({ history }: { history: AssessmentHistoryPoint[] }) {
 }
 
 function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
-  const series = buildCircSeries(rows, 6, 10)
+  const series = buildCircSeries(rows, 12, 10)
   if (series.length === 0) return null
   return (
     <View style={styles.section}>
       <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
       <View style={styles.evoGrid}>
         {series.map((s) => (
-          <TrendChart
-            key={s.site}
-            title={circumferenceLabel(s.site)}
-            unit=" cm"
-            color={palette.plum}
-            points={s.points}
-          />
+          <TrendChart key={s.label} title={s.label} unit=" cm" color={palette.plum} points={s.points} />
         ))}
       </View>
     </View>
