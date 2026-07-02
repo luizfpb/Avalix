@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import {
   VOLUME_LANDMARKS_NOTE,
   VOLUME_METHOD_NOTE,
+  VOLUME_METHOD_NOTE_REFINED,
+  VOLUME_METHOD_REFS,
   ZONE_LABELS,
   landmarkBar,
   type LandmarkZone,
@@ -73,29 +76,63 @@ function Row({ item }: { item: VolumeItem }) {
 
 export function VolumeLandmarkPanel({
   items,
+  refinedItems,
   typicalWeek,
   emptyHint,
 }: {
   items: VolumeItem[]
+  // séries recontadas no método refinado (0,5 composto / 0,25 isolado).
+  // ausente = sem toggle (só o padrão).
+  refinedItems?: VolumeItem[]
   typicalWeek: number
   emptyHint?: string
 }) {
+  const [method, setMethod] = useState<'fractional' | 'refined'>('fractional')
+  const refined = method === 'refined' && refinedItems != null
+  const shown = refined ? refinedItems! : items
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">
-          Volume semanal por grupo{' '}
-          <span className="font-normal text-muted-foreground">· semana {typicalWeek}</span>
-        </CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-base">
+            Volume semanal por grupo{' '}
+            <span className="font-normal text-muted-foreground">· semana {typicalWeek}</span>
+          </CardTitle>
+          {refinedItems != null ? (
+            <div className="inline-flex shrink-0 overflow-hidden rounded-md border text-xs">
+              <button
+                type="button"
+                onClick={() => setMethod('fractional')}
+                className={
+                  method === 'fractional'
+                    ? 'bg-primary px-2 py-1 text-primary-foreground'
+                    : 'px-2 py-1 text-muted-foreground hover:bg-accent'
+                }
+              >
+                Padrão
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod('refined')}
+                className={
+                  method === 'refined'
+                    ? 'bg-primary px-2 py-1 text-primary-foreground'
+                    : 'px-2 py-1 text-muted-foreground hover:bg-accent'
+                }
+              >
+                Refinado
+              </button>
+            </div>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2.5">
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {emptyHint ?? 'Sem volume ainda.'}
-          </p>
+        {shown.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyHint ?? 'Sem volume ainda.'}</p>
         ) : (
           <>
-            {items.map((it) => (
+            {shown.map((it) => (
               <Row key={it.muscle} item={it} />
             ))}
             {/* legenda das zonas */}
@@ -108,7 +145,28 @@ export function VolumeLandmarkPanel({
                 <span className="h-3 w-px bg-foreground/40" /> teto (MRV)
               </span>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
+            {refined ? (
+              <div className="space-y-1 rounded-md bg-muted/40 p-2">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {VOLUME_METHOD_NOTE_REFINED}
+                </p>
+                <div className="flex flex-col gap-0.5 pt-0.5">
+                  {VOLUME_METHOD_REFS.map((r) => (
+                    <a
+                      key={r.url}
+                      href={r.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      {r.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
+            )}
             <p className="text-[11px] leading-relaxed text-muted-foreground">{VOLUME_LANDMARKS_NOTE}</p>
           </>
         )}

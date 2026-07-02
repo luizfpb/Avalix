@@ -173,6 +173,7 @@ function Builder({
           {
             primaryMuscle: e.primary_muscle as MuscleGroup,
             secondaryMuscles: e.secondary_muscles as MuscleGroup[],
+            movementPattern: e.movement_pattern as MovementPattern,
           },
         ])
       ),
@@ -180,6 +181,10 @@ function Builder({
   )
 
   const snapshot = useMemo(() => snapshotFromEditor(plan, metaById), [plan, metaById])
+  const refinedSnapshot = useMemo(
+    () => snapshotFromEditor(plan, metaById, 'refined'),
+    [plan, metaById]
+  )
 
   function nameOf(exerciseId: string): string {
     return exercisesById.get(exerciseId)?.name ?? 'Exercício'
@@ -479,6 +484,7 @@ function Builder({
       {/* Volume ao vivo, contra os landmarks (MEV/MAV/MRV) */}
       <VolumeLandmarkPanel
         items={snapshotVolumeItems(snapshot)}
+        refinedItems={snapshotVolumeItems(refinedSnapshot)}
         typicalWeek={snapshot.typicalWeek}
         emptyHint="Adicione exercícios para ver o volume por grupo muscular."
       />

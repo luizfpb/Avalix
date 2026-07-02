@@ -4,6 +4,7 @@ export type {
   MovementPattern,
   VolumeExercise,
   VolumeDay,
+  VolumeMethod,
   VolumeOverride,
   VolumePlanInput,
   MuscleVolume,
@@ -13,7 +14,11 @@ export type {
 export {
   VOLUME_ENGINE_VERSION,
   VOLUME_WEIGHTS,
+  REFINED_WEIGHTS,
   VOLUME_METHOD_NOTE,
+  VOLUME_METHOD_NOTE_REFINED,
+  VOLUME_METHOD_REFS,
+  secondaryWeight,
   countWeekVolume,
   buildVolumeSnapshot,
 } from './engine'

@@ -11,7 +11,9 @@ import type {
 } from './api'
 import {
   buildVolumeSnapshot,
+  type MovementPattern,
   type MuscleGroup,
+  type VolumeMethod,
   type VolumePlanInput,
   type VolumeSnapshot,
 } from './volume'
@@ -72,7 +74,13 @@ export type EditorPlan = {
 }
 
 // metadados de musculo necessarios pro volume, indexados por exercise_id
-export type ExerciseMeta = { primaryMuscle: MuscleGroup; secondaryMuscles: MuscleGroup[] }
+export type ExerciseMeta = {
+  primaryMuscle: MuscleGroup
+  secondaryMuscles: MuscleGroup[]
+  // usado só pelo método refinado (composto vs isolado); opcional pra não
+  // quebrar chamadas/testes que só ligam no volume padrão
+  movementPattern?: MovementPattern
+}
 
 export function emptyEditorPlan(): EditorPlan {
   return {
@@ -121,6 +129,7 @@ export function editorToVolumePlan(
             key: ex.key,
             primaryMuscle: meta.primaryMuscle,
             secondaryMuscles: meta.secondaryMuscles,
+            movementPattern: meta.movementPattern,
             sets: ex.sets,
           },
         ]
@@ -133,9 +142,10 @@ export function editorToVolumePlan(
 
 export function snapshotFromEditor(
   plan: EditorPlan,
-  metaById: Map<string, ExerciseMeta>
+  metaById: Map<string, ExerciseMeta>,
+  method: VolumeMethod = 'fractional'
 ): VolumeSnapshot {
-  return buildVolumeSnapshot(editorToVolumePlan(plan, metaById))
+  return buildVolumeSnapshot(editorToVolumePlan(plan, metaById), method)
 }
 
 // ---- editor -> payload de persistencia --------------------------------

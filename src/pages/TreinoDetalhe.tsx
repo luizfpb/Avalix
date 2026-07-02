@@ -17,12 +17,14 @@ import type { WorkoutExerciseRow, WorkoutPlanDetail } from '../features/workout/
 import {
   goalLabel,
   snapshotVolumeItems,
+  type MovementPattern,
   type MuscleGroup,
   type VolumeSnapshot,
 } from '../features/workout/volume'
 import {
   duplicatePlanEditor,
   editorToSaveInput,
+  planDetailToEditor,
   snapshotFromEditor,
   type ExerciseMeta,
 } from '../features/workout/builder'
@@ -86,6 +88,23 @@ export default function TreinoDetalhe() {
     return m
   }, [exercisesQuery.data])
 
+  // meta por exercício pro recálculo de volume (inclui movementPattern, usado
+  // pelo modo refinado do painel)
+  const metaById = useMemo(
+    () =>
+      new Map<string, ExerciseMeta>(
+        (exercisesQuery.data ?? []).map((e) => [
+          e.id,
+          {
+            primaryMuscle: e.primary_muscle as MuscleGroup,
+            secondaryMuscles: e.secondary_muscles as MuscleGroup[],
+            movementPattern: e.movement_pattern as MovementPattern,
+          },
+        ])
+      ),
+    [exercisesQuery.data]
+  )
+
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
   if (query.isError || !query.data.plan) {
     return (
@@ -100,6 +119,10 @@ export default function TreinoDetalhe() {
 
   const { plan, days, exercises, overrides, weeks } = query.data
   const snapshot = plan.volume as VolumeSnapshot | null
+  // volume recontado no método refinado (do plano carregado), pro toggle do painel
+  const refinedSnapshot = snapshot
+    ? snapshotFromEditor(planDetailToEditor(query.data), metaById, 'refined')
+    : null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = formatDate(plan.starts_on)
   const schedule =
@@ -407,6 +430,7 @@ export default function TreinoDetalhe() {
       {snapshot ? (
         <VolumeLandmarkPanel
           items={snapshotVolumeItems(snapshot)}
+          refinedItems={refinedSnapshot ? snapshotVolumeItems(refinedSnapshot) : undefined}
           typicalWeek={snapshot.typicalWeek}
         />
       ) : null}

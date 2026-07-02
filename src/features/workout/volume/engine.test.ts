@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildVolumeSnapshot,
   countWeekVolume,
+  secondaryWeight,
   VOLUME_ENGINE_VERSION,
   VOLUME_WEIGHTS,
 } from './engine'
@@ -43,6 +44,39 @@ describe('countWeekVolume', () => {
     ])
     expect(byMuscle.chest).toBeUndefined()
     expect(totalSets).toBe(0)
+  })
+})
+
+describe('método refinado (0,5 composto / 0,25 isolado)', () => {
+  it('secondaryWeight: fractional = 0,5 sempre; refined depende do padrão', () => {
+    expect(secondaryWeight('fractional', 'isolation')).toBe(0.5)
+    expect(secondaryWeight('fractional', 'horizontal_push')).toBe(0.5)
+    expect(secondaryWeight('refined', 'horizontal_push')).toBe(0.5)
+    expect(secondaryWeight('refined', 'isolation')).toBe(0.25)
+    expect(secondaryWeight('refined', undefined)).toBe(0.5) // sem padrão = composto
+  })
+
+  it('composto mantém 0,5; isolado cai pra 0,25', () => {
+    const composto = countWeekVolume(
+      [{ primaryMuscle: 'chest', secondaryMuscles: ['triceps'], movementPattern: 'horizontal_push', sets: 4 }],
+      'refined'
+    ).byMuscle
+    expect(composto.chest).toBe(4)
+    expect(composto.triceps).toBe(2) // 4 * 0,5
+
+    const isolado = countWeekVolume(
+      [{ primaryMuscle: 'chest', secondaryMuscles: ['triceps'], movementPattern: 'isolation', sets: 4 }],
+      'refined'
+    ).byMuscle
+    expect(isolado.triceps).toBe(1) // 4 * 0,25
+  })
+
+  it('padrão (fractional) ignora o padrão de movimento e fica em 0,5', () => {
+    const { byMuscle } = countWeekVolume(
+      [{ primaryMuscle: 'chest', secondaryMuscles: ['triceps'], movementPattern: 'isolation', sets: 4 }],
+      'fractional'
+    )
+    expect(byMuscle.triceps).toBe(2)
   })
 })
 
@@ -130,7 +164,12 @@ describe('buildVolumeSnapshot', () => {
   it('carrega a versao e os pesos no snapshot', () => {
     const snap = buildVolumeSnapshot(basePlan)
     expect(snap.engineVersion).toBe(VOLUME_ENGINE_VERSION)
+    expect(snap.method).toBe('fractional') // padrão
     expect(snap.weights).toEqual({ primary: VOLUME_WEIGHTS.primary, secondary: VOLUME_WEIGHTS.secondary })
+  })
+
+  it('grava o método refinado quando pedido', () => {
+    expect(buildVolumeSnapshot(basePlan, 'refined').method).toBe('refined')
   })
 
   it('lida com plano vazio sem quebrar', () => {

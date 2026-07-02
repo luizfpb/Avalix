@@ -61,12 +61,19 @@ export type MovementPattern =
   | 'isolation'
   | 'core'
 
+// Método de contagem do secundário. 'fractional' (padrão) = 0,5 fixo, o de
+// melhor evidência nas meta-regressões. 'refined' (opcional) = 0,5 em composto
+// e 0,25 em isolado — convenção prática, não constante validada (ver engine.ts).
+export type VolumeMethod = 'fractional' | 'refined'
+
 // Um exercicio do plano sob a otica do volume. `key` e o id estavel usado pelo
 // editor (temp no create, id do banco no edit) e tambem o alvo dos overrides.
+// movementPattern só é usado pelo método 'refined' (distingue composto/isolado).
 export type VolumeExercise = {
   key: string
   primaryMuscle: MuscleGroup
   secondaryMuscles: MuscleGroup[]
+  movementPattern?: MovementPattern
   sets: number // baseline do template
 }
 
@@ -108,6 +115,7 @@ export type WeekVolume = {
 // AssessmentResultSnapshot).
 export type VolumeSnapshot = {
   engineVersion: string
+  method: VolumeMethod
   weights: { primary: number; secondary: number }
   perWeek: WeekVolume[]
   typicalWeek: number // 1a semana sem deload (default 1)
