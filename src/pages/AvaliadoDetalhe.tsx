@@ -5,6 +5,11 @@ import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments } from '../features/assessment/hooks'
 import { useAnamneses } from '../features/anamnesis/hooks'
+import {
+  useSubjectIntakes,
+  useGenerateIntakeLink,
+  useCancelIntake,
+} from '../features/anamnesis/intakeHooks'
 import { useWorkoutPlans } from '../features/workout/hooks'
 import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
@@ -19,7 +24,7 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
-import { Pencil, TrendingUp, CalendarPlus } from 'lucide-react'
+import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -36,6 +41,7 @@ import {
 } from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -247,25 +253,137 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
 }
 
 function AnamneseSection({ subjectId }: { subjectId: string }) {
+  const { organization } = useOrganization()
   const consentQuery = useActiveConsent(subjectId)
   const anamnesesQuery = useAnamneses(subjectId)
+  const intakesQuery = useSubjectIntakes(subjectId)
+  const generate = useGenerateIntakeLink(subjectId)
+  const cancel = useCancelIntake(subjectId)
   const hasConsent = !!consentQuery.data
   const items = anamnesesQuery.data ?? []
+  const intakes = intakesQuery.data ?? []
+
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  async function handleGenerate() {
+    setGenError(null)
+    setCopied(false)
+    if (!organization) return
+    try {
+      const res = await generate.mutateAsync({ subjectId, orgId: organization.id })
+      setGeneratedUrl(res.url)
+    } catch (e) {
+      setGenError(normalizeDbError(e))
+    }
+  }
+
+  async function copyLink() {
+    if (!generatedUrl) return
+    try {
+      await navigator.clipboard.writeText(generatedUrl)
+      setCopied(true)
+    } catch {
+      // clipboard bloqueado: o campo fica selecionável para copiar manualmente
+    }
+  }
+
+  const waHref = generatedUrl
+    ? `https://wa.me/?text=${encodeURIComponent(
+        `Olá! Preencha sua anamnese para começarmos: ${generatedUrl}`
+      )}`
+    : '#'
 
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Anamnese e triagem</h2>
-        {hasConsent ? (
-          <Button asChild size="sm">
-            <Link to={`/avaliados/${subjectId}/anamnese/nova`}>Nova anamnese</Link>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGenerate}
+            disabled={generate.isPending || !organization}
+          >
+            <Send /> {generate.isPending ? 'Gerando...' : 'Enviar link'}
           </Button>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Registre o consentimento para preencher
-          </span>
-        )}
+          {hasConsent ? (
+            <Button asChild size="sm">
+              <Link to={`/avaliados/${subjectId}/anamnese/nova`}>Nova anamnese</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      {genError ? <p className="text-sm text-destructive">{genError}</p> : null}
+
+      {generatedUrl ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="space-y-2 py-3 text-sm">
+            <p className="font-medium">Link gerado — envie para o aluno responder</p>
+            <input
+              readOnly
+              value={generatedUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className={controlClass}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={copyLink}>
+                <Copy /> {copied ? 'Copiado!' : 'Copiar'}
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <a href={waHref} target="_blank" rel="noreferrer">
+                  <MessageCircle /> WhatsApp
+                </a>
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setGeneratedUrl(null)}>
+                Fechar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Válido por 7 dias e de uso único. Por segurança, o link não é exibido de novo — se
+              precisar, gere outro.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {intakes.length > 0 ? (
+        <ul className="divide-y rounded-md border bg-card">
+          {intakes.map((it) =>
+            it.status === 'submitted' ? (
+              <li
+                key={it.id}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+              >
+                <Badge variant="warn">Aguardando revisão</Badge>
+                <Button asChild size="sm">
+                  <Link to={`/avaliados/${subjectId}/anamnese/intake/${it.id}`}>Revisar</Link>
+                </Button>
+              </li>
+            ) : (
+              <li
+                key={it.id}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <Badge variant="secondary">Aguardando o aluno</Badge>
+                  <span className="text-muted-foreground">expira {formatDate(it.expires_at)}</span>
+                </span>
+                <button
+                  onClick={() => cancel.mutate(it.id)}
+                  disabled={cancel.isPending}
+                  className="text-xs text-destructive hover:underline disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </li>
+            )
+          )}
+        </ul>
+      ) : null}
+
       {anamnesesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : items.length > 0 ? (
@@ -287,9 +405,9 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
             )
           })}
         </ul>
-      ) : (
+      ) : intakes.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhuma anamnese ainda.</p>
-      )}
+      ) : null}
     </section>
   )
 }

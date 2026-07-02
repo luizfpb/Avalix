@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
+import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { BrandLogo, BrandMark } from './BrandLogo'
 
@@ -18,6 +19,7 @@ type NavItem = { to: string; label: string; icon: LucideIcon }
 export function AppShell() {
   const { user, signOut } = useAuth()
   const { organization } = useOrganization()
+  const pendingCount = usePendingIntakes(organization?.id).data?.length ?? 0
   const navItems: NavItem[] = [
     { to: '/dashboard', label: 'Início', icon: LayoutDashboard },
     { to: '/avaliados', label: subjectTermLabels(organization?.subject_term).pluralCap, icon: Users },
@@ -69,6 +71,11 @@ export function AppShell() {
             >
               <item.icon className="size-4" />
               {item.label}
+              {item.to === '/dashboard' && pendingCount > 0 ? (
+                <span className="grid size-4 place-items-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
+                  {pendingCount}
+                </span>
+              ) : null}
             </NavLink>
           ))}
         </nav>
@@ -92,7 +99,14 @@ export function AppShell() {
                 ].join(' ')
               }
             >
-              <item.icon className="size-5" />
+              <span className="relative">
+                <item.icon className="size-5" />
+                {item.to === '/dashboard' && pendingCount > 0 ? (
+                  <span className="absolute -right-2 -top-1 grid min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-semibold text-destructive-foreground">
+                    {pendingCount}
+                  </span>
+                ) : null}
+              </span>
               <span className="max-w-full truncate px-1">{item.label}</span>
             </NavLink>
           ))}

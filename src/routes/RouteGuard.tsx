@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router'
 import type { ReactNode } from 'react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
-import { resolveRedirect } from '../lib/routing'
+import { resolveRedirect, isIntakePath } from '../lib/routing'
 
 function FullScreen({ children }: { children: ReactNode }) {
   return (
@@ -16,6 +16,11 @@ export function RouteGuard({ children }: { children: ReactNode }) {
   const { status: authStatus, isRecovering, mfaStatus } = useAuth()
   const org = useOrganization()
   const location = useLocation()
+
+  // rota pública do aluno (/a/:token): não depende de sessão nem de org
+  if (isIntakePath(location.pathname)) {
+    return <>{children}</>
+  }
 
   const authLoading = authStatus === 'loading'
   const mfaUnresolved = authStatus === 'signedIn' && mfaStatus === 'unknown'

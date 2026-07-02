@@ -39,6 +39,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      anamnese_intakes: {
+        Row: {
+          consent_text_sha256: string | null
+          consent_version: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          org_id: string
+          payload: Json | null
+          resulting_anamnese_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signer_kind: string | null
+          signer_name: string | null
+          spec_version: string
+          status: string
+          subject_id: string
+          submit_user_agent: string | null
+          submitted_at: string | null
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          consent_text_sha256?: string | null
+          consent_version?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at: string
+          id?: string
+          org_id: string
+          payload?: Json | null
+          resulting_anamnese_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signer_kind?: string | null
+          signer_name?: string | null
+          spec_version: string
+          status?: string
+          subject_id: string
+          submit_user_agent?: string | null
+          submitted_at?: string | null
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          consent_text_sha256?: string | null
+          consent_version?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          org_id?: string
+          payload?: Json | null
+          resulting_anamnese_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signer_kind?: string | null
+          signer_name?: string | null
+          spec_version?: string
+          status?: string
+          subject_id?: string
+          submit_user_agent?: string | null
+          submitted_at?: string | null
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_intakes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_resulting_anamnese_id_fkey"
+            columns: ["resulting_anamnese_id"]
+            isOneToOne: false
+            referencedRelation: "anamneses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anamneses: {
         Row: {
           assessed_at: string
@@ -1301,7 +1406,47 @@ export type Database = {
           org_id: string | null
           subject_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assessments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_anamnese_intakes: {
+        Row: {
+          id: string | null
+          org_id: string | null
+          subject_id: string | null
+          subject_name: string | null
+          submitted_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_intakes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workout_log_summary: {
         Row: {
@@ -1310,17 +1455,67 @@ export type Database = {
           org_id: string | null
           plan_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workout_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
+      accept_anamnese_intake: {
+        Args: {
+          p_flag: boolean
+          p_intake: string
+          p_liberado: boolean
+          p_nivel: string
+        }
+        Returns: string
+      }
       create_organization: { Args: { p_name: string }; Returns: string }
+      get_anamnese_intake: {
+        Args: { p_token: string }
+        Returns: {
+          org_logo_path: string
+          org_name: string
+          spec_version: string
+          subject_first_name: string
+          subject_sex: string
+        }[]
+      }
       replace_assessment_readings: {
-        Args: { p_assessment: string; p_skinfolds: Json; p_circumferences: Json }
+        Args: {
+          p_assessment: string
+          p_circumferences: Json
+          p_skinfolds: Json
+        }
         Returns: undefined
       }
       replace_workout_plan_children: {
-        Args: { p_plan: string; p_days: Json; p_overrides: Json; p_weeks: Json }
+        Args: { p_days: Json; p_overrides: Json; p_plan: string; p_weeks: Json }
+        Returns: undefined
+      }
+      submit_anamnese_intake: {
+        Args: {
+          p_consent_text_sha256: string
+          p_consent_version: string
+          p_payload: Json
+          p_signer_kind: string
+          p_signer_name: string
+          p_token: string
+          p_user_agent: string
+        }
         Returns: undefined
       }
     }

@@ -18,6 +18,8 @@ const AvaliacaoNova = lazy(() => import('./pages/AvaliacaoNova'))
 const AvaliacaoDetalhe = lazy(() => import('./pages/AvaliacaoDetalhe'))
 const AnamneseNova = lazy(() => import('./pages/AnamneseNova'))
 const AnamneseDetalhe = lazy(() => import('./pages/AnamneseDetalhe'))
+const AnamneseRevisar = lazy(() => import('./pages/AnamneseRevisar'))
+const AnamnesePublica = lazy(() => import('./pages/AnamnesePublica'))
 const TreinoNovo = lazy(() => import('./pages/TreinoNovo'))
 const TreinoDetalhe = lazy(() => import('./pages/TreinoDetalhe'))
 const Execucao = lazy(() => import('./pages/Execucao'))
@@ -45,6 +47,7 @@ export default function App() {
     <RouteGuard>
       <Suspense fallback={<PageFallback />}>
         <Routes>
+          <Route path="/a/:token" element={<AnamnesePublica />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />
@@ -58,6 +61,10 @@ export default function App() {
             <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
             <Route path="/avaliados/:id/evolucao" element={<Evolucao />} />
             <Route path="/avaliados/:id/anamnese/nova" element={<AnamneseNova />} />
+            <Route
+              path="/avaliados/:id/anamnese/intake/:intakeId"
+              element={<AnamneseRevisar />}
+            />
             <Route path="/avaliados/:id/anamnese/:anamneseId" element={<AnamneseDetalhe />} />
             <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
             <Route

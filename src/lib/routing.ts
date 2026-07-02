@@ -13,6 +13,12 @@ export function isPublicPath(pathname: string): boolean {
   return (PUBLIC_ROUTES as readonly string[]).includes(pathname)
 }
 
+// Página pública da anamnese respondida pelo aluno (link com token). Fica fora
+// de toda a lógica de auth/org: qualquer visitante, logado ou não, acessa.
+export function isIntakePath(pathname: string): boolean {
+  return pathname.startsWith('/a/')
+}
+
 export type RedirectInput = {
   authStatus: AuthStatus
   orgStatus: OrgStatus
@@ -25,6 +31,7 @@ export type RedirectInput = {
 export function resolveRedirect(input: RedirectInput): string | null {
   const { authStatus, orgStatus, pathname, isRecovering, mfaRequired = false } = input
 
+  if (isIntakePath(pathname)) return null
   if (authStatus === 'loading') return null
 
   if (isRecovering) {

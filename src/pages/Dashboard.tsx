@@ -1,7 +1,8 @@
 import { Link } from 'react-router'
-import { Users, UserPlus, Settings, ShieldCheck, ArrowRight, CalendarDays, Bell } from 'lucide-react'
+import { Users, UserPlus, Settings, ShieldCheck, ArrowRight, CalendarDays, Bell, ClipboardCheck } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
+import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
 import { useAppointments } from '../features/appointments/hooks'
 import { useLastAssessmentBySubject } from '../features/assessment/hooks'
 import { relativeDayLabel, dueForReassessment, REASSESS_DAYS } from '../lib/reminders'
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const ativos = subjects?.filter((s) => s.is_active).length ?? 0
   const isEmpty = !isPending && total === 0
 
+  const pendingIntakes = usePendingIntakes(organization?.id).data ?? []
   const apptsQ = useAppointments(organization?.id)
   const lastAssessQ = useLastAssessmentBySubject(organization?.id)
   const now = new Date()
@@ -70,6 +72,40 @@ export default function Dashboard() {
           <StatCard label="Ativos" value={isPending ? '—' : ativos} />
         </section>
       )}
+
+      {pendingIntakes.length > 0 ? (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="py-1">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <ClipboardCheck className="size-4 text-destructive" /> Anamneses aguardando revisão
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {pendingIntakes.length}{' '}
+              {pendingIntakes.length === 1 ? 'aluno respondeu e está' : 'alunos responderam e estão'}{' '}
+              esperando você revisar e aceitar.
+            </p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {pendingIntakes.slice(0, 5).map((p) => (
+                <li key={p.id}>
+                  {p.subject_id && p.id ? (
+                    <Link
+                      to={`/avaliados/${p.subject_id}/anamnese/intake/${p.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {p.subject_name ?? 'Aluno'}
+                    </Link>
+                  ) : (
+                    <span>{p.subject_name ?? 'Aluno'}</span>
+                  )}
+                </li>
+              ))}
+              {pendingIntakes.length > 5 ? (
+                <li className="text-xs text-muted-foreground">+{pendingIntakes.length - 5} mais</li>
+              ) : null}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {hasReminders ? (
         <section className="space-y-3">
