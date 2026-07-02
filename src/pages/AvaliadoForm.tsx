@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function Field({
   label,
@@ -70,9 +71,11 @@ export default function AvaliadoForm() {
     defaultValues: emptySubjectForm(),
   })
 
-  // no modo edição, preenche o formulário quando o subject carregar
+  // no modo edição, preenche o formulário quando o subject carregar; ao voltar
+  // pro modo "novo" (mesma rota montada), limpa pra não vazar dados do anterior
   useEffect(() => {
     if (isEdit && subjectQuery.data) reset(subjectToForm(subjectQuery.data))
+    if (!isEdit) reset(emptySubjectForm())
   }, [isEdit, subjectQuery.data, reset])
 
   const age = ageFromBirthDate(watch('birth_date') ?? '')
@@ -247,7 +250,7 @@ function DangerZone({
           placeholder={subjectName}
         />
       </div>
-      {error ? <p className="text-xs text-destructive">{error.message}</p> : null}
+      {error ? <p className="text-xs text-destructive">{normalizeDbError(error)}</p> : null}
       <Button
         type="button"
         variant="destructive"

@@ -1,10 +1,10 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
 import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { normalizeAuthError } from '../lib/errors'
+import { normalizeAuthError, normalizeDbError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useTheme, type Theme } from '../features/theme/context'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 export default function Configuracoes() {
   const { user } = useAuth()
@@ -148,7 +149,7 @@ function LogoSettings() {
       await uploadOrgLogo(organization.id, file)
       await refresh()
     } catch (err) {
-      setError((err as Error).message)
+      setError(normalizeDbError(err))
     } finally {
       setBusy(false)
     }
@@ -297,9 +298,11 @@ function MfaSettings() {
     await reload()
   }
 
+  const [confirmRemove, setConfirmRemove] = useState(false)
+
   async function remove() {
     if (!verified) return
-    if (!window.confirm('Remover a verificação em dois fatores desta conta?')) return
+    setConfirmRemove(false)
     setBusy(true)
     setError(null)
     const { error } = await supabase.auth.mfa.unenroll({ factorId: verified.id })
@@ -365,9 +368,22 @@ function MfaSettings() {
           </span>
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button size="sm" variant="destructive" onClick={remove} disabled={busy}>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => setConfirmRemove(true)}
+          disabled={busy}
+        >
           {busy ? 'Removendo...' : 'Remover 2FA'}
         </Button>
+        <ConfirmDialog
+          open={confirmRemove}
+          title="Remover a verificação em dois fatores?"
+          description="Sua conta volta a ser protegida apenas pela senha."
+          confirmLabel="Remover"
+          onConfirm={remove}
+          onCancel={() => setConfirmRemove(false)}
+        />
       </div>
     )
   }

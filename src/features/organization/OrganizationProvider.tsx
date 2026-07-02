@@ -10,8 +10,8 @@ import {
   type OrgStatus,
 } from './context'
 
-// ATENÇÃO (Ponto 1): 'memberships', 'organizations' e 'user_id' precisam bater
-// com o seu schema. Se a relação for ambígua, use 'organizations!nome_da_fk(*)'.
+// V1 opera com uma org por usuário; se houver mais de uma membership, carrega
+// a mais antiga (determinístico — sem o order, qual org abre seria loteria).
 async function fetchMembership(userId: string): Promise<{
   membership: MembershipRow | null
   organization: OrganizationRow | null
@@ -20,6 +20,7 @@ async function fetchMembership(userId: string): Promise<{
     .from('org_members')
     .select('*, organizations(*)')
     .eq('user_id', userId)
+    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
 

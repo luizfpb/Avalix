@@ -36,9 +36,10 @@ export default defineConfig({
         // cross-origin de propósito; offline = o app abre, as chamadas de rede
         // falham com graça.
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-        // o chunk do PDF (~1,5 MB) só serve online (precisa dos dados do
-        // Supabase pra gerar o laudo); fora do precache pra instalação leve.
-        globIgnores: ["**/assessmentPdf-*.js"],
+        // os chunks de PDF só servem online (precisam dos dados do Supabase
+        // pra gerar o laudo); fora do precache pra instalação leve. O pesado
+        // (~1,5 MB) é o pdfTheme, que carrega o @react-pdf compartilhado.
+        globIgnores: ["**/pdfTheme-*.js", "**/assessmentPdf-*.js", "**/workoutPdf-*.js"],
         navigateFallback: "/index.html",
         maximumFileSizeToCacheInBytes: 4_000_000,
       },

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { OneRmCalculator } from '../features/workout/OneRmCalculator'
 import { Card, CardContent } from '@/components/ui/card'
 

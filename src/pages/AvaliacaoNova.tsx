@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Pill, Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function todayLocal(): string {
   const d = new Date()
@@ -117,7 +118,15 @@ export default function AvaliacaoNova() {
         }
       : undefined
 
-  return <Form subject={subjectQuery.data} existing={existing} />
+  // key força remontar o formulário ao trocar de avaliação/rota (o estado
+  // inicial vem de useState e não acompanharia a mudança de props)
+  return (
+    <Form
+      key={existing?.assessment.id ?? 'nova'}
+      subject={subjectQuery.data}
+      existing={existing}
+    />
+  )
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -386,7 +395,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       })
       navigate(`/avaliados/${subject.id}/avaliacoes/${assessment.id}`)
     } catch (e) {
-      setSubmitError((e as Error).message)
+      setSubmitError(normalizeDbError(e))
     }
   }
 

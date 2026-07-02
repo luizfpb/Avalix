@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Pill, Pencil, Trash2 } from 'lucide-react'
 import { useAssessment, useAssessments, useDeleteAssessment } from '../features/assessment/hooks'
 import { useSubject } from '../features/subjects/hooks'
@@ -23,6 +23,8 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
+import { normalizeDbError } from '../lib/errors'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -48,6 +50,7 @@ export default function AvaliacaoDetalhe() {
   const navigate = useNavigate()
   const deleteMut = useDeleteAssessment(id)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
   if (query.isError || !query.data.assessment) {
@@ -114,7 +117,7 @@ export default function AvaliacaoDetalhe() {
   }
 
   async function handleDelete() {
-    if (!window.confirm('Excluir esta avaliação e suas medidas? Esta ação é definitiva.')) return
+    setConfirmDelete(false)
     try {
       await deleteMut.mutateAsync(assessment.id)
       navigate(`/avaliados/${id}`)
@@ -154,7 +157,7 @@ export default function AvaliacaoDetalhe() {
             variant="outline"
             size="sm"
             className="text-destructive"
-            onClick={handleDelete}
+            onClick={() => setConfirmDelete(true)}
             disabled={deleteMut.isPending}
           >
             <Trash2 /> {deleteMut.isPending ? 'Excluindo...' : 'Excluir'}
@@ -163,8 +166,16 @@ export default function AvaliacaoDetalhe() {
       </div>
 
       {deleteMut.error ? (
-        <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
+        <p className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Excluir avaliação?"
+        description="A avaliação e as medidas dela serão removidas. Esta ação é definitiva."
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
 
       {result ? (
         <Card>

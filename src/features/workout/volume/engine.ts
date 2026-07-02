@@ -42,27 +42,27 @@ export function secondaryWeight(method: VolumeMethod, pattern?: MovementPattern)
 // Texto curto do metodo padrao, exibido na UI e no PDF (transparencia, igual a
 // divulgacao Siri/Brozek na avaliacao).
 export const VOLUME_METHOD_NOTE =
-  `Volume fracionado (${VOLUME_ENGINE_VERSION}): musculo primario conta ` +
-  `${VOLUME_WEIGHTS.primary.toFixed(1)} serie e secundario ${VOLUME_WEIGHTS.secondary.toFixed(1)}, ` +
-  `somando series por grupo muscular na semana.`
+  `Volume fracionado (${VOLUME_ENGINE_VERSION}): músculo primário conta ` +
+  `${VOLUME_WEIGHTS.primary.toFixed(1)} série e secundário ${VOLUME_WEIGHTS.secondary.toFixed(1)}, ` +
+  `somando séries por grupo muscular na semana.`
 
 // Texto do modo refinado: explica O QUE E e deixa clara a VALIDADE (convencao
 // pratica, nao constante validada). As referencias vao em VOLUME_METHOD_REFS.
 export const VOLUME_METHOD_NOTE_REFINED =
-  `Refinado (opcional): o secundario conta ${REFINED_WEIGHTS.compoundSecondary.toFixed(2)} nos ` +
-  `exercicios compostos (multiarticulares) e ${REFINED_WEIGHTS.isolationSecondary.toFixed(2)} nos ` +
-  `isolados (monoarticulares). E uma CONVENCAO PRATICA, nao uma constante validada: nenhuma ` +
-  `literatura estabelece fracoes por exercicio, e a EMG (ativacao muscular) nao prediz hipertrofia. ` +
-  `O padrao do app segue o 0,5 fixo, o metodo de melhor evidencia nas meta-regressoes dose-resposta.`
+  `Refinado (opcional): o secundário conta ${REFINED_WEIGHTS.compoundSecondary.toFixed(2)} nos ` +
+  `exercícios compostos (multiarticulares) e ${REFINED_WEIGHTS.isolationSecondary.toFixed(2)} nos ` +
+  `isolados (monoarticulares). É uma CONVENÇÃO PRÁTICA, não uma constante validada: nenhuma ` +
+  `literatura estabelece frações por exercício, e a EMG (ativação muscular) não prediz hipertrofia. ` +
+  `O padrão do app segue o 0,5 fixo, o método de melhor evidência nas meta-regressões dose-resposta.`
 
 // Referencias exibidas junto do modo refinado (links clicaveis na UI).
 export const VOLUME_METHOD_REFS: { label: string; url: string }[] = [
   {
-    label: 'Meta-regressao dose-resposta (fracionado 0,5 = melhor evidencia relativa)',
+    label: 'Meta-regressão dose-resposta (fracionado 0,5 = melhor evidência relativa)',
     url: 'https://sportrxiv.org/index.php/server/preprint/view/460',
   },
   {
-    label: 'Vigotsky et al. 2022 (Sports Med): EMG nao e preditor validado de hipertrofia',
+    label: 'Vigotsky et al. 2022 (Sports Med): EMG não é preditor validado de hipertrofia',
     url: 'https://andrewvigotsky.com/studies/Vigotsky_2022_Sports_Med_sEMG_hypertrophy.pdf',
   },
 ]
@@ -137,7 +137,16 @@ export function buildVolumeSnapshot(
   return {
     engineVersion: VOLUME_ENGINE_VERSION,
     method,
-    weights: { primary: VOLUME_WEIGHTS.primary, secondary: VOLUME_WEIGHTS.secondary },
+    // registra os pesos realmente usados: snapshot com method 'refined' precisa
+    // dizer 0,25 no isolado, senao o metadado mente sobre o calculo
+    weights:
+      method === 'refined'
+        ? {
+            primary: REFINED_WEIGHTS.primary,
+            secondary: REFINED_WEIGHTS.compoundSecondary,
+            isolationSecondary: REFINED_WEIGHTS.isolationSecondary,
+          }
+        : { primary: VOLUME_WEIGHTS.primary, secondary: VOLUME_WEIGHTS.secondary },
     perWeek,
     typicalWeek,
     typicalByMuscle: typical?.byMuscle ?? {},

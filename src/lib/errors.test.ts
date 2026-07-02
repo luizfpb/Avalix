@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeAuthError } from './errors'
+import { normalizeAuthError, normalizeDbError } from './errors'
 
 describe('normalizeAuthError', () => {
   it('mapeia code invalid_credentials', () => {
@@ -20,5 +20,30 @@ describe('normalizeAuthError', () => {
   })
   it('preserva mensagem desconhecida não vazia', () => {
     expect(normalizeAuthError({ message: 'Coisa estranha' })).toBe('Coisa estranha')
+  })
+})
+
+describe('normalizeDbError', () => {
+  it('traduz violação de RLS (mensagem ou code 42501)', () => {
+    expect(
+      normalizeDbError({ message: 'new row violates row-level security policy for table "x"' })
+    ).toMatch(/consentimento|permissão/i)
+    expect(normalizeDbError({ code: '42501', message: 'permission denied' })).toMatch(/permissão/i)
+  })
+  it('traduz unique e foreign key', () => {
+    expect(normalizeDbError({ code: '23505', message: 'duplicate key value' })).toMatch(/já existe/i)
+    expect(
+      normalizeDbError({ code: '23503', message: 'violates foreign key constraint' })
+    ).toMatch(/em uso/i)
+  })
+  it('traduz falha de rede', () => {
+    expect(normalizeDbError({ message: 'Failed to fetch' })).toMatch(/conexão/i)
+  })
+  it('deixa passar exceção pt-BR dos nossos triggers', () => {
+    const msg = 'registro de consentimento e imutavel; apenas revoked_at pode ser alterado'
+    expect(normalizeDbError({ message: msg })).toBe(msg)
+  })
+  it('tem fallback genérico', () => {
+    expect(normalizeDbError(null)).toMatch(/errado/i)
   })
 })

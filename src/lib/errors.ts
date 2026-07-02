@@ -1,4 +1,4 @@
-// Normaliza erros de autenticação do Supabase para mensagens em pt-BR.
+// Normaliza erros do Supabase (auth e banco/RLS) para mensagens em pt-BR.
 
 type MaybeAuthError = {
   code?: string
@@ -46,6 +46,39 @@ export function normalizeAuthError(error: unknown): string {
     return MESSAGES_BY_CODE.user_already_exists
   if (text.includes('password should be at least')) return MESSAGES_BY_CODE.weak_password
   if (text.includes('rate limit')) return MESSAGES_BY_CODE.over_request_rate_limit
+
+  return message && message.trim().length > 0
+    ? message
+    : 'Algo deu errado. Tente novamente em instantes.'
+}
+
+// Erros de banco (PostgREST/RLS/constraints) e de rede, traduzidos pro usuário.
+// As exceções dos nossos próprios triggers já vêm em pt-BR e passam direto.
+export function normalizeDbError(error: unknown): string {
+  const { code, message } = asAuthError(error)
+  const text = (message ?? '').toLowerCase()
+
+  // 23505 unique / 23503 foreign key / 42501 privilégio (inclui RLS)
+  if (code === '23505' || text.includes('duplicate key value')) {
+    return 'Já existe um registro igual a este. Confira os dados e tente de novo.'
+  }
+  if (code === '23503' || text.includes('violates foreign key constraint')) {
+    return 'Este registro está em uso por outro dado e não pode ser alterado ou excluído.'
+  }
+  if (code === '42501' || text.includes('row-level security')) {
+    return 'Ação bloqueada pelas regras de acesso — confira se o consentimento está vigente e se você tem permissão.'
+  }
+  if (text.includes('jwt expired') || text.includes('jwt is expired')) {
+    return 'Sessão expirada. Faça login de novo.'
+  }
+  if (
+    text.includes('failed to fetch') ||
+    text.includes('networkerror') ||
+    text.includes('fetch failed') ||
+    text.includes('load failed')
+  ) {
+    return 'Falha de conexão. Verifique sua internet e tente de novo.'
+  }
 
   return message && message.trim().length > 0
     ? message

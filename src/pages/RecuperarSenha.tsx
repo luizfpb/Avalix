@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'

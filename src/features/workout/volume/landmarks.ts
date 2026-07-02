@@ -33,8 +33,8 @@ export const VOLUME_LANDMARKS: Partial<Record<MuscleGroup, VolumeLandmark>> = {
 }
 
 export const VOLUME_LANDMARKS_NOTE =
-  `Faixas de referencia (MEV/MAV/MRV) de Renaissance Periodization/Israetel — ` +
-  `diretriz pratica de hipertrofia, nao constante validada (${VOLUME_LANDMARKS_VERSION}).`
+  `Faixas de referência (MEV/MAV/MRV) de Renaissance Periodization/Israetel — ` +
+  `diretriz prática de hipertrofia, não constante validada (${VOLUME_LANDMARKS_VERSION}).`
 
 export type LandmarkZone = 'below' | 'effective' | 'optimal' | 'high' | 'above'
 

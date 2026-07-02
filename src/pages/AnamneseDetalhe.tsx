@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ShieldCheck, AlertTriangle } from 'lucide-react'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { computeGate, NIVEL_LABEL } from '../features/anamnesis/gate'

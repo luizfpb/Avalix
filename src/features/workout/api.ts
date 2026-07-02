@@ -234,74 +234,18 @@ export type SaveWorkoutPlanInput = {
   weeksMeta: PlanWeekMetaInput[]
 }
 
-// Reinsere toda a estrutura filha (dias/exercicios/overrides/semanas) a partir do
-// estado do editor, espelhando updateAssessment (apaga as leituras e regrava). O
-// snapshot de volume vai na linha do plano e e a fonte de verdade do PDF, entao
-// uma falha parcial e recuperavel: basta salvar de novo (o update reescreve tudo).
-//
-// O passo nao-obvio e o mapa clientKey->id: os overrides referenciam
-// workout_exercise_id, que so existe depois do insert dos exercicios. Inserimos
-// os exercicios dia a dia (position = indice) e correlacionamos pelo par
-// (day_id, position) pra reconstruir o mapa antes de gravar os overrides.
-async function insertPlanChildren(
-  planId: string,
-  orgId: string,
-  input: SaveWorkoutPlanInput
-): Promise<void> {
-  const keyToExerciseId = new Map<string, string>()
-
-  for (let i = 0; i < input.days.length; i++) {
-    const day = input.days[i]
-    const { data: dayRow, error: dayErr } = await supabase
-      .from('workout_days')
-      .insert({
-        org_id: orgId,
-        plan_id: planId,
-        label: day.label,
-        name: day.name,
-        position: i,
-      })
-      .select('id')
-      .single()
-    if (dayErr) throw dayErr
-
-    if (day.exercises.length === 0) continue
-
-    const { data: exRows, error: exErr } = await supabase
-      .from('workout_exercises')
-      .insert(
-        day.exercises.map((ex, pos) => ({
-          org_id: orgId,
-          day_id: dayRow.id,
-          exercise_id: ex.exerciseId,
-          position: pos,
-          sets: ex.sets,
-          reps: ex.reps,
-          rir: ex.rir,
-          rest_seconds: ex.restSeconds,
-          tempo: ex.tempo,
-          notes: ex.notes,
-        }))
-      )
-      .select('id, position')
-    if (exErr) throw exErr
-
-    // correlaciona pelo position (unico por dia) pra casar clientKey -> id real
-    const byPosition = new Map((exRows ?? []).map((r) => [r.position, r.id]))
-    day.exercises.forEach((ex, pos) => {
-      const id = byPosition.get(pos)
-      if (id) keyToExerciseId.set(ex.clientKey, id)
-    })
-  }
-
-  // overrides: descarta semanas fora do mesociclo (defesa; o b2 tambem barraria)
-  const overrideRows = input.overrides
-    .filter((o) => o.week >= 1 && o.week <= input.weeks && keyToExerciseId.has(o.exerciseKey))
+// Regrava toda a estrutura filha (dias/exercicios/overrides/semanas) pela RPC
+// replace_workout_plan_children (migration 0016): delete + reinsert numa
+// transação só — falha no meio reverte inteiro, sem estado parcial. O mapa
+// clientKey->workout_exercise_id (os overrides referenciam ids que só existem
+// após o insert) é reconstruído dentro da função, no banco.
+async function replacePlanChildren(planId: string, input: SaveWorkoutPlanInput): Promise<void> {
+  // descarta overrides/semanas fora do mesociclo (defesa; o b2 também barraria)
+  const overrides = input.overrides
+    .filter((o) => o.week >= 1 && o.week <= input.weeks)
     .map((o) => ({
-      org_id: orgId,
-      plan_id: planId,
-      workout_exercise_id: keyToExerciseId.get(o.exerciseKey) as string,
-      week_number: o.week,
+      week: o.week,
+      exercise_key: o.exerciseKey,
       sets: o.sets,
       reps: o.reps,
       rir: o.rir,
@@ -309,25 +253,37 @@ async function insertPlanChildren(
       is_skipped: o.isSkipped,
       notes: o.notes,
     }))
-  if (overrideRows.length > 0) {
-    const { error: ovErr } = await supabase.from('workout_week_overrides').insert(overrideRows)
-    if (ovErr) throw ovErr
-  }
-
-  const weekRows = input.weeksMeta
+  const weeks = input.weeksMeta
     .filter((w) => w.week >= 1 && w.week <= input.weeks)
     .map((w) => ({
-      org_id: orgId,
-      plan_id: planId,
-      week_number: w.week,
+      week: w.week,
       label: w.label,
       is_deload: w.isDeload,
       notes: w.notes,
     }))
-  if (weekRows.length > 0) {
-    const { error: wkErr } = await supabase.from('workout_weeks').insert(weekRows)
-    if (wkErr) throw wkErr
-  }
+
+  const { error } = await supabase.rpc('replace_workout_plan_children', {
+    p_plan: planId,
+    p_days: input.days.map((day, i) => ({
+      label: day.label,
+      name: day.name,
+      position: i,
+      exercises: day.exercises.map((ex, pos) => ({
+        client_key: ex.clientKey,
+        exercise_id: ex.exerciseId,
+        position: pos,
+        sets: ex.sets,
+        reps: ex.reps,
+        rir: ex.rir,
+        rest_seconds: ex.restSeconds,
+        tempo: ex.tempo,
+        notes: ex.notes,
+      })),
+    })) as unknown as Json,
+    p_overrides: overrides as unknown as Json,
+    p_weeks: weeks as unknown as Json,
+  })
+  if (error) throw error
 }
 
 function planColumns(input: SaveWorkoutPlanInput) {
@@ -361,12 +317,17 @@ export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<Wo
     .single()
   if (error) throw error
 
-  await insertPlanChildren(plan.id, input.orgId, input)
+  try {
+    await replacePlanChildren(plan.id, input)
+  } catch (e) {
+    // não deixa um plano vazio pra trás se a estrutura falhar; best-effort
+    await supabase.from('workout_plans').delete().eq('id', plan.id)
+    throw e
+  }
   return plan
 }
 
-// Atualiza o plano e regrava toda a estrutura. Apagar os dias leva exercicios e
-// overrides em cascata; as semanas (FK direto no plano) sao apagadas a parte.
+// Atualiza o plano e regrava toda a estrutura filha (atômico via RPC).
 export async function updateWorkoutPlan(
   id: string,
   input: SaveWorkoutPlanInput
@@ -379,12 +340,7 @@ export async function updateWorkoutPlan(
     .single()
   if (error) throw error
 
-  const delDays = await supabase.from('workout_days').delete().eq('plan_id', id)
-  if (delDays.error) throw delDays.error
-  const delWeeks = await supabase.from('workout_weeks').delete().eq('plan_id', id)
-  if (delWeeks.error) throw delWeeks.error
-
-  await insertPlanChildren(id, input.orgId, input)
+  await replacePlanChildren(id, input)
   return plan
 }
 
@@ -558,19 +514,19 @@ export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSumma
 
 export type LogSummary = { count: number; lastDate: string | null }
 
-// Resumo de execucao por plano da org (qtde de sessoes + ultima data). RLS vale.
+// Resumo de execucao por plano da org (qtde de sessoes + ultima data). A view
+// workout_log_summary (0016) agrega no banco em vez de baixar todos os logs;
+// security_invoker mantem a RLS valendo.
 export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<string, LogSummary>> {
   const { data, error } = await supabase
-    .from('workout_logs')
-    .select('plan_id, performed_at')
+    .from('workout_log_summary')
+    .select('plan_id, log_count, last_date')
     .eq('org_id', orgId)
   if (error) throw error
   const map: Record<string, LogSummary> = {}
   for (const r of data ?? []) {
-    const cur = map[r.plan_id] ?? { count: 0, lastDate: null }
-    cur.count += 1
-    if (!cur.lastDate || r.performed_at > cur.lastDate) cur.lastDate = r.performed_at
-    map[r.plan_id] = cur
+    if (!r.plan_id) continue
+    map[r.plan_id] = { count: r.log_count ?? 0, lastDate: r.last_date }
   }
   return map
 }

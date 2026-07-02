@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../../lib/errors'
 
 // Form único de exercício custom, usado na biblioteca (criar/editar) e no picker
 // do builder (criar e adicionar). Valida pelo zod do schema; metadados de
@@ -72,7 +73,7 @@ export function ExerciseForm({
         onSaved(row)
       }
     } catch (e) {
-      setError((e as Error).message)
+      setError(normalizeDbError(e))
     }
   }
 

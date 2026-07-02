@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'

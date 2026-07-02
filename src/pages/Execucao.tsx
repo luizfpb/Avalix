@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { Trash2, Plus } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
@@ -24,8 +24,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function todayLocal(): string {
   const d = new Date()
@@ -44,6 +46,7 @@ export default function Execucao() {
   const logsQuery = useWorkoutLogs(planId)
   const historyQuery = usePlanSetHistory(planId)
   const deleteMut = useDeleteWorkoutLog(planId)
+  const [confirmLogId, setConfirmLogId] = useState<string | null>(null)
 
   const names = useMemo(() => {
     const m: Record<string, string> = {}
@@ -129,9 +132,7 @@ export default function Execucao() {
                   {log.week_number ? <span className="text-muted-foreground"> · semana {log.week_number}</span> : null}
                 </span>
                 <button
-                  onClick={() => {
-                    if (window.confirm('Excluir esta sessão registrada?')) deleteMut.mutate(log.id)
-                  }}
+                  onClick={() => setConfirmLogId(log.id)}
                   disabled={deleteMut.isPending}
                   className="text-destructive"
                   title="Excluir"
@@ -188,6 +189,17 @@ export default function Execucao() {
           </p>
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmLogId != null}
+        title="Excluir sessão registrada?"
+        description="As séries registradas nesta sessão serão removidas do histórico."
+        onConfirm={() => {
+          if (confirmLogId) deleteMut.mutate(confirmLogId)
+          setConfirmLogId(null)
+        }}
+        onCancel={() => setConfirmLogId(null)}
+      />
     </div>
   )
 }
@@ -301,7 +313,7 @@ function LogForm({
       setNotes('')
       setOkMsg(true)
     } catch (e) {
-      setError((e as Error).message)
+      setError(normalizeDbError(e))
     }
   }
 
@@ -336,7 +348,7 @@ function LogForm({
             <Input
               type="number"
               min={1}
-              max={plan_weeks(detail)}
+              max={planWeeks(detail)}
               placeholder="—"
               value={week}
               onChange={(e) => setWeek(e.target.value)}
@@ -442,6 +454,6 @@ function LogForm({
   )
 }
 
-function plan_weeks(detail: WorkoutPlanDetail): number {
+function planWeeks(detail: WorkoutPlanDetail): number {
   return detail.plan?.weeks ?? 52
 }

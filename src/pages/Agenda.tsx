@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { CalendarPlus, Download, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
@@ -20,8 +20,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
@@ -59,6 +61,7 @@ export default function Agenda() {
   const subjectsQuery = useSubjects(orgId)
   const apptsQuery = useAppointments(orgId)
   const createMut = useCreateAppointment(orgId)
+  const [confirmApptId, setConfirmApptId] = useState<string | null>(null)
   const deleteMut = useDeleteAppointment(orgId)
 
   const [subjectId, setSubjectId] = useState(params.get('subject') ?? '')
@@ -104,7 +107,7 @@ export default function Agenda() {
       })
       setNotes('')
     } catch (e) {
-      setError((e as Error).message)
+      setError(normalizeDbError(e))
     }
   }
 
@@ -194,9 +197,7 @@ export default function Agenda() {
               <AppointmentItem
                 key={a.id}
                 appt={a}
-                onDelete={() => {
-                  if (window.confirm('Excluir este agendamento?')) deleteMut.mutate(a.id)
-                }}
+                onDelete={() => setConfirmApptId(a.id)}
                 onIcs={() => downloadIcs(a)}
                 deleting={deleteMut.isPending}
               />
@@ -220,9 +221,7 @@ export default function Agenda() {
                 <AppointmentItem
                   key={a.id}
                   appt={a}
-                  onDelete={() => {
-                    if (window.confirm('Excluir este agendamento?')) deleteMut.mutate(a.id)
-                  }}
+                  onDelete={() => setConfirmApptId(a.id)}
                   onIcs={() => downloadIcs(a)}
                   deleting={deleteMut.isPending}
                   muted
@@ -232,6 +231,16 @@ export default function Agenda() {
           ) : null}
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmApptId != null}
+        title="Excluir agendamento?"
+        onConfirm={() => {
+          if (confirmApptId) deleteMut.mutate(confirmApptId)
+          setConfirmApptId(null)
+        }}
+        onCancel={() => setConfirmApptId(null)}
+      />
     </div>
   )
 }

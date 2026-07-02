@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function todayLocal(): string {
   const d = new Date()
@@ -57,7 +58,7 @@ export default function PosturaSessaoNova() {
       })
       navigate(`/avaliados/${id}/postural/${session.id}`)
     } catch (e) {
-      setError((e as Error).message)
+      setError(normalizeDbError(e))
     }
   }
 

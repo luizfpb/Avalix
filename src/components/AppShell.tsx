@@ -1,4 +1,4 @@
-import { NavLink, Link, Outlet } from 'react-router-dom'
+import { NavLink, Link, Outlet } from 'react-router'
 import {
   LayoutDashboard,
   Users,

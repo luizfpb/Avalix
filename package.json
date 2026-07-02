@@ -1,7 +1,7 @@
 {
   "name": "bodytrack",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.45.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,6 @@
   "dependencies": {
     "@fontsource/black-ops-one": "^5.2.8",
     "@hookform/resolvers": "^5.0.0",
-    "@radix-ui/react-slot": "^1.2.0",
     "@react-pdf/renderer": "^4.0.0",
     "@supabase/supabase-js": "^2.108.1",
     "@tanstack/react-query": "^5.101.0",
@@ -27,7 +26,6 @@
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.54.0",
     "react-router": "^7.6.0",
-    "react-router-dom": "^7.17.0",
     "recharts": "^3.0.0",
     "tailwind-merge": "^3.0.0",
     "tw-animate-css": "^1.0.0",
@@ -36,6 +34,9 @@
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@tailwindcss/vite": "^4.1.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.0.0",
     "@types/papaparse": "^5.3.0",
     "@types/react": "^19.1.0",
@@ -45,6 +46,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
+    "jsdom": "^29.1.1",
     "opentype.js": "^2.0.0",
     "supabase": "^2.0.0",
     "tailwindcss": "^4.1.0",

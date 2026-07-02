@@ -1295,10 +1295,34 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      last_assessment_by_subject: {
+        Row: {
+          assessed_at: string | null
+          org_id: string | null
+          subject_id: string | null
+        }
+        Relationships: []
+      }
+      workout_log_summary: {
+        Row: {
+          last_date: string | null
+          log_count: number | null
+          org_id: string | null
+          plan_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_organization: { Args: { p_name: string }; Returns: string }
+      replace_assessment_readings: {
+        Args: { p_assessment: string; p_skinfolds: Json; p_circumferences: Json }
+        Returns: undefined
+      }
+      replace_workout_plan_children: {
+        Args: { p_plan: string; p_days: Json; p_overrides: Json; p_weeks: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

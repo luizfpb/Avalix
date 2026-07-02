@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { PenLine } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
@@ -25,6 +25,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { controlClass } from '@/lib/ui'
 import { cn } from '@/lib/utils'
+import { normalizeDbError } from '../lib/errors'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -70,7 +72,7 @@ export default function PosturaSessaoDetalhe() {
         image,
       })
     } catch (err) {
-      setUploadError((err as Error).message)
+      setUploadError(normalizeDbError(err))
     } finally {
       setUploading(false)
     }
@@ -87,17 +89,16 @@ export default function PosturaSessaoDetalhe() {
     }
   }
 
+  const [confirmPhoto, setConfirmPhoto] = useState<PosturePhotoRow | null>(null)
+  const [confirmSession, setConfirmSession] = useState(false)
+
   function onDelete(photo: PosturePhotoRow) {
-    if (!window.confirm('Excluir esta foto? Esta ação é definitiva.')) return
-    deleteMut.mutate(photo)
+    setConfirmPhoto(photo)
   }
 
   async function onDeleteSession() {
     if (!sessionId) return
-    if (
-      !window.confirm('Excluir esta sessão inteira e todas as fotos dela? Esta ação é definitiva.')
-    )
-      return
+    setConfirmSession(false)
     try {
       await deleteSessionMut.mutateAsync(sessionId)
       navigate(`/avaliados/${id}`)
@@ -144,15 +145,33 @@ export default function PosturaSessaoDetalhe() {
           size="sm"
           className="text-destructive"
           disabled={deleteSessionMut.isPending}
-          onClick={onDeleteSession}
+          onClick={() => setConfirmSession(true)}
         >
           {deleteSessionMut.isPending ? 'Excluindo...' : 'Excluir sessão'}
         </Button>
       </div>
 
       {deleteSessionMut.error ? (
-        <p className="text-sm text-destructive">{(deleteSessionMut.error as Error).message}</p>
+        <p className="text-sm text-destructive">{normalizeDbError(deleteSessionMut.error)}</p>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmPhoto != null}
+        title="Excluir foto?"
+        description="A foto e a miniatura serão removidas do armazenamento. Esta ação é definitiva."
+        onConfirm={() => {
+          if (confirmPhoto) deleteMut.mutate(confirmPhoto)
+          setConfirmPhoto(null)
+        }}
+        onCancel={() => setConfirmPhoto(null)}
+      />
+      <ConfirmDialog
+        open={confirmSession}
+        title="Excluir sessão inteira?"
+        description="Todas as fotos desta sessão serão removidas. Esta ação é definitiva."
+        onConfirm={onDeleteSession}
+        onCancel={() => setConfirmSession(false)}
+      />
 
       <div className="flex flex-wrap items-end gap-3 rounded-md border p-4">
         <div className="space-y-1.5">

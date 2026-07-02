@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Plus, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -34,6 +34,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function todayLocal(): string {
   const d = new Date()
@@ -223,7 +224,7 @@ function Form({ subject }: { subject: SubjectRow }) {
       })
       navigate(`/avaliados/${subject.id}/anamnese/${row.id}`)
     } catch (e) {
-      setSubmitError((e as Error).message)
+      setSubmitError(normalizeDbError(e))
     }
   }
 

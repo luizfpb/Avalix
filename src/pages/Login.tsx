@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { AuthLayout } from '../components/AuthLayout'

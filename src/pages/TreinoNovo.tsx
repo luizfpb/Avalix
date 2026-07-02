@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import {
   Plus,
   Trash2,
@@ -54,6 +54,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
 
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
@@ -123,6 +124,9 @@ export default function TreinoNovo() {
 
   return (
     <Builder
+      // key força remontar o editor ao trocar de plano/rota: sem ela, navegar
+      // entre duas edições manteria o estado do plano anterior (useState(initial))
+      key={planId ?? 'novo'}
       subjectId={subjectQuery.data.id}
       subjectName={subjectQuery.data.full_name}
       orgId={organization?.id ?? ''}
@@ -375,7 +379,7 @@ function Builder({
       const saved = await mut.mutateAsync(save)
       navigate(`/avaliados/${subjectId}/treinos/${saved.id}`)
     } catch (e) {
-      setSubmitError((e as Error).message)
+      setSubmitError(normalizeDbError(e))
     }
   }
 

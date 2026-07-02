@@ -116,7 +116,8 @@ export type WeekVolume = {
 export type VolumeSnapshot = {
   engineVersion: string
   method: VolumeMethod
-  weights: { primary: number; secondary: number }
+  // pesos realmente usados no cálculo; isolationSecondary só existe no 'refined'
+  weights: { primary: number; secondary: number; isolationSecondary?: number }
   perWeek: WeekVolume[]
   typicalWeek: number // 1a semana sem deload (default 1)
   typicalByMuscle: MuscleVolume

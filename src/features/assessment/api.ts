@@ -28,6 +28,27 @@ export type CreateAssessmentInput = {
   circumferences: NewCircumferenceReading[]
 }
 
+// Troca as leituras pela RPC replace_assessment_readings (migration 0016):
+// delete + reinsert rodam numa transação só, então falha no meio (rede, RLS,
+// consentimento revogado) reverte inteiro em vez de deixar estado parcial.
+async function replaceReadings(assessmentId: string, input: CreateAssessmentInput): Promise<void> {
+  const { error } = await supabase.rpc('replace_assessment_readings', {
+    p_assessment: assessmentId,
+    p_skinfolds: input.skinfolds.map((s) => ({
+      site: s.site,
+      reading_1: s.reading_1,
+      reading_2: s.reading_2,
+      reading_3: s.reading_3,
+    })) as unknown as Json,
+    p_circumferences: input.circumferences.map((c) => ({
+      site: c.site,
+      value_cm: c.value_cm,
+      is_custom: c.is_custom ?? false,
+    })) as unknown as Json,
+  })
+  if (error) throw error
+}
+
 // Insere a avaliação e, em seguida, as leituras (org_id é recopiado pelos
 // triggers a partir do pai). O snapshot em results já contém todos os números,
 // então a avaliação é a fonte de verdade do laudo mesmo se uma leitura falhar.
@@ -50,40 +71,15 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     .single()
   if (error) throw error
 
-  if (input.skinfolds.length > 0) {
-    const { error: skErr } = await supabase.from('skinfold_readings').insert(
-      input.skinfolds.map((s) => ({
-        org_id: input.orgId,
-        assessment_id: assessment.id,
-        site: s.site,
-        reading_1: s.reading_1,
-        reading_2: s.reading_2,
-        reading_3: s.reading_3,
-      }))
-    )
-    if (skErr) throw skErr
-  }
-
-  if (input.circumferences.length > 0) {
-    const { error: ciErr } = await supabase.from('circumference_readings').insert(
-      input.circumferences.map((c) => ({
-        org_id: input.orgId,
-        assessment_id: assessment.id,
-        site: c.site,
-        value_cm: c.value_cm,
-        is_custom: c.is_custom ?? false,
-      }))
-    )
-    if (ciErr) throw ciErr
-  }
-
+  await replaceReadings(assessment.id, input)
   return assessment
 }
 
-// Atualiza a avaliação e substitui as leituras. org_id/subject_id são
-// congelados por trigger; assessed_at, protocolo, peso, altura, results e
-// medicamentos/observações podem mudar. Reinserir leituras exige consentimento
-// vigente (mesma regra do create), por isso o editar é gated por consentimento.
+// Atualiza a avaliação e substitui as leituras (atômico via RPC). org_id/
+// subject_id são congelados por trigger; assessed_at, protocolo, peso, altura,
+// results e medicamentos/observações podem mudar. Reinserir leituras exige
+// consentimento vigente (mesma regra do create) — se tiver sido revogado, a
+// transação reverte e as leituras antigas ficam intactas.
 export async function updateAssessment(
   id: string,
   input: CreateAssessmentInput
@@ -105,36 +101,7 @@ export async function updateAssessment(
     .single()
   if (error) throw error
 
-  const delSk = await supabase.from('skinfold_readings').delete().eq('assessment_id', id)
-  if (delSk.error) throw delSk.error
-  const delCi = await supabase.from('circumference_readings').delete().eq('assessment_id', id)
-  if (delCi.error) throw delCi.error
-
-  if (input.skinfolds.length > 0) {
-    const { error: skErr } = await supabase.from('skinfold_readings').insert(
-      input.skinfolds.map((s) => ({
-        org_id: input.orgId,
-        assessment_id: id,
-        site: s.site,
-        reading_1: s.reading_1,
-        reading_2: s.reading_2,
-        reading_3: s.reading_3,
-      }))
-    )
-    if (skErr) throw skErr
-  }
-  if (input.circumferences.length > 0) {
-    const { error: ciErr } = await supabase.from('circumference_readings').insert(
-      input.circumferences.map((c) => ({
-        org_id: input.orgId,
-        assessment_id: id,
-        site: c.site,
-        value_cm: c.value_cm,
-        is_custom: c.is_custom ?? false,
-      }))
-    )
-    if (ciErr) throw ciErr
-  }
+  await replaceReadings(id, input)
   return assessment
 }
 
@@ -167,17 +134,18 @@ export async function listSubjectCircumferences(subjectId: string): Promise<Subj
 }
 
 // Última avaliação (data) por avaliado da org — pro gatilho de reavaliação no
-// dashboard. Vem ordenado desc, então o 1º de cada subject é o mais recente.
+// dashboard. A view last_assessment_by_subject (0016) agrega no banco com
+// distinct on, em vez de baixar todas as avaliações da org; security_invoker
+// mantém a RLS valendo.
 export async function listLastAssessmentBySubject(orgId: string): Promise<Record<string, string>> {
   const { data, error } = await supabase
-    .from('assessments')
+    .from('last_assessment_by_subject')
     .select('subject_id, assessed_at')
     .eq('org_id', orgId)
-    .order('assessed_at', { ascending: false })
   if (error) throw error
   const map: Record<string, string> = {}
   for (const r of data ?? []) {
-    if (!map[r.subject_id]) map[r.subject_id] = r.assessed_at
+    if (r.subject_id && r.assessed_at) map[r.subject_id] = r.assessed_at
   }
   return map
 }

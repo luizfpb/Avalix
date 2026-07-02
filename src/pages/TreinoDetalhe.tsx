@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
@@ -40,6 +40,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -81,6 +83,7 @@ export default function TreinoDetalhe() {
   const [showDup, setShowDup] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const exerciseNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -235,7 +238,7 @@ export default function TreinoDetalhe() {
   }
 
   async function handleDelete() {
-    if (!window.confirm('Excluir este plano de treino? Esta ação é definitiva.')) return
+    setConfirmDelete(false)
     try {
       await deleteMut.mutateAsync(plan.id)
       navigate(`/avaliados/${id}`)
@@ -319,7 +322,7 @@ export default function TreinoDetalhe() {
             variant="outline"
             size="sm"
             className="text-destructive"
-            onClick={handleDelete}
+            onClick={() => setConfirmDelete(true)}
             disabled={deleteMut.isPending}
           >
             <Trash2 /> {deleteMut.isPending ? 'Excluindo...' : 'Excluir'}
@@ -328,8 +331,16 @@ export default function TreinoDetalhe() {
       </div>
 
       {deleteMut.error ? (
-        <p className="text-sm text-destructive">{(deleteMut.error as Error).message}</p>
+        <p className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Excluir plano de treino?"
+        description="O plano, as divisões e o histórico de execução dele serão removidos. Esta ação é definitiva."
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
 
       {showDup ? (
         <DuplicatePanel
@@ -570,7 +581,7 @@ function DuplicatePanel({
       const created = await dupMut.mutateAsync(save)
       navigate(`/avaliados/${targetSubjectId}/treinos/${created.id}`)
     } catch (e) {
-      setError((e as Error).message)
+      setError(normalizeDbError(e))
     }
   }
 

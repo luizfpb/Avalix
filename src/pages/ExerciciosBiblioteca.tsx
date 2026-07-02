@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useExercises, useDeleteCustomExercise } from '../features/workout/hooks'
@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
 import { controlClass } from '@/lib/ui'
+import { normalizeDbError } from '../lib/errors'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 export default function ExerciciosBiblioteca() {
   const { organization, role } = useOrganization()
@@ -36,14 +38,18 @@ export default function ExerciciosBiblioteca() {
     })
   }, [exercises, search, muscle])
 
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
   async function handleDelete(id: string) {
-    if (!window.confirm('Excluir este exercício custom? Esta ação é definitiva.')) return
+    setConfirmId(null)
+    setDeleteError(null)
     try {
       await deleteMut.mutateAsync(id)
     } catch (e) {
-      window.alert(
-        'Não foi possível excluir. O exercício pode estar em uso em algum plano de treino.\n\n' +
-          (e as Error).message
+      setDeleteError(
+        'Não foi possível excluir. O exercício pode estar em uso em algum plano de treino. ' +
+          normalizeDbError(e)
       )
     }
   }
@@ -136,7 +142,7 @@ export default function ExerciciosBiblioteca() {
                       </button>
                       {canDelete ? (
                         <button
-                          onClick={() => handleDelete(e.id)}
+                          onClick={() => setConfirmId(e.id)}
                           disabled={deleteMut.isPending}
                           className="inline-flex items-center gap-1 text-destructive hover:underline"
                         >
@@ -153,6 +159,18 @@ export default function ExerciciosBiblioteca() {
           })}
         </ul>
       )}
+
+      {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
+
+      <ConfirmDialog
+        open={confirmId != null}
+        title="Excluir exercício custom?"
+        description="Esta ação é definitiva. O banco recusa a exclusão se o exercício estiver em uso em algum plano."
+        onConfirm={() => {
+          if (confirmId) void handleDelete(confirmId)
+        }}
+        onCancel={() => setConfirmId(null)}
+      />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { PenLine } from 'lucide-react'
 import { useSubjectPhotos, useSignedUrls, useAnnotation } from '../features/posture/hooks'
 import { categoryLabel, type SubjectPhoto } from '../features/posture/api'
