@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
-import type { AnamnesisAnswers } from '../features/anamnesis/spec'
+import { parseAnswers } from '../features/anamnesis/spec'
 import { Button } from '@/components/ui/button'
 
 function formatDate(iso: string): string {
@@ -26,7 +26,7 @@ export default function AnamneseDetalhe() {
   }
 
   const row = query.data
-  const a = row.payload as unknown as AnamnesisAnswers
+  const a = parseAnswers(row.payload)
 
   return (
     <div className="max-w-2xl space-y-5">

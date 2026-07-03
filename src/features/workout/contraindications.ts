@@ -5,7 +5,7 @@ import type { MovementPattern, MuscleGroup } from './volume'
 // exercícios do plano. NÃO é contraindicação médica nem diagnóstico — é um SINAL
 // pra o profissional REVISAR o exercício diante da queixa/achado. Conservador,
 // versionado e transparente (cada sinal traz o motivo). O treinador decide.
-export const CONTRA_RULES_VERSION = 'contra-rules@1'
+export const CONTRA_RULES_VERSION = 'contra-rules@2'
 
 type Caution = { muscles: MuscleGroup[]; patterns: MovementPattern[] }
 
@@ -39,6 +39,23 @@ const REGION_LABEL: Record<string, string> = {
   outra: 'outra região',
 }
 
+// Lesão diagnosticada (LESOES da anamnese) -> grupos/padrões a revisar. Só as
+// lesões cuja região é inequívoca; as demais (fratura, tendinopatia, luxação,
+// estiramento, outra) não carregam região e ficam pro texto livre do estado
+// atual — sinal automático nelas seria chute.
+const LESION_CAUTION: Record<string, { caution: Caution; label: string }> = {
+  lca: { caution: { muscles: ['quads'], patterns: ['squat', 'lunge'] }, label: 'lesão de LCA (joelho)' },
+  menisco: { caution: { muscles: ['quads'], patterns: ['squat', 'lunge'] }, label: 'lesão de menisco (joelho)' },
+  manguito: {
+    caution: { muscles: ['front_delts', 'side_delts', 'chest'], patterns: ['vertical_push', 'horizontal_push'] },
+    label: 'lesão de manguito rotador (ombro)',
+  },
+  hernia_disco: {
+    caution: { muscles: ['lower_back'], patterns: ['hinge', 'squat'] },
+    label: 'hérnia de disco',
+  },
+}
+
 export type ExerciseLite = {
   primaryMuscle: MuscleGroup
   secondaryMuscles: MuscleGroup[]
@@ -68,6 +85,15 @@ export function exerciseCautions(answers: AnamnesisAnswers, ex: ExerciseLite): s
     if (!c) continue
     if (c.muscles.some((m) => muscles.has(m)) || c.patterns.includes(ex.movementPattern)) {
       reasons.push(reason)
+    }
+  }
+
+  // histórico de lesão diagnosticada com região conhecida
+  for (const lesao of answers.lesoes_diagnosticadas ?? []) {
+    const l = LESION_CAUTION[lesao]
+    if (!l) continue
+    if (l.caution.muscles.some((m) => muscles.has(m)) || l.caution.patterns.includes(ex.movementPattern)) {
+      reasons.push(`histórico de ${l.label}`)
     }
   }
 

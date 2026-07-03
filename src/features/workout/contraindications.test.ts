@@ -52,6 +52,24 @@ describe('exerciseCautions', () => {
   it('sem queixas -> nenhum sinal', () => {
     expect(exerciseCautions(emptyAnamnesis(), agacho)).toEqual([])
   })
+
+  it('lesão diagnosticada de joelho (LCA) sinaliza agachamento, não supino', () => {
+    const a = { ...emptyAnamnesis(), lesoes_diagnosticadas: ['lca'] }
+    expect(exerciseCautions(a, agacho).some((r) => /LCA/.test(r))).toBe(true)
+    expect(exerciseCautions(a, supino)).toEqual([])
+  })
+
+  it('manguito sinaliza empurrar; hérnia de disco sinaliza hinge', () => {
+    const a = { ...emptyAnamnesis(), lesoes_diagnosticadas: ['manguito', 'hernia_disco'] }
+    expect(exerciseCautions(a, supino).some((r) => /manguito/.test(r))).toBe(true)
+    expect(exerciseCautions(a, terra).some((r) => /hérnia/.test(r))).toBe(true)
+  })
+
+  it('lesão sem região mapeada não gera sinal automático', () => {
+    const a = { ...emptyAnamnesis(), lesoes_diagnosticadas: ['tendinopatia', 'outra'] }
+    expect(exerciseCautions(a, agacho)).toEqual([])
+    expect(exerciseCautions(a, supino)).toEqual([])
+  })
 })
 
 describe('posturalEmphasis', () => {

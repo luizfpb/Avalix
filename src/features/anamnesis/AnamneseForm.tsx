@@ -17,6 +17,13 @@ import {
   ESTRESSE,
   LADO_DOMINANTE,
   ALTERACAO_POSTURAL,
+  TREINO_FREQ,
+  TEMPO_SESSAO,
+  LOCAL_TREINO,
+  LOCAL_SEM_ESTRUTURA,
+  PERFIL_SESSAO,
+  LESOES,
+  HISTORIA_FAMILIAR,
   type AnamnesisAnswers,
   type Option,
 } from './spec'
@@ -62,6 +69,37 @@ function YesNo({ value, onChange }: { value: boolean | null; onChange: (v: boole
           ].join(' ')}
         >
           {t}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// como o YesNo, mas com valores string (ex.: Sim / Não / Não sei)
+function Choice({
+  options,
+  value,
+  onChange,
+}: {
+  options: Option[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="flex shrink-0 gap-1">
+      {options.map((o) => (
+        <button
+          type="button"
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={[
+            'rounded-md border px-3 py-1 text-sm transition-colors',
+            value === o.value
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-accent',
+          ].join(' ')}
+        >
+          {o.label}
         </button>
       ))}
     </div>
@@ -186,12 +224,27 @@ function updateItem<K extends 'cirurgias' | 'medicamentos' | 'dor_queixas'>(
 }
 
 // ---- Camada A (triagem PAR-Q+ / ACSM) ---------------------------------
-export function AnamneseCamadaA({ a, set }: { a: AnamnesisAnswers; set: SetAnswers }) {
+// isAluno: na pagina publica os titulos/descricoes escondem a logica do gate
+// (PAR-Q+, "qualquer Sim retira a liberacao") pra nao induzir resposta falsa;
+// o resultado da triagem so aparece pro personal na revisao.
+export function AnamneseCamadaA({
+  a,
+  set,
+  isAluno = false,
+}: {
+  a: AnamnesisAnswers
+  set: SetAnswers
+  isAluno?: boolean
+}) {
   return (
     <>
       <Section
-        title="A1. Triagem de prontidão (PAR-Q+)"
-        desc="Obrigatória. Qualquer 'Sim' retira a liberação automática."
+        title={isAluno ? 'Sobre sua saúde' : 'A1. Triagem de prontidão (PAR-Q+)'}
+        desc={
+          isAluno
+            ? 'Responda todos os itens com sinceridade — não há resposta certa ou errada.'
+            : "Obrigatória. Qualquer 'Sim' retira a liberação automática."
+        }
       >
         <div className="space-y-3">
           {PARQ_ITEMS.map((item) => (
@@ -221,7 +274,10 @@ export function AnamneseCamadaA({ a, set }: { a: AnamnesisAnswers; set: SetAnswe
         </div>
       </Section>
 
-      <Section title="A2. Refinamento (ACSM)" desc="Define o nível de encaminhamento.">
+      <Section
+        title={isAluno ? 'Atividade física e sintomas' : 'A2. Refinamento (ACSM)'}
+        desc={isAluno ? 'Considere como você está hoje.' : 'Define o nível de encaminhamento.'}
+      >
         <Row label="Pratica exercício estruturado regular há ≥3 meses (≥30 min, ≥3x/sem, ao menos moderado)?">
           <YesNo value={a.ativo_regular} onChange={(v) => set({ ativo_regular: v })} />
         </Row>
@@ -245,14 +301,16 @@ export function AnamneseCamadaB({
   a,
   set,
   isFemale,
+  isAluno = false,
 }: {
   a: AnamnesisAnswers
   set: SetAnswers
   isFemale: boolean
+  isAluno?: boolean
 }) {
   return (
     <>
-      <Section title="B1. Objetivo e contexto">
+      <Section title={isAluno ? 'Seu objetivo' : 'B1. Objetivo e contexto'}>
         <Field label="Objetivo principal">
           <MultiCheck
             options={OBJETIVOS}
@@ -271,9 +329,61 @@ export function AnamneseCamadaB({
             <Select value={a.intensidade_desejada} onChange={(v) => set({ intensidade_desejada: v })} options={INTENSIDADE} />
           </Field>
         </div>
+        <Field label="Por que esse objetivo é importante pra você hoje? (opcional)">
+          <textarea rows={2} className={controlClass} value={a.objetivo_motivo} onChange={(e) => set({ objetivo_motivo: e.target.value })} />
+        </Field>
+        <Field label="Onde você gostaria de estar daqui a 6 meses? (opcional)">
+          <textarea rows={2} className={controlClass} value={a.objetivo_6meses} onChange={(e) => set({ objetivo_6meses: e.target.value })} />
+        </Field>
       </Section>
 
-      <Section title="B2. História clínica">
+      <Section
+        title={isAluno ? 'Seu treino' : 'B1b. Logística e preferências de treino'}
+        desc={
+          isAluno
+            ? 'Como o treino cabe na sua rotina — e do que você gosta.'
+            : 'Disponibilidade, local, equipamentos e preferências: alimenta a montagem do treino.'
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Quantas vezes por semana pretende treinar?">
+            <Select value={a.treino_freq_semana} onChange={(v) => set({ treino_freq_semana: v })} options={TREINO_FREQ} />
+          </Field>
+          <Field label="Tempo disponível por sessão">
+            <Select value={a.treino_tempo_sessao} onChange={(v) => set({ treino_tempo_sessao: v })} options={TEMPO_SESSAO} />
+          </Field>
+        </div>
+        <Field label="Onde vai treinar na maior parte do tempo?">
+          <Select value={a.treino_local} onChange={(v) => set({ treino_local: v })} options={LOCAL_TREINO} />
+        </Field>
+        {LOCAL_SEM_ESTRUTURA.includes(a.treino_local) ? (
+          <Field label="Quais equipamentos você tem à disposição?">
+            <textarea
+              rows={2}
+              className={controlClass}
+              placeholder="halteres (quais pesos), elásticos, barra fixa, banco..."
+              value={a.treino_equipamentos}
+              onChange={(e) => set({ treino_equipamentos: e.target.value })}
+            />
+          </Field>
+        ) : null}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Exercícios ou treinos que você mais gosta (opcional)">
+            <Input value={a.pref_gosta} onChange={(e) => set({ pref_gosta: e.target.value })} />
+          </Field>
+          <Field label="E que menos gosta (opcional)">
+            <Input value={a.pref_nao_gosta} onChange={(e) => set({ pref_nao_gosta: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Algum exercício que você não quer fazer de jeito nenhum? (opcional)">
+          <Input value={a.pref_veto} onChange={(e) => set({ pref_veto: e.target.value })} />
+        </Field>
+        <Field label="Que estilo de sessão combina mais com você?">
+          <Select value={a.perfil_sessao} onChange={(v) => set({ perfil_sessao: v })} options={PERFIL_SESSAO} />
+        </Field>
+      </Section>
+
+      <Section title={isAluno ? 'Histórico de saúde' : 'B2. História clínica'}>
         <Field label="Doenças crônicas">
           <MultiCheck options={DOENCAS_CRONICAS} value={a.doencas_cronicas} onChange={(v) => set({ doencas_cronicas: v })} />
         </Field>
@@ -305,7 +415,11 @@ export function AnamneseCamadaB({
         />
 
         <Row label="Morte por doença cardíaca/súbita em familiar de 1º grau (homem <55a, mulher <65a)?">
-          <YesNo value={a.historia_familiar_dcv} onChange={(v) => set({ historia_familiar_dcv: v })} />
+          <Choice
+            options={HISTORIA_FAMILIAR}
+            value={a.historia_familiar_dcv}
+            onChange={(v) => set({ historia_familiar_dcv: v })}
+          />
         </Row>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Tabagismo">
@@ -323,7 +437,7 @@ export function AnamneseCamadaB({
       </Section>
 
       <Section
-        title="B3. Dor e sistema musculoesquelético"
+        title={isAluno ? 'Dores e desconfortos' : 'B3. Dor e sistema musculoesquelético'}
         desc="Adicione uma queixa por região."
       >
         <RepeatList
@@ -367,12 +481,41 @@ export function AnamneseCamadaB({
             </div>
           )}
         />
-        <Field label="Sinais de alerta (red flags) — indicam avaliação médica, não treino">
+        <Field
+          label={
+            isAluno
+              ? 'Você tem ou já teve diagnóstico médico de alguma destas lesões?'
+              : 'Lesões com diagnóstico médico/cirúrgico'
+          }
+        >
+          <MultiCheck
+            options={LESOES}
+            value={a.lesoes_diagnosticadas}
+            onChange={(v) => set({ lesoes_diagnosticadas: v })}
+          />
+        </Field>
+        {a.lesoes_diagnosticadas.length > 0 ? (
+          <Field label="Como está hoje? (operado, liberado pelo médico, sente instabilidade...)">
+            <textarea
+              rows={2}
+              className={controlClass}
+              value={a.lesoes_estado_atual}
+              onChange={(e) => set({ lesoes_estado_atual: e.target.value })}
+            />
+          </Field>
+        ) : null}
+        <Field
+          label={
+            isAluno
+              ? 'Você percebe algum destes sinais atualmente?'
+              : 'Sinais de alerta (red flags) — indicam avaliação médica, não treino'
+          }
+        >
           <MultiCheck options={RED_FLAGS} value={a.red_flags} onChange={(v) => set({ red_flags: v })} />
         </Field>
       </Section>
 
-      <Section title="B4. Hábitos de vida">
+      <Section title={isAluno ? 'Hábitos de vida' : 'B4. Hábitos de vida'}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Ocupação">
             <Input value={a.ocupacao} onChange={(e) => set({ ocupacao: e.target.value })} />
@@ -401,7 +544,7 @@ export function AnamneseCamadaB({
         </Row>
       </Section>
 
-      <Section title="B5. Postural / ocupacional">
+      <Section title={isAluno ? 'Postura e dia a dia' : 'B5. Postural / ocupacional'}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Lado dominante">
             <Select value={a.lado_dominante} onChange={(v) => set({ lado_dominante: v })} options={LADO_DOMINANTE} />
@@ -428,7 +571,7 @@ export function AnamneseCamadaB({
       </Section>
 
       {isFemale ? (
-        <Section title="B6. Saúde da mulher">
+        <Section title={isAluno ? 'Saúde da mulher' : 'B6. Saúde da mulher'}>
           <Row label="Gestante?">
             <YesNo value={a.gestante} onChange={(v) => set({ gestante: v })} />
           </Row>

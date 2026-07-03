@@ -43,7 +43,7 @@ import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { OneRmCalculator } from '../features/workout/OneRmCalculator'
 import { exerciseCautions, posturalEmphasis } from '../features/workout/contraindications'
 import { useAnamneses } from '../features/anamnesis/hooks'
-import type { AnamnesisAnswers } from '../features/anamnesis/spec'
+import { parseAnswers } from '../features/anamnesis/spec'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -195,7 +195,8 @@ function Builder({
   }
 
   // inteligência avaliação→prescrição: sinais da anamnese mais recente do aluno
-  const anamneseAnswers = (anamneseQ.data?.[0]?.payload ?? null) as AnamnesisAnswers | null
+  const anamnesePayload = anamneseQ.data?.[0]?.payload
+  const anamneseAnswers = anamnesePayload != null ? parseAnswers(anamnesePayload) : null
   const posturalNotes = anamneseAnswers ? posturalEmphasis(anamneseAnswers) : []
   function cautionsFor(exerciseId: string): string[] {
     if (!anamneseAnswers) return []

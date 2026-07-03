@@ -14,6 +14,12 @@ import {
   ALCOOL,
   ALTERACAO_POSTURAL,
   LADO_DOMINANTE,
+  TREINO_FREQ,
+  TEMPO_SESSAO,
+  LOCAL_TREINO,
+  PERFIL_SESSAO,
+  LESOES,
+  HISTORIA_FAMILIAR,
   type AnamnesisAnswers,
   type Option,
 } from './spec'
@@ -73,9 +79,22 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
 
       <Block title="Objetivo">
         <Item label="Objetivo" value={labelsOf(OBJETIVOS, a.objetivo_principal ?? [])} />
+        <Item label="Por que importa hoje" value={a.objetivo_motivo} />
+        <Item label="Em 6 meses" value={a.objetivo_6meses} />
         <Item label="Esporte/modalidade" value={a.esporte_modalidade} />
         <Item label="Experiência" value={a.experiencia_treino ? labelOf(EXPERIENCIA, a.experiencia_treino) : ''} />
         <Item label="Intensidade desejada" value={a.intensidade_desejada ? labelOf(INTENSIDADE, a.intensidade_desejada) : ''} />
+      </Block>
+
+      <Block title="Logística e preferências de treino">
+        <Item label="Frequência pretendida" value={a.treino_freq_semana ? labelOf(TREINO_FREQ, a.treino_freq_semana) : ''} />
+        <Item label="Tempo por sessão" value={a.treino_tempo_sessao ? labelOf(TEMPO_SESSAO, a.treino_tempo_sessao) : ''} />
+        <Item label="Local" value={a.treino_local ? labelOf(LOCAL_TREINO, a.treino_local) : ''} />
+        <Item label="Equipamentos" value={a.treino_equipamentos} />
+        <Item label="Mais gosta" value={a.pref_gosta} />
+        <Item label="Menos gosta" value={a.pref_nao_gosta} />
+        <Item label="Não quer fazer" value={a.pref_veto} />
+        <Item label="Estilo de sessão" value={a.perfil_sessao ? labelOf(PERFIL_SESSAO, a.perfil_sessao) : ''} />
       </Block>
 
       <Block title="História clínica">
@@ -86,7 +105,7 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
         {(a.medicamentos ?? []).map((m, i) => (
           <Item key={`m${i}`} label="Medicamento" value={[m.nome, m.dose].filter(Boolean).join(' · ')} />
         ))}
-        <Item label="História familiar DCV" value={fmtBool(a.historia_familiar_dcv)} />
+        <Item label="História familiar DCV" value={a.historia_familiar_dcv ? labelOf(HISTORIA_FAMILIAR, a.historia_familiar_dcv) : ''} />
         <Item label="Tabagismo" value={a.tabagismo ? labelOf(TABAGISMO, a.tabagismo) : ''} />
         <Item label="Álcool" value={a.alcool ? labelOf(ALCOOL, a.alcool) : ''} />
       </Block>
@@ -101,6 +120,8 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
             }`}
           />
         ))}
+        <Item label="Lesões diagnosticadas" value={labelsOf(LESOES, a.lesoes_diagnosticadas ?? [])} />
+        <Item label="Estado das lesões" value={a.lesoes_estado_atual} />
         <Item label="Red flags" value={labelsOf(RED_FLAGS, a.red_flags ?? [])} />
       </Block>
 

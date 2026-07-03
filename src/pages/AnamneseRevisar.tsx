@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useIntake, useAcceptIntake, useRejectIntake } from '../features/anamnesis/intakeHooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
-import type { AnamnesisAnswers } from '../features/anamnesis/spec'
+import { parseAnswers } from '../features/anamnesis/spec'
 import { subjectFormSchema, formToInsert, type SubjectFormValues } from '../features/subjects/schema'
 import { useSubjects } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
@@ -50,7 +50,8 @@ export default function AnamneseRevisar() {
 
   const intake = query.data
   const isCadastro = intake.kind === 'cadastro_anamnese'
-  const answers = intake.payload as unknown as AnamnesisAnswers | null
+  // payload pode ser de spec anterior: parseAnswers completa/converte campos
+  const answers = intake.payload != null ? parseAnswers(intake.payload) : null
   const registration = intake.registration as unknown as SubjectFormValues | null
 
   // aviso barato de duplicata: link de cadastro reenviado ou aluno ja existente

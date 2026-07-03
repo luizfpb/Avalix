@@ -152,7 +152,7 @@ function Form({
       const ok = await trigger()
       if (!ok) return setError('Confira os campos do cadastro destacados em vermelho.')
     }
-    if (!parqComplete) return setError('Responda todos os itens da triagem inicial.')
+    if (!parqComplete) return setError('Responda todos os itens da seção "Sobre sua saúde".')
     if (signerName.trim().length < 3) return setError('Preencha o nome de quem está aceitando o termo.')
     if (!accepted) return setError('É preciso aceitar o termo de consentimento para enviar.')
     if (isMinor && signerKind !== 'responsavel')
@@ -194,8 +194,8 @@ function Form({
 
         <p className="text-sm text-muted-foreground">
           {isCadastro
-            ? 'Olá! Preencha seus dados e responda com sinceridade — leva alguns minutos. Isto é uma triagem de segurança e não substitui avaliação médica.'
-            : `Olá, ${intake.subjectFirstName}. Responda com sinceridade — leva alguns minutos. Isto é uma triagem de segurança e não substitui avaliação médica.`}
+            ? 'Olá! Preencha seus dados e responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: elas orientam um acompanhamento seguro e sob medida pra você.'
+            : `Olá, ${intake.subjectFirstName}. Responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: suas respostas orientam um acompanhamento seguro e sob medida pra você.`}
         </p>
 
         {isCadastro ? (
@@ -255,8 +255,8 @@ function Form({
           </Card>
         ) : null}
 
-        <AnamneseCamadaA a={a} set={set} />
-        <AnamneseCamadaB a={a} set={set} isFemale={isFemale} />
+        <AnamneseCamadaA a={a} set={set} isAluno />
+        <AnamneseCamadaB a={a} set={set} isFemale={isFemale} isAluno />
 
         {/* consentimento dado pelo proprio aluno */}
         <Card>

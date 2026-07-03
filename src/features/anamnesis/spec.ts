@@ -3,7 +3,10 @@
 // segurança; Camada B é contexto de avaliação. Redação própria, inspirada em
 // instrumentos validados (PAR-Q+ e diretrizes ACSM de pré-participação).
 
-export const SPEC_VERSION = '1.0'
+// 1.1: + motivação (B1), logística e preferências de treino (B1b), lesões
+// diagnosticadas (B3); historia_familiar_dcv vira enum com "não sei" (era
+// booleano na 1.0 — parseAnswers converte payloads antigos).
+export const SPEC_VERSION = '1.1'
 
 export type Option = { value: string; label: string }
 
@@ -51,6 +54,42 @@ export const OBJETIVOS: Option[] = [
   { value: 'dor_reab', label: 'Dor e reabilitação' },
   { value: 'postural', label: 'Correção postural' },
   { value: 'cardio', label: 'Condicionamento cardiorrespiratório' },
+  { value: 'mobilidade', label: 'Flexibilidade / mobilidade' },
+  { value: 'energia', label: 'Disposição e energia no dia a dia' },
+]
+
+// ---- B1b. Logística e preferências de treino ---------------------------
+export const TREINO_FREQ: Option[] = [
+  { value: '1', label: '1x por semana' },
+  { value: '2', label: '2x por semana' },
+  { value: '3', label: '3x por semana' },
+  { value: '4', label: '4x por semana' },
+  { value: '5', label: '5x por semana' },
+  { value: '6', label: '6x ou mais por semana' },
+  { value: 'nao_sei', label: 'Ainda não sei' },
+]
+
+export const TEMPO_SESSAO: Option[] = [
+  { value: 'ate_30', label: 'Até 30 min' },
+  { value: '30_45', label: '30 a 45 min' },
+  { value: '45_60', label: '45 min a 1h' },
+  { value: '60_90', label: '1h a 1h30' },
+  { value: 'mais_90', label: 'Mais de 1h30' },
+]
+
+export const LOCAL_TREINO: Option[] = [
+  { value: 'academia', label: 'Academia' },
+  { value: 'casa', label: 'Em casa / home gym' },
+  { value: 'condominio', label: 'Academia do condomínio' },
+  { value: 'ar_livre', label: 'Parque / ao ar livre' },
+]
+
+// locais onde os equipamentos disponíveis limitam a prescrição
+export const LOCAL_SEM_ESTRUTURA = ['casa', 'condominio', 'ar_livre']
+
+export const PERFIL_SESSAO: Option[] = [
+  { value: 'curta_intensa', label: 'Curtas e intensas' },
+  { value: 'volumosa_cadenciada', label: 'Mais longas, com mais descanso entre séries' },
 ]
 
 export const EXPERIENCIA: Option[] = [
@@ -89,6 +128,26 @@ export const REGIAO_DOR: Option[] = [
   { value: 'tornozelo_pe', label: 'Tornozelo / pé' },
   { value: 'cotovelo_punho', label: 'Cotovelo / punho' },
   { value: 'outra', label: 'Outra' },
+]
+
+// lesões com diagnóstico médico/cirúrgico (histórico estruturado; o detalhe
+// do estado atual vai em texto livre)
+export const LESOES: Option[] = [
+  { value: 'lca', label: 'Ligamento cruzado anterior — LCA (joelho)' },
+  { value: 'menisco', label: 'Menisco (joelho)' },
+  { value: 'manguito', label: 'Manguito rotador (ombro)' },
+  { value: 'luxacao_recidivante', label: 'Luxação recidivante ("articulação que sai do lugar")' },
+  { value: 'fratura_recente', label: 'Fratura óssea recente (menos de 1 ano)' },
+  { value: 'hernia_disco', label: 'Hérnia de disco (lombar / cervical)' },
+  { value: 'tendinopatia', label: 'Tendinite / tendinopatia crônica' },
+  { value: 'estiramento_grave', label: 'Estiramento muscular grave (grau II/III)' },
+  { value: 'outra', label: 'Outra lesão estrutural importante' },
+]
+
+export const HISTORIA_FAMILIAR: Option[] = [
+  { value: 'sim', label: 'Sim' },
+  { value: 'nao', label: 'Não' },
+  { value: 'nao_sei', label: 'Não sei' },
 ]
 
 export const TEMPO_EVOLUCAO: Option[] = [
@@ -167,19 +226,34 @@ export type AnamnesisAnswers = {
   sinais_sintomas: string[]
   // B1
   objetivo_principal: string[]
+  objetivo_motivo: string
+  objetivo_6meses: string
   esporte_modalidade: string
   experiencia_treino: string
   intensidade_desejada: string
+  // B1b — logística e preferências de treino
+  treino_freq_semana: string
+  treino_tempo_sessao: string
+  treino_local: string
+  treino_equipamentos: string
+  pref_gosta: string
+  pref_nao_gosta: string
+  pref_veto: string
+  perfil_sessao: string
   // B2
   doencas_cronicas: string[]
   cirurgias: Cirurgia[]
   medicamentos: Medicamento[]
-  historia_familiar_dcv: boolean | null
+  // '' | 'sim' | 'nao' | 'nao_sei' (na spec 1.0 era boolean | null;
+  // parseAnswers converte na leitura)
+  historia_familiar_dcv: string
   tabagismo: string
   tabagismo_macos_ano: string
   alcool: string
   // B3
   dor_queixas: QueixaDor[]
+  lesoes_diagnosticadas: string[]
+  lesoes_estado_atual: string
   red_flags: string[]
   // B4
   atividade_tipo: string
@@ -222,17 +296,29 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     doenca_cmr: [],
     sinais_sintomas: [],
     objetivo_principal: [],
+    objetivo_motivo: '',
+    objetivo_6meses: '',
     esporte_modalidade: '',
     experiencia_treino: '',
     intensidade_desejada: '',
+    treino_freq_semana: '',
+    treino_tempo_sessao: '',
+    treino_local: '',
+    treino_equipamentos: '',
+    pref_gosta: '',
+    pref_nao_gosta: '',
+    pref_veto: '',
+    perfil_sessao: '',
     doencas_cronicas: [],
     cirurgias: [],
     medicamentos: [],
-    historia_familiar_dcv: null,
+    historia_familiar_dcv: '',
     tabagismo: '',
     tabagismo_macos_ano: '',
     alcool: '',
     dor_queixas: [],
+    lesoes_diagnosticadas: [],
+    lesoes_estado_atual: '',
     red_flags: [],
     atividade_tipo: '',
     atividade_freq_semanal: '',
@@ -261,4 +347,21 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     consentimento_lgpd: false,
     observacoes: '',
   }
+}
+
+// Lê um payload persistido (qualquer spec_version): completa campos que não
+// existiam quando a resposta foi gravada e converte historia_familiar_dcv
+// booleano (spec 1.0) pro enum atual. Toda leitura de payload do banco deve
+// passar por aqui antes de chegar ao resumo, ao gate ou à prescrição.
+export function parseAnswers(payload: unknown): AnamnesisAnswers {
+  const raw = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
+  const base = emptyAnamnesis()
+  const a = { ...base, ...raw } as AnamnesisAnswers
+  a.parq = {
+    ...base.parq,
+    ...(raw.parq && typeof raw.parq === 'object' ? (raw.parq as Record<string, boolean | null>) : {}),
+  }
+  const hf = raw.historia_familiar_dcv
+  a.historia_familiar_dcv = hf === true ? 'sim' : hf === false ? 'nao' : typeof hf === 'string' ? hf : ''
+  return a
 }
