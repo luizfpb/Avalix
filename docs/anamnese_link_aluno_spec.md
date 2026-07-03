@@ -316,3 +316,53 @@ Registrar: (1) anamnese auto-preenchida por link com aceite obrigatório do pers
 mecanismo aprovado pra acesso anônimo pontual — distinto de "segurança por path"
 (D2/D3); (3) consentimento dado pelo titular via link como base LGPD reforçada (D4);
 (4) nova migration 0017 e as RPCs `get/submit/accept_anamnese_intake`.
+
+---
+
+## 10. Extensão v1.47 — cadastro feito pelo próprio aluno (migration 0018)
+
+O pedido: além do fluxo acima (avaliado já cadastrado), o personal pode gerar um
+**link de cadastro** — o aluno preenche os próprios dados E a anamnese numa página
+só. Agiliza os dois lados sem abrir mão do checkpoint humano.
+
+**Decisões:**
+
+- **D6. Nada vira registro oficial no envio.** O cadastro preenchido pelo aluno
+  fica no jsonb `registration` do intake; o `subjects` só é criado no **aceite**,
+  na mesma transação que cria consentimento + anamnese (D1 continua valendo).
+  Recusar descarta tudo — nenhum lixo entra na base.
+- **D7. Mesma tabela, discriminada por `kind`.** `anamnese_intakes.kind`
+  ('anamnese' | 'cadastro_anamnese'); `subject_id` vira nullable com check de
+  consistência `(kind='anamnese') = (subject_id is not null)`. O avaliado criado
+  no aceite fica em `resulting_subject_id` (o `subject_id` é congelado e
+  permanece nulo). Mesmo token capability, mesma validade, mesmo uso único.
+- **D8. Visibilidade org-wide para intake sem avaliado.** Sem subject não há
+  `can_view_subject_id`; as policies caem para `is_member(org_id) +
+  mfa_satisfied()`. V1 opera solo; com equipe, todo membro vê os convites de
+  cadastro da org (aceitável: é um cadastro que ainda não existe, e quem aceita
+  vira o avaliador responsável via `check_evaluator`).
+- **D9. Validação em três camadas.** No envio: zod client-side
+  (`subjectFormSchema`, o MESMO do cadastro manual) + validação server-side mínima
+  na RPC (nome/nascimento/sexo; menor de idade exige `signer_kind='responsavel'`).
+  No aceite: o personal REVALIDA o `registration` com o mesmo zod e converte com
+  `formToInsert`; as constraints de `subjects` são a rede final. A tela de revisão
+  ainda avisa duplicata por nome igual na org.
+
+**UI:** botão "Convidar por link" na tela Avaliados (Copiar/WhatsApp + lista de
+convites vivos com cancelar/revisar); página pública ganha o bloco "Seus dados"
+(sexo escolhido decide a B6; menor de 18 abre o bloco de responsável legal e trava
+o signatário do termo em "responsável"); revisão na rota nova
+`/avaliados/intake/:intakeId` com card do cadastro e botão "Aceitar e cadastrar";
+pendências entram no badge do AppShell e no card do Dashboard ("novo cadastro").
+
+**Checklist de teste (adicional):**
+
+- [ ] Avaliados → Convidar por link → link gerado com Copiar/WhatsApp; convite aparece como "aguardando resposta".
+- [ ] Abrir `/a/<token>` deslogado → página "Cadastro e anamnese" com bloco "Seus dados".
+- [ ] Enviar sem preencher cadastro → erros de campo; nascimento menor de 18 → bloco responsável obrigatório + signatário travado em responsável.
+- [ ] Enviar completo → "Recebido!"; convite vira "aguardando revisão" (Avaliados, Dashboard e badge).
+- [ ] Revisar → cadastro exibido; nome igual a avaliado existente → aviso de duplicata.
+- [ ] Aceitar → avaliado criado (quem aceitou é o avaliador) + consentimento + anamnese numa transação; navega pra anamnese nova; convite some das pendências.
+- [ ] Recusar → intake `rejected`; nenhum avaliado criado.
+- [ ] Cancelar convite `pending` → `canceled`; link abre como inválido.
+- [ ] Fluxos antigos intactos: cadastro manual e link de anamnese por avaliado.

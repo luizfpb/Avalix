@@ -87,9 +87,13 @@ export default function Dashboard() {
             <ul className="mt-2 space-y-1 text-sm">
               {pendingIntakes.slice(0, 5).map((p) => (
                 <li key={p.id}>
-                  {p.subject_id && p.id ? (
+                  {p.id ? (
                     <Link
-                      to={`/avaliados/${p.subject_id}/anamnese/intake/${p.id}`}
+                      to={
+                        p.subject_id
+                          ? `/avaliados/${p.subject_id}/anamnese/intake/${p.id}`
+                          : `/avaliados/intake/${p.id}`
+                      }
                       className="font-medium text-primary hover:underline"
                     >
                       {p.subject_name ?? 'Aluno'}
@@ -97,6 +101,9 @@ export default function Dashboard() {
                   ) : (
                     <span>{p.subject_name ?? 'Aluno'}</span>
                   )}
+                  {!p.subject_id ? (
+                    <span className="ml-1.5 text-xs text-muted-foreground">novo cadastro</span>
+                  ) : null}
                 </li>
               ))}
               {pendingIntakes.length > 5 ? (

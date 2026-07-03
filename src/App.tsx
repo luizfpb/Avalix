@@ -57,6 +57,9 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/avaliados" element={<Avaliados />} />
             <Route path="/avaliados/novo" element={<AvaliadoForm />} />
+            {/* revisao de intake de CADASTRO (ainda sem avaliado): o segmento
+                estatico "intake" vence o dinamico /avaliados/:id no ranking */}
+            <Route path="/avaliados/intake/:intakeId" element={<AnamneseRevisar />} />
             <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
             <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
             <Route path="/avaliados/:id/evolucao" element={<Evolucao />} />

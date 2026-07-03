@@ -47,16 +47,19 @@ export type Database = {
           created_by: string
           expires_at: string
           id: string
+          kind: string
           org_id: string
           payload: Json | null
+          registration: Json | null
           resulting_anamnese_id: string | null
+          resulting_subject_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           signer_kind: string | null
           signer_name: string | null
           spec_version: string
           status: string
-          subject_id: string
+          subject_id: string | null
           submit_user_agent: string | null
           submitted_at: string | null
           token_hash: string
@@ -69,16 +72,19 @@ export type Database = {
           created_by?: string
           expires_at: string
           id?: string
+          kind?: string
           org_id: string
           payload?: Json | null
+          registration?: Json | null
           resulting_anamnese_id?: string | null
+          resulting_subject_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           signer_kind?: string | null
           signer_name?: string | null
           spec_version: string
           status?: string
-          subject_id: string
+          subject_id?: string | null
           submit_user_agent?: string | null
           submitted_at?: string | null
           token_hash: string
@@ -91,16 +97,19 @@ export type Database = {
           created_by?: string
           expires_at?: string
           id?: string
+          kind?: string
           org_id?: string
           payload?: Json | null
+          registration?: Json | null
           resulting_anamnese_id?: string | null
+          resulting_subject_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           signer_kind?: string | null
           signer_name?: string | null
           spec_version?: string
           status?: string
-          subject_id?: string
+          subject_id?: string | null
           submit_user_agent?: string | null
           submitted_at?: string | null
           token_hash?: string
@@ -126,6 +135,13 @@ export type Database = {
             columns: ["resulting_anamnese_id"]
             isOneToOne: false
             referencedRelation: "anamneses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_intakes_resulting_subject_id_fkey"
+            columns: ["resulting_subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
           {
@@ -1426,6 +1442,7 @@ export type Database = {
       pending_anamnese_intakes: {
         Row: {
           id: string | null
+          kind: string | null
           org_id: string | null
           subject_id: string | null
           subject_name: string | null
@@ -1480,13 +1497,18 @@ export type Database = {
           p_intake: string
           p_liberado: boolean
           p_nivel: string
+          p_subject?: Json
         }
-        Returns: string
+        Returns: {
+          anamnese_id: string
+          subject_id: string
+        }[]
       }
       create_organization: { Args: { p_name: string }; Returns: string }
       get_anamnese_intake: {
         Args: { p_token: string }
         Returns: {
+          kind: string
           org_logo_path: string
           org_name: string
           spec_version: string
@@ -1511,6 +1533,7 @@ export type Database = {
           p_consent_text_sha256: string
           p_consent_version: string
           p_payload: Json
+          p_registration?: Json
           p_signer_kind: string
           p_signer_name: string
           p_token: string

@@ -5,9 +5,16 @@ import { SPEC_VERSION, type AnamnesisAnswers } from './spec'
 import { computeGate } from './gate'
 import { consentText, CONSENT_VERSION } from '../consent/text'
 import type { SignerKind } from '../consent/api'
+import type { SubjectInsert } from '../subjects/api'
+import type { SubjectFormValues } from '../subjects/schema'
 
 export type IntakeRow = Database['public']['Tables']['anamnese_intakes']['Row']
 export type PendingIntake = Database['public']['Views']['pending_anamnese_intakes']['Row']
+
+// 'anamnese' = link amarrado a um avaliado existente (0017);
+// 'cadastro_anamnese' = o aluno preenche o proprio cadastro junto (0018) e o
+// avaliado so e criado no aceite do personal.
+export type IntakeKind = 'anamnese' | 'cadastro_anamnese'
 
 const INTAKE_TTL_DAYS = 7
 
@@ -28,11 +35,10 @@ function intakeUrl(token: string): string {
 
 export type GeneratedLink = { intakeId: string; url: string; expiresAt: string }
 
-// Gera o link pro aluno responder. NAO exige consentimento previo: o aluno
-// consente no proprio envio. org_id e recopiado do subject pelo trigger.
-export async function generateIntakeLink(input: {
-  subjectId: string
-  orgId: string
+async function insertIntake(row: {
+  subject_id?: string
+  org_id: string
+  kind?: IntakeKind
 }): Promise<GeneratedLink> {
   const token = randomToken()
   const tokenHash = await sha256Hex(token)
@@ -40,8 +46,7 @@ export async function generateIntakeLink(input: {
   const { data, error } = await supabase
     .from('anamnese_intakes')
     .insert({
-      subject_id: input.subjectId,
-      org_id: input.orgId,
+      ...row,
       token_hash: tokenHash,
       spec_version: SPEC_VERSION,
       expires_at: expiresAt,
@@ -52,12 +57,40 @@ export async function generateIntakeLink(input: {
   return { intakeId: data.id, url: intakeUrl(token), expiresAt: data.expires_at }
 }
 
+// Gera o link pro aluno responder. NAO exige consentimento previo: o aluno
+// consente no proprio envio. org_id e recopiado do subject pelo trigger.
+export async function generateIntakeLink(input: {
+  subjectId: string
+  orgId: string
+}): Promise<GeneratedLink> {
+  return insertIntake({ subject_id: input.subjectId, org_id: input.orgId })
+}
+
+// Link de cadastro: sem avaliado. O aluno se cadastra e responde a anamnese
+// numa pagina so; o subject nasce no aceite do personal.
+export async function generateRegistrationLink(input: { orgId: string }): Promise<GeneratedLink> {
+  return insertIntake({ org_id: input.orgId, kind: 'cadastro_anamnese' })
+}
+
 // intakes "vivos" de um avaliado (aguardando o aluno ou aguardando revisao)
 export async function listSubjectIntakes(subjectId: string): Promise<IntakeRow[]> {
   const { data, error } = await supabase
     .from('anamnese_intakes')
     .select('*')
     .eq('subject_id', subjectId)
+    .in('status', ['pending', 'submitted'])
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+// convites de cadastro "vivos" da org (aguardando o aluno ou aguardando revisao)
+export async function listRegistrationIntakes(orgId: string): Promise<IntakeRow[]> {
+  const { data, error } = await supabase
+    .from('anamnese_intakes')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('kind', 'cadastro_anamnese')
     .in('status', ['pending', 'submitted'])
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -105,26 +138,37 @@ export async function rejectIntake(intakeId: string): Promise<void> {
 
 // aceita: o gate e calculado aqui no TS (modulo puro) a partir das respostas e
 // passado pra RPC atomica, que cria consentimento + anamnese numa transacao.
+// No intake de cadastro, `subject` (validado pelo zod do cadastro e convertido
+// por formToInsert) vai junto e a RPC cria o avaliado na mesma transacao.
+export type AcceptedIntake = { subjectId: string; anamneseId: string }
+
 export async function acceptIntake(input: {
   intakeId: string
   answers: AnamnesisAnswers
-}): Promise<string> {
+  subject?: SubjectInsert
+}): Promise<AcceptedIntake> {
   const gate = computeGate(input.answers)
   const { data, error } = await supabase.rpc('accept_anamnese_intake', {
     p_intake: input.intakeId,
     p_liberado: gate.liberado,
     p_nivel: gate.nivelEncaminhamento,
     p_flag: gate.flagEncaminhamento,
+    ...(input.subject ? { p_subject: input.subject as unknown as Json } : {}),
   })
   if (error) throw error
-  return data as string
+  const row = data?.[0]
+  if (!row) throw new Error('aceite nao retornou os registros criados')
+  return { subjectId: row.subject_id, anamneseId: row.anamnese_id }
 }
 
 // ---- publico (aluno, sem login) ---------------------------------------
+// No intake de cadastro nao existe avaliado ainda: nome/sexo vem nulos e o
+// proprio formulario coleta (o sexo escolhido decide a secao B6).
 export type PublicIntake = {
+  kind: IntakeKind
   orgName: string
-  subjectFirstName: string
-  subjectSex: 'M' | 'F'
+  subjectFirstName: string | null
+  subjectSex: 'M' | 'F' | null
   specVersion: string
 }
 
@@ -133,10 +177,12 @@ export async function getIntakeByToken(token: string): Promise<PublicIntake | nu
   if (error) throw error
   const row = data?.[0]
   if (!row) return null
+  const isCadastro = row.kind === 'cadastro_anamnese'
   return {
+    kind: isCadastro ? 'cadastro_anamnese' : 'anamnese',
     orgName: row.org_name,
-    subjectFirstName: row.subject_first_name,
-    subjectSex: row.subject_sex === 'F' ? 'F' : 'M',
+    subjectFirstName: isCadastro ? null : row.subject_first_name,
+    subjectSex: isCadastro ? null : row.subject_sex === 'F' ? 'F' : 'M',
     specVersion: row.spec_version,
   }
 }
@@ -147,6 +193,9 @@ export type SubmitIntakeInput = {
   answers: AnamnesisAnswers
   signerKind: SignerKind
   signerName: string
+  // presente so no intake de cadastro: os valores do formulario (strings),
+  // revalidados com o mesmo zod no aceite do personal
+  registration?: SubjectFormValues
 }
 
 // O hash do termo e do texto EXATO exibido (com o nome do Controlador), igual ao
@@ -161,6 +210,7 @@ export async function submitIntake(input: SubmitIntakeInput): Promise<void> {
     p_consent_version: CONSENT_VERSION,
     p_consent_text_sha256: consentHash,
     p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    ...(input.registration ? { p_registration: input.registration as unknown as Json } : {}),
   })
   if (error) throw error
 }
