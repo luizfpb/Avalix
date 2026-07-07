@@ -1,6 +1,7 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { setErrlogOrg } from '../../lib/errlog'
 import { useAuth } from '../auth/context'
 import {
   OrganizationContext,
@@ -49,6 +50,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     staleTime: 1000 * 60 * 5,
     retry: 1,
   })
+
+  // o log de erros (client_errors) precisa da org pra RLS; módulo fora do React
+  const currentOrgId = query.data?.organization?.id ?? null
+  useEffect(() => {
+    setErrlogOrg(currentOrgId)
+  }, [currentOrgId])
 
   const status: OrgStatus = useMemo(() => {
     if (authStatus !== 'signedIn') return 'absent'

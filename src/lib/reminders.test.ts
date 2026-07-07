@@ -9,6 +9,14 @@ describe('daysSince', () => {
     expect(daysSince('2026-06-20T00:00:00', now)).toBe(4)
     expect(daysSince('2026-06-25T00:00:00', now)).toBe(-1) // amanhã
   })
+
+  it('data-só é dia LOCAL (não desloca em fusos negativos)', () => {
+    // new Date('2026-06-24') seria meia-noite UTC = dia 23 à noite em Brasília;
+    // o parse local garante que a data conta como o próprio dia (v2.0)
+    expect(daysSince('2026-06-24', now)).toBe(0)
+    expect(daysSince('2026-06-23', now)).toBe(1)
+    expect(relativeDayLabel('2026-06-25', now)).toBe('Amanhã')
+  })
 })
 
 describe('relativeDayLabel', () => {

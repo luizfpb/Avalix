@@ -8,6 +8,7 @@ import {
   Trash2,
   Eraser,
   Save,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -48,6 +49,8 @@ export default function PosturaFoto() {
   const [tool, setTool] = useState<Tool>('move')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [detecting, setDetecting] = useState(false)
+  const [detectError, setDetectError] = useState<string | null>(null)
   const inited = useRef(false)
 
   // carrega as anotações existentes uma vez
@@ -83,6 +86,29 @@ export default function PosturaFoto() {
     setShapes((s) => s.filter((x) => x.id !== selectedId))
     setSelectedId(null)
     setDirty(true)
+  }
+
+  // Deteção assistida (P7): MediaPipe roda no aparelho e SUGERE pontos/linhas
+  // (ombros, quadris, orelhas, joelhos, tornozelos). O chunk + modelo só
+  // baixam no primeiro uso. Sugestão se soma às marcas existentes; ajuste e
+  // apague como qualquer marca — não é diagnóstico.
+  async function handleDetect() {
+    if (!url) return
+    setDetecting(true)
+    setDetectError(null)
+    try {
+      const { detectPoseShapes } = await import('../features/posture/poseDetect')
+      const suggested = await detectPoseShapes(url)
+      setShapes((s) => [...s, ...suggested])
+      setDirty(true)
+      setTool('move')
+    } catch (e) {
+      setDetectError(
+        e instanceof Error ? e.message : 'Não foi possível detectar os pontos nesta foto.'
+      )
+    } finally {
+      setDetecting(false)
+    }
   }
 
   async function save() {
@@ -135,6 +161,9 @@ export default function PosturaFoto() {
           ))}
         </div>
         <div className="mx-1 h-6 w-px bg-border" />
+        <Button size="sm" variant="ghost" onClick={handleDetect} disabled={detecting || !url}>
+          <Sparkles /> {detecting ? 'Detectando...' : 'Detectar pontos'}
+        </Button>
         <Button size="sm" variant="ghost" onClick={deleteSelected} disabled={!selectedId}>
           <Trash2 /> Apagar
         </Button>
@@ -157,6 +186,7 @@ export default function PosturaFoto() {
 
       <p className="text-xs text-muted-foreground">{HINTS[tool]}</p>
 
+      {detectError ? <p className="text-sm text-destructive">{detectError}</p> : null}
       {saveError ? <p className="text-sm text-destructive">{saveError.message}</p> : null}
 
       {photoQuery.isPending || annotationQuery.isPending ? (
@@ -181,7 +211,8 @@ export default function PosturaFoto() {
 
       <p className="text-xs text-muted-foreground">
         Ângulos e inclinações são calculados sobre a imagem (referência visual). Não substituem
-        medição clínica.
+        medição clínica. A deteção automática é uma sugestão de pontos (processada no seu
+        aparelho, a foto não sai do navegador) — ajuste ou apague qualquer marca antes de salvar.
       </p>
     </div>
   )

@@ -349,19 +349,3 @@ export function emptyAnamnesis(): AnamnesisAnswers {
   }
 }
 
-// Lê um payload persistido (qualquer spec_version): completa campos que não
-// existiam quando a resposta foi gravada e converte historia_familiar_dcv
-// booleano (spec 1.0) pro enum atual. Toda leitura de payload do banco deve
-// passar por aqui antes de chegar ao resumo, ao gate ou à prescrição.
-export function parseAnswers(payload: unknown): AnamnesisAnswers {
-  const raw = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
-  const base = emptyAnamnesis()
-  const a = { ...base, ...raw } as AnamnesisAnswers
-  a.parq = {
-    ...base.parq,
-    ...(raw.parq && typeof raw.parq === 'object' ? (raw.parq as Record<string, boolean | null>) : {}),
-  }
-  const hf = raw.historia_familiar_dcv
-  a.historia_familiar_dcv = hf === true ? 'sim' : hf === false ? 'nao' : typeof hf === 'string' ? hf : ''
-  return a
-}

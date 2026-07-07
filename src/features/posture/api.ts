@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { removePhotoObjectsVerified } from '../../lib/storage'
 import type { Database, Json } from '../../lib/database.types'
 import type { ProcessedImage } from './image'
 import { parseDoc, type AnnotationDoc, type Shape } from './annotations'
@@ -152,23 +153,21 @@ export async function addPhoto(input: AddPhotoInput): Promise<PosturePhotoRow> {
 }
 
 // Exclusão definitiva: arquivos ANTES da linha (a policy resolve o objeto pela
-// linha correspondente).
+// linha correspondente) e com verificação — o remove() do supabase-js não
+// reporta falha por objeto; sem conferir, a linha morreria com o arquivo lá,
+// órfão e inapagável pelo app (achado LGPD da auditoria v2.0).
 export async function deletePhoto(photo: PosturePhotoRow): Promise<void> {
-  await supabase.storage.from(BUCKET).remove([photo.storage_path, photo.thumb_path])
+  await removePhotoObjectsVerified([photo.storage_path, photo.thumb_path])
   const { error } = await supabase.from('posture_photos').delete().eq('id', photo.id)
   if (error) throw error
 }
 
 // Exclusão da sessão inteira (também resolve sessões vazias abandonadas).
-// Remove os arquivos de todas as fotos ANTES de apagar a sessão; o FK on delete
-// cascade leva as linhas de posture_photos e suas anotações.
+// Remove e verifica os arquivos de todas as fotos ANTES de apagar a sessão;
+// o FK on delete cascade leva as linhas de posture_photos e suas anotações.
 export async function deleteSession(sessionId: string): Promise<void> {
   const photos = await listPhotos(sessionId)
-  const paths = photos.flatMap((p) => [p.storage_path, p.thumb_path])
-  if (paths.length > 0) {
-    const { error: rmErr } = await supabase.storage.from(BUCKET).remove(paths)
-    if (rmErr) throw rmErr
-  }
+  await removePhotoObjectsVerified(photos.flatMap((p) => [p.storage_path, p.thumb_path]))
   const { error } = await supabase.from('posture_sessions').delete().eq('id', sessionId)
   if (error) throw error
 }

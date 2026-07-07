@@ -136,6 +136,7 @@ export default function Execucao() {
                   disabled={deleteMut.isPending}
                   className="text-destructive"
                   title="Excluir"
+                  aria-label={`Excluir sessão de ${formatDate(log.performed_at)}`}
                 >
                   <Trash2 className="size-4" />
                 </button>

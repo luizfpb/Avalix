@@ -374,39 +374,27 @@ export type CreateWorkoutLogInput = {
   sets: NewLogSet[]
 }
 
-// Cria a sessao executada + as series. org_id/subject_id sao recopiados do
-// plano pelos triggers; os valores enviados sao so pra satisfazer o tipo.
+// Cria a sessao executada + as series numa transacao so (RPC create_workout_log,
+// 0019). Antes eram duas chamadas: series falhando deixavam sessao vazia que
+// contava na adesao. org_id/subject_id vem do plano pelo trigger b1.
 export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<WorkoutLogRow> {
-  const { data: log, error } = await supabase
-    .from('workout_logs')
-    .insert({
-      org_id: input.orgId,
-      subject_id: input.subjectId,
-      plan_id: input.planId,
-      day_label: input.dayLabel,
-      week_number: input.weekNumber,
-      performed_at: input.performedAt,
-      notes: input.notes,
-    })
-    .select('*')
-    .single()
+  const { data, error } = await supabase.rpc('create_workout_log', {
+    p_plan: input.planId,
+    // args com default null na RPC: omitidos quando não há valor
+    ...(input.dayLabel != null ? { p_day_label: input.dayLabel } : {}),
+    ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
+    p_performed_at: input.performedAt,
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+    p_sets: input.sets.map((s) => ({
+      exercise_id: s.exerciseId,
+      set_number: s.setNumber,
+      weight_kg: s.weightKg,
+      reps: s.reps,
+      rir: s.rir,
+    })) as unknown as Json,
+  })
   if (error) throw error
-
-  if (input.sets.length > 0) {
-    const { error: setErr } = await supabase.from('workout_log_sets').insert(
-      input.sets.map((s) => ({
-        org_id: input.orgId,
-        log_id: log.id,
-        exercise_id: s.exerciseId,
-        set_number: s.setNumber,
-        weight_kg: s.weightKg,
-        reps: s.reps,
-        rir: s.rir,
-      }))
-    )
-    if (setErr) throw setErr
-  }
-  return log
+  return data as WorkoutLogRow
 }
 
 export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> {

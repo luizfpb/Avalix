@@ -502,3 +502,114 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 export async function generateAssessmentPdf(data: AssessmentPdfData): Promise<Blob> {
   return pdf(<AssessmentDoc data={data} />).toBlob()
 }
+
+// =====================================================================
+// PDF de evolução (P6, v2.0): relatório standalone do período — resumo
+// "de → para → Δ" + os mesmos cartões de tendência do PDF de avaliação.
+// Entregável de renovação de ciclo; reusa TrendChart/tema (mesmo chunk).
+// =====================================================================
+
+export type EvolutionPdfData = {
+  orgName: string
+  subjectName: string
+  logoUrl?: string | null
+  history: AssessmentHistoryPoint[]
+  circumferenceHistory: SubjectCircumference[]
+}
+
+type SummaryRow = { label: string; unit: string; from: number; to: number }
+
+// primeiro e último valor válido de cada métrica no período (puro/testável)
+export function evolutionSummaryRows(history: AssessmentHistoryPoint[]): SummaryRow[] {
+  const out: SummaryRow[] = []
+  for (const m of TREND_METRICS) {
+    const valid = history.map((p) => p[m.key]).filter((v): v is number => v != null)
+    if (valid.length < 2) continue
+    out.push({ label: m.title, unit: m.unit, from: valid[0], to: valid[valid.length - 1] })
+  }
+  return out
+}
+
+const summaryStyles = StyleSheet.create({
+  head: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.8,
+    borderBottomColor: palette.hairline,
+    paddingBottom: 3,
+    marginBottom: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 2.5,
+    borderBottomWidth: 0.5,
+    borderBottomColor: palette.hairline,
+  },
+  colLabel: { width: '40%', color: palette.muted },
+  colNum: { width: '20%', textAlign: 'right' },
+  colHead: { fontSize: 8, color: palette.muted },
+  delta: { fontFamily: 'Helvetica-Bold' },
+})
+
+function EvolutionSummary({ history }: { history: AssessmentHistoryPoint[] }) {
+  const rows = evolutionSummaryRows(history)
+  if (rows.length === 0) return null
+  return (
+    <View style={styles.section}>
+      <SectionTitle>Resumo do período</SectionTitle>
+      <View style={summaryStyles.head}>
+        <Text style={[summaryStyles.colLabel, summaryStyles.colHead]}>Métrica</Text>
+        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Início</Text>
+        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Atual</Text>
+        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Variação</Text>
+      </View>
+      {rows.map((r) => {
+        const delta = r.to - r.from
+        return (
+          <View key={r.label} style={summaryStyles.row}>
+            <Text style={summaryStyles.colLabel}>{r.label}</Text>
+            <Text style={summaryStyles.colNum}>{fmtNum(r.from)}{r.unit}</Text>
+            <Text style={summaryStyles.colNum}>{fmtNum(r.to)}{r.unit}</Text>
+            <Text style={[summaryStyles.colNum, summaryStyles.delta]}>
+              {delta > 0 ? '+' : ''}{fmtNum(delta)}{r.unit}
+            </Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
+  const first = data.history[0]
+  const last = data.history[data.history.length - 1]
+  const info: InfoItem[] = [
+    { label: 'Avaliado', value: data.subjectName, wide: true },
+    { label: 'Período', value: first && last ? `${first.date} a ${last.date}` : '—' },
+    { label: 'Avaliações', value: String(data.history.length) },
+  ]
+  return (
+    <Document>
+      <Page size="A4" style={pdfTheme.page}>
+        <ReportHeader
+          logoUrl={data.logoUrl}
+          orgName={data.orgName}
+          title="Relatório de Evolução"
+          subtitle={first && last ? `${first.date} a ${last.date}` : undefined}
+        />
+        <InfoCard items={info} />
+        <EvolutionSummary history={data.history} />
+        <EvolutionSection history={data.history} />
+        <CircumferenceEvolution rows={data.circumferenceHistory} />
+        <Text style={styles.reproNote}>
+          Valores calculados a partir das avaliações registradas no período. Documento de uso
+          profissional.
+        </Text>
+        <ReportFooter note="Calculado pelo motor Avalix" />
+      </Page>
+    </Document>
+  )
+}
+
+export async function generateEvolutionPdf(data: EvolutionPdfData): Promise<Blob> {
+  return pdf(<EvolutionDoc data={data} />).toBlob()
+}

@@ -452,11 +452,18 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : assessments.length > 0 ? (
         <>
-          <Button asChild variant="outline" size="sm" className="w-full">
-            <Link to={`/avaliados/${subjectId}/evolucao`}>
-              <TrendingUp /> Ver evolução e gráficos
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm" className="flex-1">
+              <Link to={`/avaliados/${subjectId}/evolucao`}>
+                <TrendingUp /> Evolução e gráficos
+              </Link>
+            </Button>
+            {assessments.length >= 2 ? (
+              <Button asChild variant="outline" size="sm" className="flex-1">
+                <Link to={`/avaliados/${subjectId}/comparar`}>Comparar avaliações</Link>
+              </Button>
+            ) : null}
+          </div>
           <ul className="divide-y rounded-md border bg-card">
             {assessments.map((a) => {
               const res = a.results as { bodyFatPct?: number } | null

@@ -176,7 +176,7 @@ export default function AvaliadoForm() {
         ) : null}
 
         {mutationError ? (
-          <p className="text-sm text-destructive">{mutationError.message}</p>
+          <p className="text-sm text-destructive">{normalizeDbError(mutationError)}</p>
         ) : null}
 
         <div className="flex gap-3">
@@ -203,7 +203,8 @@ export default function AvaliadoForm() {
 
 // Exclusão definitiva (LGPD). Fica fora do <form> pra não disparar submit e
 // exige digitar o nome exato como trava contra clique acidental.
-function DangerZone({
+// Exportado pra teste de componente (fluxo crítico).
+export function DangerZone({
   subjectId,
   subjectName,
   orgId,

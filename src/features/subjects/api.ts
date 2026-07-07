@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { removePhotoObjectsVerified } from '../../lib/storage'
 import type { Database } from '../../lib/database.types'
 import { listSubjectPhotos } from '../posture/api'
 
@@ -52,11 +53,9 @@ export async function updateSubject(id: string, patch: SubjectUpdate): Promise<S
 // trigger de auditoria registra os DELETE automaticamente.
 export async function deleteSubjectCompletely(subjectId: string): Promise<void> {
   const photos = await listSubjectPhotos(subjectId)
-  const paths = photos.flatMap((p) => [p.storage_path, p.thumb_path])
-  if (paths.length > 0) {
-    const { error: rmErr } = await supabase.storage.from('photos').remove(paths)
-    if (rmErr) throw rmErr
-  }
+  // remoção VERIFICADA (v2.0): o remove() do supabase-js não reporta falha por
+  // objeto; sobrou arquivo => aborta antes de apagar qualquer linha.
+  await removePhotoObjectsVerified(photos.flatMap((p) => [p.storage_path, p.thumb_path]))
   const { error } = await supabase.from('subjects').delete().eq('id', subjectId)
   if (error) throw error
 }

@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { clearDraft, useFormDraft } from '../lib/draft'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -107,12 +108,14 @@ function Form({
     watch,
     trigger,
     getValues,
+    reset,
     formState: { errors },
   } = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectFormSchema),
     defaultValues: emptySubjectForm(),
     mode: 'onTouched',
   })
+
 
   const watchedSex = watch('sex')
   const age = ageFromBirthDate(watch('birth_date') ?? '')
@@ -146,6 +149,25 @@ function Form({
       }),
   })
 
+  // rascunho local (P4): o aluno responde no celular, muitas vezes com sinal
+  // ruim — um refresh não pode perder tudo. TTL 24h; limpo no envio (a chave
+  // vira null após o sucesso pra o debounce não ressuscitar o rascunho). O
+  // aceite do termo NÃO é restaurado (a pessoa reconfirma). A chave usa só um
+  // prefixo do token pra não duplicar o segredo inteiro no storage.
+  const registrationValues = watch()
+  const draftKey = submit.isSuccess ? null : `intake:${token.slice(0, 12)}`
+  const draft = useFormDraft<{
+    a: AnamnesisAnswers
+    signerKind: SignerKind
+    signerName: string
+    registration?: SubjectFormValues
+  }>(draftKey, { a, signerKind, signerName, registration: isCadastro ? registrationValues : undefined }, (d) => {
+    setA({ ...emptyAnamnesis(), ...d.a })
+    setSignerKind(d.signerKind === 'responsavel' ? 'responsavel' : 'titular')
+    setSignerName(typeof d.signerName === 'string' ? d.signerName : '')
+    if (isCadastro && d.registration) reset({ ...emptySubjectForm(), ...d.registration })
+  })
+
   async function handleSubmit() {
     setError(null)
     if (isCadastro) {
@@ -159,6 +181,7 @@ function Form({
       return setError('Menor de idade: o responsável legal deve aceitar o termo.')
     try {
       await submit.mutateAsync(isCadastro ? getValues() : undefined)
+      clearDraft(`intake:${token.slice(0, 12)}`)
     } catch (e) {
       setError(normalizeDbError(e))
     }
@@ -197,6 +220,20 @@ function Form({
             ? 'Olá! Preencha seus dados e responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: elas orientam um acompanhamento seguro e sob medida pra você.'
             : `Olá, ${intake.subjectFirstName}. Responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: suas respostas orientam um acompanhamento seguro e sob medida pra você.`}
         </p>
+
+        {draft.restored ? (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+            <span>Recuperamos o que você já tinha preenchido — continue de onde parou.</span>
+            <button
+              type="button"
+              onClick={draft.dismiss}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        ) : null}
 
         {isCadastro ? (
           <Card>

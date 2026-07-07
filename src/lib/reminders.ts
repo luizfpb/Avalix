@@ -8,9 +8,19 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
+// Data-só ('2026-07-07', caso de assessed_at) precisa ser parseada como dia
+// LOCAL: new Date('2026-07-07') vira meia-noite UTC, que em UTC-3 cai no dia
+// anterior — deslocava o gatilho de reavaliação em 1 dia. Timestamps completos
+// (agenda) seguem no parse nativo.
+function parseLocal(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim())
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return new Date(iso)
+}
+
 // dias de calendário entre `iso` e `now` (positivo = no passado).
 export function daysSince(iso: string, now: Date): number {
-  const then = startOfDay(new Date(iso)).getTime()
+  const then = startOfDay(parseLocal(iso)).getTime()
   const today = startOfDay(now).getTime()
   return Math.round((today - then) / 86400000)
 }

@@ -14,10 +14,10 @@ export default defineConfig({
       // formulario. injectRegister null porque registramos no componente.
       registerType: "prompt",
       injectRegister: null,
-      // Emergency PWA reset: publishes a service worker that unregisters
-      // itself and clears same-origin caches on the client's next SW update.
-      // Remove this and deploy again after affected clients recover.
-      selfDestroying: true,
+      // v2.0: reset de emergência (selfDestroying) removido. Quem abriu o app
+      // durante a janela do reset teve o SW antigo destruído; quem não abriu
+      // pega este SW novo direto no próximo acesso (sw.js é no-cache no
+      // Cloudflare, então a troca acontece de qualquer forma).
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "AvalixFit",
@@ -43,7 +43,15 @@ export default defineConfig({
         // os chunks de PDF só servem online (precisam dos dados do Supabase
         // pra gerar o laudo); fora do precache pra instalação leve. O pesado
         // (~1,5 MB) é o pdfTheme, que carrega o @react-pdf compartilhado.
-        globIgnores: ["**/pdfTheme-*.js", "**/assessmentPdf-*.js", "**/workoutPdf-*.js"],
+        // poseDetect/vision_bundle (MediaPipe) idem: só baixam quando o
+        // recurso é usado e o modelo/wasm vêm de CDN — fora do precache.
+        globIgnores: [
+          "**/pdfTheme-*.js",
+          "**/assessmentPdf-*.js",
+          "**/workoutPdf-*.js",
+          "**/poseDetect-*.js",
+          "**/vision_bundle-*.js",
+        ],
         navigateFallback: "/index.html",
         maximumFileSizeToCacheInBytes: 4_000_000,
       },

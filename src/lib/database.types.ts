@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       anamnese_intakes: {
@@ -435,6 +410,54 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_errors: {
+        Row: {
+          at: string
+          id: number
+          message: string
+          org_id: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          at?: string
+          id?: never
+          message: string
+          org_id: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          at?: string
+          id?: never
+          message?: string
+          org_id?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_errors_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_errors_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1505,11 +1528,38 @@ export type Database = {
         }[]
       }
       create_organization: { Args: { p_name: string }; Returns: string }
+      create_workout_log: {
+        Args: {
+          p_day_label?: string
+          p_notes?: string
+          p_performed_at?: string
+          p_plan: string
+          p_sets: Json
+          p_week_number?: number
+        }
+        Returns: {
+          created_at: string
+          day_label: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          performed_at: string
+          plan_id: string
+          subject_id: string
+          updated_at: string
+          week_number: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workout_logs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_anamnese_intake: {
         Args: { p_token: string }
         Returns: {
           kind: string
-          org_logo_path: string
           org_name: string
           spec_version: string
           subject_first_name: string
@@ -1527,6 +1577,43 @@ export type Database = {
       replace_workout_plan_children: {
         Args: { p_days: Json; p_overrides: Json; p_plan: string; p_weeks: Json }
         Returns: undefined
+      }
+      save_assessment: {
+        Args: {
+          p_assessed_at: string
+          p_assessment: string
+          p_circumferences: Json
+          p_engine_version: string
+          p_height_cm: number
+          p_medications?: string
+          p_notes?: string
+          p_protocol_id: string
+          p_results: Json
+          p_skinfolds: Json
+          p_weight_kg: number
+        }
+        Returns: {
+          assessed_at: string
+          created_at: string
+          engine_version: string | null
+          evaluator_id: string
+          height_cm: number
+          id: string
+          medications: string | null
+          notes: string | null
+          org_id: string
+          protocol_id: string | null
+          results: Json | null
+          subject_id: string
+          updated_at: string
+          weight_kg: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "assessments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       submit_anamnese_intake: {
         Args: {
@@ -1669,9 +1756,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

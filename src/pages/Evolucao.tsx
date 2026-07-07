@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { GitCompareArrows } from 'lucide-react'
 import {
   ResponsiveContainer,
   PieChart,
@@ -21,7 +22,13 @@ import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
 import { circumferenceLabel } from '../features/assessment/sites'
+import { useOrganization } from '../features/organization/context'
+import { useAuth } from '../features/auth/context'
+import { loadOrgLogoDataUrl } from '../features/organization/logo'
+import { downloadBlob } from '../features/reports/download'
+import { logExport } from '../features/reports/audit'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 const LEAN = 'var(--color-chart-1)'
 const FAT = 'var(--color-chart-2)'
@@ -50,11 +57,53 @@ export default function Evolucao() {
   const subjectQuery = useSubject(id)
   const assessmentsQuery = useAssessments(id)
   const circsQuery = useSubjectCircumferences(id)
+  const { organization } = useOrganization()
+  const { user } = useAuth()
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   const assessments = useMemo(
     () => [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
     [assessmentsQuery.data]
   )
+
+  // PDF de evolução (P6): resumo do período + cartões de tendência, chunk lazy
+  async function handlePdf() {
+    setPdfBusy(true)
+    try {
+      const { generateEvolutionPdf } = await import('../features/reports/assessmentPdf')
+      const history = assessments.map((x) => {
+        const rr = x.results as AssessmentResultSnapshot | null
+        return {
+          date: dateShort(x.assessed_at),
+          weightKg: x.weight_kg ?? null,
+          bmi: x.weight_kg && x.height_cm ? round1(computeBmi(x.weight_kg, x.height_cm)) : null,
+          bodyFatPct: rr?.bodyFatPct ?? null,
+          leanMassKg: rr?.leanMassKg ?? null,
+          fatMassKg: rr?.fatMassKg ?? null,
+        }
+      })
+      const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
+      const blob = await generateEvolutionPdf({
+        orgName: organization?.name ?? '',
+        subjectName: subjectQuery.data?.full_name ?? '',
+        logoUrl,
+        history,
+        circumferenceHistory: circsQuery.data ?? [],
+      })
+      downloadBlob(blob, `evolucao-${id}.pdf`)
+      if (organization && user) {
+        void logExport({
+          orgId: organization.id,
+          userId: user.id,
+          action: 'PDF_REPORT',
+          tableName: 'assessments',
+          rowId: null,
+        })
+      }
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   if (subjectQuery.isPending || assessmentsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -95,13 +144,29 @@ export default function Evolucao() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        {back}
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Evolução e gráficos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {subject?.full_name} · {assessments.length}{' '}
-          {assessments.length === 1 ? 'avaliação' : 'avaliações'}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          {back}
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Evolução e gráficos</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {subject?.full_name} · {assessments.length}{' '}
+            {assessments.length === 1 ? 'avaliação' : 'avaliações'}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {assessments.length >= 2 ? (
+            <>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/avaliados/${id}/comparar`}>
+                  <GitCompareArrows /> Comparar
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePdf} disabled={pdfBusy}>
+                {pdfBusy ? 'Gerando...' : 'PDF de evolução'}
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {/* ===== ESTADO ATUAL ===== */}

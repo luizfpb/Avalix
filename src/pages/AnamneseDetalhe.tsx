@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
-import { parseAnswers } from '../features/anamnesis/spec'
+import { parseAnswers } from '../features/anamnesis/parse'
 import { Button } from '@/components/ui/button'
 
 function formatDate(iso: string): string {

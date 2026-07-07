@@ -32,6 +32,7 @@ import type {
   SkinfoldReadingRow,
 } from '../features/assessment/api'
 import { ageFromBirthDate } from '../lib/age'
+import { clearDraft, useFormDraft } from '../lib/draft'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -226,6 +227,7 @@ function CircumferencesCard({
                 onClick={() => setCustom((p) => p.filter((_, idx) => idx !== i))}
                 className="text-destructive"
                 title="Remover"
+                aria-label={`Remover circunferência ${c.site || 'personalizada'}`}
               >
                 <Trash2 className="size-4" />
               </button>
@@ -284,6 +286,36 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       .map((c) => ({ site: c.site, value: String(c.value_cm) }))
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // rascunho local (P4): só no modo criar — editar tem o servidor como fonte
+  // de verdade. Restaura ao montar, salva com debounce, limpa no save.
+  const draftKey = isEdit ? null : `avaliacao:${subject.id}`
+  type AvaliacaoDraft = {
+    assessedAt: string
+    protocolId: string
+    weight: string
+    height: string
+    medications: string
+    notes: string
+    skinfolds: Record<string, [string, string, string]>
+    circumferences: Record<string, string>
+    customCircs: { site: string; value: string }[]
+  }
+  const draft = useFormDraft<AvaliacaoDraft>(
+    draftKey,
+    { assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs },
+    (d) => {
+      setAssessedAt(d.assessedAt)
+      setProtocolId(d.protocolId)
+      setWeight(d.weight)
+      setHeight(d.height)
+      setMedications(d.medications)
+      setNotes(d.notes)
+      setSkinfolds(d.skinfolds ?? {})
+      setCircumferences(d.circumferences ?? {})
+      setCustomCircs(d.customCircs ?? [])
+    }
+  )
 
   const protocol = protocols.find((p) => p.id === protocolId) ?? protocols[0]
   const neededCircs: CircumferenceSite[] = (protocol?.circumferenceSites ?? []).filter(
@@ -393,6 +425,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         skinfolds: skinfoldRows,
         circumferences: circRows,
       })
+      if (draftKey) clearDraft(draftKey)
       navigate(`/avaliados/${subject.id}/avaliacoes/${assessment.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -412,6 +445,20 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
           {isEdit ? 'Editar avaliação' : 'Nova avaliação'}
         </h1>
       </div>
+
+      {draft.restored ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+          <button
+            type="button"
+            onClick={draft.dismiss}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Fechar aviso de rascunho"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Data">
@@ -471,6 +518,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
                         type="number"
                         inputMode="decimal"
                         className="w-16"
+                        aria-label={`${SKINFOLD_LABELS[site]}, aferição ${i + 1}`}
                         value={trio[i]}
                         onChange={(e) => setSkinfold(site, i, e.target.value)}
                       />

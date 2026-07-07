@@ -8,8 +8,13 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './features/theme/ThemeProvider'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { OrganizationProvider } from './features/organization/OrganizationProvider'
+import { PwaUpdatePrompt } from './features/pwa/PwaUpdatePrompt'
+import { installGlobalErrorLog } from './lib/errlog'
 
 const queryClient = new QueryClient()
+
+// erros de runtime não capturados (fora do React) também vão pro client_errors
+installGlobalErrorLog()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -20,6 +25,8 @@ createRoot(document.getElementById('root')!).render(
             <AuthProvider>
               <OrganizationProvider>
                 <App />
+                {/* aviso de versão nova do PWA (registro manual do SW) */}
+                <PwaUpdatePrompt />
               </OrganizationProvider>
             </AuthProvider>
           </BrowserRouter>

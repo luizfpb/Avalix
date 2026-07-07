@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeDbError } from '../lib/errors'
+import { clearDraft, useFormDraft } from '../lib/draft'
 
 function todayLocal(): string {
   const d = new Date()
@@ -63,6 +64,17 @@ function Form({ subject }: { subject: SubjectRow }) {
   const [a, setA] = useState<AnamnesisAnswers>(emptyAnamnesis)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  // rascunho local (P4): anamnese é formulário longo; refresh não pode perder
+  const draftKey = `anamnese:${subject.id}`
+  const draft = useFormDraft<{ assessedAt: string; a: AnamnesisAnswers }>(
+    draftKey,
+    { assessedAt, a },
+    (d) => {
+      setAssessedAt(d.assessedAt)
+      setA({ ...emptyAnamnesis(), ...d.a })
+    }
+  )
+
   function set(patch: Partial<AnamnesisAnswers>) {
     setA((prev) => ({ ...prev, ...patch }))
   }
@@ -85,6 +97,7 @@ function Form({ subject }: { subject: SubjectRow }) {
         assessedAt,
         answers: a,
       })
+      clearDraft(draftKey)
       navigate(`/avaliados/${subject.id}/anamnese/${row.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -106,6 +119,20 @@ function Form({ subject }: { subject: SubjectRow }) {
           (redação própria). É triagem de segurança — não substitui avaliação médica.
         </p>
       </div>
+
+      {draft.restored ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+          <button
+            type="button"
+            onClick={draft.dismiss}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Fechar aviso de rascunho"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

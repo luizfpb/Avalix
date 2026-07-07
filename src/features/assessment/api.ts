@@ -75,34 +75,39 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
   return assessment
 }
 
-// Atualiza a avaliação e substitui as leituras (atômico via RPC). org_id/
-// subject_id são congelados por trigger; assessed_at, protocolo, peso, altura,
-// results e medicamentos/observações podem mudar. Reinserir leituras exige
-// consentimento vigente (mesma regra do create) — se tiver sido revogado, a
-// transação reverte e as leituras antigas ficam intactas.
+// Atualiza header + leituras numa transação só (RPC save_assessment, 0019).
+// Antes eram duas chamadas: se a troca das leituras falhasse (rede,
+// consentimento revogado), o snapshot novo ficava com leituras velhas — PDF e
+// gráficos de evolução divergiam. Agora falha reverte tudo.
 export async function updateAssessment(
   id: string,
   input: CreateAssessmentInput
 ): Promise<AssessmentRow> {
-  const { data: assessment, error } = await supabase
-    .from('assessments')
-    .update({
-      assessed_at: input.assessedAt,
-      protocol_id: input.protocolId,
-      weight_kg: input.weightKg,
-      height_cm: input.heightCm,
-      medications: input.medications,
-      notes: input.notes,
-      results: input.result as unknown as Json,
-      engine_version: input.result.engineVersion,
-    })
-    .eq('id', id)
-    .select('*')
-    .single()
+  const { data, error } = await supabase.rpc('save_assessment', {
+    p_assessment: id,
+    p_assessed_at: input.assessedAt,
+    p_protocol_id: input.protocolId,
+    p_weight_kg: input.weightKg,
+    p_height_cm: input.heightCm,
+    // args com default null na RPC: omitir = limpar o campo
+    ...(input.medications != null ? { p_medications: input.medications } : {}),
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+    p_results: input.result as unknown as Json,
+    p_engine_version: input.result.engineVersion,
+    p_skinfolds: input.skinfolds.map((s) => ({
+      site: s.site,
+      reading_1: s.reading_1,
+      reading_2: s.reading_2,
+      reading_3: s.reading_3,
+    })) as unknown as Json,
+    p_circumferences: input.circumferences.map((c) => ({
+      site: c.site,
+      value_cm: c.value_cm,
+      is_custom: c.is_custom ?? false,
+    })) as unknown as Json,
+  })
   if (error) throw error
-
-  await replaceReadings(id, input)
-  return assessment
+  return data as AssessmentRow
 }
 
 // Exclusão da avaliação. O FK on delete cascade leva as leituras; a auditoria

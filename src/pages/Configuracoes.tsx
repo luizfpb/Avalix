@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
-import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight } from 'lucide-react'
+import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight, ScrollText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError, normalizeDbError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
@@ -83,6 +83,30 @@ export default function Configuracoes() {
           </Link>
         </CardContent>
       </Card>
+
+      {role === 'owner' || role === 'admin' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ScrollText className="size-4 text-muted-foreground" /> Auditoria
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Link
+              to="/auditoria"
+              className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+            >
+              <span>
+                Trilha de auditoria e erros
+                <span className="block text-xs text-muted-foreground">
+                  Quem fez o quê e quando (LGPD) + erros do aplicativo
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

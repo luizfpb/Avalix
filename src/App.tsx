@@ -33,6 +33,8 @@ const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Agenda = lazy(() => import('./pages/Agenda'))
 const Carteira = lazy(() => import('./pages/Carteira'))
+const AvaliacoesComparar = lazy(() => import('./pages/AvaliacoesComparar'))
+const Auditoria = lazy(() => import('./pages/Auditoria'))
 
 function PageFallback() {
   return (
@@ -63,6 +65,7 @@ export default function App() {
             <Route path="/avaliados/:id" element={<AvaliadoDetalhe />} />
             <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
             <Route path="/avaliados/:id/evolucao" element={<Evolucao />} />
+            <Route path="/avaliados/:id/comparar" element={<AvaliacoesComparar />} />
             <Route path="/avaliados/:id/anamnese/nova" element={<AnamneseNova />} />
             <Route
               path="/avaliados/:id/anamnese/intake/:intakeId"
@@ -94,6 +97,7 @@ export default function App() {
               element={<PosturaSessaoDetalhe />}
             />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/auditoria" element={<Auditoria />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/carteira" element={<Carteira />} />
             <Route path="/exercicios" element={<ExerciciosBiblioteca />} />
