@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { sha256Hex } from '../../lib/hash'
+import { clearIntakeLinkLocal, purgeExpiredIntakeLinks, saveIntakeLinkLocal } from './linkStore'
 import type { Database, Json } from '../../lib/database.types'
 import { SPEC_VERSION, type AnamnesisAnswers } from './spec'
 import { computeGate } from './gate'
@@ -54,7 +55,11 @@ async function insertIntake(row: {
     .select('id, expires_at')
     .single()
   if (error) throw error
-  return { intakeId: data.id, url: intakeUrl(token), expiresAt: data.expires_at }
+  const url = intakeUrl(token)
+  // v2.1: a URL fica salva NESTE aparelho (o banco só tem o hash) pra
+  // sobreviver a reload — o segredo continua sem sair do dispositivo
+  saveIntakeLinkLocal(data.id, url, data.expires_at)
+  return { intakeId: data.id, url, expiresAt: data.expires_at }
 }
 
 // Gera o link pro aluno responder. NAO exige consentimento previo: o aluno
@@ -74,6 +79,7 @@ export async function generateRegistrationLink(input: { orgId: string }): Promis
 
 // intakes "vivos" de um avaliado (aguardando o aluno ou aguardando revisao)
 export async function listSubjectIntakes(subjectId: string): Promise<IntakeRow[]> {
+  purgeExpiredIntakeLinks()
   const { data, error } = await supabase
     .from('anamnese_intakes')
     .select('*')
@@ -86,6 +92,7 @@ export async function listSubjectIntakes(subjectId: string): Promise<IntakeRow[]
 
 // convites de cadastro "vivos" da org (aguardando o aluno ou aguardando revisao)
 export async function listRegistrationIntakes(orgId: string): Promise<IntakeRow[]> {
+  purgeExpiredIntakeLinks()
   const { data, error } = await supabase
     .from('anamnese_intakes')
     .select('*')
@@ -125,6 +132,7 @@ export async function cancelIntake(intakeId: string): Promise<void> {
     .eq('id', intakeId)
     .eq('status', 'pending')
   if (error) throw error
+  clearIntakeLinkLocal(intakeId)
 }
 
 export async function rejectIntake(intakeId: string): Promise<void> {

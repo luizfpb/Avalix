@@ -8,6 +8,7 @@ import {
   useGenerateRegistrationLink,
   useCancelRegistrationIntake,
 } from '../features/anamnesis/intakeHooks'
+import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -21,6 +22,13 @@ import { normalizeDbError } from '../lib/errors'
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('pt-BR')
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function Avaliados() {
@@ -130,7 +138,8 @@ export default function Avaliados() {
             </div>
             <p className="text-xs text-muted-foreground">
               Válido por 7 dias e de uso único (um link por pessoa). Nada entra no sistema sem a sua
-              revisão. Por segurança, o link não é exibido de novo — se precisar, gere outro.
+              revisão. O link fica disponível na lista abaixo (neste aparelho) enquanto o convite
+              estiver ativo.
             </p>
           </CardContent>
         </Card>
@@ -153,18 +162,29 @@ export default function Avaliados() {
                 </Button>
               </li>
             ) : (
-              <li key={it.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="flex items-center gap-2">
+              <li
+                key={it.id}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2.5 text-sm"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge variant="secondary">Convite aguardando resposta</Badge>
-                  <span className="text-muted-foreground">expira {formatDate(it.expires_at)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    gerado {formatDateTime(it.created_at)} · expira {formatDate(it.expires_at)}
+                  </span>
                 </span>
-                <button
-                  onClick={() => cancel.mutate(it.id)}
-                  disabled={cancel.isPending}
-                  className="text-xs text-destructive hover:underline disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
+                <span className="flex items-center gap-2">
+                  <IntakeLinkButtons
+                    intakeId={it.id}
+                    waMessage="Olá! Faça seu cadastro e preencha a anamnese para começarmos:"
+                  />
+                  <button
+                    onClick={() => cancel.mutate(it.id)}
+                    disabled={cancel.isPending}
+                    className="text-xs text-destructive hover:underline disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </span>
               </li>
             )
           )}

@@ -10,6 +10,7 @@ import {
   useGenerateIntakeLink,
   useCancelIntake,
 } from '../features/anamnesis/intakeHooks'
+import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { useWorkoutPlans } from '../features/workout/hooks'
 import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
@@ -342,8 +343,8 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Válido por 7 dias e de uso único. Por segurança, o link não é exibido de novo — se
-              precisar, gere outro.
+              Válido por 7 dias e de uso único. O link fica disponível na lista abaixo (neste
+              aparelho) enquanto o convite estiver ativo.
             </p>
           </CardContent>
         </Card>
@@ -365,19 +366,27 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
             ) : (
               <li
                 key={it.id}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2.5 text-sm"
               >
-                <span className="flex items-center gap-2">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge variant="secondary">Aguardando o aluno</Badge>
-                  <span className="text-muted-foreground">expira {formatDate(it.expires_at)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    gerado {formatDateTime(it.created_at)} · expira {formatDate(it.expires_at)}
+                  </span>
                 </span>
-                <button
-                  onClick={() => cancel.mutate(it.id)}
-                  disabled={cancel.isPending}
-                  className="text-xs text-destructive hover:underline disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
+                <span className="flex items-center gap-2">
+                  <IntakeLinkButtons
+                    intakeId={it.id}
+                    waMessage="Olá! Preencha sua anamnese para começarmos:"
+                  />
+                  <button
+                    onClick={() => cancel.mutate(it.id)}
+                    disabled={cancel.isPending}
+                    className="text-xs text-destructive hover:underline disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </span>
               </li>
             )
           )}
