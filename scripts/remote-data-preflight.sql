@@ -5,6 +5,22 @@
 with metrics(metric, value) as (
   values
     ('auth_users', (select count(*)::bigint from auth.users)),
+    ('auth_users_with_verified_mfa', (
+      select count(*)::bigint
+      from auth.users u
+      where exists (
+        select 1 from auth.mfa_factors f
+        where f.user_id = u.id and f.status = 'verified'
+      )
+    )),
+    ('auth_users_without_verified_mfa', (
+      select count(*)::bigint
+      from auth.users u
+      where not exists (
+        select 1 from auth.mfa_factors f
+        where f.user_id = u.id and f.status = 'verified'
+      )
+    )),
     ('profiles', (select count(*)::bigint from public.profiles)),
     ('organizations', (select count(*)::bigint from public.organizations)),
     ('org_members', (select count(*)::bigint from public.org_members)),
@@ -63,11 +79,17 @@ with metrics(metric, value) as (
         having count(*) > 1
       ) duplicates
     )),
-    ('terminal_intakes_with_payload_to_anonymize', (
+    ('terminal_intakes_with_any_evidence_to_anonymize', (
       select count(*)::bigint
       from public.anamnese_intakes
       where status in ('rejected', 'canceled')
-        and (payload is not null or registration is not null)
+        and (
+          payload is not null or registration is not null
+          or submitted_at is not null or signer_kind is not null
+          or signer_name is not null or consent_version is not null
+          or consent_text_sha256 is not null or submit_user_agent is not null
+          or resulting_anamnese_id is not null or resulting_subject_id is not null
+        )
     )),
     ('expired_pending_intakes', (
       select count(*)::bigint

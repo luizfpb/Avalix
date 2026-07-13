@@ -8,12 +8,14 @@ rollback destrutivo, seed ou reaplicacao de migrations antigas.
 - o schema remoto contem as mudancas de `0001` a `0019`;
 - o historico remoto do CLI registra apenas `0001` e `0002`;
 - a migration `0020` ainda nao esta aplicada;
-- o ultimo workflow de backup observado concluiu com sucesso em 12/07/2026;
+- o backup gerado em 13/07/2026 foi descriptografado e restaurado com sucesso
+  em PostgreSQL descartavel; banco, FKs, RLS, gatilhos e Storage foram
+  validados, incluindo 6 objetos/136.200 bytes com SHA-256;
 - a auditoria remota contou 7 avaliados, 5 avaliacoes, 4 anamneses,
   6 consentimentos, 19 intakes (3 aceitos e 16 cancelados), 4 planos com
   7 dias/35 exercicios, 60 circunferencias e 35 dobras;
 - nao havia consentimento ativo duplicado, menor sem responsavel, objeto de foto
-  orfao nem intake terminal com payload sujeito a anonimizacao no rollout.
+  orfao nem intake terminal com evidencia sujeita a anonimizacao no rollout.
 
 Essas contagens sao uma linha de base, nao substituem um backup restauravel.
 
@@ -47,6 +49,12 @@ npm run check
 
 O resultado de referencia desta revisao e 262 testes aprovados, build aprovado,
 budgets aprovados e zero vulnerabilidades no audit offline.
+
+O MFA TOTP permanece opcional por decisao do produto. Quem optar por usa-lo pode
+ativar e validar o fator em **Configuracoes > Conta e seguranca**; contas sem
+fator continuam autenticadas normalmente por e-mail e senha. O preflight
+contabiliza a adesao ao MFA apenas como informacao operacional, sem bloquear o
+rollout.
 
 ## 2. Gerar e provar o backup
 
@@ -83,8 +91,11 @@ Antes da reconciliacao, o esperado e:
   e `0002`;
 - schema preflight: `present=true` para `0003` a `0019`,
   `recorded_in_history=false` para elas e `present=false` para `0020`;
-- data preflight: nenhuma queda em relacao a linha de base acima e zero nos
-  indicadores de integridade. Guarde a saida no registro da release.
+- data preflight: investigue qualquer diferenca em relacao a linha de base e
+  exija zero nos indicadores de integridade. Como o app segue em uso, a
+  comparacao decisiva e entre as contagens imediatamente antes e depois da
+  migration. As metricas de MFA sao informativas e nao sao indicadores de
+  integridade. Guarde ambas as saidas no registro da release.
 
 Qualquer diferenca exige parar e investigar. Nao avance por aproximacao.
 

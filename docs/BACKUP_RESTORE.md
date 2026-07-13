@@ -44,11 +44,24 @@ Faça o teste em um ambiente descartável compatível, nunca diretamente em prod
 Não execute o dump integral com `psql` sobre um projeto Supabase novo: ele já
 possui schemas e papéis gerenciados (`auth`, `storage` etc.) e haveria colisões.
 
-Para um Postgres realmente vazio e compatível, a validação base é:
+Para um Postgres realmente vazio e compatível, prefira restaurar apenas os
+schemas usados pelo app. O filtro `--schema` não cria os próprios schemas nem
+os papéis globais do Supabase. No banco descartável, pré-crie:
+
+- os schemas `extensions`, `app`, `auth`, `storage` e
+  `supabase_migrations` (`public` normalmente já existe);
+- as extensões `pgcrypto` e `uuid-ossp` no schema `extensions`;
+- o papel global `authenticated` com `NOLOGIN`.
+
+Depois restaure em uma única transação, para que qualquer erro reverta o ensaio
+inteiro:
 
 ```cmd
-pg_restore --exit-on-error --no-owner --no-privileges --dbname "%RESTORE_URL%" backup-AAAAmmdd-HHMMSS\db.dump
+pg_restore --single-transaction --exit-on-error --no-owner --no-privileges --schema app --schema auth --schema storage --schema public --schema supabase_migrations --dbname "%RESTORE_URL%" backup-AAAAmmdd-HHMMSS\db.dump
 ```
+
+Esses preparativos são exclusivos do Postgres local vazio. Não crie, substitua
+nem sobrescreva schemas ou papéis gerenciados dessa forma em produção.
 
 Para um projeto Supabase gerenciado, restaure pelo procedimento de disaster
 recovery vigente do Supabase: aplique as migrations do app, restaure os dados
@@ -64,6 +77,12 @@ Checklist do ensaio:
 5. entre com um usuário de teste e abra uma avaliação, uma foto e um PDF;
 6. confirme logins/Auth, FKs, RLS e contagens por tabela;
 7. registre a data, ambiente, comandos e resultado do teste.
+
+Se o schema materializado estiver à frente de
+`supabase_migrations.schema_migrations`, reconcilie o histórico antes de usar
+`supabase db push`. Primeiro execute um `--dry-run` e exija que ele liste apenas
+a migration realmente pendente; nunca use `db reset` para corrigir histórico em
+um projeto com dados.
 
 Um artifact apenas descriptografável não basta: o teste conjunto de banco e
 Storage deve ser repetido antes do beta e depois de mudanças no schema de fotos.
