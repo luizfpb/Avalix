@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
@@ -15,19 +15,26 @@ export default function DesafioMfa() {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [factorsLoading, setFactorsLoading] = useState(true)
+
+  const loadFactors = useCallback(async () => {
+    setFactorsLoading(true)
+    setError(null)
+    const { data, error: listError } = await supabase.auth.mfa.listFactors()
+    if (listError) {
+      setFactorId(null)
+      setError(normalizeAuthError(listError))
+    } else {
+      const factor = (data?.totp ?? []).find((item) => item.status === 'verified')
+      setFactorId(factor?.id ?? null)
+      if (!factor) setError('Nenhum fator verificado foi encontrado. Saia e entre novamente ou configure o 2FA.')
+    }
+    setFactorsLoading(false)
+  }, [])
 
   useEffect(() => {
-    let active = true
-    supabase.auth.mfa.listFactors().then(({ data }) => {
-      if (!active) return
-      const totp = data?.totp ?? []
-      const factor = totp.find((f) => f.status === 'verified') ?? totp[0]
-      setFactorId(factor?.id ?? null)
-    })
-    return () => {
-      active = false
-    }
-  }, [])
+    void loadFactors()
+  }, [loadFactors])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -61,14 +68,20 @@ export default function DesafioMfa() {
             inputMode="numeric"
             autoComplete="one-time-code"
             required
+            aria-describedby={error ? 'mfa-error' : undefined}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="000000"
           />
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={loading || !factorId}>
-          {loading ? 'Verificando...' : 'Verificar'}
+        {error ? <p id="mfa-error" role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {!factorId && !factorsLoading ? (
+          <Button type="button" variant="outline" className="w-full" onClick={() => void loadFactors()}>
+            Tentar carregar novamente
+          </Button>
+        ) : null}
+        <Button type="submit" className="w-full" disabled={loading || factorsLoading || !factorId}>
+          {factorsLoading ? 'Carregando 2FA...' : loading ? 'Verificando...' : 'Verificar'}
         </Button>
       </form>
       <button

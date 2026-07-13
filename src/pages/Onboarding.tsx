@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
-import { normalizeAuthError } from '../lib/errors'
+import { normalizeAuthError, normalizeDbError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { Button } from '@/components/ui/button'
@@ -23,19 +23,24 @@ export default function Onboarding() {
   const [termo, setTermo] = useState<string>('aluno')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [createdOrgId, setCreatedOrgId] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    // ATENÇÃO (Ponto 2): nomes dos parâmetros devem bater com a função no banco.
-    const { data: orgId, error } = await supabase.rpc('create_organization', {
-      p_name: nome.trim(),
-    })
-    if (error) {
-      setLoading(false)
-      setError(normalizeAuthError(error))
-      return
+    let orgId = createdOrgId
+    if (!orgId) {
+      const result = await supabase.rpc('create_organization', {
+        p_name: nome.trim(),
+      })
+      if (result.error) {
+        setLoading(false)
+        setError(normalizeAuthError(result.error))
+        return
+      }
+      orgId = result.data
+      setCreatedOrgId(orgId)
     }
     // A RPC cria a org com subject_term padrão. Aqui gravamos o termo escolhido.
     if (orgId) {
@@ -44,8 +49,9 @@ export default function Onboarding() {
         .update({ subject_term: termo })
         .eq('id', orgId)
       if (termErr) {
-        // Não bloqueia: a org já foi criada. Só avisa no console.
-        console.warn('Não foi possível salvar o termo:', termErr.message)
+        setLoading(false)
+        setError(`A organização foi criada, mas não foi possível salvar o termo escolhido. Tente novamente. ${normalizeDbError(termErr)}`)
+        return
       }
     }
     await refresh() // recarrega a org -> o RouteGuard manda pro dashboard
@@ -97,13 +103,13 @@ export default function Onboarding() {
               Esse termo aparece nas telas do app (ex.: lista de {termo}s).
             </p>
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <Button
             type="submit"
             className="w-full"
             disabled={loading || nome.trim().length === 0}
           >
-            {loading ? 'Criando...' : 'Criar organização'}
+            {loading ? 'Salvando...' : createdOrgId ? 'Tentar salvar novamente' : 'Criar organização'}
           </Button>
         </form>
         <button

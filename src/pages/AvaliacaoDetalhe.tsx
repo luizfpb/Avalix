@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/card'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { QueryError } from '../components/QueryError'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -50,17 +51,28 @@ export default function AvaliacaoDetalhe() {
   const navigate = useNavigate()
   const deleteMut = useDeleteAssessment(id)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
-  if (query.isError || !query.data.assessment) {
+  if (query.isPending || subjectQuery.isPending || assessmentsQuery.isPending) {
+    return <p className="text-sm text-muted-foreground">Carregando...</p>
+  }
+  if (
+    query.isError ||
+    !query.data.assessment ||
+    subjectQuery.isError ||
+    !subjectQuery.data ||
+    assessmentsQuery.isError
+  ) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar a avaliação.</p>
-        <Button asChild variant="outline">
-          <Link to={`/avaliados/${id}`}>Voltar</Link>
-        </Button>
-      </div>
+      <QueryError
+        message="Não foi possível carregar todos os dados da avaliação. O relatório foi bloqueado."
+        onRetry={() => void Promise.all([
+          query.refetch(),
+          subjectQuery.refetch(),
+          assessmentsQuery.refetch(),
+        ])}
+      />
     )
   }
 
@@ -73,6 +85,7 @@ export default function AvaliacaoDetalhe() {
 
   async function handlePdf() {
     setPdfBusy(true)
+    setPdfError(null)
     try {
       const { generateAssessmentPdf } = await import('../features/reports/assessmentPdf')
       const history = [...(assessmentsQuery.data ?? [])]
@@ -111,6 +124,8 @@ export default function AvaliacaoDetalhe() {
           rowId: assessment.id,
         })
       }
+    } catch {
+      setPdfError('Não foi possível gerar o PDF da avaliação. Tente novamente.')
     } finally {
       setPdfBusy(false)
     }
@@ -164,6 +179,8 @@ export default function AvaliacaoDetalhe() {
           </Button>
         </div>
       </div>
+
+      {pdfError ? <p role="alert" className="text-sm text-destructive">{pdfError}</p> : null}
 
       {deleteMut.error ? (
         <p className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>

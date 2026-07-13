@@ -29,6 +29,7 @@ import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { QueryError } from '../components/QueryError'
 
 const LEAN = 'var(--color-chart-1)'
 const FAT = 'var(--color-chart-2)'
@@ -60,6 +61,7 @@ export default function Evolucao() {
   const { organization } = useOrganization()
   const { user } = useAuth()
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   const assessments = useMemo(
     () => [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
@@ -69,6 +71,7 @@ export default function Evolucao() {
   // PDF de evolução (P6): resumo do período + cartões de tendência, chunk lazy
   async function handlePdf() {
     setPdfBusy(true)
+    setPdfError(null)
     try {
       const { generateEvolutionPdf } = await import('../features/reports/assessmentPdf')
       const history = assessments.map((x) => {
@@ -98,15 +101,31 @@ export default function Evolucao() {
           action: 'PDF_REPORT',
           tableName: 'assessments',
           rowId: null,
+          subjectId: id,
         })
       }
+    } catch {
+      setPdfError('Não foi possível gerar o PDF de evolução. Tente novamente.')
     } finally {
       setPdfBusy(false)
     }
   }
 
-  if (subjectQuery.isPending || assessmentsQuery.isPending) {
+  if (subjectQuery.isPending || assessmentsQuery.isPending || circsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
+  }
+
+  if (subjectQuery.isError || assessmentsQuery.isError || circsQuery.isError || !subjectQuery.data) {
+    return (
+      <QueryError
+        message="Não foi possível carregar os dados completos da evolução."
+        onRetry={() => void Promise.all([
+          subjectQuery.refetch(),
+          assessmentsQuery.refetch(),
+          circsQuery.refetch(),
+        ])}
+      />
+    )
   }
 
   const subject = subjectQuery.data
@@ -129,7 +148,7 @@ export default function Evolucao() {
 
   const last = assessments[assessments.length - 1]
   const lastRes = last.results as AssessmentResultSnapshot | null
-  const sex = subject?.sex === 'F' ? 'F' : 'M'
+  const sex = subject.sex === 'F' ? 'F' : 'M'
 
   // séries por métrica (uma por gráfico)
   const dates = assessments.map((a) => dateShort(a.assessed_at))
@@ -168,6 +187,8 @@ export default function Evolucao() {
           ) : null}
         </div>
       </div>
+
+      {pdfError ? <p role="alert" className="text-sm text-destructive">{pdfError}</p> : null}
 
       {/* ===== ESTADO ATUAL ===== */}
       <Card>
@@ -297,6 +318,17 @@ function MetricChart({
           <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
         </LineChart>
       </ResponsiveContainer>
+      <details className="mt-2 text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Ver dados do gráfico</summary>
+        <table className="mt-2 w-full text-left">
+          <thead><tr><th scope="col">Data</th><th scope="col" className="text-right">{title}</th></tr></thead>
+          <tbody>
+            {valid.map((point) => (
+              <tr key={point.date}><td>{point.date}</td><td className="text-right tabular-nums">{point.value.toFixed(1)}{u}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   )
 }
@@ -366,6 +398,13 @@ function CircumferencesCharts({
               <Bar dataKey="value" fill="var(--color-chart-1)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          <details className="mt-2 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">Ver medidas em tabela</summary>
+            <table className="mt-2 w-full text-left">
+              <thead><tr><th scope="col">Ponto</th><th scope="col" className="text-right">Medida</th></tr></thead>
+              <tbody>{current.map((item) => <tr key={item.label}><td>{item.label}</td><td className="text-right tabular-nums">{item.value} cm</td></tr>)}</tbody>
+            </table>
+          </details>
         </CardContent>
       </Card>
 
@@ -380,7 +419,6 @@ function CircumferencesCharts({
                 unit="cm"
                 color={`var(--color-chart-${(i % 5) + 1})`}
                 series={s.series}
-                betterDown
               />
             ))}
           </div>

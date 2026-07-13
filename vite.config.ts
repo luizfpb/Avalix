@@ -18,7 +18,9 @@ export default defineConfig({
       // durante a janela do reset teve o SW antigo destruído; quem não abriu
       // pega este SW novo direto no próximo acesso (sw.js é no-cache no
       // Cloudflare, então a troca acontece de qualquer forma).
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      // Os icones ja entram pelos globPatterns abaixo. Evita URLs duplicadas no
+      // manifesto de precache (includeAssets/includeManifestIcons + glob).
+      includeManifestIcons: false,
       manifest: {
         name: "AvalixFit",
         short_name: "Avalix",
@@ -53,7 +55,9 @@ export default defineConfig({
           "**/vision_bundle-*.js",
         ],
         navigateFallback: "/index.html",
-        maximumFileSizeToCacheInBytes: 4_000_000,
+        // Nenhum chunk grande pode entrar por acidente quando um arquivo for
+        // renomeado. O orçamento completo também é conferido no CI.
+        maximumFileSizeToCacheInBytes: 750_000,
       },
     }),
   ],
@@ -65,5 +69,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // A suite completa roda arquivos jsdom pesados em paralelo. Em runners
+    // Windows/CI mais lentos, testes que levam <2 s isoladamente podem passar
+    // de 5 s sob contencao; 15 s ainda detecta travamentos sem gerar falsos
+    // negativos por falta de CPU.
+    testTimeout: 15_000,
   },
 })

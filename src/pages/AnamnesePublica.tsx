@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle2 } from 'lucide-react'
-import { getIntakeByToken, submitIntake } from '../features/anamnesis/intake'
+import {
+  consumePublicIntakeToken,
+  getIntakeByToken,
+  intakeDraftFingerprint,
+  submitIntake,
+} from '../features/anamnesis/intake'
 import { emptyAnamnesis, PARQ_ITEMS, type AnamnesisAnswers } from '../features/anamnesis/spec'
 import { AnamneseCamadaA, AnamneseCamadaB } from '../features/anamnesis/AnamneseForm'
 import { subjectFormSchema, emptySubjectForm, type SubjectFormValues } from '../features/subjects/schema'
@@ -29,11 +33,13 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function Field({
+  id,
   label,
   error,
   hint,
   children,
 }: {
+  id: string
   label: string
   error?: string
   hint?: string
@@ -41,18 +47,18 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label>
+      <Label htmlFor={id}>
         {label}
         {hint ? <span className="ml-1 text-xs font-normal text-muted-foreground">({hint})</span> : null}
       </Label>
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p id={`${id}-error`} role="alert" className="text-xs text-destructive">{error}</p> : null}
     </div>
   )
 }
 
 export default function AnamnesePublica() {
-  const { token } = useParams()
+  const [token] = useState(() => consumePublicIntakeToken())
   const query = useQuery({
     queryKey: ['public-intake', token],
     queryFn: () => getIntakeByToken(token as string),
@@ -60,7 +66,7 @@ export default function AnamnesePublica() {
     retry: false,
   })
 
-  if (query.isPending) {
+  if (token && query.isPending) {
     return (
       <Shell>
         <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -68,7 +74,24 @@ export default function AnamnesePublica() {
     )
   }
 
-  if (query.isError || !query.data) {
+  if (query.isError) {
+    return (
+      <Shell>
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <BrandMark size={40} />
+          <h1 className="text-xl font-semibold">Não foi possível verificar o link</h1>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Confira sua conexão e tente novamente. O link não foi descartado.
+          </p>
+          <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
+            {query.isFetching ? 'Tentando...' : 'Tentar de novo'}
+          </Button>
+        </div>
+      </Shell>
+    )
+  }
+
+  if (!token || !query.data) {
     return (
       <Shell>
         <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -82,7 +105,7 @@ export default function AnamnesePublica() {
     )
   }
 
-  return <Form token={token as string} intake={query.data} />
+  return <Form token={token} intake={query.data} />
 }
 
 function Form({
@@ -155,18 +178,24 @@ function Form({
   // aceite do termo NÃO é restaurado (a pessoa reconfirma). A chave usa só um
   // prefixo do token pra não duplicar o segredo inteiro no storage.
   const registrationValues = watch()
-  const draftKey = submit.isSuccess ? null : `intake:${token.slice(0, 12)}`
+  const publicDraftKey = `intake:${intakeDraftFingerprint(token)}`
+  const draftKey = submit.isSuccess ? null : publicDraftKey
   const draft = useFormDraft<{
     a: AnamnesisAnswers
     signerKind: SignerKind
     signerName: string
     registration?: SubjectFormValues
-  }>(draftKey, { a, signerKind, signerName, registration: isCadastro ? registrationValues : undefined }, (d) => {
-    setA({ ...emptyAnamnesis(), ...d.a })
-    setSignerKind(d.signerKind === 'responsavel' ? 'responsavel' : 'titular')
-    setSignerName(typeof d.signerName === 'string' ? d.signerName : '')
-    if (isCadastro && d.registration) reset({ ...emptySubjectForm(), ...d.registration })
-  })
+  }>(
+    draftKey,
+    { a, signerKind, signerName, registration: isCadastro ? registrationValues : undefined },
+    (d) => {
+      setA({ ...emptyAnamnesis(), ...d.a })
+      setSignerKind(d.signerKind === 'responsavel' ? 'responsavel' : 'titular')
+      setSignerName(typeof d.signerName === 'string' ? d.signerName : '')
+      if (isCadastro && d.registration) reset({ ...emptySubjectForm(), ...d.registration })
+    },
+    { storage: 'session' }
+  )
 
   async function handleSubmit() {
     setError(null)
@@ -181,7 +210,7 @@ function Form({
       return setError('Menor de idade: o responsável legal deve aceitar o termo.')
     try {
       await submit.mutateAsync(isCadastro ? getValues() : undefined)
-      clearDraft(`intake:${token.slice(0, 12)}`)
+      clearDraft(publicDraftKey, { storage: 'session' })
     } catch (e) {
       setError(normalizeDbError(e))
     }
@@ -245,16 +274,16 @@ function Form({
                 </p>
               </div>
 
-              <Field label="Nome completo" error={errors.full_name?.message}>
-                <Input {...register('full_name')} autoComplete="name" />
+              <Field id="public-full-name" label="Nome completo" error={errors.full_name?.message}>
+                <Input id="public-full-name" {...register('full_name')} autoComplete="name" aria-invalid={!!errors.full_name} aria-describedby={errors.full_name ? 'public-full-name-error' : undefined} />
               </Field>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Data de nascimento" error={errors.birth_date?.message}>
-                  <Input type="date" {...register('birth_date')} />
+                <Field id="public-birth-date" label="Data de nascimento" error={errors.birth_date?.message}>
+                  <Input id="public-birth-date" type="date" {...register('birth_date')} aria-invalid={!!errors.birth_date} aria-describedby={errors.birth_date ? 'public-birth-date-error' : undefined} />
                 </Field>
-                <Field label="Sexo" error={errors.sex?.message}>
-                  <select className={controlClass} {...register('sex')}>
+                <Field id="public-sex" label="Sexo" error={errors.sex?.message}>
+                  <select id="public-sex" className={controlClass} {...register('sex')} aria-invalid={!!errors.sex} aria-describedby={errors.sex ? 'public-sex-error' : undefined}>
                     <option value="">Selecione</option>
                     <option value="M">Masculino</option>
                     <option value="F">Feminino</option>
@@ -263,16 +292,16 @@ function Form({
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Altura (cm)" error={errors.height_cm?.message} hint="opcional">
-                  <Input type="number" step="0.1" {...register('height_cm')} />
+                <Field id="public-height" label="Altura (cm)" error={errors.height_cm?.message} hint="opcional">
+                  <Input id="public-height" type="number" step="0.1" {...register('height_cm')} aria-invalid={!!errors.height_cm} aria-describedby={errors.height_cm ? 'public-height-error' : undefined} />
                 </Field>
-                <Field label="Telefone" hint="opcional">
-                  <Input {...register('phone')} autoComplete="tel" />
+                <Field id="public-phone" label="Telefone" error={errors.phone?.message} hint="opcional">
+                  <Input id="public-phone" {...register('phone')} autoComplete="tel" aria-invalid={!!errors.phone} aria-describedby={errors.phone ? 'public-phone-error' : undefined} />
                 </Field>
               </div>
 
-              <Field label="E-mail" error={errors.email?.message} hint="opcional">
-                <Input type="email" {...register('email')} autoComplete="email" />
+              <Field id="public-email" label="E-mail" error={errors.email?.message} hint="opcional">
+                <Input id="public-email" type="email" {...register('email')} autoComplete="email" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'public-email-error' : undefined} />
               </Field>
 
               {isMinor ? (
@@ -280,11 +309,11 @@ function Form({
                   <legend className="px-1 text-sm font-medium">
                     Responsável legal <span className="text-destructive">(obrigatório para menor de 18)</span>
                   </legend>
-                  <Field label="Nome do responsável" error={errors.guardian_name?.message}>
-                    <Input {...register('guardian_name')} />
+                  <Field id="public-guardian-name" label="Nome do responsável" error={errors.guardian_name?.message}>
+                    <Input id="public-guardian-name" {...register('guardian_name')} aria-invalid={!!errors.guardian_name} aria-describedby={errors.guardian_name ? 'public-guardian-name-error' : undefined} />
                   </Field>
-                  <Field label="Parentesco" error={errors.guardian_relationship?.message}>
-                    <Input {...register('guardian_relationship')} placeholder="mãe, pai, tutor..." />
+                  <Field id="public-guardian-relationship" label="Parentesco" error={errors.guardian_relationship?.message}>
+                    <Input id="public-guardian-relationship" {...register('guardian_relationship')} placeholder="mãe, pai, tutor..." aria-invalid={!!errors.guardian_relationship} aria-describedby={errors.guardian_relationship ? 'public-guardian-relationship-error' : undefined} />
                   </Field>
                 </fieldset>
               ) : null}
@@ -320,8 +349,9 @@ function Form({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Quem está respondendo</Label>
+                <Label htmlFor="public-signer-kind">Quem está respondendo</Label>
                 <select
+                  id="public-signer-kind"
                   value={signerKind}
                   onChange={(e) => setSignerKind(e.target.value as SignerKind)}
                   className={controlClass}
@@ -337,8 +367,9 @@ function Form({
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label>Nome completo de quem aceita</Label>
+                <Label htmlFor="public-signer-name">Nome completo de quem aceita</Label>
                 <Input
+                  id="public-signer-name"
                   value={signerName}
                   onChange={(e) => setSignerName(e.target.value)}
                   placeholder="Nome completo"
@@ -361,7 +392,7 @@ function Form({
           </CardContent>
         </Card>
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
         <Button className="w-full" onClick={handleSubmit} disabled={!canSubmit || submit.isPending}>
           {submit.isPending ? 'Enviando...' : isCadastro ? 'Enviar cadastro e respostas' : 'Enviar respostas'}

@@ -25,9 +25,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { QueryError } from '../components/QueryError'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { ensureLogRows, type LogRow } from '../features/workout/logRows'
 
 function todayLocal(): string {
   const d = new Date()
@@ -60,6 +62,9 @@ export default function Execucao() {
     return (
       <div className="space-y-3">
         <p className="text-sm text-destructive">Não foi possível carregar o plano.</p>
+        <Button type="button" size="sm" onClick={() => void planQuery.refetch()}>
+          Tentar novamente
+        </Button>
         <Button asChild variant="outline">
           <Link to={`/avaliados/${id}`}>Voltar</Link>
         </Button>
@@ -75,6 +80,26 @@ export default function Execucao() {
   const done = logs.length
   const pct = adherencePct(done, planned)
   const progress = exerciseProgression(historyQuery.data ?? [])
+
+  if (exercisesQuery.isError || logsQuery.isError || historyQuery.isError) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <Link to={`/avaliados/${id}/treinos/${plan.id}`} className="text-sm text-muted-foreground hover:text-foreground">
+          ← {plan.name}
+        </Link>
+        <QueryError
+          message="Não foi possível carregar o histórico completo do treino. A adesão e as sugestões foram ocultadas para evitar valores incorretos."
+          onRetry={() => {
+            void Promise.all([exercisesQuery.refetch(), logsQuery.refetch(), historyQuery.refetch()])
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (exercisesQuery.isPending || logsQuery.isPending || historyQuery.isPending) {
+    return <p role="status" className="text-sm text-muted-foreground">Carregando execução e histórico...</p>
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -134,7 +159,7 @@ export default function Execucao() {
                 <button
                   onClick={() => setConfirmLogId(log.id)}
                   disabled={deleteMut.isPending}
-                  className="text-destructive"
+                  className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   title="Excluir"
                   aria-label={`Excluir sessão de ${formatDate(log.performed_at)}`}
                 >
@@ -176,7 +201,7 @@ export default function Execucao() {
                     </p>
                   </div>
                   {p.points.length >= 2 ? (
-                    <svg width={90} height={26} className="shrink-0">
+                    <svg width={90} height={26} className="shrink-0" aria-hidden="true">
                       <polyline points={l.points} fill="none" stroke="var(--primary)" strokeWidth={1.5} />
                     </svg>
                   ) : null}
@@ -204,8 +229,6 @@ export default function Execucao() {
     </div>
   )
 }
-
-type Row = { weight: string; reps: string; rir: string }
 
 const KIND_LABEL: Record<ProgressionKind, string> = {
   increase_load: 'subir carga',
@@ -239,7 +262,7 @@ function LogForm({
   const [date, setDate] = useState(todayLocal())
   const [week, setWeek] = useState('')
   const [notes, setNotes] = useState('')
-  const [sets, setSets] = useState<Record<string, Row[]>>({})
+  const [sets, setSets] = useState<Record<string, LogRow[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState(false)
 
@@ -249,14 +272,10 @@ function LogForm({
   )
 
   useEffect(() => {
-    const init: Record<string, Row[]> = {}
-    for (const ex of dayExercises) {
-      init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '' }))
-    }
-    setSets(init)
+    setSets((previous) => ensureLogRows(previous, dayExercises))
   }, [dayExercises])
 
-  function setCell(exRowId: string, i: number, field: keyof Row, val: string) {
+  function setCell(exRowId: string, i: number, field: keyof LogRow, val: string) {
     setSets((prev) => {
       const rows = (prev[exRowId] ?? []).slice()
       rows[i] = { ...rows[i], [field]: val }
@@ -306,11 +325,11 @@ function LogForm({
         sets: finalSets,
       })
       // limpa pra registrar a próxima
-      const init: Record<string, Row[]> = {}
+      const init: Record<string, LogRow[]> = {}
       for (const ex of dayExercises) {
         init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '' }))
       }
-      setSets(init)
+      setSets((previous) => ({ ...previous, ...init }))
       setNotes('')
       setOkMsg(true)
     } catch (e) {
@@ -328,10 +347,10 @@ function LogForm({
         <CardTitle className="text-base">Registrar treino</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Divisão</Label>
-            <select className={controlClass} value={dayKey} onChange={(e) => setDayKey(e.target.value)}>
+            <Label htmlFor="workout-day" className="text-xs">Divisão</Label>
+            <select id="workout-day" className={controlClass} value={dayKey} onChange={(e) => setDayKey(e.target.value)}>
               {days.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
@@ -341,12 +360,13 @@ function LogForm({
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Data</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Label htmlFor="workout-date" className="text-xs">Data</Label>
+            <Input id="workout-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Semana</Label>
+            <Label htmlFor="workout-week" className="text-xs">Semana</Label>
             <Input
+              id="workout-week"
               type="number"
               min={1}
               max={planWeeks(detail)}
@@ -397,6 +417,7 @@ function LogForm({
                   <div key={i} className="flex items-center gap-2">
                     <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
                     <Input
+                      aria-label={`Carga da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
                       className="h-8 w-20"
                       type="number"
                       inputMode="decimal"
@@ -405,6 +426,7 @@ function LogForm({
                       onChange={(e) => setCell(ex.id, i, 'weight', e.target.value)}
                     />
                     <Input
+                      aria-label={`Repetições da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
                       className="h-8 w-16"
                       type="number"
                       inputMode="numeric"
@@ -413,6 +435,7 @@ function LogForm({
                       onChange={(e) => setCell(ex.id, i, 'reps', e.target.value)}
                     />
                     <Input
+                      aria-label={`RIR da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
                       className="h-8 w-14"
                       type="number"
                       inputMode="numeric"
@@ -425,7 +448,7 @@ function LogForm({
                 <button
                   type="button"
                   onClick={() => addRow(ex.id)}
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  className="flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Plus className="size-3" /> série
                 </button>
@@ -435,8 +458,9 @@ function LogForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Observações (opcional)</Label>
+          <Label htmlFor="workout-notes" className="text-xs">Observações (opcional)</Label>
           <textarea
+            id="workout-notes"
             rows={2}
             className={controlClass}
             value={notes}
@@ -444,8 +468,8 @@ function LogForm({
           />
         </div>
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {okMsg ? <p className="text-sm text-primary">Treino registrado!</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {okMsg ? <p role="status" className="text-sm text-primary">Treino registrado!</p> : null}
 
         <Button size="sm" onClick={save} disabled={createMut.isPending}>
           {createMut.isPending ? 'Salvando...' : 'Registrar treino'}

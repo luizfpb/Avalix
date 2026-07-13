@@ -16,8 +16,10 @@ export type Database = {
     Tables: {
       anamnese_intakes: {
         Row: {
+          consent_text_snapshot: string | null
           consent_text_sha256: string | null
           consent_version: string | null
+          controller_name_snapshot: string | null
           created_at: string
           created_by: string
           expires_at: string
@@ -25,6 +27,7 @@ export type Database = {
           kind: string
           org_id: string
           payload: Json | null
+          purged_at: string | null
           registration: Json | null
           resulting_anamnese_id: string | null
           resulting_subject_id: string | null
@@ -41,8 +44,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          consent_text_snapshot?: string | null
           consent_text_sha256?: string | null
           consent_version?: string | null
+          controller_name_snapshot?: string | null
           created_at?: string
           created_by?: string
           expires_at: string
@@ -50,6 +55,7 @@ export type Database = {
           kind?: string
           org_id: string
           payload?: Json | null
+          purged_at?: string | null
           registration?: Json | null
           resulting_anamnese_id?: string | null
           resulting_subject_id?: string | null
@@ -66,8 +72,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          consent_text_snapshot?: string | null
           consent_text_sha256?: string | null
           consent_version?: string | null
+          controller_name_snapshot?: string | null
           created_at?: string
           created_by?: string
           expires_at?: string
@@ -75,6 +83,7 @@ export type Database = {
           kind?: string
           org_id?: string
           payload?: Json | null
+          purged_at?: string | null
           registration?: Json | null
           resulting_anamnese_id?: string | null
           resulting_subject_id?: string | null
@@ -465,40 +474,49 @@ export type Database = {
       consent_records: {
         Row: {
           collected_by: string
+          consent_text_snapshot: string | null
           consent_text_sha256: string
           consent_version: string
+          controller_name_snapshot: string | null
           granted_at: string
           id: string
           org_id: string
           revoked_at: string | null
           signer_kind: string
           signer_name: string
+          source_intake_id: string | null
           subject_id: string
           user_agent: string | null
         }
         Insert: {
           collected_by: string
+          consent_text_snapshot?: string | null
           consent_text_sha256: string
           consent_version: string
+          controller_name_snapshot?: string | null
           granted_at?: string
           id?: string
           org_id: string
           revoked_at?: string | null
           signer_kind: string
           signer_name: string
+          source_intake_id?: string | null
           subject_id: string
           user_agent?: string | null
         }
         Update: {
           collected_by?: string
+          consent_text_snapshot?: string | null
           consent_text_sha256?: string
           consent_version?: string
+          controller_name_snapshot?: string | null
           granted_at?: string
           id?: string
           org_id?: string
           revoked_at?: string | null
           signer_kind?: string
           signer_name?: string
+          source_intake_id?: string | null
           subject_id?: string
           user_agent?: string | null
         }
@@ -515,6 +533,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_records_source_intake_id_fkey"
+            columns: ["source_intake_id"]
+            isOneToOne: true
+            referencedRelation: "anamnese_intakes"
             referencedColumns: ["id"]
           },
           {
@@ -1527,6 +1552,11 @@ export type Database = {
           subject_id: string
         }[]
       }
+      app_schema_version: { Args: never; Returns: string }
+      cancel_anamnese_intake: {
+        Args: { p_intake: string }
+        Returns: undefined
+      }
       create_organization: { Args: { p_name: string }; Returns: string }
       create_workout_log: {
         Args: {
@@ -1556,6 +1586,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      export_subject_data: {
+        Args: { p_subject: string }
+        Returns: Json
+      }
+      finalize_subject_deletion: {
+        Args: { p_subject: string }
+        Returns: undefined
+      }
       get_anamnese_intake: {
         Args: { p_token: string }
         Returns: {
@@ -1565,6 +1603,35 @@ export type Database = {
           subject_first_name: string
           subject_sex: string
         }[]
+      }
+      log_data_action: {
+        Args: {
+          p_action: string
+          p_org: string
+          p_row_id?: string | null
+          p_subject_id?: string | null
+          p_table_name: string
+        }
+        Returns: undefined
+      }
+      purge_client_errors: {
+        Args: { p_before?: string; p_limit?: number }
+        Returns: number
+      }
+      purge_expired_anamnese_intakes: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      prepare_subject_deletion: {
+        Args: { p_subject: string }
+        Returns: {
+          storage_path: string
+          thumb_path: string
+        }[]
+      }
+      reject_anamnese_intake: {
+        Args: { p_intake: string }
+        Returns: undefined
       }
       replace_assessment_readings: {
         Args: {
@@ -1576,6 +1643,10 @@ export type Database = {
       }
       replace_workout_plan_children: {
         Args: { p_days: Json; p_overrides: Json; p_plan: string; p_weeks: Json }
+        Returns: undefined
+      }
+      revoke_consent: {
+        Args: { p_consent: string }
         Returns: undefined
       }
       save_assessment: {

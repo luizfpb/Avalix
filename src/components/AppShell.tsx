@@ -1,4 +1,5 @@
-import { NavLink, Link, Outlet } from 'react-router'
+import { useEffect, useMemo, useRef } from 'react'
+import { NavLink, Link, Outlet, useLocation } from 'react-router'
 import {
   CalendarDays,
   ClipboardList,
@@ -21,9 +22,10 @@ function PendingBadge({ count, mobile = false }: { count: number; mobile?: boole
   if (count === 0) return null
   return (
     <span
+      aria-label={`${count} ${count === 1 ? 'anamnese pendente' : 'anamneses pendentes'}`}
       className={
         mobile
-          ? 'absolute -right-2 -top-1 grid min-w-4 place-items-center rounded-full bg-warning px-1 text-[9px] font-bold text-white'
+          ? 'absolute -right-2 -top-1 grid min-w-4 place-items-center rounded-full bg-warning px-1 text-[9px] font-bold text-[#181124]'
           : 'ml-auto grid min-w-5 place-items-center rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning'
       }
     >
@@ -36,16 +38,36 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const { organization, role } = useOrganization()
   const pendingCount = usePendingIntakes(organization?.id).data?.length ?? 0
-  const navItems: NavItem[] = [
+  const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  const previousPath = useRef<string | null>(null)
+  const subjectLabel = subjectTermLabels(organization?.subject_term).pluralCap
+  const navItems: NavItem[] = useMemo(() => [
     { to: '/dashboard', label: 'Início', icon: LayoutDashboard },
-    { to: '/avaliados', label: subjectTermLabels(organization?.subject_term).pluralCap, icon: Users },
+    { to: '/avaliados', label: subjectLabel, icon: Users },
     { to: '/carteira', label: 'Carteira', icon: ClipboardList },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/configuracoes', label: 'Ajustes', icon: Settings },
-  ]
+  ], [subjectLabel])
+
+  useEffect(() => {
+    const current = navItems.find((item) =>
+      location.pathname === item.to || (item.to !== '/dashboard' && location.pathname.startsWith(`${item.to}/`))
+    )?.label
+    const section = current ?? (location.pathname.includes('/treinos') ? 'Treinos' : location.pathname.includes('/postural') ? 'Postura' : location.pathname.includes('/avaliacoes') ? 'Avaliações' : 'Avalix')
+    document.title = section === 'Avalix' ? 'Avalix' : `${section} · Avalix`
+    if (previousPath.current && previousPath.current !== location.pathname) mainRef.current?.focus()
+    previousPath.current = location.pathname
+  }, [location.pathname, navItems])
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <a
+        href="#app-main"
+        className="fixed left-3 top-3 z-[100] -translate-y-20 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg transition-transform focus:translate-y-0"
+      >
+        Ir para o conteúdo principal
+      </a>
       <aside className="measurement-field fixed inset-y-0 left-0 z-40 hidden w-72 flex-col overflow-hidden border-r border-border/70 bg-card/80 backdrop-blur-xl lg:flex">
         <Link
           to="/dashboard"
@@ -153,7 +175,7 @@ export function AppShell() {
       </header>
 
       <div className="lg:pl-72">
-        <main className="measurement-field relative mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
+        <main id="app-main" ref={mainRef} tabIndex={-1} className="measurement-field relative mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 outline-none sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
           <Outlet />
         </main>
       </div>

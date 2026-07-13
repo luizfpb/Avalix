@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Plus, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
 import {
   PARQ_ITEMS,
@@ -55,14 +55,15 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
 
 function YesNo({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex shrink-0 gap-1">
+    <div className="flex shrink-0 gap-1" role="group" aria-label="Resposta">
       {([['Sim', true], ['Não', false]] as const).map(([t, v]) => (
         <button
           type="button"
           key={t}
+          aria-pressed={value === v}
           onClick={() => onChange(v)}
           className={[
-            'rounded-md border px-3 py-1 text-sm transition-colors',
+            'min-h-10 rounded-md border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             value === v
               ? 'border-primary bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-accent',
@@ -86,14 +87,15 @@ function Choice({
   onChange: (v: string) => void
 }) {
   return (
-    <div className="flex shrink-0 gap-1">
+    <div className="flex shrink-0 flex-wrap gap-1" role="group" aria-label="Resposta">
       {options.map((o) => (
         <button
           type="button"
           key={o.value}
+          aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={[
-            'rounded-md border px-3 py-1 text-sm transition-colors',
+            'min-h-10 rounded-md border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             value === o.value
               ? 'border-primary bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-accent',
@@ -107,10 +109,11 @@ function Choice({
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
+  const labelId = useId()
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-sm">{label}</span>
-      {children}
+    <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center" role="group" aria-labelledby={labelId}>
+      <span id={labelId} className="text-sm">{label}</span>
+      <div>{children}</div>
     </div>
   )
 }
@@ -163,9 +166,10 @@ function Select({
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
+  const labelId = useId()
   return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
+    <div className="space-y-1.5" role="group" aria-labelledby={labelId}>
+      <Label id={labelId}>{label}</Label>
       {children}
     </div>
   )
@@ -199,7 +203,7 @@ function RepeatList<T>({
           {items.map((item, i) => (
             <div key={i} className="flex items-start gap-2 rounded-md border p-2">
               <div className="flex-1">{render(item, i)}</div>
-              <button type="button" onClick={() => onRemove(i)} className="text-destructive" title="Remover">
+              <button type="button" onClick={() => onRemove(i)} className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Remover item ${i + 1}`}>
                 <Trash2 className="size-4" />
               </button>
             </div>

@@ -25,13 +25,16 @@ import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { QueryError } from '../components/QueryError'
 
 function Field({
+  id,
   label,
   error,
   hint,
   children,
 }: {
+  id: string
   label: string
   error?: string
   hint?: string
@@ -39,12 +42,12 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label>
+      <Label htmlFor={id}>
         {label}
         {hint ? <span className="ml-1 text-xs font-normal text-muted-foreground">({hint})</span> : null}
       </Label>
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p id={`${id}-error`} role="alert" className="text-xs text-destructive">{error}</p> : null}
     </div>
   )
 }
@@ -53,7 +56,7 @@ export default function AvaliadoForm() {
   const { id } = useParams()
   const isEdit = !!id
   const navigate = useNavigate()
-  const { organization } = useOrganization()
+  const { organization, role } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
 
   const subjectQuery = useSubject(isEdit ? id : undefined)
@@ -103,6 +106,20 @@ export default function AvaliadoForm() {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
 
+  if (isEdit && (subjectQuery.isError || !subjectQuery.data)) {
+    return (
+      <div className="max-w-xl space-y-4">
+        <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
+          ← Voltar
+        </Link>
+        <QueryError
+          message={`Não foi possível carregar este ${labels.singular}. O formulário foi bloqueado para evitar sobrescrever o cadastro com campos vazios.`}
+          onRetry={() => void subjectQuery.refetch()}
+        />
+      </div>
+    )
+  }
+
   const backTo = isEdit ? `/avaliados/${id}` : '/avaliados'
 
   return (
@@ -117,16 +134,16 @@ export default function AvaliadoForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-        <Field label="Nome completo" error={errors.full_name?.message}>
-          <Input {...register('full_name')} />
+        <Field id="subject-full-name" label="Nome completo" error={errors.full_name?.message}>
+          <Input id="subject-full-name" aria-describedby={errors.full_name ? 'subject-full-name-error' : undefined} {...register('full_name')} />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Data de nascimento" error={errors.birth_date?.message}>
-            <Input type="date" {...register('birth_date')} />
+          <Field id="subject-birth-date" label="Data de nascimento" error={errors.birth_date?.message}>
+            <Input id="subject-birth-date" aria-describedby={errors.birth_date ? 'subject-birth-date-error' : undefined} type="date" {...register('birth_date')} />
           </Field>
-          <Field label="Sexo" error={errors.sex?.message}>
-            <select className={controlClass} {...register('sex')}>
+          <Field id="subject-sex" label="Sexo" error={errors.sex?.message}>
+            <select id="subject-sex" aria-describedby={errors.sex ? 'subject-sex-error' : undefined} className={controlClass} {...register('sex')}>
               <option value="">Selecione</option>
               <option value="M">Masculino</option>
               <option value="F">Feminino</option>
@@ -135,16 +152,16 @@ export default function AvaliadoForm() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Altura (cm)" error={errors.height_cm?.message} hint="opcional">
-            <Input type="number" step="0.1" {...register('height_cm')} />
+          <Field id="subject-height" label="Altura (cm)" error={errors.height_cm?.message} hint="opcional">
+            <Input id="subject-height" aria-describedby={errors.height_cm ? 'subject-height-error' : undefined} type="number" step="0.1" {...register('height_cm')} />
           </Field>
-          <Field label="Telefone" hint="opcional">
-            <Input {...register('phone')} />
+          <Field id="subject-phone" label="Telefone" hint="opcional">
+            <Input id="subject-phone" type="tel" autoComplete="tel" {...register('phone')} />
           </Field>
         </div>
 
-        <Field label="E-mail" error={errors.email?.message} hint="opcional">
-          <Input type="email" {...register('email')} />
+        <Field id="subject-email" label="E-mail" error={errors.email?.message} hint="opcional">
+          <Input id="subject-email" aria-describedby={errors.email ? 'subject-email-error' : undefined} type="email" autoComplete="email" {...register('email')} />
         </Field>
 
         <fieldset className="space-y-4 rounded-md border p-4">
@@ -156,16 +173,16 @@ export default function AvaliadoForm() {
               <span className="text-muted-foreground">(exigido para menor de 18)</span>
             )}
           </legend>
-          <Field label="Nome do responsável" error={errors.guardian_name?.message}>
-            <Input {...register('guardian_name')} />
+          <Field id="subject-guardian-name" label="Nome do responsável" error={errors.guardian_name?.message}>
+            <Input id="subject-guardian-name" aria-describedby={errors.guardian_name ? 'subject-guardian-name-error' : undefined} {...register('guardian_name')} />
           </Field>
-          <Field label="Parentesco" error={errors.guardian_relationship?.message}>
-            <Input {...register('guardian_relationship')} />
+          <Field id="subject-guardian-relationship" label="Parentesco" error={errors.guardian_relationship?.message}>
+            <Input id="subject-guardian-relationship" aria-describedby={errors.guardian_relationship ? 'subject-guardian-relationship-error' : undefined} {...register('guardian_relationship')} />
           </Field>
         </fieldset>
 
-        <Field label="Observações" hint="opcional">
-          <textarea rows={3} className={controlClass} {...register('notes')} />
+        <Field id="subject-notes" label="Observações" hint="opcional">
+          <textarea id="subject-notes" rows={3} className={controlClass} {...register('notes')} />
         </Field>
 
         {isEdit ? (
@@ -176,7 +193,7 @@ export default function AvaliadoForm() {
         ) : null}
 
         {mutationError ? (
-          <p className="text-sm text-destructive">{normalizeDbError(mutationError)}</p>
+          <p role="alert" className="text-sm text-destructive">{normalizeDbError(mutationError)}</p>
         ) : null}
 
         <div className="flex gap-3">
@@ -189,7 +206,7 @@ export default function AvaliadoForm() {
         </div>
       </form>
 
-      {isEdit && subjectQuery.data ? (
+      {isEdit && subjectQuery.data && (role === 'owner' || role === 'admin') ? (
         <DangerZone
           subjectId={subjectQuery.data.id}
           subjectName={subjectQuery.data.full_name}
@@ -242,16 +259,17 @@ export function DangerZone({
         </p>
       </div>
       <div className="space-y-1.5">
-        <Label>
+        <Label htmlFor="delete-subject-name">
           Para confirmar, digite o nome exato: <span className="font-semibold">{subjectName}</span>
         </Label>
         <Input
+          id="delete-subject-name"
           value={confirmName}
           onChange={(e) => setConfirmName(e.target.value)}
           placeholder={subjectName}
         />
       </div>
-      {error ? <p className="text-xs text-destructive">{normalizeDbError(error)}</p> : null}
+      {error ? <p role="alert" className="text-xs text-destructive">{normalizeDbError(error)}</p> : null}
       <Button
         type="button"
         variant="destructive"

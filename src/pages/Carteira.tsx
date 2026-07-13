@@ -8,6 +8,7 @@ import { buildCarteira } from '../features/workout/carteira'
 import { relativeDayLabel } from '../lib/reminders'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { Badge } from '@/components/ui/badge'
+import { QueryError } from '../components/QueryError'
 
 export default function Carteira() {
   const { organization } = useOrganization()
@@ -33,7 +34,8 @@ export default function Carteira() {
 
   const reassessCount = rows.filter((r) => r.reassessDue).length
   const quietCount = rows.filter((r) => r.quiet).length
-  const loading = subjectsQ.isPending || plansQ.isPending || logsQ.isPending
+  const loading = subjectsQ.isPending || lastAssessQ.isPending || plansQ.isPending || logsQ.isPending
+  const hasLoadError = subjectsQ.isError || lastAssessQ.isError || plansQ.isError || logsQ.isError
 
   return (
     <div className="max-w-2xl space-y-5">
@@ -61,7 +63,19 @@ export default function Carteira() {
         </div>
       ) : null}
 
-      {loading ? (
+      {hasLoadError ? (
+        <QueryError
+          message="Não foi possível carregar a carteira. Nenhum total foi exibido porque os dados podem estar incompletos."
+          onRetry={() => {
+            void Promise.all([
+              subjectsQ.refetch(),
+              lastAssessQ.refetch(),
+              plansQ.refetch(),
+              logsQ.refetch(),
+            ])
+          }}
+        />
+      ) : loading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum {labels.singular} ativo.</p>

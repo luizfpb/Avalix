@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { setErrlogOrg } from '../../lib/errlog'
@@ -50,6 +50,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     staleTime: 1000 * 60 * 5,
     retry: 1,
   })
+  const { refetch } = query
 
   // o log de erros (client_errors) precisa da org pra RLS; módulo fora do React
   const currentOrgId = query.data?.organization?.id ?? null
@@ -64,6 +65,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     return query.data?.organization ? 'present' : 'absent'
   }, [authStatus, query.isError, query.isPending, query.data])
 
+  const refresh = useCallback(async () => {
+    await refetch()
+  }, [refetch])
+
   const value = useMemo<OrganizationContextValue>(
     () => ({
       status,
@@ -71,11 +76,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       membership: query.data?.membership ?? null,
       role:
         (query.data?.membership as { role?: string | null } | null | undefined)?.role ?? null,
-      refresh: async () => {
-        await query.refetch()
-      },
+      refresh,
     }),
-    [status, query]
+    [status, query.data?.organization, query.data?.membership, refresh]
   )
 
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>

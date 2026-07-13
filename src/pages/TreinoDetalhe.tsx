@@ -32,7 +32,7 @@ import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { planShareText, whatsappUrl } from '../features/workout/share'
 import { downloadBlob } from '../features/reports/download'
-import { logExport } from '../features/reports/audit'
+import { logDataAction, logExport } from '../features/reports/audit'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,6 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { QueryError } from '../components/QueryError'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -80,6 +81,7 @@ export default function TreinoDetalhe() {
   const assessmentsQ = useAssessments(id)
   const sessionsQ = useSessions(id)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   const [showDup, setShowDup] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -108,15 +110,35 @@ export default function TreinoDetalhe() {
     [exercisesQuery.data]
   )
 
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
-  if (query.isError || !query.data.plan) {
+  if (
+    query.isPending ||
+    subjectQuery.isPending ||
+    exercisesQuery.isPending ||
+    assessmentsQ.isPending ||
+    sessionsQ.isPending
+  ) {
+    return <p className="text-sm text-muted-foreground">Carregando...</p>
+  }
+  if (
+    query.isError ||
+    !query.data.plan ||
+    subjectQuery.isError ||
+    !subjectQuery.data ||
+    exercisesQuery.isError ||
+    assessmentsQ.isError ||
+    sessionsQ.isError
+  ) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar o plano.</p>
-        <Button asChild variant="outline">
-          <Link to={`/avaliados/${id}`}>Voltar</Link>
-        </Button>
-      </div>
+      <QueryError
+        message="Não foi possível carregar todos os dados do plano. Ações e relatórios foram bloqueados."
+        onRetry={() => void Promise.all([
+          query.refetch(),
+          subjectQuery.refetch(),
+          exercisesQuery.refetch(),
+          assessmentsQ.refetch(),
+          sessionsQ.refetch(),
+        ])}
+      />
     )
   }
 
@@ -208,10 +230,13 @@ export default function TreinoDetalhe() {
 
   async function handlePdf() {
     setPdfBusy(true)
+    setShareError(null)
     try {
       const blob = await buildPdfBlob()
       downloadBlob(blob, pdfFilename)
       logPdf()
+    } catch {
+      setShareError('Não foi possível gerar o PDF do treino. Tente novamente.')
     } finally {
       setPdfBusy(false)
     }
@@ -219,6 +244,7 @@ export default function TreinoDetalhe() {
 
   async function handleSharePdf() {
     setPdfBusy(true)
+    setShareError(null)
     try {
       const blob = await buildPdfBlob()
       const file = new File([blob], pdfFilename, { type: 'application/pdf' })
@@ -230,10 +256,25 @@ export default function TreinoDetalhe() {
         downloadBlob(blob, pdfFilename)
         logPdf()
       }
-    } catch {
-      // share cancelado pelo usuário ou indisponível — ignora
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setShareError('Não foi possível compartilhar o PDF. Você ainda pode baixá-lo e anexar manualmente.')
+      }
     } finally {
       setPdfBusy(false)
+    }
+  }
+
+  function handleWhatsapp() {
+    setShareError(null)
+    if (organization) {
+      void logDataAction({
+        orgId: organization.id,
+        action: 'SHARE_WHATSAPP',
+        tableName: 'workout_plans',
+        rowId: plan.id,
+        subjectId: plan.subject_id,
+      })
     }
   }
 
@@ -315,7 +356,7 @@ export default function TreinoDetalhe() {
           <Button variant="outline" size="sm" onClick={() => setShowDup((s) => !s)}>
             <Copy /> Duplicar
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowShare((s) => !s)}>
+          <Button variant="outline" size="sm" aria-expanded={showShare} onClick={() => setShowShare((s) => !s)}>
             <Share2 /> Compartilhar
           </Button>
           <Button
@@ -330,8 +371,10 @@ export default function TreinoDetalhe() {
         </div>
       </div>
 
+      {shareError ? <p role="alert" className="text-sm text-destructive">{shareError}</p> : null}
+
       {deleteMut.error ? (
-        <p className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
+        <p role="alert" className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
 
       <ConfirmDialog
@@ -358,15 +401,22 @@ export default function TreinoDetalhe() {
             <CardTitle className="text-base">Compartilhar plano</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <textarea readOnly rows={8} value={shareText} className={controlClass} />
+            <label htmlFor="workout-share-text" className="sr-only">Resumo do plano para compartilhar</label>
+            <textarea id="workout-share-text" readOnly rows={8} value={shareText} className={controlClass} />
+            <p className="text-xs text-muted-foreground">
+              Confira o conteúdo antes de enviar. Ao abrir o WhatsApp, estes dados passam a ser
+              tratados também pelo serviço e pelo destinatário escolhidos.
+            </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() =>
-                  window.open(whatsappUrl(shareText, subjectQuery.data?.phone), '_blank')
-                }
-              >
-                Enviar no WhatsApp
+              <Button asChild size="sm">
+                <a
+                  href={whatsappUrl(shareText, subjectQuery.data?.phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleWhatsapp}
+                >
+                  Enviar no WhatsApp
+                </a>
               </Button>
               {canShareFiles ? (
                 <Button size="sm" variant="outline" onClick={handleSharePdf} disabled={pdfBusy}>
@@ -382,11 +432,11 @@ export default function TreinoDetalhe() {
                     setCopied(true)
                     setTimeout(() => setCopied(false), 1500)
                   } catch {
-                    // sem permissão de clipboard — ignora
+                    setShareError('O navegador não permitiu copiar o texto. Selecione o resumo acima e copie manualmente.')
                   }
                 }}
               >
-                {copied ? 'Copiado!' : 'Copiar texto'}
+                <span aria-live="polite">{copied ? 'Copiado!' : 'Copiar texto'}</span>
               </Button>
             </div>
             {!canShareFiles ? (
@@ -569,6 +619,18 @@ function DuplicatePanel({
     [exercisesQ.data]
   )
 
+  if (subjectsQ.isPending || exercisesQ.isPending) {
+    return <p className="text-sm text-muted-foreground">Carregando opções de duplicação...</p>
+  }
+  if (subjectsQ.isError || exercisesQ.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar avaliados ou exercícios. A duplicação foi bloqueada."
+        onRetry={() => void Promise.all([subjectsQ.refetch(), exercisesQ.refetch()])}
+      />
+    )
+  }
+
   async function confirm() {
     setError(null)
     if (!name.trim()) return setError('Informe o nome do novo plano.')
@@ -592,12 +654,13 @@ function DuplicatePanel({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1.5">
-          <Label>Nome do novo plano</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Label htmlFor="duplicate-plan-name">Nome do novo plano</Label>
+          <Input id="duplicate-plan-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>Para qual avaliado</Label>
+          <Label htmlFor="duplicate-plan-subject">Para qual avaliado</Label>
           <select
+            id="duplicate-plan-subject"
             className={controlClass}
             value={targetSubjectId}
             onChange={(e) => setTargetSubjectId(e.target.value)}

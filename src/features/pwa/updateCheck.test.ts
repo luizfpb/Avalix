@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { entryAssetUrls, hasExpectedContentType, verifyPublishedShell } from './updateCheck'
+import {
+  entryAssetUrls,
+  hasExpectedContentType,
+  isPublicIntakeLocation,
+  verifyPublishedShell,
+} from './updateCheck'
 
 describe('verificação da publicação do PWA', () => {
   it('extrai apenas entradas JS e CSS sem duplicar', () => {
@@ -47,5 +52,13 @@ describe('verificação da publicação do PWA', () => {
     })
 
     expect(await verifyPublishedShell(fetcher as typeof fetch, 1)).toBe(false)
+  })
+})
+
+describe('rota publica e PWA', () => {
+  it('identifica a rota nova e o path legado', () => {
+    expect(isPublicIntakeLocation('/a')).toBe(true)
+    expect(isPublicIntakeLocation('/a/token-legado')).toBe(true)
+    expect(isPublicIntakeLocation('/agenda')).toBe(false)
   })
 })

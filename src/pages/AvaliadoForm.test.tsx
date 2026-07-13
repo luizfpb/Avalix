@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
-import { DangerZone } from './AvaliadoForm'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import AvaliadoForm, { DangerZone } from './AvaliadoForm'
 
 // Fluxo crítico (v2.0): a exclusão definitiva (LGPD) só pode disparar com o
 // nome exato digitado — trava contra clique acidental.
 
-const { deleteMock } = vi.hoisted(() => ({ deleteMock: vi.fn() }))
+const { deleteMock, refetchMock } = vi.hoisted(() => ({ deleteMock: vi.fn(), refetchMock: vi.fn() }))
 
 vi.mock('../features/subjects/hooks', () => ({
-  useSubject: () => ({ data: null, isPending: false, isError: false }),
+  useSubject: () => ({ data: null, isPending: false, isError: true, refetch: refetchMock }),
   useCreateSubject: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useUpdateSubject: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useDeleteSubject: () => ({ mutateAsync: deleteMock, isPending: false, error: null }),
@@ -62,5 +62,21 @@ describe('DangerZone — exclusão definitiva', () => {
     })
     const btn = screen.getByRole('button', { name: /Excluir definitivamente/ })
     expect((btn as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
+describe('AvaliadoForm — falha no modo de edição', () => {
+  it('bloqueia o formulário vazio e oferece nova tentativa', () => {
+    render(
+      <MemoryRouter initialEntries={['/avaliados/s1/editar']}>
+        <Routes>
+          <Route path="/avaliados/:id/editar" element={<AvaliadoForm />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('alert').textContent).toMatch(/formulário foi bloqueado/i)
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    expect(refetchMock).toHaveBeenCalledTimes(1)
   })
 })

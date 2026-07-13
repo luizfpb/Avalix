@@ -31,7 +31,51 @@ function randomToken(): string {
 
 function intakeUrl(token: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  return `${origin}/a/${token}`
+  // Fragmentos nao sao enviados no request HTTP, Referer ou logs do servidor.
+  return `${origin}/a#${token}`
+}
+
+const INTAKE_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/
+
+export function isValidIntakeToken(value: string | null | undefined): value is string {
+  return typeof value === 'string' && INTAKE_TOKEN_RE.test(value)
+}
+
+type PublicIntakeLocation = Pick<Location, 'pathname' | 'hash' | 'search'>
+type PublicIntakeHistory = Pick<History, 'replaceState' | 'state'>
+
+// Consome o capability token uma unica vez e limpa URL/historico imediatamente.
+// Aceita /a#token e, durante a transicao, o formato antigo /a/token.
+export function consumePublicIntakeToken(
+  currentLocation: PublicIntakeLocation = window.location,
+  currentHistory: PublicIntakeHistory = window.history
+): string | null {
+  const hashToken = currentLocation.pathname === '/a' ? currentLocation.hash.slice(1) : ''
+  const legacyToken = currentLocation.pathname.match(/^\/a\/([^/]+)$/)?.[1] ?? ''
+  const candidate = hashToken || legacyToken
+
+  if (
+    currentLocation.pathname === '/a' ||
+    currentLocation.pathname.startsWith('/a/') ||
+    currentLocation.hash ||
+    currentLocation.search
+  ) {
+    currentHistory.replaceState(currentHistory.state, '', '/a')
+  }
+  return isValidIntakeToken(candidate) ? candidate : null
+}
+
+// Identificador local nao reversivel na pratica (token aleatorio de 256 bits),
+// usado somente para separar rascunhos sem persistir parte do segredo na chave.
+export function intakeDraftFingerprint(token: string): string {
+  let a = 0x811c9dc5
+  let b = 0x9e3779b9
+  for (let i = 0; i < token.length; i++) {
+    const code = token.charCodeAt(i)
+    a = Math.imul(a ^ code, 0x01000193)
+    b = Math.imul(b ^ code, 0x85ebca6b)
+  }
+  return `${(a >>> 0).toString(16).padStart(8, '0')}${(b >>> 0).toString(16).padStart(8, '0')}`
 }
 
 export type GeneratedLink = { intakeId: string; url: string; expiresAt: string }
@@ -126,22 +170,19 @@ export async function listPendingIntakes(orgId: string): Promise<PendingIntake[]
 }
 
 export async function cancelIntake(intakeId: string): Promise<void> {
-  const { error } = await supabase
-    .from('anamnese_intakes')
-    .update({ status: 'canceled' })
-    .eq('id', intakeId)
-    .eq('status', 'pending')
+  const { error } = await supabase.rpc('cancel_anamnese_intake', {
+    p_intake: intakeId,
+  })
   if (error) throw error
   clearIntakeLinkLocal(intakeId)
 }
 
 export async function rejectIntake(intakeId: string): Promise<void> {
-  const { error } = await supabase
-    .from('anamnese_intakes')
-    .update({ status: 'rejected' })
-    .eq('id', intakeId)
-    .eq('status', 'submitted')
+  const { error } = await supabase.rpc('reject_anamnese_intake', {
+    p_intake: intakeId,
+  })
   if (error) throw error
+  clearIntakeLinkLocal(intakeId)
 }
 
 // aceita: o gate e calculado aqui no TS (modulo puro) a partir das respostas e
@@ -166,6 +207,7 @@ export async function acceptIntake(input: {
   if (error) throw error
   const row = data?.[0]
   if (!row) throw new Error('aceite nao retornou os registros criados')
+  clearIntakeLinkLocal(input.intakeId)
   return { subjectId: row.subject_id, anamneseId: row.anamnese_id }
 }
 

@@ -12,9 +12,13 @@ on:
     - cron: '0 6 */3 * *' # a cada 3 dias, 06:00 UTC
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Ping REST API
         # Secrets via env (nao interpolar ${{ }} direto no shell): mais seguro e,
@@ -30,12 +34,12 @@ jobs:
             echo '(repo > Settings > Secrets and variables > Actions).'
             exit 1
           fi
-          code=$(curl -s -o /dev/null -w '%{http_code}' \
-            "${SUPABASE_URL%/}/rest/v1/plans?select=id&limit=1" \
+          code=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
+            "${SUPABASE_URL%/}/rest/v1/organizations?select=id&limit=1" \
             -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}")
           echo "HTTP $code"
-          # qualquer resposta do servidor (2xx/4xx) conta como atividade
+          # 401/403/404 agora falham: secret inválido não pode parecer saudável.
           case "$code" in
-            2*|4*) echo 'ok: projeto respondeu' ;;
+            2*) echo 'ok: projeto respondeu e a chave foi aceita' ;;
             *) echo "falha: sem resposta do servidor (HTTP $code)"; exit 1 ;;
           esac

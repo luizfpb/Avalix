@@ -1,5 +1,6 @@
 # Rotas conhecidas da SPA. Não use fallback global: um JS inexistente precisa
 # responder 404, nunca index.html com status 200.
+/a                   /index.html   200
 /a/*                 /index.html   200
 /login               /index.html   200
 /cadastro            /index.html   200

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
+import { QueryError } from '../components/QueryError'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -22,7 +23,8 @@ export default function PosturaComparar() {
   const { id } = useParams()
   const photosQuery = useSubjectPhotos(id)
   const photos = useMemo(() => photosQuery.data ?? [], [photosQuery.data])
-  const urls = useSignedUrls(photos.map((p) => p.storage_path)).data ?? {}
+  const urlsQuery = useSignedUrls(photos.map((p) => p.storage_path))
+  const urls = urlsQuery.data ?? {}
 
   const [aId, setAId] = useState('')
   const [bId, setBId] = useState('')
@@ -45,6 +47,17 @@ export default function PosturaComparar() {
 
   if (photosQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
+  }
+
+  if (photosQuery.isError || urlsQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar as fotos para comparação."
+        onRetry={() => {
+          void Promise.all([photosQuery.refetch(), urlsQuery.refetch()])
+        }}
+      />
+    )
   }
 
   const back = (
@@ -76,8 +89,8 @@ export default function PosturaComparar() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Foto A</Label>
-          <select className={controlClass} value={aId} onChange={(e) => setAId(e.target.value)}>
+          <Label htmlFor="posture-photo-a">Foto A</Label>
+          <select id="posture-photo-a" className={controlClass} value={aId} onChange={(e) => setAId(e.target.value)}>
             {photos.map((p) => (
               <option key={p.id} value={p.id}>
                 {photoLabel(p)}
@@ -86,8 +99,8 @@ export default function PosturaComparar() {
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label>Foto B</Label>
-          <select className={controlClass} value={bId} onChange={(e) => setBId(e.target.value)}>
+          <Label htmlFor="posture-photo-b">Foto B</Label>
+          <select id="posture-photo-b" className={controlClass} value={bId} onChange={(e) => setBId(e.target.value)}>
             {photos.map((p) => (
               <option key={p.id} value={p.id}>
                 {photoLabel(p)}
@@ -102,6 +115,7 @@ export default function PosturaComparar() {
           <Button
             size="sm"
             variant={mode === 'lado' ? 'default' : 'outline'}
+            aria-pressed={mode === 'lado'}
             onClick={() => setMode('lado')}
           >
             Lado a lado
@@ -109,6 +123,7 @@ export default function PosturaComparar() {
           <Button
             size="sm"
             variant={mode === 'sobre' ? 'default' : 'outline'}
+            aria-pressed={mode === 'sobre'}
             onClick={() => setMode('sobre')}
           >
             Sobreposição
@@ -118,6 +133,7 @@ export default function PosturaComparar() {
           <Button
             size="sm"
             variant={showAnn ? 'default' : 'outline'}
+            aria-pressed={showAnn}
             onClick={() => setShowAnn((v) => !v)}
           >
             <PenLine /> Anotações
@@ -137,6 +153,25 @@ export default function PosturaComparar() {
           </label>
         ) : null}
       </div>
+
+      {mode === 'sobre' && a && b && a.category !== b.category ? (
+        <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+          As fotos têm categorias diferentes ({categoryLabel(a.category)} e {categoryLabel(b.category)}). A sobreposição pode induzir uma comparação incorreta.
+        </p>
+      ) : null}
+      {mode === 'sobre' && a && b && a.width != null && a.height != null && b.width != null && b.height != null && Math.abs(a.width / a.height - b.width / b.height) > 0.05 ? (
+        <p role="alert" className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+          As fotos têm proporções diferentes. Elas serão centralizadas sem recorte; use pontos de referência antes de interpretar o alinhamento.
+        </p>
+      ) : null}
+      {mode === 'lado' && (annA.isError || annB.isError) ? (
+        <QueryError
+          message="As fotos foram carregadas, mas não foi possível carregar todas as anotações."
+          onRetry={() => {
+            void Promise.all([annA.refetch(), annB.refetch()])
+          }}
+        />
+      ) : null}
 
       {a && b ? (
         mode === 'lado' ? (
@@ -184,7 +219,7 @@ export default function PosturaComparar() {
                   src={urls[b.storage_path]}
                   alt={photoLabel(b)}
                   style={{ opacity: opacity / 100 }}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full object-contain"
                 />
               ) : null}
             </div>

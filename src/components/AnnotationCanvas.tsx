@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   angleDeg,
   lineTiltDeg,
@@ -44,6 +44,7 @@ export function AnnotationCanvas({
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [draft, setDraft] = useState<Pt[]>([])
   const [drag, setDrag] = useState<{ id: string; idx: number } | null>(null)
+  const [keyboardCursor, setKeyboardCursor] = useState<Pt>({ x: 0.5, y: 0.5 })
 
   // mede a caixa renderizada da imagem (px); coords normalizadas viram px aqui
   useEffect(() => {
@@ -84,10 +85,8 @@ export function AnnotationCanvas({
     return best
   }
 
-  function onPointerDown(e: ReactPointerEvent) {
-    if (readOnly || !onChange) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const n = normFromEvent(e)
+  function placeAt(n: Pt) {
+    if (!onChange) return
     const hit = hitVertex(n)
     if (hit) {
       setDrag(hit)
@@ -114,6 +113,50 @@ export function AnnotationCanvas({
     }
   }
 
+  function onPointerDown(e: ReactPointerEvent) {
+    if (readOnly || !onChange) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    placeAt(normFromEvent(e))
+  }
+
+  function onKeyDown(e: ReactKeyboardEvent<SVGSVGElement>) {
+    if (!interactive || !onChange) return
+    const step = e.shiftKey ? 0.05 : 0.01
+    const delta =
+      e.key === 'ArrowLeft' ? { x: -step, y: 0 }
+      : e.key === 'ArrowRight' ? { x: step, y: 0 }
+      : e.key === 'ArrowUp' ? { x: 0, y: -step }
+      : e.key === 'ArrowDown' ? { x: 0, y: step }
+      : null
+    if (delta) {
+      e.preventDefault()
+      if (tool === 'move' && selectedId) {
+        onChange(shapes.map((shape) => shape.id === selectedId ? {
+          ...shape,
+          points: shape.points.map((point) => ({
+            x: clamp01(point.x + delta.x),
+            y: clamp01(point.y + delta.y),
+          })),
+        } as Shape : shape))
+      } else {
+        setKeyboardCursor((point) => ({
+          x: clamp01(point.x + delta.x),
+          y: clamp01(point.y + delta.y),
+        }))
+      }
+      return
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && tool !== 'move') {
+      e.preventDefault()
+      placeAt(keyboardCursor)
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      e.preventDefault()
+      onChange(shapes.filter((shape) => shape.id !== selectedId))
+      onSelect?.(null)
+    }
+  }
+
   function onPointerMove(e: ReactPointerEvent) {
     if (!drag || !onChange) return
     const n = normFromEvent(e)
@@ -136,7 +179,7 @@ export function AnnotationCanvas({
 
   return (
     <div ref={boxRef} className={containerClassName}>
-      <img src={src} alt="" draggable={false} className={imgClassName} />
+      <img src={src} alt="Foto postural" draggable={false} className={imgClassName} />
       <svg
         ref={svgRef}
         className="absolute inset-0 h-full w-full"
@@ -144,12 +187,29 @@ export function AnnotationCanvas({
         onPointerDown={interactive ? onPointerDown : undefined}
         onPointerMove={interactive ? onPointerMove : undefined}
         onPointerUp={interactive ? onPointerUp : undefined}
+        onKeyDown={interactive ? onKeyDown : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        role={interactive ? 'application' : undefined}
+        aria-label={interactive ? 'Editor da foto postural. Use as setas para mover o cursor ou a marca selecionada; Enter adiciona um ponto da ferramenta atual; Delete apaga a marca selecionada.' : undefined}
+        aria-hidden={interactive ? undefined : true}
       >
         {ready
           ? shapes.map((s) => (
               <ShapeView key={s.id} shape={s} toPx={toPx} selected={s.id === selectedId} />
             ))
           : null}
+        {ready && interactive && tool !== 'move' ? (
+          <circle
+            cx={keyboardCursor.x * size.w}
+            cy={keyboardCursor.y * size.h}
+            r={7}
+            fill="none"
+            stroke={SELECTED}
+            strokeWidth={2}
+            strokeDasharray="3 2"
+            pointerEvents="none"
+          />
+        ) : null}
         {ready
           ? draft.map((p, i) => {
               const q = toPx(p)
