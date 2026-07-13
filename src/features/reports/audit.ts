@@ -1,26 +1,44 @@
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../lib/database.types'
 
-export type ExportAction = 'EXPORT_CSV' | 'EXPORT_JSON' | 'PDF_REPORT' | 'AI_SUMMARY'
+export type DataAction =
+  | 'EXPORT_CSV'
+  | 'EXPORT_JSON'
+  | 'PDF_REPORT'
+  | 'AI_SUMMARY'
+  | 'SHARE_GOOGLE_CALENDAR'
+  | 'SHARE_ICS'
+  | 'SHARE_WHATSAPP'
+  | 'SUBJECT_EXPORT'
 
-// Registra a exportação em audit_logs. Best-effort: a policy exige ser membro
-// da org, user_id = auth.uid() e a ação na lista permitida. Não bloqueia o
-// download se a auditoria falhar.
-export async function logExport(input: {
+// A RPC valida no servidor a organização, o alvo, o MFA e o usuário da sessão.
+// Uma indisponibilidade momentânea da trilha não bloqueia o arquivo já gerado.
+export async function logDataAction(input: {
   orgId: string
-  userId: string
-  action: ExportAction
+  action: DataAction
   tableName: string
   rowId: string | null
+  subjectId?: string | null
 }): Promise<void> {
-  const { error } = await supabase.from('audit_logs').insert({
-    org_id: input.orgId,
-    user_id: input.userId,
-    action: input.action,
-    table_name: input.tableName,
-    row_id: input.rowId,
+  const { error } = await supabase.rpc('log_data_action', {
+    p_org: input.orgId,
+    p_action: input.action,
+    p_table_name: input.tableName,
+    ...(input.rowId !== null ? { p_row_id: input.rowId } : {}),
+    ...(input.subjectId != null ? { p_subject_id: input.subjectId } : {}),
   })
-  if (error) console.warn('falha ao registrar auditoria de exportação:', error.message)
+  if (error) console.warn('falha ao registrar auditoria de dados:', error.message)
+}
+
+export async function logExport(input: {
+  orgId: string
+  userId?: string
+  action: Extract<DataAction, 'EXPORT_CSV' | 'EXPORT_JSON' | 'PDF_REPORT' | 'AI_SUMMARY'>
+  tableName: string
+  rowId: string | null
+  subjectId?: string | null
+}): Promise<void> {
+  return logDataAction(input)
 }
 
 // ---- leitura (página /auditoria, owner/admin — a RLS garante) -----------

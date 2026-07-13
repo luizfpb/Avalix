@@ -50,4 +50,13 @@ describe('ConfirmDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onConfirm).not.toHaveBeenCalled()
   })
+
+  it('tem nome acessível e Escape cancela uma única vez', () => {
+    const onCancel = vi.fn()
+    render(<ConfirmDialog open title="Descartar alterações?" onConfirm={() => {}} onCancel={onCancel} />)
+    const dialog = screen.getByRole('dialog', { name: 'Descartar alterações?' })
+    fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    fireEvent(dialog, new Event('close'))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
 })

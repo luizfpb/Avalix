@@ -15,6 +15,7 @@ import {
   type CalendarEvent,
 } from '../features/appointments/calendar'
 import { downloadBlob } from '../features/reports/download'
+import { logDataAction } from '../features/reports/audit'
 import { relativeDayLabel } from '../lib/reminders'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { QueryError } from '../components/QueryError'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
@@ -86,6 +88,18 @@ export default function Agenda() {
     return { upcoming: up, past: pa }
   }, [apptsQuery.data])
 
+  if (subjectsQuery.isPending || apptsQuery.isPending) {
+    return <p className="text-sm text-muted-foreground">Carregando agenda...</p>
+  }
+  if (subjectsQuery.isError || apptsQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar a agenda ou a lista de avaliados."
+        onRetry={() => void Promise.all([subjectsQuery.refetch(), apptsQuery.refetch()])}
+      />
+    )
+  }
+
   async function create() {
     setError(null)
     if (!orgId) return setError('Organização não carregada.')
@@ -114,6 +128,21 @@ export default function Agenda() {
   function downloadIcs(a: AppointmentWithSubject) {
     const ics = icsContent(toEvent(a), `${a.id}@avalix`)
     downloadBlob(new Blob([ics], { type: 'text/calendar;charset=utf-8' }), `avaliacao-${a.id.slice(0, 8)}.ics`)
+    logCalendarShare(a, 'SHARE_ICS')
+  }
+
+  function logCalendarShare(
+    appointment: AppointmentWithSubject,
+    action: 'SHARE_GOOGLE_CALENDAR' | 'SHARE_ICS'
+  ) {
+    if (!orgId) return
+    void logDataAction({
+      orgId,
+      action,
+      tableName: 'appointments',
+      rowId: appointment.id,
+      subjectId: appointment.subject_id,
+    })
   }
 
   return (
@@ -132,8 +161,9 @@ export default function Agenda() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Avaliado</Label>
+              <Label htmlFor="appointment-subject" className="text-xs">Avaliado</Label>
               <select
+                id="appointment-subject"
                 className={controlClass}
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
@@ -147,12 +177,13 @@ export default function Agenda() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Data e hora</Label>
-              <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+              <Label htmlFor="appointment-when" className="text-xs">Data e hora</Label>
+              <Input id="appointment-when" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Duração (min)</Label>
+              <Label htmlFor="appointment-duration" className="text-xs">Duração (min)</Label>
               <Input
+                id="appointment-duration"
                 type="number"
                 min={5}
                 max={1440}
@@ -161,16 +192,17 @@ export default function Agenda() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Título</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Label htmlFor="appointment-title" className="text-xs">Título</Label>
+              <Input id="appointment-title" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">Local (opcional)</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+              <Label htmlFor="appointment-location" className="text-xs">Local (opcional)</Label>
+              <Input id="appointment-location" value={location} onChange={(e) => setLocation(e.target.value)} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">Observações (opcional)</Label>
+              <Label htmlFor="appointment-notes" className="text-xs">Observações (opcional)</Label>
               <textarea
+                id="appointment-notes"
                 rows={2}
                 className={controlClass}
                 value={notes}
@@ -199,6 +231,7 @@ export default function Agenda() {
                 appt={a}
                 onDelete={() => setConfirmApptId(a.id)}
                 onIcs={() => downloadIcs(a)}
+                onGoogle={() => logCalendarShare(a, 'SHARE_GOOGLE_CALENDAR')}
                 deleting={deleteMut.isPending}
               />
             ))}
@@ -223,6 +256,7 @@ export default function Agenda() {
                   appt={a}
                   onDelete={() => setConfirmApptId(a.id)}
                   onIcs={() => downloadIcs(a)}
+                  onGoogle={() => logCalendarShare(a, 'SHARE_GOOGLE_CALENDAR')}
                   deleting={deleteMut.isPending}
                   muted
                 />
@@ -249,12 +283,14 @@ function AppointmentItem({
   appt,
   onDelete,
   onIcs,
+  onGoogle,
   deleting,
   muted,
 }: {
   appt: AppointmentWithSubject
   onDelete: () => void
   onIcs: () => void
+  onGoogle: () => void
   deleting: boolean
   muted?: boolean
 }) {
@@ -284,7 +320,13 @@ function AppointmentItem({
             {appt.duration_min} min{appt.location ? ` · ${appt.location}` : ''}
           </p>
         </div>
-        <button onClick={onDelete} disabled={deleting} className="shrink-0 text-destructive" title="Excluir">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleting}
+          className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10"
+          aria-label={`Excluir agendamento de ${appt.subjectName}`}
+        >
           <Trash2 className="size-4" />
         </button>
       </div>
@@ -293,14 +335,18 @@ function AppointmentItem({
           href={googleCalendarUrl(toEvent(appt))}
           target="_blank"
           rel="noreferrer"
-          className="text-primary hover:underline"
+          onClick={onGoogle}
+          className="inline-flex min-h-10 items-center text-primary hover:underline"
         >
           Adicionar ao Google Agenda
         </a>
-        <button onClick={onIcs} className="inline-flex items-center gap-1 text-primary hover:underline">
+        <button type="button" onClick={onIcs} className="inline-flex min-h-10 items-center gap-1 text-primary hover:underline">
           <Download className="size-3.5" /> .ics (Apple/Outlook)
         </button>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Ao usar estas opções, o nome e os dados do agendamento são enviados ao serviço escolhido.
+      </p>
     </li>
   )
 }

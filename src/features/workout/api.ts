@@ -398,13 +398,20 @@ export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<Wo
 }
 
 export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> {
-  const { data, error } = await supabase
-    .from('workout_logs')
-    .select('*')
-    .eq('plan_id', planId)
-    .order('performed_at', { ascending: false })
-  if (error) throw error
-  return data ?? []
+  const rows: WorkoutLogRow[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('workout_logs')
+      .select('*')
+      .eq('plan_id', planId)
+      .order('performed_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    rows.push(...(data ?? []))
+    if ((data?.length ?? 0) < pageSize) return rows
+  }
 }
 
 export async function listWorkoutLogSets(logId: string): Promise<WorkoutLogSetRow[]> {
@@ -434,12 +441,21 @@ export type SetHistoryPoint = {
 // Todas as series executadas do plano com a data da sessao (via join), pra
 // montar a progressao de carga / e1RM e as sugestoes por exercicio. RLS vale.
 export async function listPlanSetHistory(planId: string): Promise<SetHistoryPoint[]> {
-  const { data, error } = await supabase
-    .from('workout_log_sets')
-    .select('exercise_id, weight_kg, reps, rir, workout_logs!inner(plan_id, performed_at)')
-    .eq('workout_logs.plan_id', planId)
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<{
+  const pages: unknown[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('workout_log_sets')
+      .select('exercise_id, weight_kg, reps, rir, workout_logs!inner(plan_id, performed_at)')
+      .eq('workout_logs.plan_id', planId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    pages.push(...(data ?? []))
+    if ((data?.length ?? 0) < pageSize) break
+  }
+  const rows = pages as Array<{
     exercise_id: string
     weight_kg: number | null
     reps: number | null

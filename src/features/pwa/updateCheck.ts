@@ -1,5 +1,9 @@
 const ENTRY_ASSET_RE = /(?:src|href)=["'](\/assets\/[^"']+\.(?:js|css))["']/g
 
+export function isPublicIntakeLocation(pathname: string): boolean {
+  return pathname === '/a' || pathname.startsWith('/a/')
+}
+
 export function entryAssetUrls(html: string): string[] {
   return [...new Set([...html.matchAll(ENTRY_ASSET_RE)].map((match) => match[1]))]
 }

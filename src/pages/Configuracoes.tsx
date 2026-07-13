@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
@@ -195,7 +195,7 @@ function LogoSettings() {
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              className="hidden"
+              className="sr-only"
               onChange={onFile}
               disabled={busy}
             />
@@ -205,7 +205,7 @@ function LogoSettings() {
           </label>
         ) : null}
       </div>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
       <p className="text-[11px] text-muted-foreground">PNG, JPEG ou WebP, até 1 MB.</p>
     </div>
   )
@@ -227,11 +227,13 @@ function AppearanceCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="inline-flex rounded-md border bg-card p-1">
+        <div className="inline-flex rounded-md border bg-card p-1" role="radiogroup" aria-label="Tema da interface">
           {THEME_OPTS.map((o) => (
             <button
               key={o.v}
               type="button"
+              role="radio"
+              aria-checked={theme === o.v}
               onClick={() => setTheme(o.v)}
               className={[
                 'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
@@ -260,15 +262,21 @@ function MfaSettings() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function reload() {
+  const reload = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.mfa.listFactors()
-    setFactors(data?.totp ?? [])
+    setError(null)
+    const { data, error: listError } = await supabase.auth.mfa.listFactors()
+    if (listError) {
+      setFactors([])
+      setError(normalizeAuthError(listError))
+    } else {
+      setFactors(data?.totp ?? [])
+    }
     setLoading(false)
-  }
+  }, [])
   useEffect(() => {
     void reload()
-  }, [])
+  }, [reload])
 
   const verified = factors.find((f) => f.status === 'verified')
 
@@ -339,7 +347,18 @@ function MfaSettings() {
     await reload()
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando...</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Carregando...</p>
+
+  if (error && factors.length === 0 && !enrolling) {
+    return (
+      <div className="space-y-3" role="alert">
+        <p className="text-sm text-destructive">{error}</p>
+        <Button type="button" size="sm" variant="outline" onClick={() => void reload()}>
+          Tentar novamente
+        </Button>
+      </div>
+    )
+  }
 
   if (enrolling) {
     return (
@@ -366,7 +385,7 @@ function MfaSettings() {
             onChange={(e) => setCode(e.target.value)}
             placeholder="000000"
           />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={busy}>
               {busy ? 'Confirmando...' : 'Confirmar'}
@@ -391,7 +410,7 @@ function MfaSettings() {
             O login passa a pedir um código do app autenticador.
           </span>
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <Button
           size="sm"
           variant="destructive"
@@ -417,7 +436,7 @@ function MfaSettings() {
       <p className="text-sm text-muted-foreground">
         Não ativada. Recomendada para proteger os dados sensíveis dos avaliados.
       </p>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <Button size="sm" onClick={startEnroll} disabled={busy}>
         {busy ? 'Gerando...' : 'Ativar 2FA'}
       </Button>

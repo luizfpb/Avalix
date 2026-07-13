@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { RouteGuard } from './routes/RouteGuard'
 import { AppShell } from './components/AppShell'
 
@@ -48,10 +48,12 @@ function PageFallback() {
 }
 
 export default function App() {
-  return (
-    <RouteGuard>
-      <Suspense fallback={<PageFallback />}>
+  const location = useLocation()
+  const publicIntake = location.pathname === '/a' || location.pathname.startsWith('/a/')
+  const routes = (
+    <Suspense fallback={<PageFallback />}>
         <Routes>
+          <Route path="/a" element={<AnamnesePublica />} />
           <Route path="/a/:token" element={<AnamnesePublica />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
@@ -109,7 +111,10 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Suspense>
-    </RouteGuard>
+    </Suspense>
   )
+
+  // A rota por capability token nao monta dependencias de sessao/org. O
+  // formato antigo continua publico apenas para migrar e limpar o path.
+  return publicIntake ? routes : <RouteGuard>{routes}</RouteGuard>
 }

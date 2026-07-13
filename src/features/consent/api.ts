@@ -53,9 +53,6 @@ export async function grantConsent(input: GrantConsentInput): Promise<ConsentRow
 }
 
 export async function revokeConsent(consentId: string): Promise<void> {
-  const { error } = await supabase
-    .from('consent_records')
-    .update({ revoked_at: new Date().toISOString() })
-    .eq('id', consentId)
+  const { error } = await supabase.rpc('revoke_consent', { p_consent: consentId })
   if (error) throw error
 }

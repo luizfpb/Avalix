@@ -1,32 +1,70 @@
-import { describe, it, expect } from 'vitest'
-import { CONSENT_VERSION, consentText, consentContent } from './text'
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { sha256Hex } from '../../lib/hash'
+import { CONSENT_VERSION, consentContent, consentText } from './text'
 
-describe('consentimento', () => {
-  it('tem versão final (não rascunho) e texto substancial', () => {
-    expect(CONSENT_VERSION).toMatch(/\S/)
-    expect(CONSENT_VERSION).not.toMatch(/rascunho/i)
-    expect(consentText('Clínica X').length).toBeGreaterThan(200)
+describe('consentimento LGPD', () => {
+  it('permanece byte-a-byte igual ao texto canonico da migration 0020', () => {
+    const migration = readFileSync(
+      join(process.cwd(), 'supabase/migrations/0020_integrity_privacy.sql'),
+      'utf8'
+    )
+    const canonical = migration.match(/\$consent\$([\s\S]*?)\$consent\$/)?.[1]
+    expect(canonical).toBeDefined()
+    expect(canonical?.replace('{{CONTROLADOR}}', 'Clínica X')).toBe(consentText('Clínica X'))
   })
 
-  it('embute o nome do Controlador no texto', () => {
-    expect(consentText('Estúdio Corpo & Movimento')).toContain('Estúdio Corpo & Movimento')
+  it('publica a versao 1.1 e um texto substancial', () => {
+    expect(CONSENT_VERSION).toBe('1.1')
+    expect(consentText('Clínica X').length).toBeGreaterThan(3_000)
   })
 
-  it('usa fallback genérico quando não há nome', () => {
-    const text = consentText('')
-    expect(text).toContain('o profissional ou a organização responsável')
-    expect(text).toContain('Controlador')
+  it('embute o nome normalizado do Controlador ou o fallback sem inventar contato', () => {
+    expect(consentText('  Estúdio Corpo & Movimento  ')).toContain(
+      'Estúdio Corpo & Movimento (o “Controlador”)'
+    )
+    const fallback = consentText('')
+    expect(fallback).toContain('o profissional ou a organização responsável pela sua avaliação')
+    expect(fallback).toContain('Solicitações devem ser dirigidas ao Controlador')
+    expect(fallback).not.toMatch(/@|telefone:\s*\d/i)
   })
 
-  it('cobre os pontos mínimos de LGPD (base legal, revogação, responsável)', () => {
+  it('usa as bases legais corretas para consentimento comum e dado sensivel', () => {
     const text = consentText('Clínica X')
-    expect(text).toMatch(/LGPD/)
-    expect(text).toMatch(/revogar/i)
-    expect(text).toMatch(/respons[áa]vel legal/i)
+    expect(text).toMatch(/art\. 7º, inciso I/)
+    expect(text).toMatch(/art\. 11, inciso I/)
+    expect(text).not.toMatch(/art\. 7º, inciso IX/)
+    expect(text).toMatch(/art\. 14 da LGPD/)
   })
 
-  it('hash é estável por nome e muda quando o nome muda', async () => {
+  it('enumera anamnese, saude, treino, agenda, logs e formatos de saida', () => {
+    const text = consentText('Clínica X')
+    for (const expected of [
+      'Anamnese',
+      'medicamentos',
+      'gestação',
+      'registros de treino',
+      'agenda de avaliações',
+      'registros de acesso',
+      'PDF',
+      'CSV',
+    ]) {
+      expect(text).toContain(expected)
+    }
+  })
+
+  it('explica terceiros, retencao e compartilhamentos somente por acao explicita', () => {
+    const text = consentText('Clínica X')
+    expect(text).toMatch(/fornecedores de infraestrutura/)
+    expect(text).toMatch(/eliminados ou anonimizados/)
+    expect(text).toMatch(/Google Agenda/)
+    expect(text).toMatch(/WhatsApp/)
+    expect(text.match(/ação explícita/g)).toHaveLength(2)
+    expect(text).toMatch(/não envia esses dados automaticamente/)
+  })
+
+  it('gera hash estavel por Controlador e diferente entre Controladores', async () => {
     const a1 = await sha256Hex(consentText('Org A'))
     const a2 = await sha256Hex(consentText('Org A'))
     const b = await sha256Hex(consentText('Org B'))
@@ -35,7 +73,7 @@ describe('consentimento', () => {
     expect(a1).toHaveLength(64)
   })
 
-  it('consentContent devolve versão e texto renderizado', () => {
+  it('consentContent devolve a versao e o texto renderizado', () => {
     expect(consentContent('Org A')).toEqual({
       version: CONSENT_VERSION,
       text: consentText('Org A'),

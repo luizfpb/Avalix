@@ -1,0 +1,52 @@
+name: retention
+
+on:
+  schedule:
+    - cron: '20 4 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalix-retention
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Expira intakes e remove erros antigos
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo 'Erro: configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.'
+            exit 1
+          fi
+
+          call_rpc() {
+            local name="$1"
+            local body="$2"
+            curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 60 \
+              -X POST "${SUPABASE_URL%/}/rest/v1/rpc/$name" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H 'Content-Type: application/json' \
+              --data "$body"
+          }
+
+          for _ in $(seq 1 20); do
+            count=$(call_rpc purge_expired_anamnese_intakes '{"p_limit":500}')
+            [[ "$count" =~ ^[0-9]+$ ]] || { echo "Retorno inválido do purge de intakes: $count"; exit 1; }
+            [ "$count" -lt 500 ] && break
+          done
+
+          for _ in $(seq 1 20); do
+            count=$(call_rpc purge_client_errors '{"p_limit":5000}')
+            [[ "$count" =~ ^[0-9]+$ ]] || { echo "Retorno inválido do purge de erros: $count"; exit 1; }
+            [ "$count" -lt 5000 ] && break
+          done

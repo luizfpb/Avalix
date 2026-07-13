@@ -6,7 +6,22 @@ import globals from "globals"
 import tseslint from "typescript-eslint"
 
 export default defineConfig([
-  globalIgnores(["dist", "scripts"]),
+  // Geradores históricos reproduzem etapas antigas e não fazem parte do app.
+  // Scripts operacionais atuais são lintados como Node logo abaixo.
+  globalIgnores([
+    "dist",
+    "scripts/write-etapa3-files.mjs",
+    "scripts/write-etapa3-2-files.mjs",
+  ]),
+  {
+    files: ["scripts/**/*.mjs"],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: globals.node,
+    },
+  },
   {
     files: ["**/*.{ts,tsx}"],
     extends: [

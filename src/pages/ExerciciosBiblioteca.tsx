@@ -14,11 +14,13 @@ import { Badge } from '@/components/ui/badge'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { QueryError } from '../components/QueryError'
 
 export default function ExerciciosBiblioteca() {
   const { organization, role } = useOrganization()
   const orgId = organization?.id
-  const { data, isPending } = useExercises(orgId)
+  const exercisesQuery = useExercises(orgId)
+  const { data, isPending } = exercisesQuery
   const deleteMut = useDeleteCustomExercise(orgId)
   const [search, setSearch] = useState('')
   const [muscle, setMuscle] = useState('')
@@ -80,19 +82,30 @@ export default function ExerciciosBiblioteca() {
         />
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <Input placeholder="Buscar exercício..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className={`${controlClass} w-44`} value={muscle} onChange={(e) => setMuscle(e.target.value)}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem]">
+        <div>
+          <label htmlFor="exercise-search" className="sr-only">Buscar exercício</label>
+          <Input id="exercise-search" placeholder="Buscar exercício..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="exercise-muscle" className="sr-only">Filtrar por grupo muscular</label>
+          <select id="exercise-muscle" className={controlClass} value={muscle} onChange={(e) => setMuscle(e.target.value)}>
           <option value="">Todos os grupos</option>
           {MUSCLE_OPTIONS.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
           ))}
-        </select>
+          </select>
+        </div>
       </div>
 
-      {isPending ? (
+      {exercisesQuery.isError ? (
+        <QueryError
+          message="Não foi possível carregar a biblioteca de exercícios."
+          onRetry={() => void exercisesQuery.refetch()}
+        />
+      ) : isPending ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum exercício encontrado.</p>
@@ -113,7 +126,7 @@ export default function ExerciciosBiblioteca() {
               )
             }
             return (
-              <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <li key={e.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 truncate text-sm">
                     {e.name}
@@ -130,13 +143,13 @@ export default function ExerciciosBiblioteca() {
                       : ''}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3 text-xs">
+                <div className="flex shrink-0 flex-wrap items-center gap-1 text-xs sm:justify-end">
                   <ExerciseDemoLink name={e.name} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground" />
                   {custom ? (
                     <>
                       <button
                         onClick={() => setEditingId(e.id)}
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                        className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Pencil className="size-3.5" /> Editar
                       </button>
@@ -144,7 +157,7 @@ export default function ExerciciosBiblioteca() {
                         <button
                           onClick={() => setConfirmId(e.id)}
                           disabled={deleteMut.isPending}
-                          className="inline-flex items-center gap-1 text-destructive hover:underline"
+                          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-destructive hover:bg-destructive/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <Trash2 className="size-3.5" /> Excluir
                         </button>
@@ -160,7 +173,7 @@ export default function ExerciciosBiblioteca() {
         </ul>
       )}
 
-      {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
+      {deleteError ? <p role="alert" className="text-sm text-destructive">{deleteError}</p> : null}
 
       <ConfirmDialog
         open={confirmId != null}

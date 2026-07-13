@@ -19,17 +19,20 @@ import { relativeDayLabel, dueForReassessment, REASSESS_DAYS } from '../lib/remi
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { subjectTermLabels } from '../lib/subjectTerm'
+import { QueryError } from '../components/QueryError'
 
 export default function Dashboard() {
   const { organization } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
-  const { data: subjects, isPending } = useSubjects(organization?.id)
+  const subjectsQ = useSubjects(organization?.id)
+  const { data: subjects, isPending } = subjectsQ
 
   const total = subjects?.length ?? 0
   const ativos = subjects?.filter((s) => s.is_active).length ?? 0
   const isEmpty = !isPending && total === 0
 
-  const pendingIntakes = usePendingIntakes(organization?.id).data ?? []
+  const intakesQ = usePendingIntakes(organization?.id)
+  const pendingIntakes = intakesQ.data ?? []
   const apptsQ = useAppointments(organization?.id)
   const lastAssessQ = useLastAssessmentBySubject(organization?.id)
   const now = new Date()
@@ -49,6 +52,7 @@ export default function Dashboard() {
     day: '2-digit',
     month: 'long',
   }).format(now)
+  const hasLoadError = subjectsQ.isError || intakesQ.isError || apptsQ.isError || lastAssessQ.isError
 
   return (
     <div className="space-y-8">
@@ -71,7 +75,19 @@ export default function Dashboard() {
         </Button>
       </header>
 
-      {isEmpty ? (
+      {hasLoadError ? (
+        <QueryError
+          message="Não foi possível carregar o resumo. Os números abaixo foram ocultados para não mostrar dados incompletos."
+          onRetry={() => {
+            void Promise.all([
+              subjectsQ.refetch(),
+              intakesQ.refetch(),
+              apptsQ.refetch(),
+              lastAssessQ.refetch(),
+            ])
+          }}
+        />
+      ) : isEmpty ? (
         <Card className="overflow-hidden border-dashed border-primary/30 bg-primary/[0.035]">
           <CardContent className="relative flex flex-col items-start gap-5 py-4 sm:flex-row sm:items-center">
             <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/15">
@@ -90,7 +106,7 @@ export default function Dashboard() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : hasLoadError ? null : (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumo da operação">
           <StatCard
             label={`${labels.pluralCap} cadastrados`}
@@ -98,12 +114,12 @@ export default function Dashboard() {
             hint="base completa"
           />
           <StatCard label="Ativos" value={isPending ? '—' : ativos} hint="em acompanhamento" tone="success" />
-          <StatCard label="Próximos 7 dias" value={upcoming.length} hint="sessões agendadas" />
-          <StatCard label="Para reavaliar" value={dueList.length} hint={`há ${REASSESS_DAYS}+ dias`} tone="warning" />
+          <StatCard label="Próximos 7 dias" value={apptsQ.isPending ? '—' : upcoming.length} hint="sessões agendadas" />
+          <StatCard label="Para reavaliar" value={lastAssessQ.isPending ? '—' : dueList.length} hint={`há ${REASSESS_DAYS}+ dias`} tone="warning" />
         </section>
       )}
 
-      {pendingIntakes.length > 0 ? (
+      {!hasLoadError && pendingIntakes.length > 0 ? (
         <Card className="overflow-hidden border-warning/25 bg-warning/[0.055]">
           <CardContent className="flex flex-col gap-4 py-1 sm:flex-row sm:items-center">
             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warning/12 text-warning">
@@ -139,7 +155,7 @@ export default function Dashboard() {
         </Card>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-5">
+      {!hasLoadError ? <section className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardContent className="py-1">
             <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-4">
@@ -156,7 +172,9 @@ export default function Dashboard() {
               </Button>
             </div>
 
-            {upcoming.length === 0 ? (
+            {apptsQ.isPending ? (
+              <p role="status" className="py-6 text-sm text-muted-foreground">Carregando agenda...</p>
+            ) : upcoming.length === 0 ? (
               <EmptyLine
                 icon={CalendarDays}
                 title="Agenda tranquila nos próximos 7 dias"
@@ -192,7 +210,9 @@ export default function Dashboard() {
               <h2 className="mt-1 text-xl font-semibold">Para reavaliar</h2>
             </div>
 
-            {dueList.length === 0 ? (
+            {lastAssessQ.isPending ? (
+              <p role="status" className="py-6 text-sm text-muted-foreground">Carregando reavaliações...</p>
+            ) : dueList.length === 0 ? (
               <EmptyLine
                 icon={CheckCircle2}
                 title="Acompanhamentos em dia"
@@ -221,7 +241,7 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </section>
+      </section> : null}
 
       <section>
         <div className="mb-3 flex items-center justify-between">

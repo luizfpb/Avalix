@@ -15,13 +15,27 @@ let orgId: string | null = null
 let sent = 0
 const seen = new Set<string>()
 
+// Capability tokens nunca podem sair do dispositivo por observabilidade.
+// Cobre o path legado, o fragmento novo caso apareca numa mensagem/stack e
+// parametros comuns adicionados por clientes externos.
+export function sanitizeClientErrorText(value: unknown, maxLength: number): string {
+  return String(value ?? '')
+    .replace(/(\/a(?:\/|#|%23))[A-Za-z0-9_-]{20,}/gi, '$1[redacted]')
+    .replace(/([?&](?:token|access_token|apikey)=)[^&#\s]+/gi, '$1[redacted]')
+    .slice(0, maxLength)
+}
+
+export function sanitizedClientPath(pathname: string): string {
+  return /^\/a(?:\/|$)/.test(pathname) ? '/a' : sanitizeClientErrorText(pathname, 300)
+}
+
 export function setErrlogOrg(id: string | null): void {
   orgId = id
 }
 
 export function reportClientError(message: string, stack?: string | null): void {
   try {
-    const msg = String(message ?? '').slice(0, 600)
+    const msg = sanitizeClientErrorText(message, 600)
     if (!msg || !orgId || sent >= MAX_PER_SESSION) return
     // dedup por mensagem: um render quebrado em loop não vira flood
     if (seen.has(msg)) return
@@ -36,8 +50,8 @@ export function reportClientError(message: string, stack?: string | null): void 
         org_id: org,
         user_id: uid,
         message: msg,
-        stack: stack ? String(stack).slice(0, 4000) : null,
-        url: typeof location !== 'undefined' ? location.pathname.slice(0, 300) : null,
+        stack: stack ? sanitizeClientErrorText(stack, 4000) : null,
+        url: typeof location !== 'undefined' ? sanitizedClientPath(location.pathname) : null,
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 400) : null,
       })
     })().catch(() => undefined)

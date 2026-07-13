@@ -1,17 +1,21 @@
 name: backup
 
-# Backup semanal do Postgres, criptografado (gpg simetrico AES256) e publicado
-# como artifact do repositorio (retencao 90 dias).
+# Backup semanal do Postgres + bytes dos buckets privados, criptografado (gpg
+# simétrico AES256) e publicado como artifact do repositório (retenção 90 dias).
 #
 # Secrets necessarios (Settings > Secrets and variables > Actions):
 #   SUPABASE_DB_URL    -> connection string do Postgres. Use a string do painel
 #                         (Settings > Database > Connection string > URI). Prefira
 #                         a "Session pooler" (IPv4) porque o runner do GitHub e IPv4.
 #   BACKUP_PASSPHRASE  -> senha do gpg simetrico (guardar no gerenciador de senhas).
+#   SUPABASE_URL        -> Project URL.
+#   SUPABASE_SERVICE_ROLE_KEY -> chave exclusiva do job de backup; nunca no front.
 #
 # Restaurar:
-#   gpg --batch --passphrase 'SENHA' --decrypt backup-XXXX.sql.gpg > dump.sql
-#   psql "$SUPABASE_DB_URL" < dump.sql
+#   gpg --decrypt backup-XXXX.tar.gz.gpg > backup.tar.gz
+#   tar -xzf backup.tar.gz
+#   validar backup-XXXX/db.dump com pg_restore --list e seguir o runbook
+#   conferir backup-XXXX/storage/manifest.json e restaurar photos/logos.
 # Fazer um teste de restore (num projeto descartavel) ANTES do beta: backup que
 # nunca foi restaurado nao e backup.
 
@@ -20,33 +24,72 @@ on:
     - cron: '0 5 * * 0' # domingo, 05:00 UTC
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
+concurrency:
+  group: avalix-backup
+  cancel-in-progress: false
+
 jobs:
   dump:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: pg_dump + gpg
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --omit=dev
+
+      - name: Banco + Storage + criptografia
+        id: backup
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${DB_URL:-}" ] || [ -z "${PASSPHRASE:-}" ]; then
-            echo 'Erro: configure os secrets SUPABASE_DB_URL e BACKUP_PASSPHRASE'
+          if [ -z "${DB_URL:-}" ] || [ -z "${PASSPHRASE:-}" ] || \
+             [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo 'Erro: configure SUPABASE_DB_URL, BACKUP_PASSPHRASE,'
+            echo 'SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.'
             echo '(repo > Settings > Secrets and variables > Actions).'
             exit 1
           fi
           stamp=$(date -u +%Y%m%d-%H%M%S)
-          # pg_dump 17 via docker: roda contra servidores 15+ sem mismatch de versao
-          docker run --rm -i postgres:17-alpine \
-            pg_dump "$DB_URL" --no-owner --no-privileges > "backup-$stamp.sql"
-          gpg --batch --yes --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 \
-            -o "backup-$stamp.sql.gpg" "backup-$stamp.sql"
-          rm -f "backup-$stamp.sql"
+          root="backup-$stamp"
+          mkdir -p "$root"
+
+          # Imagem oficial fixada por digest: o job não executa uma tag mutável.
+          docker run --rm -i -e DB_URL \
+            postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
+            sh -c 'exec pg_dump "$DB_URL" --format=custom --no-owner --no-privileges' > "$root/db.dump"
+          docker run --rm -v "$PWD/$root:/backup:ro" \
+            postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
+            pg_restore --list /backup/db.dump > "$root/db.restore-list.txt"
+          node scripts/backup-storage.mjs --output "$root/storage"
+
+          tar -czf "$root.tar.gz" "$root"
+          printf '%s' "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+            -o "$root.tar.gz.gpg" "$root.tar.gz"
+
+          # Verifica que o artifact é descriptografável e contém o arquivo SQL.
+          printf '%s' "$PASSPHRASE" | gpg --batch --quiet --pinentry-mode loopback \
+            --passphrase-fd 0 --decrypt "$root.tar.gz.gpg" | tar -tzf - > "$root.contents.txt"
+          grep -q "/db.dump$" "$root.contents.txt"
+          rm -rf "$root" "$root.tar.gz" "$root.contents.txt"
+          echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: db-backup
-          path: '*.sql.gpg'
+          name: avalix-backup-${{ steps.backup.outputs.stamp }}
+          path: 'backup-*.tar.gz.gpg'
           retention-days: 90
           if-no-files-found: error

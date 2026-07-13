@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { PenLine } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -27,6 +27,7 @@ import { controlClass } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { QueryError } from '../components/QueryError'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -54,7 +55,14 @@ export default function PosturaSessaoDetalhe() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<PosturePhotoRow | null>(null)
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
+  const [selectedUrlError, setSelectedUrlError] = useState<string | null>(null)
   const selectedAnnotation = useAnnotation(selected?.id)
+  const lightboxRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = lightboxRef.current
+    if (selected && dialog && !dialog.open) dialog.showModal()
+  }, [selected])
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -81,11 +89,13 @@ export default function PosturaSessaoDetalhe() {
   async function openPhoto(photo: PosturePhotoRow) {
     setSelected(photo)
     setSelectedUrl(null)
+    setSelectedUrlError(null)
     try {
       const map = await signedUrls([photo.storage_path])
       setSelectedUrl(map[photo.storage_path] ?? null)
     } catch {
       setSelectedUrl(null)
+      setSelectedUrlError('Não foi possível carregar a imagem ampliada.')
     }
   }
 
@@ -107,7 +117,12 @@ export default function PosturaSessaoDetalhe() {
     }
   }
 
-  if (sessionQuery.isPending) {
+  if (
+    sessionQuery.isPending ||
+    photosQuery.isPending ||
+    thumbUrlsQuery.isPending ||
+    annotatedQuery.isPending
+  ) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
   if (sessionQuery.isError || !sessionQuery.data) {
@@ -118,6 +133,18 @@ export default function PosturaSessaoDetalhe() {
           <Link to={`/avaliados/${id}`}>Voltar</Link>
         </Button>
       </div>
+    )
+  }
+  if (photosQuery.isError || thumbUrlsQuery.isError || annotatedQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar todas as fotos e anotações da sessão."
+        onRetry={() => void Promise.all([
+          photosQuery.refetch(),
+          thumbUrlsQuery.refetch(),
+          annotatedQuery.refetch(),
+        ])}
+      />
     )
   }
 
@@ -175,8 +202,9 @@ export default function PosturaSessaoDetalhe() {
 
       <div className="flex flex-wrap items-end gap-3 rounded-md border p-4">
         <div className="space-y-1.5">
-          <Label>Categoria</Label>
+            <Label htmlFor="posture-category">Categoria</Label>
           <select
+            id="posture-category"
             className={cn(controlClass, 'w-auto')}
             value={category}
             onChange={(e) => setCategory(e.target.value as PhotoCategory)}
@@ -209,7 +237,7 @@ export default function PosturaSessaoDetalhe() {
         </p>
       </div>
 
-      {uploadError ? <p className="text-sm text-destructive">{uploadError}</p> : null}
+      {uploadError ? <p role="alert" className="text-sm text-destructive">{uploadError}</p> : null}
 
       {photosQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando fotos...</p>
@@ -272,23 +300,39 @@ export default function PosturaSessaoDetalhe() {
       )}
 
       {selected ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setSelected(null)}
+        <dialog
+          ref={lightboxRef}
+          aria-labelledby="posture-lightbox-title"
+          onClose={() => setSelected(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) event.currentTarget.close()
+          }}
+          className="m-auto max-h-screen max-w-[calc(100vw-2rem)] overflow-visible border-0 bg-transparent p-0 text-white backdrop:bg-black/80"
         >
-          <div className="max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            {selectedUrl ? (
+          <div className="max-h-full max-w-3xl">
+            {selectedAnnotation.isError ? (
+              <div role="alert" className="space-y-2 rounded-md bg-black/80 p-4 text-sm text-white">
+                <p>Não foi possível carregar as anotações desta foto.</p>
+                <button type="button" className="min-h-10 rounded-md border px-3" onClick={() => void selectedAnnotation.refetch()}>
+                  Tentar novamente
+                </button>
+              </div>
+            ) : selectedAnnotation.isPending ? (
+              <p className="text-sm text-white">Carregando anotações...</p>
+            ) : selectedUrl ? (
               <AnnotationCanvas
                 src={selectedUrl}
                 shapes={selectedAnnotation.data?.doc.shapes ?? []}
                 readOnly
                 imgClassName="block max-h-[85vh] w-auto max-w-full rounded-md"
               />
+            ) : selectedUrlError ? (
+              <p role="alert" className="rounded-md bg-black/70 p-4 text-sm text-white">{selectedUrlError}</p>
             ) : (
               <p className="text-sm text-white">Carregando...</p>
             )}
             <div className="mt-2 flex items-center justify-between gap-3 text-sm text-white">
-              <span>{categoryLabel(selected.category)}</span>
+              <span id="posture-lightbox-title">{categoryLabel(selected.category)}</span>
               <div className="flex items-center gap-4">
                 <Link
                   to={`/avaliados/${id}/postural/${sessionId}/foto/${selected.id}`}
@@ -296,13 +340,13 @@ export default function PosturaSessaoDetalhe() {
                 >
                   <PenLine className="size-4" /> Anotar
                 </Link>
-                <button type="button" onClick={() => setSelected(null)} className="hover:underline">
+                <button type="button" onClick={() => lightboxRef.current?.close()} className="min-h-10 rounded-md px-2 hover:bg-white/10 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
                   Fechar
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       ) : null}
     </div>
   )

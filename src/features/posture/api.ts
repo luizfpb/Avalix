@@ -27,6 +27,7 @@ export function categoryLabel(value: string): string {
 
 const BUCKET = 'photos'
 const SIGNED_TTL = 300
+const API_BATCH_SIZE = 100
 
 export async function createSession(input: {
   orgId: string
@@ -79,13 +80,20 @@ export async function getPhoto(id: string): Promise<PosturePhotoRow | null> {
 }
 
 export async function listPhotos(sessionId: string): Promise<PosturePhotoRow[]> {
-  const { data, error } = await supabase
-    .from('posture_photos')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('created_at')
-  if (error) throw error
-  return data ?? []
+  const rows: PosturePhotoRow[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('posture_photos')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at')
+      .order('id')
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    rows.push(...(data ?? []))
+    if ((data?.length ?? 0) < pageSize) return rows
+  }
 }
 
 export type SubjectPhoto = PosturePhotoRow & { takenAt: string }
@@ -93,13 +101,21 @@ export type SubjectPhoto = PosturePhotoRow & { takenAt: string }
 // Todas as fotos do avaliado (via join com a sessão), pra comparação entre
 // sessões. A RLS continua valendo foto a foto.
 export async function listSubjectPhotos(subjectId: string): Promise<SubjectPhoto[]> {
-  const { data, error } = await supabase
-    .from('posture_photos')
-    .select('*, posture_sessions!inner(subject_id, taken_at)')
-    .eq('posture_sessions.subject_id', subjectId)
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<
+  const pages: unknown[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('posture_photos')
+      .select('*, posture_sessions!inner(subject_id, taken_at)')
+      .eq('posture_sessions.subject_id', subjectId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    pages.push(...(data ?? []))
+    if ((data?.length ?? 0) < pageSize) break
+  }
+  const rows = pages as Array<
     PosturePhotoRow & { posture_sessions: { taken_at: string } | { taken_at: string }[] }
   >
   return rows.map(({ posture_sessions, ...rest }) => {
@@ -138,16 +154,32 @@ export async function addPhoto(input: AddPhotoInput): Promise<PosturePhotoRow> {
     .single()
   if (error) throw error
 
-  const opts = { contentType: input.image.mime, upsert: false }
+  // URL assinada curta nao deve virar foto reutilizavel por cache compartilhado.
+  const opts = { contentType: input.image.mime, upsert: false, cacheControl: '0' }
   const up1 = await supabase.storage.from(BUCKET).upload(photo.storage_path, input.image.main, opts)
   const up2 = up1.error
     ? null
     : await supabase.storage.from(BUCKET).upload(photo.thumb_path, input.image.thumb, opts)
 
   if (up1.error || up2?.error) {
-    await supabase.storage.from(BUCKET).remove([photo.storage_path, photo.thumb_path])
-    await supabase.from('posture_photos').delete().eq('id', photo.id)
-    throw up1.error ?? up2?.error
+    const uploadError = up1.error ?? up2?.error
+    try {
+      await removePhotoObjectsVerified([photo.storage_path, photo.thumb_path])
+    } catch (cleanupError) {
+      // Mantem a linha: as policies de Storage dependem dela para permitir retry.
+      throw new AggregateError(
+        [uploadError, cleanupError],
+        'O upload falhou e a limpeza dos arquivos precisa ser tentada novamente.'
+      )
+    }
+    const { error: deleteError } = await supabase.from('posture_photos').delete().eq('id', photo.id)
+    if (deleteError) {
+      throw new AggregateError(
+        [uploadError, deleteError],
+        'O upload falhou e nao foi possivel remover o registro incompleto.'
+      )
+    }
+    throw uploadError
   }
   return photo
 }
@@ -222,25 +254,32 @@ export async function saveAnnotation(input: {
 // Quais fotos da lista têm anotações de fato (pra marcar na grade).
 export async function listAnnotatedPhotoIds(photoIds: string[]): Promise<Set<string>> {
   if (photoIds.length === 0) return new Set()
-  const { data, error } = await supabase
-    .from('posture_annotations')
-    .select('photo_id, payload')
-    .in('photo_id', photoIds)
-  if (error) throw error
   const set = new Set<string>()
-  for (const r of data ?? []) {
-    if (parseDoc(r.payload).shapes.length > 0) set.add(r.photo_id)
+  const uniqueIds = [...new Set(photoIds)]
+  for (let offset = 0; offset < uniqueIds.length; offset += API_BATCH_SIZE) {
+    const { data, error } = await supabase
+      .from('posture_annotations')
+      .select('photo_id, payload')
+      .in('photo_id', uniqueIds.slice(offset, offset + API_BATCH_SIZE))
+    if (error) throw error
+    for (const r of data ?? []) {
+      if (parseDoc(r.payload).shapes.length > 0) set.add(r.photo_id)
+    }
   }
   return set
 }
 
 export async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   if (paths.length === 0) return {}
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(paths, SIGNED_TTL)
-  if (error) throw error
   const map: Record<string, string> = {}
-  for (const item of data ?? []) {
-    if (item.path && item.signedUrl) map[item.path] = item.signedUrl
+  const uniquePaths = [...new Set(paths)]
+  for (let offset = 0; offset < uniquePaths.length; offset += API_BATCH_SIZE) {
+    const batch = uniquePaths.slice(offset, offset + API_BATCH_SIZE)
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(batch, SIGNED_TTL)
+    if (error) throw error
+    for (const item of data ?? []) {
+      if (item.path && item.signedUrl) map[item.path] = item.signedUrl
+    }
   }
   return map
 }

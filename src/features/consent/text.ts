@@ -1,61 +1,62 @@
-// TEXTO DE CONSENTIMENTO (LGPD) - versao 1.0, revisada e aprovada.
+// TEXTO DE CONSENTIMENTO (LGPD) - versao 1.1.
 //
 // REGRA DE VERSIONAMENTO: o hash gravado no aceite (consent_records.
 // consent_text_sha256) e calculado sobre o texto EXATO retornado por
-// consentText(). Qualquer mudanca (ate um espaco) muda o hash. Por isso,
-// sempre que editar o texto, incremente CONSENT_VERSION. Aceites antigos
-// preservam a versao/hash do texto que a pessoa de fato leu.
+// consentText(). Qualquer mudanca (ate um espaco) exige nova versao.
 //
-// O Controlador (profissional/organizacao) aparece no texto pelo nome (vindo de
-// organizations.name). Como o nome entra no texto, o hash varia por org: o
-// registro de aceite prova exatamente o texto, com o nome, que a pessoa leu.
+// A migration 0020 possui a copia canonica deste texto. Ela valida o hash
+// recebido e grava texto, nome do Controlador, versao e hash como snapshots.
+// Ao editar este arquivo, a funcao SQL deve mudar byte-a-byte na mesma janela.
 
-export const CONSENT_VERSION = '1.0'
+export const CONSENT_VERSION = '1.1'
 
 function controllerLabel(name: string | null | undefined): string {
-  const n = name?.trim()
-  return n && n.length > 0 ? n : 'o profissional ou a organização responsável pela sua avaliação'
+  const normalized = name?.trim()
+  return normalized && normalized.length > 0
+    ? normalized
+    : 'o profissional ou a organização responsável pela sua avaliação'
 }
 
 export function consentText(controllerName: string | null | undefined): string {
   const controller = controllerLabel(controllerName)
   return `Termo de Consentimento para Tratamento de Dados Pessoais e de Saúde
 
-1. O que este termo autoriza
-Ao confirmar, você autoriza ${controller} (o "Controlador") a coletar e tratar seus dados pessoais e seus dados pessoais sensíveis de saúde, por meio do aplicativo Avalix, para as finalidades descritas abaixo.
+1. Controlador e alcance deste termo
+Ao confirmar, você autoriza ${controller} (o “Controlador”) a tratar, por meio do Avalix, seus dados pessoais e dados pessoais sensíveis de saúde para as finalidades descritas neste termo.
 
 2. Dados tratados
-- Identificação e contato: nome, data de nascimento, sexo biológico, telefone e e-mail.
-- Avaliação física: peso, altura, dobras cutâneas, circunferências e a composição corporal calculada a partir desses dados.
-- Avaliação postural: fotografias do corpo e anotações associadas.
-- Observações registradas pelo profissional durante o acompanhamento.
+- Identificação, cadastro e contato: nome, data de nascimento, sexo biológico, telefone, e-mail, responsável legal e relação com o responsável.
+- Anamnese e saúde: histórico de saúde, sintomas, dores, lesões, doenças, cirurgias, limitações, medicamentos, gestação ou possibilidade de gravidez, hábitos, prática de atividade física, objetivos e respostas fornecidas nos formulários.
+- Avaliação física e postural: peso, altura, dobras cutâneas, circunferências, composição corporal calculada, fotografias do corpo e anotações associadas.
+- Acompanhamento: planos e registros de treino, séries, cargas, repetições, percepção de esforço, agenda de avaliações, evolução e observações do profissional.
+- Operação e segurança: registros de acesso, auditoria, erros técnicos, dispositivo/navegador e ações de exportação.
 
-3. Finalidade
-Os dados são usados para realizar e registrar avaliações físicas e posturais, acompanhar sua evolução ao longo do tempo e gerar relatórios para você e para o profissional responsável. Não são usados para outras finalidades sem novo consentimento.
+3. Finalidades
+Os dados são usados para cadastrar e identificar você, realizar anamnese e avaliações físicas ou posturais, verificar cuidados e encaminhamentos necessários, planejar e acompanhar treinos, organizar a agenda, acompanhar sua evolução, manter a segurança e a rastreabilidade do serviço e gerar relatórios ou exportações solicitados.
 
-4. Base legal
-O tratamento dos dados de saúde se baseia no seu consentimento, nos termos da Lei nº 13.709/2018 (LGPD), art. 7º, inciso IX, e art. 11, inciso I.
+4. Base legal e liberdade de escolha
+O tratamento baseado neste termo utiliza o consentimento previsto na Lei nº 13.709/2018 (LGPD), art. 7º, inciso I, para dados pessoais, e art. 11, inciso I, para dados pessoais sensíveis de saúde. O consentimento é livre e pode ser recusado ou revogado, ciente de que isso pode impedir novas coletas e funcionalidades que dependam desses dados.
 
-5. Compartilhamento
-Seus dados não são vendidos nem compartilhados com terceiros, exceto quando necessário para a prestação do serviço (por exemplo, a infraestrutura que armazena os dados) ou por obrigação legal. O Avalix atua como operador, tratando os dados em nome do Controlador.
+5. Compartilhamento e infraestrutura
+Os dados não são vendidos. Eles podem ser tratados por profissionais autorizados da organização e por fornecedores de infraestrutura, armazenamento, autenticação, processamento e suporte necessários ao funcionamento do Avalix, sujeitos a deveres de segurança e confidencialidade, além das hipóteses exigidas por lei ou por autoridade competente.
 
-6. Armazenamento e segurança
-Os dados ficam em ambiente de acesso restrito, protegidos por controle de acesso. As fotografias têm a localização (GPS) removida antes do envio.
+6. PDFs, CSV, Google Agenda e WhatsApp
+Relatórios em PDF e exportações em CSV somente são gerados por ação explícita de usuário autorizado. Inclusões no Google Agenda e compartilhamentos pelo WhatsApp também somente ocorrem após ação explícita: o Avalix não envia esses dados automaticamente. Depois do envio a um serviço externo ou destinatário escolhido, o tratamento também fica sujeito às práticas desse terceiro; confira o conteúdo antes de compartilhar.
 
-7. Seus direitos
-A qualquer momento você pode solicitar ao Controlador acesso, correção, exclusão ou portabilidade dos seus dados, além de revogar este consentimento.
+7. Armazenamento, segurança e retenção
+O Controlador deve limitar o acesso a pessoas autorizadas e adotar medidas técnicas e administrativas de segurança. Fotografias processadas pelo aplicativo têm os metadados de localização removidos antes do envio. Os dados são mantidos enquanto forem necessários para o acompanhamento e para as finalidades informadas, durante a relação com o Controlador ou pelos prazos de guarda exigidos por lei ou necessários ao exercício regular de direitos. Encerrada a necessidade, devem ser eliminados ou anonimizados, ressalvadas as hipóteses legais de conservação. Convites cancelados, rejeitados ou expirados têm as respostas e os dados de cadastro anonimizados pelo sistema.
 
-8. Revogação
-Você pode revogar este consentimento a qualquer momento. A revogação impede novas coletas, mas não afeta os tratamentos já realizados de forma lícita. Dados já coletados podem ser mantidos quando houver obrigação legal de guarda.
+8. Seus direitos e contato
+Você pode solicitar ao Controlador confirmação do tratamento, acesso, correção, informação sobre compartilhamentos, anonimização, bloqueio, eliminação ou portabilidade quando aplicável, além de retirar o consentimento e obter informações sobre as consequências da retirada. Solicitações devem ser dirigidas ao Controlador identificado no início deste termo, pelos canais que ele disponibilizar.
 
-9. Retenção
-Os dados são mantidos enquanto durar a relação com o profissional e a finalidade da avaliação, ou pelo prazo exigido por lei.
+9. Revogação
+Você pode revogar este consentimento a qualquer momento. A revogação bloqueia novas coletas baseadas nele, mas não invalida tratamentos realizados licitamente antes da retirada. Um novo consentimento, se necessário, gera um novo registro sem apagar o histórico da revogação.
 
-10. Responsável legal
-Se o titular for menor de 18 anos ou não puder consentir por si, o consentimento é dado pelo responsável legal, no melhor interesse do titular (LGPD, art. 14).
+10. Crianças, adolescentes e responsável legal
+Para titular menor de 18 anos ou que não possa consentir por si, o aceite deve ser feito pelo responsável legal, no melhor interesse do titular e com observância do art. 14 da LGPD. O responsável declara possuir legitimidade para fornecer o consentimento.
 
 11. Declaração
-Declaro que li e compreendi este termo e que as informações que forneço são verdadeiras. Ao digitar meu nome completo e confirmar, manifesto meu consentimento livre, informado e inequívoco para o tratamento dos dados descritos.`
+Declaro que li e compreendi este termo, tive oportunidade de esclarecer dúvidas e forneço informações verdadeiras. Ao digitar meu nome completo e confirmar, manifesto consentimento livre, informado e inequívoco para o tratamento descrito.`
 }
 
 export type ConsentContent = {

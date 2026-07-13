@@ -27,6 +27,10 @@ const ACTION_LABELS: Record<string, string> = {
   EXPORT_JSON: 'exportou JSON',
   PDF_REPORT: 'gerou PDF',
   AI_SUMMARY: 'gerou resumo IA',
+  SHARE_GOOGLE_CALENDAR: 'abriu no Google Agenda',
+  SHARE_ICS: 'exportou calendário',
+  SHARE_WHATSAPP: 'compartilhou pelo WhatsApp',
+  SUBJECT_EXPORT: 'exportou todos os dados do avaliado',
 }
 
 const TABLE_LABELS: Record<string, string> = {

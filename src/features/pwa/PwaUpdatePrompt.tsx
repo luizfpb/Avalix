@@ -1,43 +1,65 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router'
 import { registerSW } from 'virtual:pwa-register'
 import { X } from 'lucide-react'
-import { verifyPublishedShell } from './updateCheck'
+import { isPublicIntakeLocation, verifyPublishedShell } from './updateCheck'
 
 const UPDATE_INTERVAL_MS = 60 * 60 * 1000
 type UpdateStatus = 'checking' | 'ready' | 'failed' | 'updating'
 
 export function PwaUpdatePrompt() {
+  const location = useLocation()
+  const isPublicIntake = isPublicIntakeLocation(location.pathname)
   const [needRefresh, setNeedRefresh] = useState(false)
   const [status, setStatus] = useState<UpdateStatus>('checking')
   const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null)
-  const registered = useRef(false)
 
   useEffect(() => {
-    if (registered.current) return
-    registered.current = true
+    // O aluno recebe apenas a pagina publica; ela nao registra nem inicializa o
+    // PWA profissional. O path legado entra aqui antes de ser higienizado.
+    if (isPublicIntake) {
+      updateRef.current = null
+      setNeedRefresh(false)
+      return
+    }
+
+    let active = true
+    let registration: ServiceWorkerRegistration | undefined
+    let interval: number | undefined
+
+    const check = () => {
+      if (document.visibilityState === 'visible') void registration?.update()
+    }
 
     updateRef.current = registerSW({
       immediate: true,
       onNeedRefresh() {
+        if (!active) return
         setNeedRefresh(true)
         setStatus('checking')
-        // O SW só pode assumir o controle se o HTML publicado apontar para JS
-        // e CSS que realmente existem e têm o MIME correto.
-        void verifyPublishedShell().then((valid) => setStatus(valid ? 'ready' : 'failed'))
+        void verifyPublishedShell().then((valid) => {
+          if (active) setStatus(valid ? 'ready' : 'failed')
+        })
       },
-      onRegisteredSW(_swUrl, registration) {
-        if (!registration) return
-        const check = () => {
-          if (document.visibilityState === 'visible') void registration.update()
-        }
+      onRegisteredSW(_swUrl, nextRegistration) {
+        if (!active || !nextRegistration) return
+        registration = nextRegistration
         document.addEventListener('visibilitychange', check)
         window.addEventListener('online', check)
-        window.setInterval(check, UPDATE_INTERVAL_MS)
+        interval = window.setInterval(check, UPDATE_INTERVAL_MS)
       },
     })
-  }, [])
 
-  if (!needRefresh) return null
+    return () => {
+      active = false
+      updateRef.current = null
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('online', check)
+      if (interval !== undefined) window.clearInterval(interval)
+    }
+  }, [isPublicIntake])
+
+  if (isPublicIntake || !needRefresh) return null
 
   async function handleUpdate() {
     setStatus('checking')

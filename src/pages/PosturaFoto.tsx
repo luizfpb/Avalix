@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useBlocker, useParams } from 'react-router'
 import {
   MousePointer2,
   Dot,
@@ -18,6 +18,8 @@ import type { Shape } from '../features/posture/annotations'
 import { AnnotationCanvas, type Tool } from '../components/AnnotationCanvas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { QueryError } from '../components/QueryError'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
   { tool: 'move', label: 'Mover', icon: MousePointer2 },
@@ -52,6 +54,7 @@ export default function PosturaFoto() {
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState<string | null>(null)
   const inited = useRef(false)
+  const blocker = useBlocker(dirty)
 
   // carrega as anotações existentes uma vez
   useEffect(() => {
@@ -64,7 +67,18 @@ export default function PosturaFoto() {
 
   // atalhos: Esc desfaz seleção; Delete/Backspace apaga a marca selecionada
   useEffect(() => {
+    function beforeUnload(event: BeforeUnloadEvent) {
+      if (!dirty) return
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [dirty])
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
       if (e.key === 'Escape') setSelectedId(null)
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
         setShapes((s) => s.filter((x) => x.id !== selectedId))
@@ -144,13 +158,14 @@ export default function PosturaFoto() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-        <div className="flex gap-1">
+      <div className="flex flex-wrap items-center gap-2 rounded-md border p-2" role="toolbar" aria-label="Ferramentas de anotação">
+        <div className="flex flex-wrap gap-1">
           {TOOLS.map((t) => (
             <Button
               key={t.tool}
               size="sm"
               variant={tool === t.tool ? 'default' : 'ghost'}
+              aria-pressed={tool === t.tool}
               onClick={() => {
                 setTool(t.tool)
                 setSelectedId(null)
@@ -184,12 +199,19 @@ export default function PosturaFoto() {
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground">{HINTS[tool]}</p>
+      <p className="text-xs text-muted-foreground" aria-live="polite">{HINTS[tool]}</p>
 
-      {detectError ? <p className="text-sm text-destructive">{detectError}</p> : null}
-      {saveError ? <p className="text-sm text-destructive">{saveError.message}</p> : null}
+      {detectError ? <p role="alert" className="text-sm text-destructive">{detectError}</p> : null}
+      {saveError ? <p role="alert" className="text-sm text-destructive">{saveError.message}</p> : null}
 
-      {photoQuery.isPending || annotationQuery.isPending ? (
+      {photoQuery.isError || annotationQuery.isError || urlsQuery.isError ? (
+        <QueryError
+          message="Não foi possível carregar a foto ou suas anotações."
+          onRetry={() => {
+            void Promise.all([photoQuery.refetch(), annotationQuery.refetch(), urlsQuery.refetch()])
+          }}
+        />
+      ) : photoQuery.isPending || annotationQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : !photo ? (
         <p className="text-sm text-destructive">Foto não encontrada.</p>
@@ -214,6 +236,15 @@ export default function PosturaFoto() {
         medição clínica. A deteção automática é uma sugestão de pontos (processada no seu
         aparelho, a foto não sai do navegador) — ajuste ou apague qualquer marca antes de salvar.
       </p>
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        title="Sair sem salvar as anotações?"
+        description="As marcas feitas desde o último salvamento serão perdidas."
+        confirmLabel="Sair sem salvar"
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
     </div>
   )
 }

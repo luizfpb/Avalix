@@ -17,13 +17,21 @@ export type CreateAppointmentInput = {
 // Agenda da org com o nome do avaliado (via join), ordenada por horário. RLS já
 // restringe; o filtro por org usa o índice e deixa explícito.
 export async function listAppointments(orgId: string): Promise<AppointmentWithSubject[]> {
-  const { data, error } = await supabase
-    .from('appointments')
-    .select('*, subjects!inner(full_name)')
-    .eq('org_id', orgId)
-    .order('starts_at', { ascending: true })
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<
+  const pages: unknown[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*, subjects!inner(full_name)')
+      .eq('org_id', orgId)
+      .order('starts_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    pages.push(...(data ?? []))
+    if ((data?.length ?? 0) < pageSize) break
+  }
+  const rows = pages as Array<
     AppointmentRow & { subjects: { full_name: string } | { full_name: string }[] }
   >
   return rows.map((r) => {

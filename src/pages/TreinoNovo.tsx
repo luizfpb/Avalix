@@ -51,6 +51,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { QueryError } from '../components/QueryError'
 
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
@@ -97,6 +98,14 @@ export default function TreinoNovo() {
           <Link to="/avaliados">Voltar</Link>
         </Button>
       </div>
+    )
+  }
+  if (exercisesQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar o catálogo de exercícios. O editor foi bloqueado para proteger o plano."
+        onRetry={() => void exercisesQuery.refetch()}
+      />
     )
   }
   if (isEdit && (!planQuery.data || !planQuery.data.plan)) {
@@ -180,6 +189,18 @@ function Builder({
     () => snapshotFromEditor(plan, metaById, 'refined'),
     [plan, metaById]
   )
+
+  if (anamneseQ.isPending) {
+    return <p className="text-sm text-muted-foreground">Carregando dados de segurança...</p>
+  }
+  if (anamneseQ.isError) {
+    return (
+      <QueryError
+        message="Não foi possível carregar a anamnese. O editor foi bloqueado para não ocultar contraindicações."
+        onRetry={() => void anamneseQ.refetch()}
+      />
+    )
+  }
 
   function nameOf(exerciseId: string): string {
     return exercisesById.get(exerciseId)?.name ?? 'Exercício'
@@ -513,7 +534,7 @@ function Builder({
             }}
             className={dragDay !== null && dragDay !== dayIndex ? 'border-dashed border-primary/60' : ''}
           >
-            <CardHeader className="flex-row items-center gap-2 space-y-0">
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0">
               <span
                 draggable
                 onDragStart={() => setDragDay(dayIndex)}
@@ -788,4 +809,3 @@ function Builder({
     </div>
   )
 }
-

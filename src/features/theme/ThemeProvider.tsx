@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ThemeContext, type Theme } from './context'
 
 // Preferência de tema (claro/escuro/sistema). Padrão = escuro. Guardada só no
-// localStorage (preferência de UI, dado não sensível). Um script inline no
+// localStorage (preferência de UI, dado não sensível). O script externo do
 // index.html já aplica a classe antes do React montar, evitando "flash".
 const KEY = 'theme'
 
@@ -19,8 +19,14 @@ function apply(t: Theme): void {
 }
 
 function readStored(): Theme {
-  const s = localStorage.getItem(KEY)
-  return s === 'light' || s === 'dark' || s === 'system' ? s : 'dark'
+  try {
+    const s = localStorage.getItem(KEY)
+    return s === 'light' || s === 'dark' || s === 'system' ? s : 'dark'
+  } catch {
+    // Storage pode ser bloqueado por política/privacidade. Tema não deve
+    // impedir nem a rota pública de abrir.
+    return 'dark'
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -40,7 +46,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   function setTheme(t: Theme) {
-    localStorage.setItem(KEY, t)
+    try {
+      localStorage.setItem(KEY, t)
+    } catch {
+      // Mantém a preferência durante esta sessão mesmo sem persistência.
+    }
     setThemeState(t)
   }
 

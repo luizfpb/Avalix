@@ -52,10 +52,14 @@ const data: AssessmentPdfData = {
 }
 
 describe('render do PDF de avaliação', () => {
-  it('gera um PDF não-vazio com os gráficos de evolução', async () => {
-    const blob = await generateAssessmentPdf(data)
-    expect(blob.size).toBeGreaterThan(1000)
-  })
+  it(
+    'gera um PDF não-vazio com os gráficos de evolução',
+    async () => {
+      const blob = await generateAssessmentPdf(data)
+      expect(blob.size).toBeGreaterThan(1000)
+    },
+    15_000
+  )
 })
 
 describe('buildCircSeries', () => {

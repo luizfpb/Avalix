@@ -18,6 +18,7 @@ import { useSessions } from '../features/posture/hooks'
 import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
 import { csvBlob, downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
+import { exportSubjectArchive, type SubjectExportProgress } from '../features/reports/subjectExport'
 import {
   useActiveConsent,
   useGrantConsent,
@@ -25,7 +26,7 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
-import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle } from 'lucide-react'
+import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle, Download } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -43,6 +44,7 @@ import {
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { QueryError } from '../components/QueryError'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -68,6 +70,9 @@ export default function AvaliadoDetalhe() {
   const { organization } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
   const subjectQuery = useSubject(id)
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportProgress, setExportProgress] = useState<SubjectExportProgress | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   if (subjectQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -85,6 +90,24 @@ export default function AvaliadoDetalhe() {
 
   const s = subjectQuery.data
   const age = ageFromBirthDate(s.birth_date)
+
+  async function handleFullExport() {
+    if (!organization) return
+    setExportBusy(true)
+    setExportError(null)
+    setExportProgress(null)
+    try {
+      await exportSubjectArchive({
+        subjectId: s.id,
+        subjectName: s.full_name,
+        onProgress: setExportProgress,
+      })
+    } catch (error) {
+      setExportError(normalizeDbError(error))
+    } finally {
+      setExportBusy(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -105,7 +128,21 @@ export default function AvaliadoDetalhe() {
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFullExport}
+              disabled={exportBusy || !organization}
+            >
+              <Download />
+              {exportBusy
+                ? exportProgress && exportProgress.total > 0
+                  ? `Fotos ${exportProgress.completed}/${exportProgress.total}`
+                  : 'Preparando...'
+                : 'Exportar dados'}
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link to={`/agenda?subject=${s.id}`}>
                 <CalendarPlus /> Agendar
@@ -118,6 +155,11 @@ export default function AvaliadoDetalhe() {
             </Button>
           </div>
         </div>
+        {exportError ? (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {exportError}
+          </p>
+        ) : null}
       </div>
 
       <Card>
@@ -151,6 +193,7 @@ export default function AvaliadoDetalhe() {
         subjectId={s.id}
         orgId={organization?.id ?? ''}
         controllerName={organization?.name ?? null}
+        requiresGuardian={age !== null && age < 18}
       />
 
       <AnamneseSection subjectId={s.id} />
@@ -167,6 +210,10 @@ export default function AvaliadoDetalhe() {
 function WorkoutSection({ subjectId }: { subjectId: string }) {
   const plansQuery = useWorkoutPlans(subjectId)
   const plans = plansQuery.data ?? []
+
+  if (plansQuery.isError) {
+    return <QueryError message="Não foi possível carregar os planos de treino." onRetry={() => void plansQuery.refetch()} />
+  }
 
   return (
     <section className="space-y-3">
@@ -210,6 +257,15 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
   const consentQuery = useActiveConsent(subjectId)
   const sessionsQuery = useSessions(subjectId)
   const hasConsent = !!consentQuery.data
+
+  if (consentQuery.isError || sessionsQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível confirmar o consentimento ou carregar as fotos posturais."
+        onRetry={() => void Promise.all([consentQuery.refetch(), sessionsQuery.refetch()])}
+      />
+    )
+  }
 
   return (
     <section className="space-y-3">
@@ -267,6 +323,19 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+
+  if (consentQuery.isError || anamnesesQuery.isError || intakesQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível confirmar o consentimento ou carregar a anamnese."
+        onRetry={() => void Promise.all([
+          consentQuery.refetch(),
+          anamnesesQuery.refetch(),
+          intakesQuery.refetch(),
+        ])}
+      />
+    )
+  }
 
   async function handleGenerate() {
     setGenError(null)
@@ -429,6 +498,15 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
   const hasConsent = !!consentQuery.data
   const assessments = assessmentsQuery.data ?? []
 
+  if (consentQuery.isError || assessmentsQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível confirmar o consentimento ou carregar as avaliações."
+        onRetry={() => void Promise.all([consentQuery.refetch(), assessmentsQuery.refetch()])}
+      />
+    )
+  }
+
   function exportCsv(dialect: CsvDialect) {
     const csv = buildAssessmentsCsv(assessments.map(assessmentCsvRecord), dialect)
     downloadBlob(csvBlob(csv), `avaliacoes-${dialect}.csv`)
@@ -436,10 +514,11 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
       void logExport({
         orgId: organization.id,
         userId: user.id,
-        action: 'EXPORT_CSV',
-        tableName: 'assessments',
-        rowId: null,
-      })
+          action: 'EXPORT_CSV',
+          tableName: 'assessments',
+          rowId: null,
+          subjectId,
+        })
     }
   }
 
@@ -517,18 +596,23 @@ function ConsentSection({
   subjectId,
   orgId,
   controllerName,
+  requiresGuardian,
 }: {
   subjectId: string
   orgId: string
   controllerName: string | null
+  requiresGuardian: boolean
 }) {
   const { user } = useAuth()
   const consentQuery = useActiveConsent(subjectId)
   const grant = useGrantConsent(subjectId)
   const revoke = useRevokeConsent(subjectId)
-  const [signerKind, setSignerKind] = useState<SignerKind>('titular')
+  const [signerKind, setSignerKind] = useState<SignerKind>(
+    requiresGuardian ? 'responsavel' : 'titular'
+  )
   const [signerName, setSignerName] = useState('')
   const [showText, setShowText] = useState(false)
+  const [accepted, setAccepted] = useState(false)
 
   if (consentQuery.isPending) {
     return (
@@ -537,6 +621,15 @@ function ConsentSection({
           Carregando consentimento...
         </CardContent>
       </Card>
+    )
+  }
+
+  if (consentQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível confirmar se existe consentimento vigente. Nenhuma ação foi liberada."
+        onRetry={() => void consentQuery.refetch()}
+      />
     )
   }
 
@@ -558,7 +651,7 @@ function ConsentSection({
             Aceito por {active.signer_name} ({active.signer_kind}) em{' '}
             {formatDateTime(active.granted_at)} · versão {active.consent_version}
           </p>
-          {revokeError ? <p className="text-destructive">{revokeError.message}</p> : null}
+          {revokeError ? <p role="alert" className="text-destructive">{normalizeDbError(revokeError)}</p> : null}
           <Button
             variant="destructive"
             size="sm"
@@ -573,7 +666,8 @@ function ConsentSection({
   }
 
   const collectedBy = user?.id ?? ''
-  const canSubmit = signerName.trim().length >= 3 && orgId.length > 0 && collectedBy.length > 0
+  const canSubmit =
+    accepted && signerName.trim().length >= 3 && orgId.length > 0 && collectedBy.length > 0
 
   return (
     <Card>
@@ -599,19 +693,27 @@ function ConsentSection({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Quem assina</Label>
+            <Label htmlFor="consent-signer-kind">Quem assina</Label>
             <select
+              id="consent-signer-kind"
               value={signerKind}
               onChange={(e) => setSignerKind(e.target.value as SignerKind)}
               className={controlClass}
+              disabled={requiresGuardian}
             >
               <option value="titular">O próprio titular</option>
               <option value="responsavel">Responsável legal</option>
             </select>
+            {requiresGuardian ? (
+              <p className="text-xs text-muted-foreground">
+                Menor de idade: o responsável legal deve consentir.
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Nome de quem assina</Label>
+            <Label htmlFor="consent-signer-name">Nome de quem assina</Label>
             <Input
+              id="consent-signer-name"
               value={signerName}
               onChange={(e) => setSignerName(e.target.value)}
               placeholder="Nome completo"
@@ -619,7 +721,20 @@ function ConsentSection({
           </div>
         </div>
 
-        {grantError ? <p className="text-destructive">{grantError.message}</p> : null}
+        <label className="flex items-start gap-2 rounded-md border p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4"
+            checked={accepted}
+            onChange={(event) => setAccepted(event.target.checked)}
+          />
+          <span>
+            Confirmo que a pessoa indicada leu o termo exibido e manifestou consentimento livre,
+            informado e inequívoco para este tratamento.
+          </span>
+        </label>
+
+        {grantError ? <p role="alert" className="text-destructive">{normalizeDbError(grantError)}</p> : null}
 
         <Button
           size="sm"

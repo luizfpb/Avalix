@@ -1,45 +1,78 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  saveIntakeLinkLocal,
-  loadIntakeLinkLocal,
+  clearAllIntakeLinksLocal,
   clearIntakeLinkLocal,
+  loadIntakeLinkLocal,
   purgeExpiredIntakeLinks,
+  saveIntakeLinkLocal,
+  setIntakeLinkScope,
 } from './linkStore'
 
-const NOW = new Date('2026-07-07T12:00:00Z').getTime()
-const FUTURE = new Date('2026-07-14T12:00:00Z').toISOString()
-const PAST = new Date('2026-07-01T12:00:00Z').toISOString()
+const NOW = Date.parse('2026-01-01T00:00:00Z')
+const FUTURE = '2026-01-02T00:00:00Z'
+const PAST = '2025-12-31T00:00:00Z'
+const TOKEN = 'a'.repeat(43)
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(NOW)
+  localStorage.clear()
+  setIntakeLinkScope('user-a', 'org-a')
+})
 
-describe('linkStore (URL do convite por aparelho)', () => {
-  it('salva e recupera enquanto o convite não expirou', () => {
-    saveIntakeLinkLocal('i1', 'https://app/a/tok', FUTURE)
-    expect(loadIntakeLinkLocal('i1', NOW)).toBe('https://app/a/tok')
+afterEach(() => vi.restoreAllMocks())
+
+describe('link local de intake', () => {
+  it('salva no escopo e normaliza token legado do path para fragmento', () => {
+    saveIntakeLinkLocal('i1', `http://localhost:3000/a/${TOKEN}`, FUTURE)
+    expect(loadIntakeLinkLocal('i1', NOW)).toBe(`http://localhost:3000/a#${TOKEN}`)
+    setIntakeLinkScope('user-b', 'org-a')
+    expect(loadIntakeLinkLocal('i1', NOW)).toBeNull()
   })
 
-  it('expirado some (e é removido do storage)', () => {
-    saveIntakeLinkLocal('i2', 'https://app/a/tok', PAST)
+  it('nao salva sem dono, origem estranha ou token invalido', () => {
+    setIntakeLinkScope(null, null)
+    saveIntakeLinkLocal('i1', `http://localhost:3000/a#${TOKEN}`, FUTURE)
+    setIntakeLinkScope('user-a', 'org-a')
+    saveIntakeLinkLocal('i2', `https://evil.example/a#${TOKEN}`, FUTURE)
+    saveIntakeLinkLocal('i3', 'http://localhost:3000/a#curto', FUTURE)
+    expect(localStorage.length).toBe(0)
+  })
+
+  it('descarta link legado sem atribui-lo ao usuario atual', () => {
+    localStorage.setItem(
+      'avalix:intakelink:legado',
+      JSON.stringify({ url: `http://localhost:3000/a#${TOKEN}`, expiresAt: FUTURE })
+    )
+    setIntakeLinkScope('user-b', 'org-b')
+    expect(loadIntakeLinkLocal('legado', NOW)).toBeNull()
+    expect(localStorage.getItem('avalix:intakelink:legado')).toBeNull()
+  })
+
+  it('remove expirado ao ler', () => {
+    saveIntakeLinkLocal('i2', `http://localhost:3000/a#${TOKEN}`, PAST)
     expect(loadIntakeLinkLocal('i2', NOW)).toBeNull()
-    expect(localStorage.getItem('avalix:intakelink:i2')).toBeNull()
   })
 
-  it('clear remove (cancelamento do convite)', () => {
-    saveIntakeLinkLocal('i3', 'https://app/a/tok', FUTURE)
+  it('limpa um link e todos os links no logout', () => {
+    saveIntakeLinkLocal('i3', `http://localhost:3000/a#${TOKEN}`, FUTURE)
     clearIntakeLinkLocal('i3')
     expect(loadIntakeLinkLocal('i3', NOW)).toBeNull()
+
+    saveIntakeLinkLocal('i4', `http://localhost:3000/a#${TOKEN}`, FUTURE)
+    localStorage.setItem('outra', 'fica')
+    clearAllIntakeLinksLocal()
+    expect(localStorage.getItem('outra')).toBe('fica')
+    expect([...Array(localStorage.length)].some((_, i) => localStorage.key(i)?.startsWith('avalix:intakelink:'))).toBe(false)
   })
 
-  it('purge limpa vencidos/corrompidos e preserva vivos e chaves alheias', () => {
-    saveIntakeLinkLocal('velho', 'https://a', PAST)
-    saveIntakeLinkLocal('vivo', 'https://b', FUTURE)
-    localStorage.setItem('avalix:intakelink:lixo', '{quebrado')
-    localStorage.setItem('outra-coisa', 'fica')
+  it('purge remove vencidos e preserva vivos e chaves alheias', () => {
+    saveIntakeLinkLocal('velho', `http://localhost:3000/a#${TOKEN}`, PAST)
+    saveIntakeLinkLocal('vivo', `http://localhost:3000/a#${TOKEN}`, FUTURE)
+    localStorage.setItem('outra-chave', 'fica')
     purgeExpiredIntakeLinks(NOW)
-    expect(localStorage.getItem('avalix:intakelink:velho')).toBeNull()
-    expect(localStorage.getItem('avalix:intakelink:lixo')).toBeNull()
-    expect(loadIntakeLinkLocal('vivo', NOW)).toBe('https://b')
-    expect(localStorage.getItem('outra-coisa')).toBe('fica')
+    expect(loadIntakeLinkLocal('velho', NOW)).toBeNull()
+    expect(loadIntakeLinkLocal('vivo', NOW)).toBe(`http://localhost:3000/a#${TOKEN}`)
+    expect(localStorage.getItem('outra-chave')).toBe('fica')
   })
 })
