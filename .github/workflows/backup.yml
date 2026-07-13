@@ -79,10 +79,12 @@ jobs:
             --passphrase-fd 0 --symmetric --cipher-algo AES256 \
             -o "$root.tar.gz.gpg" "$root.tar.gz"
 
-          # Verifica que o artifact é descriptografável e contém o arquivo SQL.
+          # Verifica que o artifact é descriptografável e contém o dump SQL e o
+          # manifest do Storage (senão um backup só-de-banco passaria como bom).
           printf '%s' "$PASSPHRASE" | gpg --batch --quiet --pinentry-mode loopback \
             --passphrase-fd 0 --decrypt "$root.tar.gz.gpg" | tar -tzf - > "$root.contents.txt"
           grep -q "/db.dump$" "$root.contents.txt"
+          grep -q "/storage/manifest.json$" "$root.contents.txt"
           rm -rf "$root" "$root.tar.gz" "$root.contents.txt"
           echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
 

@@ -76,6 +76,14 @@ async function backupDirectory(bucket, prefix = '') {
       .download(objectPath, {}, { cache: 'no-store' })
     if (error) throw error
     const bytes = Buffer.from(await data.arrayBuffer())
+    // download() pode devolver corpo truncado sem setar error (proxy/conexão
+    // cortada). O tamanho da origem vem no list(); um mismatch é backup corrompido.
+    const expectedSize = item.metadata?.size
+    if (typeof expectedSize === 'number' && expectedSize !== bytes.byteLength) {
+      throw new Error(
+        `Download truncado de ${bucket}/${objectPath}: ${bytes.byteLength} de ${expectedSize} bytes`
+      )
+    }
     const destination = safeDestination(bucket, objectPath)
     await mkdir(path.dirname(destination), { recursive: true })
     await writeFile(destination, bytes)
@@ -90,6 +98,16 @@ async function backupDirectory(bucket, prefix = '') {
 
 await mkdir(output, { recursive: true })
 for (const bucket of buckets) await backupDirectory(bucket)
+
+// Zero objetos nos dois buckets indica bucket errado, regressão de permissão ou
+// falha silenciosa da API — nunca um backup completo com o Storage atual. Falha
+// dura para não publicar um artifact "com sucesso" sem as fotos/logos.
+if (manifest.objects.length === 0) {
+  throw new Error(
+    'Storage backup vazio: nenhum objeto em photos/logos. Abortando para não publicar backup incompleto.'
+  )
+}
+
 await writeFile(path.join(output, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
 const totalBytes = manifest.objects.reduce((sum, item) => sum + item.bytes, 0)

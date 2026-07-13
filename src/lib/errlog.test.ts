@@ -18,4 +18,14 @@ describe('higienizacao do log do cliente', () => {
     expect(sanitizedClientPath(`/a/${token}`)).toBe('/a')
     expect(sanitizedClientPath('/agenda')).toBe('/agenda')
   })
+
+  it('remove tokens de auth em fragmento e query (callback OAuth/recuperacao)', () => {
+    const secret = 'x'.repeat(48)
+    const input =
+      `erro em https://app/auth#access_token=${secret}&refresh_token=${secret}` +
+      `&id_token=${secret}&provider_token=${secret}&code=${secret}?apikey=${secret}`
+    const output = sanitizeClientErrorText(input, 600)
+    expect(output).not.toContain(secret)
+    expect(output).toContain('[redacted]')
+  })
 })

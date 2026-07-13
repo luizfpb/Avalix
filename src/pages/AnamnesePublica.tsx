@@ -57,8 +57,21 @@ function Field({
   )
 }
 
+// Captura o capability token uma unica vez por carga da pagina. O StrictMode
+// (dev) chama o initializer do useState duas vezes e um remount reexecutaria a
+// captura sobre a URL ja limpa (fragmento removido) devolvendo null; o memo de
+// modulo garante idempotencia — o replaceState roda uma vez e o mesmo token
+// sobrevive a remounts dentro da mesma carga.
+let capturedIntakeToken: string | null | undefined
+function captureIntakeTokenOnce(): string | null {
+  if (capturedIntakeToken === undefined) {
+    capturedIntakeToken = consumePublicIntakeToken()
+  }
+  return capturedIntakeToken
+}
+
 export default function AnamnesePublica() {
-  const [token] = useState(() => consumePublicIntakeToken())
+  const [token] = useState(captureIntakeTokenOnce)
   const query = useQuery({
     queryKey: ['public-intake', token],
     queryFn: () => getIntakeByToken(token as string),

@@ -21,7 +21,10 @@ const seen = new Set<string>()
 export function sanitizeClientErrorText(value: unknown, maxLength: number): string {
   return String(value ?? '')
     .replace(/(\/a(?:\/|#|%23))[A-Za-z0-9_-]{20,}/gi, '$1[redacted]')
-    .replace(/([?&](?:token|access_token|apikey)=)[^&#\s]+/gi, '$1[redacted]')
+    .replace(
+      /([?&#](?:token|access_token|refresh_token|provider_token|id_token|apikey|code)=)[^&#\s]+/gi,
+      '$1[redacted]',
+    )
     .slice(0, maxLength)
 }
 
