@@ -566,15 +566,20 @@ select throws_ok(
   'finalizacao recusa exclusao enquanto houver objeto'
 );
 
+-- A Storage API apaga primeiro os bytes e marca a delecao SQL como autorizada.
+-- Nesta fixture nao ha bytes reais; replica somente esse marcador transacional
+-- exigido pelo trigger nativo storage.protect_delete().
+set local storage.allow_delete_query = 'true';
 delete from storage.objects
  where bucket_id = 'photos'
    and name in (
      select storage_path from public.posture_photos
       where id = '60000000-0000-0000-0000-000000000001'
      union all
-     select thumb_path from public.posture_photos
-      where id = '60000000-0000-0000-0000-000000000001'
+      select thumb_path from public.posture_photos
+       where id = '60000000-0000-0000-0000-000000000001'
    );
+set local storage.allow_delete_query = 'false';
 
 select lives_ok(
   $$ select public.finalize_subject_deletion('20000000-0000-0000-0000-000000000001') $$,
