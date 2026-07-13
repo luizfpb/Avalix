@@ -1,18 +1,21 @@
-# Rotas conhecidas da SPA. Não use fallback global: um JS inexistente precisa
-# responder 404, nunca index.html com status 200.
-/a                   /index.html   200
-/a/*                 /index.html   200
-/login               /index.html   200
-/cadastro            /index.html   200
-/recuperar-senha     /index.html   200
-/mfa                 /index.html   200
-/onboarding          /index.html   200
-/dashboard           /index.html   200
-/avaliados           /index.html   200
-/avaliados/*         /index.html   200
-/configuracoes       /index.html   200
-/auditoria           /index.html   200
-/agenda               /index.html   200
-/carteira            /index.html   200
-/exercicios          /index.html   200
-/ferramentas/*       /index.html   200
+# Rotas conhecidas da SPA. O destino deve ser a raiz: no Cloudflare Pages,
+# /index.html e canonicalizado para / e quebra o rewrite. Nao use fallback
+# global: um JS inexistente precisa responder 404, nunca o shell com status 200.
+/a                   /   200
+/login               /   200
+/cadastro            /   200
+/recuperar-senha     /   200
+/mfa                 /   200
+/onboarding          /   200
+/dashboard           /   200
+/avaliados           /   200
+/configuracoes       /   200
+/auditoria           /   200
+/agenda               /   200
+/carteira            /   200
+/exercicios          /   200
+
+# O Pages exige redirects estaticos antes dos dinamicos.
+/a/*                 /   200
+/avaliados/*         /   200
+/ferramentas/*       /   200

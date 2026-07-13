@@ -3,17 +3,20 @@
 Este procedimento preserva o banco que ja esta em uso. Ele nao usa reset,
 rollback destrutivo, seed ou reaplicacao de migrations antigas.
 
-## Estado confirmado em 13/07/2026
+## Estado confirmado apos o rollout de 13/07/2026
 
-- o schema remoto contem as mudancas de `0001` a `0019`;
-- o historico remoto do CLI registra apenas `0001` e `0002`;
-- a migration `0020` ainda nao esta aplicada;
+- o schema e o historico remoto do CLI estao alinhados de `0001` a `0020`;
+- `public.app_schema_version()` retorna `0020`;
+- a migration `0020` foi aplicada sem reset, seed ou reaplicacao das migrations
+  antigas, depois de dry-run exclusivo e reconciliacao do historico `0003`–`0019`;
 - o backup gerado em 13/07/2026 foi descriptografado e restaurado com sucesso
   em PostgreSQL descartavel; banco, FKs, RLS, gatilhos e Storage foram
   validados, incluindo 6 objetos/136.200 bytes com SHA-256;
-- a auditoria remota contou 7 avaliados, 5 avaliacoes, 4 anamneses,
+- a validacao pos-migration manteve 7 avaliados, 5 avaliacoes, 4 anamneses,
   6 consentimentos, 19 intakes (3 aceitos e 16 cancelados), 4 planos com
   7 dias/35 exercicios, 60 circunferencias e 35 dobras;
+- os 16 intakes cancelados foram marcados como anonimizados, sem excluir as
+  linhas nem as evidencias permitidas, gerando 16 eventos de auditoria esperados;
 - nao havia consentimento ativo duplicado, menor sem responsavel, objeto de foto
   orfao nem intake terminal com evidencia sujeita a anonimizacao no rollout.
 
