@@ -56,7 +56,7 @@ export default function Carteira() {
           </span>
           <span>
             <b className="tabular-nums">{quietCount}</b>{' '}
-            <span className="text-muted-foreground">sumidos</span>
+            <span className="text-muted-foreground">sem treino recente</span>
           </span>
         </div>
       ) : null}
@@ -77,7 +77,7 @@ export default function Carteira() {
                   <span className="min-w-0 truncate font-medium">{r.name}</span>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                     {r.reassessDue ? <Badge variant="warn">Reavaliar</Badge> : null}
-                    {r.quiet ? <Badge variant="warn">Sumido</Badge> : null}
+                    {r.quiet ? <Badge variant="warn">Sem treino recente</Badge> : null}
                   </div>
                 </div>
 

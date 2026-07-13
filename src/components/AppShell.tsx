@@ -153,7 +153,7 @@ export function AppShell() {
       </header>
 
       <div className="lg:pl-72">
-        <main className="measurement-field mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
+        <main className="measurement-field relative mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
           <Outlet />
         </main>
       </div>

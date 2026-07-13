@@ -2,7 +2,7 @@ import type { ActivePlanSummary, LogSummary } from './api'
 import { adherencePct, plannedSessions } from './progress'
 import { daysSince, dueForReassessment } from '../../lib/reminders'
 
-// dias sem treino registrado (com plano ativo) que marcam um aluno como "sumido"
+// dias sem treino registrado (com plano ativo) que pedem atenção do profissional
 export const QUIET_DAYS = 10
 
 export type CarteiraRow = {

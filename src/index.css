@@ -150,7 +150,6 @@
   }
 
   .measurement-field {
-    position: relative;
     isolation: isolate;
   }
 

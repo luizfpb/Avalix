@@ -16,7 +16,7 @@ const activePlans: ActivePlanSummary[] = [
 ]
 const logSummary: Record<string, LogSummary> = {
   p1: { count: 10, lastDate: '2026-06-23' }, // aderente, treinou ontem
-  p2: { count: 1, lastDate: '2026-06-01' }, // pouca adesao, sumido (23 dias)
+  p2: { count: 1, lastDate: '2026-06-01' }, // pouca adesão, sem treino recente (23 dias)
 }
 const lastAssessment: Record<string, string> = {
   s1: '2026-06-10', // recente
@@ -32,7 +32,7 @@ describe('buildCarteira', () => {
     expect(rows).toHaveLength(3)
   })
 
-  it('calcula adesão, reavaliação e sumido', () => {
+  it('calcula adesão, reavaliação e ausência de treino recente', () => {
     const ana = rows.find((r) => r.subjectId === 's1')!
     expect(ana.adherencePct).toBeCloseTo(10 / 12, 5)
     expect(ana.reassessDue).toBe(false)
@@ -49,7 +49,7 @@ describe('buildCarteira', () => {
   })
 
   it('ordena por urgência (mais sinais primeiro)', () => {
-    // Bruno tem reavaliar(2)+sumido(2)+baixa adesao(1)=5; Carla reavaliar(2);
+    // Bruno tem reavaliar(2)+sem treino recente(2)+baixa adesão(1)=5; Carla reavaliar(2);
     // Ana 0 -> ordem Bruno, Carla, Ana
     expect(rows.map((r) => r.subjectId)).toEqual(['s2', 's3', 's1'])
   })
