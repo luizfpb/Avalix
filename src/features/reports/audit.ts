@@ -24,8 +24,8 @@ export async function logDataAction(input: {
     p_org: input.orgId,
     p_action: input.action,
     p_table_name: input.tableName,
-    p_row_id: input.rowId,
-    p_subject_id: input.subjectId ?? null,
+    ...(input.rowId !== null ? { p_row_id: input.rowId } : {}),
+    ...(input.subjectId != null ? { p_subject_id: input.subjectId } : {}),
   })
   if (error) console.warn('falha ao registrar auditoria de dados:', error.message)
 }
