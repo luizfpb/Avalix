@@ -1,3 +1,17 @@
-# SPA: qualquer rota cai no index.html (o react-router resolve no cliente).
-# Arquivos estáticos reais (assets, sw.js, manifest) são servidos antes desta regra.
-/*    /index.html   200
+# Rotas conhecidas da SPA. Não use fallback global: um JS inexistente precisa
+# responder 404, nunca index.html com status 200.
+/a/*                 /index.html   200
+/login               /index.html   200
+/cadastro            /index.html   200
+/recuperar-senha     /index.html   200
+/mfa                 /index.html   200
+/onboarding          /index.html   200
+/dashboard           /index.html   200
+/avaliados           /index.html   200
+/avaliados/*         /index.html   200
+/configuracoes       /index.html   200
+/auditoria           /index.html   200
+/agenda               /index.html   200
+/carteira            /index.html   200
+/exercicios          /index.html   200
+/ferramentas/*       /index.html   200
