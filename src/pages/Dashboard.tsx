@@ -61,7 +61,7 @@ export default function Dashboard() {
             {organization?.name ?? 'Seu espaço profissional'}
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            O que merece sua atenção agora, sem ruído.
+            O que merece sua atenção agora.
           </p>
         </div>
         <Button asChild size="lg" className="self-start sm:self-auto">
