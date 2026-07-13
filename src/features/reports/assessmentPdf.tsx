@@ -200,8 +200,8 @@ const PX0 = 34 // gutter esquerdo (escala y)
 const PX1 = 212 // borda direita do plot (deixa margem à direita pro valor atual)
 const PY0 = 18 // topo (espaço pro rótulo de valor sobre o ponto)
 const PY1 = 84 // base do plot (acima da linha de datas)
-const AXIS_COLOR = '#5b5570' // escala/datas: cinza-roxo legível (não apagado)
-const GRID_COLOR = '#d3cae8' // linhas de referência
+const AXIS_COLOR = '#66717E' // escala/datas: legível sem disputar com os dados
+const GRID_COLOR = '#DCE2E8' // linhas de referência
 
 function Donut({ lean, fat }: { lean: number; fat: number }) {
   const slices = donutSlices([lean, fat], 50, 50, 46, 28)
@@ -319,14 +319,22 @@ function TrendChart({
   )
 }
 
-function EvolutionSection({ history }: { history: AssessmentHistoryPoint[] }) {
+function EvolutionSection({
+  history,
+  maxCharts = 4,
+}: {
+  history: AssessmentHistoryPoint[]
+  maxCharts?: number
+}) {
   if (history.length < 2) return null
   // PDF: últimos 10 pontos pra leitura limpa (no app a tela mostra todos)
   const recent = history.slice(-10)
   const charts = TREND_METRICS.map((m) => ({
     m,
     points: recent.map((p) => ({ value: p[m.key], date: p.date })),
-  })).filter((c) => c.points.filter((p) => p.value != null).length >= 2)
+  }))
+    .filter((c) => c.points.filter((p) => p.value != null).length >= 2)
+    .slice(0, maxCharts)
   if (charts.length === 0) return null
   return (
     <View style={styles.section}>
@@ -348,7 +356,7 @@ function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
   const series = buildCircSeries(rows, 12, 10)
   if (series.length === 0) return null
   return (
-    <View style={styles.section}>
+    <View style={styles.section} wrap={series.length > 2}>
       <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
       <View style={styles.evoGrid}>
         {series.map((s) => (
@@ -598,7 +606,7 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
         />
         <InfoCard items={info} />
         <EvolutionSummary history={data.history} />
-        <EvolutionSection history={data.history} />
+        <EvolutionSection history={data.history} maxCharts={5} />
         <CircumferenceEvolution rows={data.circumferenceHistory} />
         <Text style={styles.reproNote}>
           Valores calculados a partir das avaliações registradas no período. Documento de uso

@@ -37,6 +37,7 @@ export default function Login() {
           <Input
             id="email"
             type="email"
+            placeholder="voce@exemplo.com"
             autoComplete="email"
             required
             value={email}
@@ -48,22 +49,27 @@ export default function Login() {
           <Input
             id="password"
             type="password"
+            placeholder="Sua senha"
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive">
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
       </form>
-      <div className="mt-4 flex items-center justify-between text-xs">
-        <Link to="/recuperar-senha" className="text-muted-foreground hover:text-foreground">
+      <div className="mt-5 flex items-center justify-between gap-4 text-xs">
+        <Link to="/recuperar-senha" className="font-medium text-muted-foreground hover:text-foreground">
           Esqueci minha senha
         </Link>
-        <Link to="/cadastro" className="text-muted-foreground hover:text-foreground">
+        <Link to="/cadastro" className="font-semibold text-primary hover:underline">
           Criar conta
         </Link>
       </div>

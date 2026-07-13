@@ -38,8 +38,11 @@ const Auditoria = lazy(() => import('./pages/Auditoria'))
 
 function PageFallback() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <span className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
+    <div className="flex min-h-[48vh] items-center justify-center" role="status" aria-label="Carregando página">
+      <div className="flex flex-col items-center gap-3">
+        <span className="size-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+        <span className="text-xs font-medium text-muted-foreground">Preparando seu espaço…</span>
+      </div>
     </div>
   )
 }

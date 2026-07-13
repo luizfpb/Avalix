@@ -1,5 +1,15 @@
 import { Link } from 'react-router'
-import { Users, UserPlus, Settings, ShieldCheck, ArrowRight, CalendarDays, Bell, ClipboardCheck } from 'lucide-react'
+import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Settings,
+  ShieldCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
@@ -11,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { subjectTermLabels } from '../lib/subjectTerm'
 
 export default function Dashboard() {
-  const { organization, role } = useOrganization()
+  const { organization } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
   const { data: subjects, isPending } = useSubjects(organization?.id)
 
@@ -34,198 +44,283 @@ export default function Dashboard() {
   const dueList = (subjects ?? []).filter(
     (s) => s.is_active && dueForReassessment(lastMap[s.id] ?? null, now)
   )
-  const hasReminders = upcoming.length > 0 || dueList.length > 0
+  const todayLabel = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+  }).format(now)
 
   return (
-    <div className="space-y-6">
-      <section>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {organization?.name ?? 'Início'}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Visão geral da sua organização{role ? ` · ${role}` : ''}.
-        </p>
-      </section>
+    <div className="space-y-8">
+      <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+            Visão de hoje · {todayLabel}
+          </p>
+          <h1 className="mt-2 max-w-2xl text-4xl font-medium leading-tight tracking-[-0.03em] sm:text-[2.75rem]">
+            {organization?.name ?? 'Seu espaço profissional'}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            O que merece sua atenção agora, sem ruído.
+          </p>
+        </div>
+        <Button asChild size="lg" className="self-start sm:self-auto">
+          <Link to="/avaliados/novo">
+            <UserPlus /> Cadastrar {labels.singular}
+          </Link>
+        </Button>
+      </header>
 
       {isEmpty ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <span className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
-              <Users className="size-6" />
+        <Card className="overflow-hidden border-dashed border-primary/30 bg-primary/[0.035]">
+          <CardContent className="relative flex flex-col items-start gap-5 py-4 sm:flex-row sm:items-center">
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/15">
+              <Users className="size-6" strokeWidth={1.8} />
             </span>
-            <div>
-              <p className="font-medium">Comece cadastrando seu primeiro {labels.singular}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Depois você registra o consentimento e já pode avaliar.
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold">Comece pelo primeiro {labels.singular}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Cadastre os dados básicos; depois o Avalix orienta consentimento, anamnese e avaliação.
               </p>
             </div>
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link to="/avaliados/novo">
-                <UserPlus /> Cadastrar {labels.singular}
+                Começar agora <ArrowRight />
               </Link>
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label={`${labels.pluralCap} cadastrados`} value={isPending ? '—' : total} />
-          <StatCard label="Ativos" value={isPending ? '—' : ativos} />
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumo da operação">
+          <StatCard
+            label={`${labels.pluralCap} cadastrados`}
+            value={isPending ? '—' : total}
+            hint="base completa"
+          />
+          <StatCard label="Ativos" value={isPending ? '—' : ativos} hint="em acompanhamento" tone="success" />
+          <StatCard label="Próximos 7 dias" value={upcoming.length} hint="sessões agendadas" />
+          <StatCard label="Para reavaliar" value={dueList.length} hint={`há ${REASSESS_DAYS}+ dias`} tone="warning" />
         </section>
       )}
 
       {pendingIntakes.length > 0 ? (
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="py-1">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <ClipboardCheck className="size-4 text-destructive" /> Anamneses aguardando revisão
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {pendingIntakes.length}{' '}
-              {pendingIntakes.length === 1 ? 'aluno respondeu e está' : 'alunos responderam e estão'}{' '}
-              esperando você revisar e aceitar.
-            </p>
-            <ul className="mt-2 space-y-1 text-sm">
-              {pendingIntakes.slice(0, 5).map((p) => (
-                <li key={p.id}>
-                  {p.id ? (
-                    <Link
-                      to={
-                        p.subject_id
-                          ? `/avaliados/${p.subject_id}/anamnese/intake/${p.id}`
-                          : `/avaliados/intake/${p.id}`
-                      }
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {p.subject_name ?? 'Aluno'}
-                    </Link>
-                  ) : (
-                    <span>{p.subject_name ?? 'Aluno'}</span>
-                  )}
-                  {!p.subject_id ? (
-                    <span className="ml-1.5 text-xs text-muted-foreground">novo cadastro</span>
-                  ) : null}
-                </li>
+        <Card className="overflow-hidden border-warning/25 bg-warning/[0.055]">
+          <CardContent className="flex flex-col gap-4 py-1 sm:flex-row sm:items-center">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warning/12 text-warning">
+              <ClipboardCheck className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{pendingIntakes.length} {pendingIntakes.length === 1 ? 'anamnese aguarda' : 'anamneses aguardam'} sua revisão</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                As respostas já chegaram. Revise antes de seguir com o atendimento.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {pendingIntakes.slice(0, 3).map((p) => (
+                <Button key={p.id} asChild variant="outline" size="sm">
+                  <Link
+                    to={
+                      p.subject_id
+                        ? `/avaliados/${p.subject_id}/anamnese/intake/${p.id}`
+                        : `/avaliados/intake/${p.id}`
+                    }
+                  >
+                    {p.subject_name ?? 'Abrir resposta'}
+                  </Link>
+                </Button>
               ))}
-              {pendingIntakes.length > 5 ? (
-                <li className="text-xs text-muted-foreground">+{pendingIntakes.length - 5} mais</li>
+              {pendingIntakes.length > 3 ? (
+                <span className="self-center text-xs font-semibold text-warning">
+                  +{pendingIntakes.length - 3}
+                </span>
               ) : null}
-            </ul>
+            </div>
           </CardContent>
         </Card>
       ) : null}
 
-      {hasReminders ? (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">Lembretes</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card>
-              <CardContent className="py-1">
-                <div className="flex items-center justify-between">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <CalendarDays className="size-4 text-primary" /> Próximas sessões
-                  </p>
-                  <Link to="/agenda" className="text-xs text-primary hover:underline">
-                    Agenda
-                  </Link>
-                </div>
-                {upcoming.length === 0 ? (
-                  <p className="mt-1 text-sm text-muted-foreground">Nada nos próximos 7 dias.</p>
-                ) : (
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {upcoming.slice(0, 3).map((a) => (
-                      <li key={a.id} className="flex justify-between gap-2">
-                        <span className="min-w-0 truncate">
-                          {a.subjectName} <span className="text-muted-foreground">· {a.title}</span>
-                        </span>
-                        <span className="shrink-0 text-muted-foreground">
-                          {relativeDayLabel(a.starts_at, now)}
-                        </span>
-                      </li>
-                    ))}
-                    {upcoming.length > 3 ? (
-                      <li className="text-xs text-muted-foreground">+{upcoming.length - 3} mais</li>
-                    ) : null}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+      <section className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardContent className="py-1">
+            <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                  Agenda
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">Próximas sessões</h2>
+              </div>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/agenda">
+                  Ver agenda <ArrowRight />
+                </Link>
+              </Button>
+            </div>
 
-            {dueList.length > 0 ? (
-              <Card>
-                <CardContent className="py-1">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <Bell className="size-4 text-amber-500" /> Para reavaliar
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Sem avaliação há {REASSESS_DAYS}+ dias (ou nunca).
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {dueList.slice(0, 4).map((s) => (
-                      <li key={s.id}>
-                        <Link to={`/avaliados/${s.id}`} className="hover:underline">
-                          {s.full_name}
-                        </Link>
-                      </li>
-                    ))}
-                    {dueList.length > 4 ? (
-                      <li className="text-xs text-muted-foreground">+{dueList.length - 4} mais</li>
-                    ) : null}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : null}
+            {upcoming.length === 0 ? (
+              <EmptyLine
+                icon={CalendarDays}
+                title="Agenda tranquila nos próximos 7 dias"
+                text="Novas sessões aparecerão aqui."
+              />
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {upcoming.slice(0, 5).map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 py-3.5">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <CalendarDays className="size-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{a.subjectName}</span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{a.title}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                      {relativeDayLabel(a.starts_at, now)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardContent className="py-1">
+            <div className="border-b border-border/70 pb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                Acompanhamento
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">Para reavaliar</h2>
+            </div>
+
+            {dueList.length === 0 ? (
+              <EmptyLine
+                icon={CheckCircle2}
+                title="Acompanhamentos em dia"
+                text="Ninguém ultrapassou o intervalo de reavaliação."
+                success
+              />
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {dueList.slice(0, 5).map((subject) => (
+                  <li key={subject.id}>
+                    <Link
+                      to={`/avaliados/${subject.id}`}
+                      className="group flex items-center gap-3 py-3.5 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                    >
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+                        <Bell className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {subject.full_name}
+                      </span>
+                      <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              Acesso rápido
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">Continue seu trabalho</h2>
           </div>
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Atalhos</h2>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <ActionCard
             to="/avaliados"
             icon={Users}
             title={labels.pluralCap}
-            desc="Cadastro, avaliações e fotos."
+            desc="Cadastros, avaliações e fotos."
           />
           <ActionCard
             to="/avaliados/novo"
             icon={UserPlus}
             title={`Novo ${labels.singular}`}
-            desc="Cadastrar uma nova pessoa."
+            desc="Inicie um novo acompanhamento."
           />
           <ActionCard
             to="/configuracoes"
             icon={Settings}
             title="Configurações"
-            desc="Conta, 2FA e organização."
+            desc="Conta, segurança e organização."
           />
         </div>
       </section>
 
-      <Card className="bg-muted/30">
-        <CardContent className="flex items-start gap-3 py-4">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Os dados dos {labels.plural} são sensíveis (LGPD). Ative a{' '}
-            <Link to="/configuracoes" className="font-medium text-foreground hover:underline">
-              verificação em dois fatores
-            </Link>{' '}
-            para reforçar a proteção da conta.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="flex items-start gap-3 rounded-2xl border border-success/15 bg-success/[0.045] px-4 py-3.5">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Dados de saúde pedem cuidado extra. A{' '}
+          <Link to="/configuracoes" className="font-semibold text-foreground hover:underline">
+            verificação em dois fatores
+          </Link>{' '}
+          reforça a proteção da sua conta e dos seus {labels.plural}.
+        </p>
+      </div>
     </div>
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({
+  label,
+  value,
+  hint,
+  tone = 'primary',
+}: {
+  label: string
+  value: string | number
+  hint: string
+  tone?: 'primary' | 'success' | 'warning'
+}) {
+  const toneClass = {
+    primary: 'bg-primary',
+    success: 'bg-success',
+    warning: 'bg-warning',
+  }[tone]
   return (
-    <Card>
-      <CardContent className="py-1">
-        <p className="text-3xl font-semibold tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+    <Card className="relative overflow-hidden">
+      <span className={`absolute inset-y-0 left-0 w-1 ${toneClass}`} />
+      <CardContent className="py-0">
+        <p className="text-3xl font-semibold tracking-[-0.04em] tabular-nums sm:text-4xl">{value}</p>
+        <p className="mt-2 text-xs font-semibold text-foreground/85">{label}</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
+  )
+}
+
+function EmptyLine({
+  icon: Icon,
+  title,
+  text,
+  success = false,
+}: {
+  icon: typeof CalendarDays
+  title: string
+  text: string
+  success?: boolean
+}) {
+  return (
+    <div className="flex items-start gap-3 py-6">
+      <span
+        className={`grid size-10 shrink-0 place-items-center rounded-xl ${
+          success ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+        }`}
+      >
+        <Icon className="size-4" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p>
+      </div>
+    </div>
   )
 }
 
@@ -241,18 +336,18 @@ function ActionCard({
   desc: string
 }) {
   return (
-    <Link to={to} className="group block">
-      <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent">
-        <CardContent className="flex h-full items-start gap-3 py-1">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="size-5" />
+    <Link to={to} className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none">
+      <Card className="h-full transition-[border-color,background-color,transform,box-shadow] group-hover:-translate-y-0.5 group-hover:border-primary/30 group-hover:bg-accent/35 group-hover:shadow-lg">
+        <CardContent className="flex h-full items-start gap-3 py-0">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+            <Icon className="size-[1.1rem]" strokeWidth={1.8} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1 font-medium">
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
               {title}
-              <ArrowRight className="size-4 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+              <ArrowRight className="size-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
             </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">{desc}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{desc}</p>
           </div>
         </CardContent>
       </Card>

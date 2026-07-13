@@ -31,11 +31,11 @@ const PLUM = palette.plum
 
 // cor da zona de volume no PDF (hex; sem CSS var aqui)
 const ZONE_HEX: Record<LandmarkZone, string> = {
-  below: '#d97706',
-  effective: '#7c93b8',
+  below: '#B57A35',
+  effective: '#6C8D9F',
   optimal: palette.violet,
-  high: '#b06fd0',
-  above: '#dc2626',
+  high: '#9B678F',
+  above: '#B94B59',
 }
 // ordem de exibição da legenda de zonas
 const ZONE_ORDER: LandmarkZone[] = ['below', 'effective', 'optimal', 'high', 'above']
@@ -99,11 +99,11 @@ const styles = StyleSheet.create({
   thead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0ebfa',
+    backgroundColor: '#EEF2F4',
     paddingVertical: 4,
     paddingHorizontal: 11,
     borderBottomWidth: 0.6,
-    borderBottomColor: '#ddd4f0',
+    borderBottomColor: palette.hairline,
   },
   th: {
     fontSize: 6.5,
@@ -120,13 +120,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: palette.hairline,
   },
-  trAlt: { backgroundColor: '#f8f6fd' },
+  trAlt: { backgroundColor: '#F7F9FA' },
   trLast: { borderBottomWidth: 0 },
   tdNum: { fontSize: 8.5, color: palette.muted },
   tdName: { fontSize: 9.5, color: palette.ink },
   tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 1.5, lineHeight: 1.35 },
   tdStrong: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: PLUM },
-  tdCell: { fontSize: 8.5, color: '#4a4a4a' },
+  tdCell: { fontSize: 8.5, color: '#46515D' },
 
   // colunas da tabela de exercícios
   colNum: { width: 20, textAlign: 'center' },
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   weekLabel: { fontSize: 9, color: palette.muted, marginLeft: 5 },
   deloadPill: {
     marginLeft: 7,
-    backgroundColor: '#efe9fb',
+    backgroundColor: '#EEEAF6',
     color: palette.violet,
     fontSize: 6.5,
     fontFamily: 'Helvetica-Bold',
@@ -183,12 +183,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 252,
     height: 8,
-    backgroundColor: '#ece7f5',
+    backgroundColor: '#E8EDF0',
     borderRadius: 4,
   },
-  barBand: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#ddd0f7' },
+  barBand: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#D9D1EA' },
   barFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 4 },
-  barMrv: { position: 'absolute', top: -1.5, bottom: -1.5, width: 1.2, backgroundColor: '#6b5e86' },
+  barMrv: { position: 'absolute', top: -1.5, bottom: -1.5, width: 1.2, backgroundColor: '#596572' },
   barValue: { width: 24, textAlign: 'right', fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: PLUM },
   barZone: { width: 84, textAlign: 'right', fontSize: 7, color: palette.muted },
   method: { fontSize: 7.5, color: palette.muted, marginTop: 8, lineHeight: 1.45 },
@@ -359,7 +359,7 @@ function VolumeAppendix({ snapshot }: { snapshot: VolumeSnapshot }) {
 
       {items.map((it) => {
         const bar = landmarkBar(it.muscle, it.value)
-        const color = bar.zone ? ZONE_HEX[bar.zone] : '#b9a3f0'
+        const color = bar.zone ? ZONE_HEX[bar.zone] : '#A99BCB'
         return (
           <View key={it.muscle} style={styles.barRow}>
             <Text style={styles.barLabel}>{it.label}</Text>

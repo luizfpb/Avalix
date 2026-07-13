@@ -1,74 +1,76 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/manrope/wght.css";
+@import "@fontsource-variable/newsreader/wght.css";
 
 @custom-variant dark (&:is(.dark *));
 
 /* ===== LIGHT (toggle/sistema) ===== */
 :root {
-  --radius: 0.625rem;
-  --background: #faf8fe;
-  --foreground: #1a1226;
-  --card: #ffffff;
-  --card-foreground: #1a1226;
+  --radius: 0.75rem;
+  --background: #f4f6f8;
+  --foreground: #18212b;
+  --card: #fbfcfd;
+  --card-foreground: #18212b;
   --popover: #ffffff;
-  --popover-foreground: #1a1226;
-  --primary: #6d28d9;
+  --popover-foreground: #18212b;
+  --primary: #66539a;
   --primary-foreground: #ffffff;
-  --secondary: #f1ecfb;
-  --secondary-foreground: #1a1226;
-  --muted: #f1ecfb;
-  --muted-foreground: #6b6480;
-  --accent: #f1eafe;
-  --accent-foreground: #5b21b6;
-  --destructive: #dc2626;
+  --secondary: #e9eef2;
+  --secondary-foreground: #25313d;
+  --muted: #edf1f4;
+  --muted-foreground: #66717e;
+  --accent: #edeaf5;
+  --accent-foreground: #4e3d7b;
+  --destructive: #bd3f4b;
   --destructive-foreground: #ffffff;
-  --border: #e7e1f2;
-  --input: #d9d0ec;
-  --ring: #6d28d9;
-  --success: #059669;
-  --warning: #b45309;
+  --border: #dce2e8;
+  --input: #cbd4dc;
+  --ring: #7663aa;
+  --success: #287a63;
+  --warning: #a46522;
   /* campo da marca (mesmo nos dois modos) */
   --brand: #2a0e52;
   --brand-foreground: #ece3fa;
-  --brand-magenta: #c0247f;
-  --chart-1: #6d28d9;
-  --chart-2: #d4537e;
-  --chart-3: #0d9488;
-  --chart-4: #d97706;
-  --chart-5: #2563eb;
+  --brand-magenta: #ad567b;
+  --chart-1: #66539a;
+  --chart-2: #ad567b;
+  --chart-3: #287a63;
+  --chart-4: #b77a35;
+  --chart-5: #39779b;
 }
 
 /* ===== DARK (padrão) ===== */
 .dark {
-  --background: #130a20;
-  --foreground: #ece6f5;
-  --card: #1c1030;
-  --card-foreground: #ece6f5;
-  --popover: #1c1030;
-  --popover-foreground: #ece6f5;
-  --primary: #8b5cf6;
-  --primary-foreground: #ffffff;
-  --secondary: #2e1d44;
-  --secondary-foreground: #ece6f5;
-  --muted: #221634;
-  --muted-foreground: #a99fbc;
-  --accent: #2e1d44;
-  --accent-foreground: #ece6f5;
-  --destructive: #f87171;
-  --destructive-foreground: #1a0a0a;
-  --border: #2e1d44;
-  --input: #2e1d44;
-  --ring: #8b5cf6;
-  --success: #34d399;
-  --warning: #fbbf24;
+  --background: #10151c;
+  --foreground: #edf1f5;
+  --card: #171e27;
+  --card-foreground: #edf1f5;
+  --popover: #1a222c;
+  --popover-foreground: #edf1f5;
+  --primary: #aa98d9;
+  --primary-foreground: #181124;
+  --secondary: #222b36;
+  --secondary-foreground: #e8edf2;
+  --muted: #1d252f;
+  --muted-foreground: #9ba6b2;
+  --accent: #28253a;
+  --accent-foreground: #eee9fa;
+  --destructive: #ed7b84;
+  --destructive-foreground: #260b0f;
+  --border: #2a3541;
+  --input: #35414e;
+  --ring: #aa98d9;
+  --success: #6fc3a6;
+  --warning: #e0ad69;
   --brand: #2a0e52;
   --brand-foreground: #ece3fa;
-  --brand-magenta: #d4537e;
-  --chart-1: #8b5cf6;
-  --chart-2: #d4537e;
-  --chart-3: #2dd4bf;
-  --chart-4: #fbbf24;
-  --chart-5: #60a5fa;
+  --brand-magenta: #d486a7;
+  --chart-1: #aa98d9;
+  --chart-2: #d486a7;
+  --chart-3: #6fc3a6;
+  --chart-4: #e0ad69;
+  --chart-5: #73afd0;
 }
 
 @theme inline {
@@ -118,6 +120,68 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    min-width: 320px;
+    font-family: "Manrope Variable", Manrope, ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss02" 1, "cv11" 1;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: "Newsreader Variable", Newsreader, Georgia, serif;
+    font-optical-sizing: auto;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Newsreader Variable", Newsreader, Georgia, serif;
+    font-optical-sizing: auto;
+  }
+
+  .measurement-field {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .measurement-field::before {
+    background-image:
+      linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 9%, transparent) 1px, transparent 1px),
+      linear-gradient(to right, color-mix(in oklab, var(--primary) 8%, transparent) 1px, transparent 1px);
+    background-size: 100% 32px, 32px 100%;
+    content: "";
+    inset: 0;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+    opacity: 0.45;
+    pointer-events: none;
+    position: absolute;
+    z-index: -1;
+  }
+
+  .surface-lift {
+    box-shadow:
+      0 1px 2px color-mix(in oklab, var(--foreground) 5%, transparent),
+      0 14px 36px color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
