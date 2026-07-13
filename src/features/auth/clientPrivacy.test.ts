@@ -2,6 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { saveDraft } from '../../lib/draft'
 import { saveIntakeLinkLocal } from '../anamnesis/linkStore'
+
+vi.mock('../../lib/errlog', () => ({ setErrlogOrg: vi.fn() }))
+
 import {
   clearPrivateClientState,
   identityChanged,

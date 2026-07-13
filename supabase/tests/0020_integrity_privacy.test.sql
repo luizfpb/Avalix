@@ -26,23 +26,10 @@ select is(
   'marcador publico confirma que o schema 0020 esta aplicado'
 );
 
--- Deterministic auth context for SQL-only tests. CREATE OR REPLACE and all
--- fixture data are reverted by the final rollback.
-create or replace function auth.uid()
-returns uuid language sql stable set search_path = ''
-as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-$$;
-
-create or replace function auth.jwt()
-returns jsonb language sql stable set search_path = ''
-as $$
-  select coalesce(
-    nullif(current_setting('request.jwt.claims', true), '')::jsonb,
-    '{}'::jsonb
-  )
-$$;
-
+-- Deterministic auth context for SQL-only tests. Supabase's built-in
+-- auth.uid()/auth.jwt() read these request claims directly; do not replace
+-- functions in the protected auth schema because pg_prove intentionally runs
+-- without CREATE privileges there.
 select set_config(
   'request.jwt.claim.sub',
   '10000000-0000-0000-0000-000000000001',
@@ -340,8 +327,8 @@ select ok(
 );
 
 -- Simula a passagem do prazo do link sem depender do relogio da transacao
--- pgTAP. O bypass e usado apenas para montar o estado temporal; a RPC e os
--- triggers da 0020 continuam sendo o objeto do teste.
+-- pgTAP. Desativa apenas o guard de update da propria tabela enquanto monta o
+-- estado temporal; nao exige o session_replication_role de superusuario.
 insert into public.anamnese_intakes
   (id, org_id, subject_id, token_hash, spec_version, expires_at)
 select
@@ -367,14 +354,16 @@ select public.submit_anamnese_intake(
   'pgTAP', null
 );
 
-set local session_replication_role = replica;
+alter table public.anamnese_intakes
+  disable trigger anamnese_intakes_integrity_guard;
 update public.anamnese_intakes
    set expires_at = now() - interval '1 day'
  where id in (
    '40000000-0000-0000-0000-000000000010',
    '40000000-0000-0000-0000-000000000011'
  );
-set local session_replication_role = origin;
+alter table public.anamnese_intakes
+  enable trigger anamnese_intakes_integrity_guard;
 
 select is(
   public.purge_expired_anamnese_intakes(500),
@@ -405,9 +394,12 @@ select ok(
 );
 
 -- Reproduz um envio 1.0 que ja estava aguardando revisao quando a 0020 foi
--- aplicada. Somente a RPC de aceite pode materializar o consentimento legado,
--- sempre vinculado ao intake de origem e sem inventar snapshot historico.
-set local session_replication_role = replica;
+-- aplicada. Desativa somente o guard de insert para montar essa fixture
+-- pre-0020; os demais triggers continuam ativos. Somente a RPC de aceite pode
+-- materializar o consentimento legado, sempre vinculado ao intake de origem e
+-- sem inventar snapshot historico.
+alter table public.anamnese_intakes
+  disable trigger anamnese_intakes_b2_create_guard;
 insert into public.anamnese_intakes
   (id, org_id, subject_id, token_hash, status, expires_at, spec_version,
    submitted_at, payload, consent_version, consent_text_sha256,
@@ -419,7 +411,8 @@ select
   '{"legacy":"preserve"}'::jsonb, '1.0', repeat('7', 64),
   'titular', 'Titular Teste', 'legacy-agent'
 from pg_temp._privacy_state where key = 'org';
-set local session_replication_role = origin;
+alter table public.anamnese_intakes
+  enable trigger anamnese_intakes_b2_create_guard;
 
 select lives_ok(
   $$
