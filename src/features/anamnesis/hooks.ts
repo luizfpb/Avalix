@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createAnamnese, getAnamnese, listAnamneses, type CreateAnamneseInput } from './api'
+import {
+  createAnamnese,
+  getAnamnese,
+  listAnamneses,
+  updateAnamnese,
+  type CreateAnamneseInput,
+  type UpdateAnamneseInput,
+} from './api'
 
 export function useAnamneses(subjectId: string | undefined) {
   return useQuery({
@@ -22,5 +29,18 @@ export function useCreateAnamnese(subjectId: string | undefined) {
   return useMutation({
     mutationFn: (input: CreateAnamneseInput) => createAnamnese(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['anamneses', subjectId] }),
+  })
+}
+
+// Edição: invalida a lista do avaliado (badge de liberado/encaminhamento no
+// perfil) e o detalhe da própria anamnese.
+export function useUpdateAnamnese(subjectId: string | undefined, id: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateAnamneseInput) => updateAnamnese(id as string, input),
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: ['anamneses', subjectId] })
+      qc.invalidateQueries({ queryKey: ['anamnese', row.id] })
+    },
   })
 }

@@ -35,6 +35,45 @@ export async function createAnamnese(input: CreateAnamneseInput): Promise<Anamne
   return data
 }
 
+export type UpdateAnamneseInput = {
+  assessedAt: string
+  answers: AnamnesisAnswers
+}
+
+// Correção de uma anamnese já registrada (mesmo registro, não versão nova: pra
+// reavaliar existe "Nova anamnese", que versiona por data). org_id/subject_id
+// nem entram no update — são congelados por trigger; updated_at e a trilha de
+// auditoria saem dos triggers da 0005. O gate é recalculado das respostas
+// novas pela MESMA função do create, senão as colunas liberado/nivel/flag
+// ficariam descrevendo respostas antigas.
+export async function updateAnamnese(
+  id: string,
+  input: UpdateAnamneseInput
+): Promise<AnamneseRow> {
+  const gate = computeGate(input.answers)
+  const { data, error } = await supabase
+    .from('anamneses')
+    .update({
+      assessed_at: input.assessedAt,
+      spec_version: SPEC_VERSION,
+      payload: input.answers as unknown as Json,
+      liberado: gate.liberado,
+      nivel_encaminhamento: gate.nivelEncaminhamento,
+      flag_encaminhamento: gate.flagEncaminhamento,
+    })
+    .eq('id', id)
+    .select('*')
+    .single()
+  // update que não pega linha nenhuma (registro excluído noutra aba, acesso
+  // perdido) volta como PGRST116 em inglês; normalizeDbError repassa a
+  // mensagem, então a tradução tem que sair daqui
+  if (error?.code === 'PGRST116') {
+    throw new Error('Esta anamnese não está mais disponível para edição. Recarregue a página.')
+  }
+  if (error) throw error
+  return data
+}
+
 export async function listAnamneses(subjectId: string): Promise<AnamneseRow[]> {
   const { data, error } = await supabase
     .from('anamneses')
