@@ -77,6 +77,7 @@ export default function App() {
               element={<AnamneseRevisar />}
             />
             <Route path="/avaliados/:id/anamnese/:anamneseId" element={<AnamneseDetalhe />} />
+            <Route path="/avaliados/:id/anamnese/:anamneseId/editar" element={<AnamneseNova />} />
             <Route path="/avaliados/:id/avaliacoes/nova" element={<AvaliacaoNova />} />
             <Route
               path="/avaliados/:id/avaliacoes/:assessmentId"
