@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { generateAssessmentPdf, buildCircSeries, type AssessmentPdfData } from './assessmentPdf'
 import type { AssessmentRow, SubjectCircumference } from '../assessment/api'
+import { registerReportFontsFrom } from './pdfFonts'
+import { join } from 'node:path'
+
+// Em Node nao ha origem HTTP para resolver /fonts. Registrando do disco, o
+// smoke test passa a exercitar o MESMO caminho de fonte do navegador — sem
+// isto, fontFamily nao registrada lancaria no render.
+registerReportFontsFrom(join(process.cwd(), 'public/fonts'))
 
 // Render de fumaça: garante que o PDF (com os gráficos de evolução em SVG:
 // Line/Polyline/Circle/Text) gera sem lançar e produz bytes. Não valida o

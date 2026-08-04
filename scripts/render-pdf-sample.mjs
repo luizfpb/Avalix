@@ -14,6 +14,11 @@ import { join } from 'node:path'
 const outDir = process.argv[2] ?? 'pdf-sample'
 mkdirSync(outDir, { recursive: true })
 
+// Registra as MESMAS fontes que o navegador vai baixar, mas por caminho de
+// arquivo: assim o que se inspecciona aqui e o que o educador recebe.
+const { registerReportFontsFrom } = await import('../src/features/reports/pdfFonts.ts')
+registerReportFontsFrom(join(process.cwd(), 'public/fonts'))
+
 const { generateWorkoutPdf } = await import('../src/features/reports/workoutPdf.tsx')
 const { generateAssessmentPdf } = await import('../src/features/reports/assessmentPdf.tsx')
 

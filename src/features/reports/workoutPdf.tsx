@@ -11,6 +11,7 @@ import type {
 } from '../workout/api'
 import type { VolumeSnapshot, LandmarkZone } from '../workout/volume'
 import { weekSessionLabels } from '../workout/progress'
+import { registerReportFonts } from './pdfFonts'
 import {
   MUSCLE_LABELS,
   MUSCLE_ORDER,
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  dayBadgeText: { fontSize: 12.5, fontFamily: 'Helvetica-Bold', color: '#ffffff' },
-  dayName: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: PLUM },
+  dayBadgeText: { fontSize: 12.5, fontFamily: 'Manrope', fontWeight: 700, color: '#ffffff' },
+  dayName: { fontSize: 11, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
   daySub: { fontSize: 7.5, color: palette.muted, marginTop: 1 },
 
   // cabeçalho da tabela
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
   },
   th: {
     fontSize: 6.5,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Manrope', fontWeight: 700,
     color: palette.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
   tdNum: { fontSize: 8.5, color: palette.muted },
   tdName: { fontSize: 9.5, color: palette.ink },
   tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 1.5, lineHeight: 1.35 },
-  tdStrong: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: PLUM },
+  tdStrong: { fontSize: 10, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
   tdCell: { fontSize: 8.5, color: '#46515D' },
 
   // colunas da tabela de exercícios
@@ -152,14 +153,14 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.hairline,
   },
   weekHead: { flexDirection: 'row', alignItems: 'center' },
-  weekNum: { fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: PLUM },
+  weekNum: { fontSize: 9.5, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
   weekLabel: { fontSize: 9, color: palette.muted, marginLeft: 5 },
   deloadPill: {
     marginLeft: 7,
     backgroundColor: '#EEEAF6',
     color: palette.violet,
     fontSize: 6.5,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Manrope', fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingVertical: 1.5,
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   barBand: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#D9D1EA' },
   barFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 4 },
   barMrv: { position: 'absolute', top: -1.5, bottom: -1.5, width: 1.2, backgroundColor: '#596572' },
-  barValue: { width: 24, textAlign: 'right', fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: PLUM },
+  barValue: { width: 24, textAlign: 'right', fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
   barZone: { width: 84, textAlign: 'right', fontSize: 7, color: palette.muted },
   method: { fontSize: 7.5, color: palette.muted, marginTop: 8, lineHeight: 1.45 },
 
@@ -241,7 +242,12 @@ function DayCard({
 
   return (
     <View style={styles.dayCard}>
-      <View style={styles.dayHeader} wrap={false} minPresenceAhead={72}>
+      {/* minPresenceAhead só precisa garantir que o cabeçalho da divisão não
+          fique órfão no pé da página: ele mais uma linha de exercício. Com 72
+          o cartão inteiro era empurrado mesmo sobrando meia página, deixando um
+          buraco grande antes do "Treino B". 46 protege do órfão e aproveita o
+          papel. */}
+      <View style={styles.dayHeader} wrap={false} minPresenceAhead={46}>
         <View style={styles.dayBadge}>
           <Text style={styles.dayBadgeText}>{day.label}</Text>
         </View>
@@ -499,5 +505,6 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
 }
 
 export async function generateWorkoutPdf(data: WorkoutPdfData): Promise<Blob> {
+  registerReportFonts()
   return pdf(<WorkoutDoc data={data} />).toBlob()
 }
