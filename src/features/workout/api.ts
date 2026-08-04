@@ -363,10 +363,7 @@ export async function updateWorkoutPlan(
   const { data, error } = await supabase.rpc('save_workout_plan', {
     p_plan: id,
     p_name: input.name,
-    p_goal: input.goal,
     p_weeks: input.weeks,
-    p_starts_on: input.startsOn,
-    p_notes: input.notes,
     p_status: input.status,
     p_weekly_schedule: input.weeklySchedule as unknown as Json,
     p_volume: input.volume as unknown as Json,
@@ -374,12 +371,19 @@ export async function updateWorkoutPlan(
     p_days: days,
     p_overrides: overrides,
     p_weeks_meta: weeks,
-    p_source_assessment_id: input.sourceAssessmentId,
-    p_source_posture_session_id: input.sourcePostureSessionId,
-    // undefined (e não null) para o supabase-js omitir a chave e o Postgres
-    // aplicar o DEFAULT null — o mesmo caminho de um frontend que ainda não
-    // conhece o parâmetro.
-    p_expected_updated_at: expectedUpdatedAt ?? undefined,
+    // args com default null na RPC: omitir = limpar o campo. Mesmo padrão do
+    // updateAssessment; o gerador de tipos do Supabase só marca o parâmetro
+    // como opcional quando ele tem DEFAULT no SQL (migration 0025).
+    ...(input.goal != null ? { p_goal: input.goal } : {}),
+    ...(input.startsOn != null ? { p_starts_on: input.startsOn } : {}),
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+    ...(input.sourceAssessmentId != null
+      ? { p_source_assessment_id: input.sourceAssessmentId }
+      : {}),
+    ...(input.sourcePostureSessionId != null
+      ? { p_source_posture_session_id: input.sourcePostureSessionId }
+      : {}),
+    ...(expectedUpdatedAt != null ? { p_expected_updated_at: expectedUpdatedAt } : {}),
   })
   if (error) throw error
   return data as unknown as WorkoutPlanRow

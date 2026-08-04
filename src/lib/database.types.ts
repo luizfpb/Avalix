@@ -777,11 +777,38 @@ export type Database = {
           {
             foreignKeyName: "posture_annotations_photo_id_fkey"
             columns: ["photo_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "posture_photos"
             referencedColumns: ["id"]
           },
         ]
+      }
+      posture_annotations_shadowed: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          payload: Json
+          photo_id: string
+          shadowed_at: string
+        }
+        Insert: {
+          created_at: string
+          id: string
+          org_id: string
+          payload: Json
+          photo_id: string
+          shadowed_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          payload?: Json
+          photo_id?: string
+          shadowed_at?: string
+        }
+        Relationships: []
       }
       posture_photos: {
         Row: {
@@ -1605,8 +1632,8 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           kind: string
-          org_contact_email: string | null
-          org_contact_phone: string | null
+          org_contact_email: string
+          org_contact_phone: string
           org_name: string
           spec_version: string
           subject_first_name: string
@@ -1694,20 +1721,20 @@ export type Database = {
         Args: {
           p_days: Json
           p_expected_updated_at?: string
-          p_goal: string | null
+          p_goal?: string
           p_name: string
-          p_notes: string | null
+          p_notes?: string
           p_overrides: Json
           p_plan: string
-          p_source_assessment_id?: string | null
-          p_source_posture_session_id?: string | null
-          p_starts_on: string | null
+          p_source_assessment_id?: string
+          p_source_posture_session_id?: string
+          p_starts_on?: string
           p_status: string
           p_volume: Json
           p_volume_engine_version: string
+          p_weekly_schedule: Json
           p_weeks: number
           p_weeks_meta: Json
-          p_weekly_schedule: Json
         }
         Returns: {
           created_at: string
