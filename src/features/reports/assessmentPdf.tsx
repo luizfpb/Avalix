@@ -23,6 +23,7 @@ import type {
 } from '../assessment/api'
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { protocolLabel } from '../assessment/protocols'
+import { registerReportFonts } from './pdfFonts'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', flexWrap: 'wrap' },
   stat: { width: '25%', marginBottom: 6 },
   statLabel: { fontSize: 8, color: palette.muted },
-  statValue: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: palette.plum },
+  statValue: { fontSize: 13, fontFamily: 'Manrope', fontWeight: 700, color: palette.plum },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -196,8 +197,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     marginBottom: 1,
   },
-  trendTitle: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: palette.plum },
-  trendDelta: { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
+  trendTitle: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: palette.plum },
+  trendDelta: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700 },
 })
 
 // dimensões e margens internas do gráfico (espaço pra escala, rótulos e datas)
@@ -298,19 +299,26 @@ function TrendChart({
         {coords.map((c, i) => (
           <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.2 : 2.2} fill={color} />
         ))}
-        {/* valor inicial: pequeno, acima do 1º ponto (referência) */}
-        <Text
-          x={first.x + 4}
-          y={first.y - 5}
-          style={{ fontSize: 7.5, fill: AXIS_COLOR, textAnchor: 'start' }}
-        >
-          {fmtNum(first.value)}
-        </Text>
+        {/* Valor inicial, pequeno, acima do 1º ponto. Só aparece quando o eixo
+            ainda não escreveu esse mesmo número: quando o ponto inicial é o
+            mínimo ou o máximo da escala (variação pequena, como massa magra
+            65,5 -> 65,6), os dois rótulos caíam na mesma altura e ficavam
+            sobrepostos. Repetir um número que o eixo já mostra não informa
+            nada e suja o gráfico. */}
+        {fmtNum(first.value) !== fmtNum(max) && fmtNum(first.value) !== fmtNum(min) ? (
+          <Text
+            x={first.x + 4}
+            y={first.y - 5}
+            style={{ fontSize: 7.5, fill: AXIS_COLOR, textAnchor: 'start' }}
+          >
+            {fmtNum(first.value)}
+          </Text>
+        ) : null}
         {/* valor atual: em destaque, FORA do plot, ao lado do último ponto */}
         <Text
           x={PX1 + 6}
           y={last.y + 2.5}
-          style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', fill: palette.ink, textAnchor: 'start' }}
+          style={{ fontSize: 10, fontFamily: 'Manrope', fontWeight: 700, fill: palette.ink, textAnchor: 'start' }}
         >
           {fmtNum(last.value)}
         </Text>
@@ -520,6 +528,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 }
 
 export async function generateAssessmentPdf(data: AssessmentPdfData): Promise<Blob> {
+  registerReportFonts()
   return pdf(<AssessmentDoc data={data} />).toBlob()
 }
 
@@ -568,7 +577,7 @@ const summaryStyles = StyleSheet.create({
   colLabel: { width: '40%', color: palette.muted },
   colNum: { width: '20%', textAlign: 'right' },
   colHead: { fontSize: 8, color: palette.muted },
-  delta: { fontFamily: 'Helvetica-Bold' },
+  delta: { fontFamily: 'Manrope', fontWeight: 700 },
 })
 
 function EvolutionSummary({ history }: { history: AssessmentHistoryPoint[] }) {
@@ -633,5 +642,6 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
 }
 
 export async function generateEvolutionPdf(data: EvolutionPdfData): Promise<Blob> {
+  registerReportFonts()
   return pdf(<EvolutionDoc data={data} />).toBlob()
 }
