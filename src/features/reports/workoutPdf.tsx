@@ -1,4 +1,7 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Page, View, StyleSheet, pdf } from '@react-pdf/renderer'
+// Text saneado: a fonte padrão é WinAnsi e trocaria glifo em silêncio para
+// qualquer caractere fora do CP1252 digitado pelo profissional. Ver pdfText.tsx.
+import { Text } from './pdfText'
 import type {
   WorkoutDayRow,
   WorkoutExerciseRow,
@@ -7,6 +10,7 @@ import type {
   WorkoutWeekRow,
 } from '../workout/api'
 import type { VolumeSnapshot, LandmarkZone } from '../workout/volume'
+import { weekSessionLabels } from '../workout/progress'
 import {
   MUSCLE_LABELS,
   MUSCLE_ORDER,
@@ -18,6 +22,7 @@ import {
 } from '../workout/volume'
 import {
   InfoCard,
+  MethodNote,
   ReportFooter,
   ReportHeader,
   SectionTitle,
@@ -43,6 +48,8 @@ const ZONE_ORDER: LandmarkZone[] = ['below', 'effective', 'optimal', 'high', 'ab
 export type WorkoutPdfData = {
   orgName: string
   subjectName: string
+  // profissional responsavel, impresso no rodape de todas as paginas
+  evaluatorName?: string | null
   plan: WorkoutPlanRow
   days: WorkoutDayRow[]
   exercises: WorkoutExerciseRow[]
@@ -211,7 +218,13 @@ function exerciseSub(ex: WorkoutExerciseRow): string {
 
 // Uma divisão (Treino A/B/C) como cartão: cabeçalho com a letra num selo e o
 // nome, seguido da tabela de exercícios (nº, exercício, séries, reps, RIR,
-// descanso) com zebra pra leitura. wrap={false}: a divisão não parte no meio.
+// descanso) com zebra pra leitura.
+//
+// A altura depende do número de exercícios, então o cartão PODE quebrar entre
+// páginas. Com wrap={false} um cartão mais alto que a página não "não partia":
+// ele transbordava e o texto saía sobreposto e ilegível, sem nenhum aviso ao
+// profissional. O que se evita aqui é só o cabeçalho órfão no pé da página
+// (minPresenceAhead) — quebrar a tabela é aceitável, imprimir lixo não.
 function DayCard({
   day,
   exercises,
@@ -227,8 +240,8 @@ function DayCard({
     .sort((a, b) => a.position - b.position)
 
   return (
-    <View style={styles.dayCard} wrap={false}>
-      <View style={styles.dayHeader}>
+    <View style={styles.dayCard}>
+      <View style={styles.dayHeader} wrap={false} minPresenceAhead={72}>
         <View style={styles.dayBadge}>
           <Text style={styles.dayBadgeText}>{day.label}</Text>
         </View>
@@ -253,8 +266,12 @@ function DayCard({
         const sub = exerciseSub(ex)
         const last = i === rows.length - 1
         return (
+          // A linha em si nunca parte: com o cartão podendo quebrar entre
+          // páginas, sem isto um exercício ficava com o nome numa folha e as
+          // séries/reps na outra.
           <View
             key={ex.id}
+            wrap={false}
             style={[styles.tr, ...(i % 2 === 1 ? [styles.trAlt] : []), ...(last ? [styles.trLast] : [])]}
           >
             <Text style={[styles.tdNum, styles.colNum]}>{i + 1}</Text>
@@ -301,8 +318,12 @@ function WeeksSection({ data }: { data: WorkoutPdfData }) {
     (a, b) => a - b
   )
 
+  // Altura proporcional a semanas x overrides: um mesociclo de 8 semanas com
+  // overrides em vários exercícios passa de uma página. Antes, wrap={false}
+  // fazia esse bloco transbordar sobreposto — o caso mais fácil de reproduzir
+  // de PDF corrompido. Cada linha de semana continua inteira.
   return (
-    <View style={styles.section} wrap={false}>
+    <View style={styles.section}>
       <SectionTitle>Organização por semana</SectionTitle>
       <View style={styles.weekWrap}>
         {allWeeks.map((n, idx) => {
@@ -397,7 +418,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = fmtDate(plan.starts_on)
   const schedule =
-    plan.weekly_schedule.length > 0 ? plan.weekly_schedule : orderedDays.map((d) => d.label)
+    weekSessionLabels(plan.weekly_schedule, orderedDays.map((d) => d.label))
 
   const sourceText = data.source
     ? [
@@ -451,7 +472,9 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
         <WeeksSection data={data} />
 
         {plan.notes ? (
-          <View style={styles.section} wrap={false}>
+          // Texto livre do profissional: sem limite de tamanho, então também
+          // não pode ser wrap={false}.
+          <View style={styles.section}>
             <SectionTitle>Observações</SectionTitle>
             <View style={styles.notesBox}>
               <Text style={styles.notesText}>{plan.notes}</Text>
@@ -459,14 +482,17 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
           </View>
         ) : null}
 
-        <Text style={styles.reproNote}>
-          Plano reproduzível a partir do snapshot registrado. Documento de uso profissional.
-        </Text>
+        <MethodNote>
+          Plano reproduzível a partir do snapshot registrado. Prescrição de exercício elaborada
+          por profissional de Educação Física para este aluno; não é transferível a terceiros e
+          não constitui diagnóstico ou orientação médica. Interrompa em caso de dor, tontura ou
+          mal-estar e comunique o profissional responsável.
+        </MethodNote>
 
         {/* Gráfico de volume como apêndice na última folha (não na frente do treino). */}
         {snapshot ? <VolumeAppendix snapshot={snapshot} /> : null}
 
-        <ReportFooter note="Montado no Avalix" />
+        <ReportFooter note="Montado no Avalix" evaluator={data.evaluatorName} />
       </Page>
     </Document>
   )

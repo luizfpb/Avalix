@@ -1,7 +1,11 @@
+import { isIntakePath } from '../../lib/routing'
+
 const ENTRY_ASSET_RE = /(?:src|href)=["'](\/assets\/[^"']+\.(?:js|css))["']/g
 
+// Delega para a definição única em lib/routing. Mantido como nome próprio
+// porque é o que os componentes de PWA já importam.
 export function isPublicIntakeLocation(pathname: string): boolean {
-  return pathname === '/a' || pathname.startsWith('/a/')
+  return isIntakePath(pathname)
 }
 
 export function entryAssetUrls(html: string): string[] {

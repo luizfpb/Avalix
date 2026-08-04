@@ -53,13 +53,17 @@ export function useCreateAssessment(subjectId: string | undefined) {
   })
 }
 
+// expectedUpdatedAt: versao que a tela carregou. O banco recusa o save se ela
+// tiver mudado em outro dispositivo (migration 0023).
 export function useUpdateAssessment(
   subjectId: string | undefined,
-  assessmentId: string | undefined
+  assessmentId: string | undefined,
+  expectedUpdatedAt?: string | null
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateAssessmentInput) => updateAssessment(assessmentId as string, input),
+    mutationFn: (input: CreateAssessmentInput) =>
+      updateAssessment(assessmentId as string, input, expectedUpdatedAt),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
       qc.invalidateQueries({ queryKey: ['assessment', assessmentId] })

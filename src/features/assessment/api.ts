@@ -81,10 +81,15 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
 // gráficos de evolução divergiam. Agora falha reverte tudo.
 export async function updateAssessment(
   id: string,
-  input: CreateAssessmentInput
+  input: CreateAssessmentInput,
+  expectedUpdatedAt?: string | null
 ): Promise<AssessmentRow> {
   const { data, error } = await supabase.rpc('save_assessment', {
     p_assessment: id,
+    // Concorrencia otimista (0023): se a linha mudou depois que esta tela
+    // carregou, o banco recusa em vez de sobrescrever o trabalho do outro
+    // dispositivo. undefined = sem checagem (comportamento antigo).
+    p_expected_updated_at: expectedUpdatedAt ?? undefined,
     p_assessed_at: input.assessedAt,
     p_protocol_id: input.protocolId,
     p_weight_kg: input.weightKg,
@@ -122,16 +127,41 @@ export type SubjectCircumference = { assessedAt: string; site: string; valueCm: 
 // Todas as circunferências do avaliado ao longo das avaliações (via join),
 // pra montar a evolução por ponto. RLS continua valendo por avaliação.
 export async function listSubjectCircumferences(subjectId: string): Promise<SubjectCircumference[]> {
-  const { data, error } = await supabase
-    .from('circumference_readings')
-    .select('site, value_cm, assessments!inner(subject_id, assessed_at)')
-    .eq('assessments.subject_id', subjectId)
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<{
+  // Esta é a consulta de maior cardinalidade do app: até 22 sítios do catálogo
+  // por avaliação, ou seja, ~45 avaliações já passam do teto de linhas do
+  // PostgREST. Era a única de alta cardinalidade sem o laço de paginação de 500
+  // que o projeto usa em outros sete lugares — e, pior, sem ORDER BY: o corte
+  // não vinha do "mais antigo", vinha do que o plano devolvesse, normalmente
+  // ordem física, então as avaliações MAIS RECENTES é que caíam fora. O sintoma
+  // era um gráfico de evolução com menos pontos e um "atual"/variação errados
+  // no PDF entregue ao aluno, sem nenhum erro na tela.
+  const rows: Array<{
+    site: string
+    value_cm: number
+    assessments: { assessed_at: string } | { assessed_at: string }[]
+  }> = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('circumference_readings')
+      .select('id, site, value_cm, assessments!inner(subject_id, assessed_at)')
+      .eq('assessments.subject_id', subjectId)
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    rows.push(...((data ?? []) as unknown as typeof rows))
+    if ((data?.length ?? 0) < pageSize) break
+  }
+  return mapCircumferences(rows)
+}
+
+function mapCircumferences(
+  rows: Array<{
     site: string
     value_cm: number
     assessments: { assessed_at: string } | { assessed_at: string }[]
   }>
+): SubjectCircumference[] {
   return rows.map(({ site, value_cm, assessments }) => {
     const a = Array.isArray(assessments) ? assessments[0] : assessments
     return { assessedAt: a?.assessed_at ?? '', site, valueCm: value_cm }

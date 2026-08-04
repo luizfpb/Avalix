@@ -360,6 +360,24 @@ function Form({
               </div>
             ) : null}
 
+            {/* Canal do Controlador (LGPD art. 9º, IV): o termo manda dirigir
+                as solicitações ao Controlador, e é aqui que o titular descobre
+                como. Só aparece quando o profissional preencheu — o app nunca
+                inventa um contato. */}
+            {intake.orgContactEmail || intake.orgContactPhone ? (
+              <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                Para pedir acesso, correção, portabilidade, revogação ou eliminação dos seus
+                dados, fale com {intake.orgName}:{' '}
+                {intake.orgContactEmail ? (
+                  <a className="text-primary underline-offset-4 hover:underline" href={`mailto:${intake.orgContactEmail}`}>
+                    {intake.orgContactEmail}
+                  </a>
+                ) : null}
+                {intake.orgContactEmail && intake.orgContactPhone ? ' · ' : ''}
+                {intake.orgContactPhone ? <span>{intake.orgContactPhone}</span> : null}
+              </p>
+            ) : null}
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="public-signer-kind">Quem está respondendo</Label>

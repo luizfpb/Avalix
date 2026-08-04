@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRedirect, isPublicPath } from './routing'
+import { resolveRedirect, isPublicPath, isIntakePath } from './routing'
+import { isPublicIntakeLocation } from '../features/pwa/updateCheck'
 
 describe('isPublicPath', () => {
   it('reconhece rotas públicas', () => {
@@ -7,6 +8,30 @@ describe('isPublicPath', () => {
     expect(isPublicPath('/cadastro')).toBe(true)
     expect(isPublicPath('/recuperar-senha')).toBe(true)
     expect(isPublicPath('/dashboard')).toBe(false)
+  })
+})
+
+describe('isIntakePath', () => {
+  // Regressão: esta função cobria só `/a/` enquanto App.tsx, o PWA e o
+  // anamnesis/intake repetiam o predicado completo inline. Ou seja, o guard de
+  // rota tinha uma noção de "rota pública" diferente do resto do app, e não
+  // cobria `/a` — que é justamente a forma ATUAL do link (token no fragmento).
+  it('cobre a forma atual (/a, token no fragmento) e a legada (/a/<token>)', () => {
+    expect(isIntakePath('/a')).toBe(true)
+    expect(isIntakePath('/a/token-legado')).toBe(true)
+  })
+
+  it('não confunde rotas que apenas começam com a letra a', () => {
+    expect(isIntakePath('/avaliados')).toBe(false)
+    expect(isIntakePath('/agenda')).toBe(false)
+    expect(isIntakePath('/auditoria')).toBe(false)
+    expect(isIntakePath('/dashboard')).toBe(false)
+  })
+
+  it('o predicado do PWA e o do roteamento respondem a mesma coisa', () => {
+    for (const p of ['/a', '/a/x', '/avaliados', '/agenda', '/', '/login']) {
+      expect(isPublicIntakeLocation(p)).toBe(isIntakePath(p))
+    }
   })
 })
 

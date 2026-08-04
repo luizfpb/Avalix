@@ -11,7 +11,13 @@ import {
   useWorkoutPlan,
 } from '../features/workout/hooks'
 import type { NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
-import { adherencePct, exerciseProgression, plannedSessions } from '../features/workout/progress'
+import {
+  adherencePct,
+  exerciseProgression,
+  plannedSessions,
+  plannedSessionsToDate,
+  sessionsPerWeek,
+} from '../features/workout/progress'
 import {
   latestBestByExercise,
   parseRepRange,
@@ -74,32 +80,53 @@ export default function Execucao() {
 
   const plan = detail.plan
   const logs = logsQuery.data ?? []
-  const sessionsPerWeek =
-    plan.weekly_schedule.length > 0 ? plan.weekly_schedule.length : detail.days.length
-  const planned = plannedSessions(plan.weeks, sessionsPerWeek)
+  const sessionsPerWeekCount = sessionsPerWeek(plan.weekly_schedule, detail.days.length)
   const done = logs.length
-  const pct = adherencePct(done, planned)
+  const startedOn = plan.starts_on ?? plan.created_at ?? null
+  // Cobra apenas as semanas já fechadas: quem está em dia na semana 2 de um
+  // plano de 8 não pode aparecer com 25%.
+  const plannedToDate = plannedSessionsToDate(plan.weeks, sessionsPerWeekCount, startedOn, new Date())
+  const planned = plannedToDate ?? 0
+  const pct = plannedToDate != null ? adherencePct(done, plannedToDate) : 0
+  const adherenceCaption =
+    plannedToDate != null
+      ? `Cobrado até aqui: ${plannedToDate} ${plannedToDate === 1 ? 'sessão' : 'sessões'} (semanas já concluídas). ` +
+        `Plano completo = ${plan.weeks} ${plan.weeks === 1 ? 'semana' : 'semanas'} × ${sessionsPerWeekCount} ` +
+        `${sessionsPerWeekCount === 1 ? 'sessão' : 'sessões'} por semana.`
+      : `Primeira semana em andamento — a adesão passa a ser calculada quando ela fechar. ` +
+        `Plano completo = ${plannedSessions(plan.weeks, sessionsPerWeekCount)} sessões.`
   const progress = exerciseProgression(historyQuery.data ?? [])
 
-  if (exercisesQuery.isError || logsQuery.isError || historyQuery.isError) {
+  // Só a lista de exercícios é realmente bloqueante: sem ela não há como
+  // montar o formulário de registro. Logs e histórico alimentam a adesão e as
+  // sugestões de carga — informação acessória.
+  //
+  // Antes, um erro em QUALQUER uma das três escondia a tela inteira, inclusive
+  // o LogForm, apesar da mensagem prometer que só "a adesão e as sugestões"
+  // tinham sido ocultadas. Como useWorkoutLogs/usePlanSetHistory não definem
+  // staleTime, elas refazem a busca a cada foco/reconexão — o cenário normal
+  // do 4G de academia. Ou seja: exatamente quando o educador estava com o
+  // aluno na frente para registrar a série, a tela sumia.
+  if (exercisesQuery.isError) {
     return (
       <div className="max-w-2xl space-y-4">
         <Link to={`/avaliados/${id}/treinos/${plan.id}`} className="text-sm text-muted-foreground hover:text-foreground">
           ← {plan.name}
         </Link>
         <QueryError
-          message="Não foi possível carregar o histórico completo do treino. A adesão e as sugestões foram ocultadas para evitar valores incorretos."
-          onRetry={() => {
-            void Promise.all([exercisesQuery.refetch(), logsQuery.refetch(), historyQuery.refetch()])
-          }}
+          message="Não foi possível carregar a lista de exercícios, então o registro da sessão não pode ser montado."
+          onRetry={() => void exercisesQuery.refetch()}
         />
       </div>
     )
   }
 
-  if (exercisesQuery.isPending || logsQuery.isPending || historyQuery.isPending) {
-    return <p role="status" className="text-sm text-muted-foreground">Carregando execução e histórico...</p>
+  if (exercisesQuery.isPending) {
+    return <p role="status" className="text-sm text-muted-foreground">Carregando execução...</p>
   }
+
+  const historyDegraded = logsQuery.isError || historyQuery.isError
+  const historyLoading = logsQuery.isPending || historyQuery.isPending
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -113,27 +140,45 @@ export default function Execucao() {
         <h1 className="mt-2 text-xl font-semibold">Execução do treino</h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Adesão</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-semibold">
-              {done}
-              <span className="text-base font-normal text-muted-foreground"> de {planned} sessões</span>
-            </span>
-            <span className="text-sm text-muted-foreground">{Math.round(pct * 100)}%</span>
-          </div>
-          <div className="h-2 rounded bg-muted">
-            <div className="h-2 rounded bg-primary" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Previsto = {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'} × {sessionsPerWeek}{' '}
-            {sessionsPerWeek === 1 ? 'sessão' : 'sessões'} por semana.
-          </p>
-        </CardContent>
-      </Card>
+      {historyDegraded ? (
+        <QueryError
+          message="Não foi possível carregar o histórico do treino, então a adesão e as sugestões de carga estão ocultas. O registro da sessão abaixo continua funcionando normalmente."
+          onRetry={() => {
+            void Promise.all([logsQuery.refetch(), historyQuery.refetch()])
+          }}
+        />
+      ) : historyLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Carregando adesão e histórico...
+        </p>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Adesão</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-semibold">
+                {done}
+                <span className="text-base font-normal text-muted-foreground">
+                  {plannedToDate != null
+                    ? ` de ${planned} ${planned === 1 ? 'sessão' : 'sessões'}`
+                    : ` ${done === 1 ? 'sessão registrada' : 'sessões registradas'}`}
+                </span>
+              </span>
+              {plannedToDate != null ? (
+                <span className="text-sm text-muted-foreground">{Math.round(pct * 100)}%</span>
+              ) : null}
+            </div>
+            {plannedToDate != null ? (
+              <div className="h-2 rounded bg-muted">
+                <div className="h-2 rounded bg-primary" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
+              </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">{adherenceCaption}</p>
+          </CardContent>
+        </Card>
+      )}
 
       <LogForm
         detail={detail}
@@ -145,7 +190,15 @@ export default function Execucao() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Sessões registradas</h2>
-        {logs.length === 0 ? (
+        {logsQuery.isError ? (
+          // Nunca afirmar "nenhuma sessão" quando na verdade não foi possível
+          // ler a lista: o educador acharia que o registro dele se perdeu.
+          <p className="text-sm text-muted-foreground">
+            Não foi possível carregar as sessões já registradas.
+          </p>
+        ) : logsQuery.isPending ? (
+          <p role="status" className="text-sm text-muted-foreground">Carregando sessões...</p>
+        ) : logs.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
         ) : (
           <ul className="divide-y rounded-md border bg-card">

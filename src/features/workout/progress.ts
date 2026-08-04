@@ -5,6 +5,32 @@ import { estimateOneRm } from './oneRm'
 // carga por exercício (melhor e1RM por dia ao longo do tempo). Puro e testável;
 // reusa o motor de e1RM da calculadora (Etapa F).
 
+// Sequência de sessões de uma semana, por rótulo de divisão (ex.: A·B·A·C).
+// weekly_schedule permite repetir uma divisão na semana; vazio significa "cada
+// divisão uma vez, na ordem".
+//
+// Esta regra estava reescrita inline em três lugares (PDF de treino, tela de
+// execução e detalhe do plano), duas devolvendo rótulos e uma devolvendo só a
+// contagem. É regra de negócio — uma divisão repetida conta em dobro no volume
+// e na adesão — e por isso passa a morar num lugar só, testável.
+export function weekSessionLabels(
+  weeklySchedule: string[] | null | undefined,
+  dayLabelsInOrder: string[]
+): string[] {
+  const schedule = weeklySchedule ?? []
+  return schedule.length > 0 ? schedule : dayLabelsInOrder
+}
+
+export function sessionsPerWeek(
+  weeklySchedule: string[] | null | undefined,
+  dayCount: number
+): number {
+  const schedule = weeklySchedule ?? []
+  return schedule.length > 0 ? schedule.length : dayCount
+}
+
+// Total de sessões do plano inteiro. Serve para a legenda ("previsto = 8
+// semanas x 3 sessões"), NÃO para medir adesão — ver plannedSessionsToDate.
 export function plannedSessions(weeks: number, dayCount: number): number {
   return Math.max(0, Math.floor(weeks)) * Math.max(0, Math.floor(dayCount))
 }
@@ -12,6 +38,46 @@ export function plannedSessions(weeks: number, dayCount: number): number {
 export function adherencePct(done: number, planned: number): number {
   if (planned <= 0) return 0
   return Math.min(1, done / planned)
+}
+
+const MS_POR_DIA = 86_400_000
+
+// Semanas JÁ CONCLUÍDAS desde o início do plano. Durante a primeira semana
+// devolve 0: uma semana só pode ser cobrada depois de terminar.
+export function completedWeeks(startedOn: string | null, now: Date): number | null {
+  if (!startedOn) return null
+  const inicio = Date.parse(
+    /^\d{4}-\d{2}-\d{2}$/.test(startedOn) ? `${startedOn}T00:00:00` : startedOn
+  )
+  if (!Number.isFinite(inicio)) return null
+  const dias = Math.floor((now.getTime() - inicio) / MS_POR_DIA)
+  if (dias < 0) return 0 // plano agendado para o futuro
+  return Math.floor(dias / 7)
+}
+
+// Sessões esperadas ATÉ AGORA, e não no plano inteiro.
+//
+// O denominador antigo era `weeks * dayCount`, o plano completo, o que fazia
+// todo aluno em dia parecer relapso: quem não faltou a nada na semana 2 de um
+// plano de 8 semanas aparecia com 25% e barra laranja, e um plano criado hoje
+// já nascia com 0% e alerta. Como quase todo plano ativo está na primeira
+// metade, o sinal ficava sistematicamente errado justamente na tela de
+// retenção. `starts_on` era capturado no builder e impresso no PDF, mas não
+// entrava em cálculo nenhum.
+//
+// Devolve null quando ainda não há semana fechada (ou não dá para saber a
+// data de início): aí não se exibe percentual, em vez de exibir 0%.
+export function plannedSessionsToDate(
+  weeks: number,
+  dayCount: number,
+  startedOn: string | null,
+  now: Date
+): number | null {
+  const fechadas = completedWeeks(startedOn, now)
+  if (fechadas == null) return null
+  const cobraveis = Math.min(fechadas, Math.max(0, Math.floor(weeks)))
+  if (cobraveis <= 0) return null
+  return cobraveis * Math.max(0, Math.floor(dayCount))
 }
 
 export type ExerciseProgress = {

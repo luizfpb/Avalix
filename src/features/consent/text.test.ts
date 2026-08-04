@@ -4,15 +4,30 @@ import { join } from 'node:path'
 import { sha256Hex } from '../../lib/hash'
 import { CONSENT_VERSION, consentContent, consentText } from './text'
 
+// O fim de linha nao faz parte do termo: a spec do JavaScript normaliza CRLF
+// para LF ao fazer o parse do template literal em text.ts, enquanto readFileSync
+// devolve o .sql exatamente como esta em disco (CRLF num checkout Windows com
+// core.autocrlf). Comparar sem normalizar deixaria este guard vermelho por
+// motivo de sistema operacional, e suite vermelha por motivo ambiental treina a
+// ignorar vermelho. O servidor tambem normaliza (app.canonical_consent_text na
+// migration 0022), entao o hash bate dos dois lados independente do checkout.
+const lf = (value: string) => value.replace(/\r\n/g, '\n')
+
 describe('consentimento LGPD', () => {
-  it('permanece byte-a-byte igual ao texto canonico da migration 0020', () => {
+  it('permanece igual ao texto canonico da migration 0020 (ignorando fim de linha)', () => {
     const migration = readFileSync(
       join(process.cwd(), 'supabase/migrations/0020_integrity_privacy.sql'),
       'utf8'
     )
     const canonical = migration.match(/\$consent\$([\s\S]*?)\$consent\$/)?.[1]
     expect(canonical).toBeDefined()
-    expect(canonical?.replace('{{CONTROLADOR}}', 'Clínica X')).toBe(consentText('Clínica X'))
+    expect(lf(canonical!).replace('{{CONTROLADOR}}', 'Clínica X')).toBe(
+      lf(consentText('Clínica X'))
+    )
+  })
+
+  it('o texto do app nao carrega CR, entao o hash independe do checkout', () => {
+    expect(consentText('Clínica X')).not.toContain('\r')
   })
 
   it('publica a versao 1.1 e um texto substancial', () => {

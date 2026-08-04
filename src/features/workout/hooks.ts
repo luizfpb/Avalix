@@ -89,13 +89,17 @@ export function useCreateWorkoutPlan(subjectId: string | undefined) {
   })
 }
 
+// expectedUpdatedAt: versao do plano que a tela carregou. O banco recusa o
+// save se ela tiver mudado em outro dispositivo (migration 0023).
 export function useUpdateWorkoutPlan(
   subjectId: string | undefined,
-  planId: string | undefined
+  planId: string | undefined,
+  expectedUpdatedAt?: string | null
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: SaveWorkoutPlanInput) => updateWorkoutPlan(planId as string, input),
+    mutationFn: (input: SaveWorkoutPlanInput) =>
+      updateWorkoutPlan(planId as string, input, expectedUpdatedAt),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })

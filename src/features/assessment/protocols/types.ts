@@ -34,4 +34,9 @@ export type ProtocolResult = {
   bodyFatPct: number
   // as duas conversões de densidade->gordura; null no US Navy
   conversions: { siri: number; brozek: number } | null
+  // ressalvas de domínio (idade extrapolada, soma acima do vértice da
+  // parábola, resultado incomum). Vazio = estimativa dentro da faixa em que o
+  // protocolo foi validado. Acompanha o resultado até o laudo: o profissional
+  // precisa saber quando o número é extrapolação, não só qual é o número.
+  warnings: import('./domain').ResultWarning[]
 }

@@ -59,6 +59,7 @@ export default function Configuracoes() {
             <Info label="Seu papel" value={role ?? '-'} />
           </div>
           <LogoSettings />
+          <ContactSettings />
         </CardContent>
       </Card>
 
@@ -138,6 +139,95 @@ function Info({ label, value }: { label: string; value: string }) {
     <div>
       <span className="block text-xs text-muted-foreground">{label}</span>
       <span className="block text-sm">{value}</span>
+    </div>
+  )
+}
+
+// Canal de contato do Controlador (LGPD art. 9º, IV e art. 18): a quem o
+// titular dirige pedido de acesso, correção, portabilidade, revogação ou
+// eliminação. O termo já diz "dirija ao Controlador" e o código se recusa a
+// inventar um contato quando não há — mas não existia onde informá-lo.
+// Fica visível para o aluno na tela pública da anamnese.
+function ContactSettings() {
+  const { organization, role, refresh } = useOrganization()
+  const canManage = role === 'owner' || role === 'admin'
+  const [email, setEmail] = useState(organization?.contact_email ?? '')
+  const [phone, setPhone] = useState(organization?.contact_phone ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const dirty =
+    email.trim() !== (organization?.contact_email ?? '') ||
+    phone.trim() !== (organization?.contact_phone ?? '')
+
+  async function save() {
+    if (!organization) return
+    setBusy(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const { error: err } = await supabase
+        .from('organizations')
+        .update({
+          contact_email: email.trim() || null,
+          contact_phone: phone.trim() || null,
+        })
+        .eq('id', organization.id)
+      if (err) throw err
+      await refresh()
+      setSaved(true)
+    } catch (e) {
+      setError(normalizeDbError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <span className="block text-xs text-muted-foreground">
+        Contato para o titular exercer seus direitos (aparece para o aluno no link da anamnese)
+      </span>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="org-contact-email">E-mail</Label>
+          <Input
+            id="org-contact-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="contato@seuestudio.com.br"
+            value={email}
+            disabled={!canManage || busy}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="org-contact-phone">Telefone / WhatsApp</Label>
+          <Input
+            id="org-contact-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="+55 11 90000-0000"
+            value={phone}
+            disabled={!canManage || busy}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+      </div>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {saved && !dirty ? (
+        <p role="status" className="text-xs text-muted-foreground">Contato salvo.</p>
+      ) : null}
+      {canManage ? (
+        <Button type="button" size="sm" variant="outline" disabled={busy || !dirty} onClick={() => void save()}>
+          {busy ? 'Salvando...' : 'Salvar contato'}
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">Só owner ou admin edita o contato.</p>
+      )}
     </div>
   )
 }

@@ -104,9 +104,17 @@ export default function AvaliacaoDetalhe() {
         })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
       const circumferenceHistory = await listSubjectCircumferences(assessment.subject_id)
+      // Quem assina o laudo. O dado já existia (assessments.evaluator_id) e só
+      // não chegava ao papel — documento de saúde sem responsável identificado
+      // não é documento profissional.
+      const { listProfileNames } = await import('../features/reports/audit')
+      const evaluatorName = await listProfileNames([assessment.evaluator_id])
+        .then((m) => m[assessment.evaluator_id] || null)
+        .catch(() => null)
       const blob = await generateAssessmentPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
+        evaluatorName,
         logoUrl,
         assessment,
         skinfolds,

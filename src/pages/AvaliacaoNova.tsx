@@ -24,6 +24,7 @@ import {
   meanReading,
 } from '../features/assessment/sites'
 import { buildAssessmentResult, type AssessmentResultSnapshot } from '../features/assessment/result'
+import { ProtocolDomainError } from '../features/assessment/protocols'
 import type {
   AssessmentRow,
   CircumferenceReadingRow,
@@ -249,7 +250,10 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const isEdit = !!existing
   const ea = existing?.assessment
   const createMut = useCreateAssessment(subject.id)
-  const updateMut = useUpdateAssessment(subject.id, ea?.id)
+  // ea.updated_at e a versao que ESTA tela carregou. Se o educador editar a
+  // mesma avaliacao pelo celular e depois salvar numa aba antiga do PC, o banco
+  // recusa em vez de sobrescrever em silencio (migration 0023).
+  const updateMut = useUpdateAssessment(subject.id, ea?.id, ea?.updated_at)
   const mut = isEdit ? updateMut : createMut
   const sex = asSex(subject.sex)
   const protocols = listProtocols(sex)
@@ -351,15 +355,27 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
     return { sex, ageYears: ageYears ?? 0, heightCm, skinfoldsMm, circumferencesCm }
   }
 
-  function currentResult(): AssessmentResultSnapshot | null {
-    if (!protocol || ageYears == null || !(weightKg > 0) || !(heightCm > 0)) return null
+  // Antes isto engolia qualquer erro e devolvia null, entao uma medida
+  // impossivel (cintura menor que o pescoco, por exemplo) sumia da tela sem
+  // explicacao nenhuma e o botao Salvar so ficava desabilitado. Agora o motivo
+  // sobe junto: erro de dominio e uma frase acionavel para o profissional.
+  function currentResult(): {
+    snapshot: AssessmentResultSnapshot | null
+    domainError: string | null
+  } {
+    if (!protocol || ageYears == null || !(weightKg > 0) || !(heightCm > 0)) {
+      return { snapshot: null, domainError: null }
+    }
     try {
-      return buildAssessmentResult(protocol.id, currentInput(), weightKg)
-    } catch {
-      return null
+      return { snapshot: buildAssessmentResult(protocol.id, currentInput(), weightKg), domainError: null }
+    } catch (e) {
+      if (e instanceof ProtocolDomainError) {
+        return { snapshot: null, domainError: e.message }
+      }
+      return { snapshot: null, domainError: null }
     }
   }
-  const result = currentResult()
+  const { snapshot: result, domainError } = currentResult()
 
   async function handleSave() {
     setSubmitError(null)
@@ -408,7 +424,10 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       circRows.push({ site: name, value_cm: v, is_custom: true })
     }
 
-    const snapshot = currentResult()
+    const { snapshot, domainError: saveDomainError } = currentResult()
+    // Medida impossível é barrada aqui com o motivo exato, em vez de deixar
+    // NaN/percentual negativo virar snapshot no banco e número no laudo.
+    if (saveDomainError) return setSubmitError(saveDomainError)
     if (!snapshot) return setSubmitError('Preencha as medidas necessárias para o protocolo escolhido.')
 
     try {
@@ -563,8 +582,25 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
                 {result.conversions.brozek.toFixed(1)}% (principal: Siri)
               </p>
             ) : null}
+            {result.warnings?.length ? (
+              <div className="col-span-2 space-y-1.5 sm:col-span-4">
+                {result.warnings.map((w) => (
+                  <p
+                    key={w.code}
+                    role="status"
+                    className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+                  >
+                    {w.message}
+                  </p>
+                ))}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
+      ) : domainError ? (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {domainError}
+        </p>
       ) : (
         <p className="text-sm text-muted-foreground">
           Preencha peso, altura e as medidas do protocolo para ver o resultado.

@@ -1,0 +1,30 @@
+# Normaliza fim de linha para LF em todo o repositorio.
+#
+# Motivo concreto: src/features/consent/text.test.ts compara byte-a-byte o
+# termo canonico da migration 0020 (lido com readFileSync, que preserva CRLF)
+# com o template literal de src/features/consent/text.ts (que a spec do
+# JavaScript normaliza para LF em tempo de parse). Num checkout Windows com
+# core.autocrlf=true e sem este arquivo, os dois divergem so no fim de linha e
+# o unico guard do consentimento LGPD fica vermelho localmente — treinando o
+# dev a ignorar suite vermelha. Com eol=lf a copia de trabalho fica igual ao
+# indice em qualquer sistema operacional.
+#
+# Depois de commitar este arquivo, renormalize a copia local uma vez:
+#   git add --renormalize .
+* text=auto eol=lf
+
+# Binarios: nunca tocar no conteudo.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.zip   binary
+*.gz    binary
+*.gpg   binary

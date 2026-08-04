@@ -79,7 +79,14 @@ export async function listAnamneses(subjectId: string): Promise<AnamneseRow[]> {
     .from('anamneses')
     .select('*')
     .eq('subject_id', subjectId)
+    // Desempate determinístico: duas anamneses na MESMA data deixavam a ordem
+    // por conta do plano do Postgres, então "a mais recente" — que alimenta o
+    // banner de contraindicações no builder de treino — podia alternar entre
+    // recarregamentos. Com um aluno que respondeu duas vezes no mesmo dia, o
+    // profissional podia ver a triagem errada.
     .order('assessed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
   if (error) throw error
   return data ?? []
 }

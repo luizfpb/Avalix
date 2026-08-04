@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { RouteGuard } from './routes/RouteGuard'
+import { isIntakePath } from './lib/routing'
 import { AppShell } from './components/AppShell'
 
 // Telas carregadas sob demanda: cada rota vira um chunk separado, deixando o
@@ -49,7 +50,7 @@ function PageFallback() {
 
 export default function App() {
   const location = useLocation()
-  const publicIntake = location.pathname === '/a' || location.pathname.startsWith('/a/')
+  const publicIntake = isIntakePath(location.pathname)
   const routes = (
     <Suspense fallback={<PageFallback />}>
         <Routes>

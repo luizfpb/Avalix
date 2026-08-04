@@ -31,6 +31,7 @@ import {
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
 import { planShareText, whatsappUrl } from '../features/workout/share'
+import { weekSessionLabels } from '../features/workout/progress'
 import { downloadBlob } from '../features/reports/download'
 import { logDataAction, logExport } from '../features/reports/audit'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
@@ -150,8 +151,7 @@ export default function TreinoDetalhe() {
     : null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = formatDate(plan.starts_on)
-  const schedule =
-    plan.weekly_schedule.length > 0 ? plan.weekly_schedule : orderedDays.map((d) => d.label)
+  const schedule = weekSessionLabels(plan.weekly_schedule, orderedDays.map((d) => d.label))
 
   const srcAssessment = plan.source_assessment_id
     ? (assessmentsQ.data ?? []).find((a) => a.id === plan.source_assessment_id) ?? null
@@ -180,6 +180,9 @@ export default function TreinoDetalhe() {
     days,
     exercises,
     exerciseNames,
+    // Sem os overrides, o texto do WhatsApp prescrevia a semana 1 para todas
+    // as semanas — contradizendo o PDF do mesmo plano.
+    overrides,
   })
   const pdfFilename = `treino-${plan.name.replace(/\s+/g, '-').toLowerCase()}.pdf`
   const canShareFiles = (() => {
@@ -195,9 +198,15 @@ export default function TreinoDetalhe() {
   async function buildPdfBlob(): Promise<Blob> {
     const { generateWorkoutPdf } = await import('../features/reports/workoutPdf')
     const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
+    // Profissional responsável pela prescrição, impresso no rodapé.
+    const { listProfileNames } = await import('../features/reports/audit')
+    const evaluatorName = await listProfileNames([plan.evaluator_id])
+      .then((m) => m[plan.evaluator_id] || null)
+      .catch(() => null)
     return generateWorkoutPdf({
       orgName: organization?.name ?? '',
       subjectName: subjectQuery.data?.full_name ?? '',
+      evaluatorName,
       logoUrl,
       plan,
       days,

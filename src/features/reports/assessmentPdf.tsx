@@ -7,10 +7,14 @@ import {
   Polyline,
   Svg,
   StyleSheet,
-  Text,
   View,
   pdf,
 } from '@react-pdf/renderer'
+// Text saneado: a fonte padrão é WinAnsi e trocaria glifo em silêncio para
+// qualquer caractere fora do CP1252 digitado pelo profissional. Ver pdfText.tsx.
+// Vale também dentro de <Svg> (rótulos de escala), que é onde este documento
+// mais usa Text — o render de fumaça cobre esse caminho.
+import { Text } from './pdfText'
 import type {
   AssessmentRow,
   CircumferenceReadingRow,
@@ -26,6 +30,7 @@ import { classifyBodyFat } from '../assessment/bodyFat'
 import { donutSlices } from './charts'
 import {
   InfoCard,
+  MethodNote,
   ReportFooter,
   ReportHeader,
   SectionTitle,
@@ -52,6 +57,8 @@ export type AssessmentHistoryPoint = {
 export type AssessmentPdfData = {
   orgName: string
   subjectName: string
+  // profissional responsavel, impresso no rodape de todas as paginas
+  evaluatorName?: string | null
   // logo da org como data URL (branding); ausente = plaqueta AVALIX
   logoUrl?: string | null
   assessment: AssessmentRow
@@ -497,11 +504,16 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
           </View>
         ) : null}
 
-        <Text style={styles.reproNote}>
-          Resultado reproduzível a partir das medidas registradas. Documento de uso profissional.
-        </Text>
+        <MethodNote warnings={r?.warnings}>
+          Resultado reproduzível a partir das medidas registradas (protocolo{' '}
+          {protocolLabel(assessment.protocol_id)}, motor {assessment.engine_version ?? '—'}).
+          Antropometria estima a composição corporal por equação de regressão e carrega erro
+          padrão inerente ao método; os valores servem para acompanhamento da evolução, não
+          substituem exame de imagem nem constituem diagnóstico ou orientação médica. Em caso de
+          sintoma, dor ou condição de saúde, procure um profissional de saúde habilitado.
+        </MethodNote>
 
-        <ReportFooter note="Calculado pelo motor Avalix" />
+        <ReportFooter note="Calculado pelo motor Avalix" evaluator={data.evaluatorName} />
       </Page>
     </Document>
   )
@@ -520,6 +532,7 @@ export async function generateAssessmentPdf(data: AssessmentPdfData): Promise<Bl
 export type EvolutionPdfData = {
   orgName: string
   subjectName: string
+  evaluatorName?: string | null
   logoUrl?: string | null
   history: AssessmentHistoryPoint[]
   circumferenceHistory: SubjectCircumference[]
@@ -608,11 +621,12 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
         <EvolutionSummary history={data.history} />
         <EvolutionSection history={data.history} maxCharts={5} />
         <CircumferenceEvolution rows={data.circumferenceHistory} />
-        <Text style={styles.reproNote}>
-          Valores calculados a partir das avaliações registradas no período. Documento de uso
-          profissional.
-        </Text>
-        <ReportFooter note="Calculado pelo motor Avalix" />
+        <MethodNote>
+          Valores calculados a partir das avaliações registradas no período. Antropometria estima
+          a composição corporal por equação de regressão e carrega erro padrão inerente ao método;
+          serve para acompanhamento da evolução e não constitui diagnóstico ou orientação médica.
+        </MethodNote>
+        <ReportFooter note="Calculado pelo motor Avalix" evaluator={data.evaluatorName} />
       </Page>
     </Document>
   )

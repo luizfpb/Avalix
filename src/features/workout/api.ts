@@ -239,7 +239,10 @@ export type SaveWorkoutPlanInput = {
 // transação só — falha no meio reverte inteiro, sem estado parcial. O mapa
 // clientKey->workout_exercise_id (os overrides referenciam ids que só existem
 // após o insert) é reconstruído dentro da função, no banco.
-async function replacePlanChildren(planId: string, input: SaveWorkoutPlanInput): Promise<void> {
+// Payload das filhas, compartilhado pelo caminho de criação (RPC
+// replace_workout_plan_children) e pelo de edição (RPC save_workout_plan, que
+// chama a mesma função dentro da própria transação).
+function planChildrenPayload(input: SaveWorkoutPlanInput) {
   // descarta overrides/semanas fora do mesociclo (defesa; o b2 também barraria)
   const overrides = input.overrides
     .filter((o) => o.week >= 1 && o.week <= input.weeks)
@@ -262,26 +265,36 @@ async function replacePlanChildren(planId: string, input: SaveWorkoutPlanInput):
       notes: w.notes,
     }))
 
+  const days = input.days.map((day, i) => ({
+    label: day.label,
+    name: day.name,
+    position: i,
+    exercises: day.exercises.map((ex, pos) => ({
+      client_key: ex.clientKey,
+      exercise_id: ex.exerciseId,
+      position: pos,
+      sets: ex.sets,
+      reps: ex.reps,
+      rir: ex.rir,
+      rest_seconds: ex.restSeconds,
+      tempo: ex.tempo,
+      notes: ex.notes,
+    })),
+  }))
+  return {
+    days: days as unknown as Json,
+    overrides: overrides as unknown as Json,
+    weeks: weeks as unknown as Json,
+  }
+}
+
+async function replacePlanChildren(planId: string, input: SaveWorkoutPlanInput): Promise<void> {
+  const { days, overrides, weeks } = planChildrenPayload(input)
   const { error } = await supabase.rpc('replace_workout_plan_children', {
     p_plan: planId,
-    p_days: input.days.map((day, i) => ({
-      label: day.label,
-      name: day.name,
-      position: i,
-      exercises: day.exercises.map((ex, pos) => ({
-        client_key: ex.clientKey,
-        exercise_id: ex.exerciseId,
-        position: pos,
-        sets: ex.sets,
-        reps: ex.reps,
-        rir: ex.rir,
-        rest_seconds: ex.restSeconds,
-        tempo: ex.tempo,
-        notes: ex.notes,
-      })),
-    })) as unknown as Json,
-    p_overrides: overrides as unknown as Json,
-    p_weeks: weeks as unknown as Json,
+    p_days: days,
+    p_overrides: overrides,
+    p_weeks: weeks,
   })
   if (error) throw error
 }
@@ -327,21 +340,49 @@ export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<Wo
   return plan
 }
 
-// Atualiza o plano e regrava toda a estrutura filha (atômico via RPC).
+// Atualiza cabeçalho E estrutura filha numa transação só (RPC save_workout_plan,
+// migration 0023).
+//
+// Antes eram duas requisições independentes: um UPDATE em workout_plans que
+// commitava sozinho e só depois a RPC das filhas. O comentário dizia "atômico
+// via RPC", mas só a substituição das filhas era transacional — o par
+// (cabeçalho, filhas) não era. Rede caindo entre as duas deixava o plano com
+// semanas/sequência/volume NOVOS e dias/exercícios VELHOS. É o mesmo defeito
+// que a 0019 corrigiu na avaliação física e que não tinha sido replicado aqui.
+//
+// expectedUpdatedAt implementa concorrência otimista: se a linha mudou depois
+// que esta tela carregou (o educador editou pelo celular e voltou à aba antiga
+// do PC), o banco recusa em vez de sobrescrever em silêncio. Omitir mantém o
+// comportamento antigo de "último a salvar vence".
 export async function updateWorkoutPlan(
   id: string,
-  input: SaveWorkoutPlanInput
+  input: SaveWorkoutPlanInput,
+  expectedUpdatedAt?: string | null
 ): Promise<WorkoutPlanRow> {
-  const { data: plan, error } = await supabase
-    .from('workout_plans')
-    .update(planColumns(input))
-    .eq('id', id)
-    .select('*')
-    .single()
+  const { days, overrides, weeks } = planChildrenPayload(input)
+  const { data, error } = await supabase.rpc('save_workout_plan', {
+    p_plan: id,
+    p_name: input.name,
+    p_goal: input.goal,
+    p_weeks: input.weeks,
+    p_starts_on: input.startsOn,
+    p_notes: input.notes,
+    p_status: input.status,
+    p_weekly_schedule: input.weeklySchedule as unknown as Json,
+    p_volume: input.volume as unknown as Json,
+    p_volume_engine_version: input.volume.engineVersion,
+    p_days: days,
+    p_overrides: overrides,
+    p_weeks_meta: weeks,
+    p_source_assessment_id: input.sourceAssessmentId,
+    p_source_posture_session_id: input.sourcePostureSessionId,
+    // undefined (e não null) para o supabase-js omitir a chave e o Postgres
+    // aplicar o DEFAULT null — o mesmo caminho de um frontend que ainda não
+    // conhece o parâmetro.
+    p_expected_updated_at: expectedUpdatedAt ?? undefined,
+  })
   if (error) throw error
-
-  await replacePlanChildren(id, input)
-  return plan
+  return data as unknown as WorkoutPlanRow
 }
 
 export async function deleteWorkoutPlan(id: string): Promise<void> {
@@ -484,13 +525,17 @@ export type ActivePlanSummary = {
   name: string
   weeks: number
   sessionsPerWeek: number // weekly_schedule.length, ou nº de divisoes se vazio
+  // Inicio efetivo do plano: starts_on quando o profissional informou, senao a
+  // criacao. Necessario para medir adesao pelas semanas ja decorridas em vez
+  // de pelo plano inteiro (ver plannedSessionsToDate).
+  startedOn: string | null
 }
 
 // Planos ativos da org com sessoes/semana (embed do count de divisoes). RLS vale.
 export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSummary[]> {
   const { data, error } = await supabase
     .from('workout_plans')
-    .select('id, subject_id, name, weeks, weekly_schedule, workout_days(count)')
+    .select('id, subject_id, name, weeks, weekly_schedule, starts_on, created_at, workout_days(count)')
     .eq('org_id', orgId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -501,6 +546,8 @@ export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSumma
     name: string
     weeks: number
     weekly_schedule: string[] | null
+    starts_on: string | null
+    created_at: string
     workout_days: { count: number }[]
   }>
   return rows.map((p) => {
@@ -512,6 +559,7 @@ export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSumma
       name: p.name,
       weeks: p.weeks,
       sessionsPerWeek: ws.length > 0 ? ws.length : dayCount,
+      startedOn: p.starts_on ?? p.created_at ?? null,
     }
   })
 }

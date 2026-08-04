@@ -14,10 +14,19 @@ import {
   usNavyBodyFatPct,
 } from './equations'
 import { brozekBodyFatPct, siriBodyFatPct } from './bodyComposition'
+import {
+  assertBodyFatUsable,
+  assertMeasurementsUsable,
+  collectWarnings,
+  type ResultWarning,
+} from './domain'
 
 // Versão do motor de cálculo. Gravada em assessments.engine_version pra um
 // laudo emitido continuar reproduzível mesmo se as fórmulas mudarem depois.
-export const ENGINE_VERSION = '1.0.0'
+// 1.1.0: entrou a camada de domínio (domain.ts). As equações não mudaram —
+// um laudo da 1.0.0 recalcula igual; o que mudou é que medida impossível
+// agora é recusada em vez de virar NaN/percentual negativo no PDF.
+export const ENGINE_VERSION = '1.1.0'
 
 export type ProtocolMeta = {
   id: string
@@ -29,8 +38,12 @@ export type ProtocolMeta = {
   circumferenceSites: CircumferenceSite[]
 }
 
+// compute devolve o resultado cru; a soma das dobras vai junto porque a
+// camada de domínio precisa dela para detectar a inversão da parábola.
+type RawResult = ProtocolResult & { sumMm: number | null }
+
 type Protocol = ProtocolMeta & {
-  compute: (input: ProtocolInput) => ProtocolResult
+  compute: (input: ProtocolInput) => RawResult
 }
 
 function sumSites(input: ProtocolInput, sites: SkinfoldSite[]): number {
@@ -43,12 +56,14 @@ function sumSites(input: ProtocolInput, sites: SkinfoldSite[]): number {
   return sum
 }
 
-function fromDensity(bodyDensity: number): ProtocolResult {
+function fromDensity(bodyDensity: number, sumMm: number): RawResult {
   const siri = siriBodyFatPct(bodyDensity)
   return {
     bodyDensity,
     bodyFatPct: siri,
     conversions: { siri, brozek: brozekBodyFatPct(bodyDensity) },
+    warnings: [],
+    sumMm,
   }
 }
 
@@ -73,7 +88,10 @@ export const PROTOCOLS: Record<string, Protocol> = {
     sexes: ['M', 'F'],
     skinfoldSites: JP7_SITES,
     circumferenceSites: [],
-    compute: (i) => fromDensity(jp7BodyDensity(i.sex, sumSites(i, JP7_SITES), i.ageYears)),
+    compute: (i) => {
+      const sum = sumSites(i, JP7_SITES)
+      return fromDensity(jp7BodyDensity(i.sex, sum, i.ageYears), sum)
+    },
   },
   jp3: {
     id: 'jp3',
@@ -82,7 +100,10 @@ export const PROTOCOLS: Record<string, Protocol> = {
     sexes: ['M'],
     skinfoldSites: JP3_MALE_SITES,
     circumferenceSites: [],
-    compute: (i) => fromDensity(jp3MaleBodyDensity(sumSites(i, JP3_MALE_SITES), i.ageYears)),
+    compute: (i) => {
+      const sum = sumSites(i, JP3_MALE_SITES)
+      return fromDensity(jp3MaleBodyDensity(sum, i.ageYears), sum)
+    },
   },
   jpWard: {
     id: 'jpWard',
@@ -91,7 +112,10 @@ export const PROTOCOLS: Record<string, Protocol> = {
     sexes: ['F'],
     skinfoldSites: JP_WARD_SITES,
     circumferenceSites: [],
-    compute: (i) => fromDensity(jpWardFemaleBodyDensity(sumSites(i, JP_WARD_SITES), i.ageYears)),
+    compute: (i) => {
+      const sum = sumSites(i, JP_WARD_SITES)
+      return fromDensity(jpWardFemaleBodyDensity(sum, i.ageYears), sum)
+    },
   },
   durninWomersley: {
     id: 'durninWomersley',
@@ -100,7 +124,10 @@ export const PROTOCOLS: Record<string, Protocol> = {
     sexes: ['M', 'F'],
     skinfoldSites: DW_SITES,
     circumferenceSites: [],
-    compute: (i) => fromDensity(durninWomersleyBodyDensity(i.sex, sumSites(i, DW_SITES), i.ageYears)),
+    compute: (i) => {
+      const sum = sumSites(i, DW_SITES)
+      return fromDensity(durninWomersleyBodyDensity(i.sex, sum, i.ageYears), sum)
+    },
   },
   usNavy: {
     id: 'usNavy',
@@ -115,7 +142,7 @@ export const PROTOCOLS: Record<string, Protocol> = {
         throw new Error('pescoço e cintura são obrigatórios')
       }
       const bf = usNavyBodyFatPct(i.sex, i.heightCm, c.neck, c.waist, c.hip)
-      return { bodyDensity: null, bodyFatPct: bf, conversions: null }
+      return { bodyDensity: null, bodyFatPct: bf, conversions: null, warnings: [], sumMm: null }
     },
   },
 }
@@ -137,5 +164,12 @@ export function computeProtocol(id: string, input: ProtocolInput): ProtocolResul
   if (!p.sexes.includes(input.sex)) {
     throw new Error(`protocolo ${id} não se aplica ao sexo ${input.sex}`)
   }
-  return p.compute(input)
+  // Ordem importa: medida impossível é barrada antes de virar NaN, e resultado
+  // impossível é barrado antes de virar snapshot no banco ou número no PDF.
+  assertMeasurementsUsable(id, input)
+  const { sumMm, ...raw } = p.compute(input)
+  assertBodyFatUsable(raw.bodyFatPct)
+  return { ...raw, warnings: collectWarnings(id, input, sumMm, raw.bodyFatPct) }
 }
+
+export type { ResultWarning }

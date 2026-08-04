@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { sha256Hex } from '../../lib/hash'
+import { isIntakePath } from '../../lib/routing'
 import { clearIntakeLinkLocal, purgeExpiredIntakeLinks, saveIntakeLinkLocal } from './linkStore'
 import type { Database, Json } from '../../lib/database.types'
 import { SPEC_VERSION, type AnamnesisAnswers } from './spec'
@@ -55,8 +56,7 @@ export function consumePublicIntakeToken(
   const candidate = hashToken || legacyToken
 
   if (
-    currentLocation.pathname === '/a' ||
-    currentLocation.pathname.startsWith('/a/') ||
+    isIntakePath(currentLocation.pathname) ||
     currentLocation.hash ||
     currentLocation.search
   ) {
@@ -220,6 +220,11 @@ export type PublicIntake = {
   subjectFirstName: string | null
   subjectSex: 'M' | 'F' | null
   specVersion: string
+  // Canal do Controlador para o titular exercer seus direitos (LGPD art. 9º,
+  // IV). Null quando o profissional ainda não preencheu — a UI nunca inventa
+  // um contato, apenas deixa de exibir a linha.
+  orgContactEmail: string | null
+  orgContactPhone: string | null
 }
 
 export async function getIntakeByToken(token: string): Promise<PublicIntake | null> {
@@ -234,6 +239,8 @@ export async function getIntakeByToken(token: string): Promise<PublicIntake | nu
     subjectFirstName: isCadastro ? null : row.subject_first_name,
     subjectSex: isCadastro ? null : row.subject_sex === 'F' ? 'F' : 'M',
     specVersion: row.spec_version,
+    orgContactEmail: row.org_contact_email ?? null,
+    orgContactPhone: row.org_contact_phone ?? null,
   }
 }
 

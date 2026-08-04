@@ -692,6 +692,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           evaluators_see_all: boolean
           id: string
@@ -700,6 +702,8 @@ export type Database = {
           subject_term: string
         }
         Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           evaluators_see_all?: boolean
           id?: string
@@ -708,6 +712,8 @@ export type Database = {
           subject_term?: string
         }
         Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           evaluators_see_all?: boolean
           id?: string
@@ -1599,6 +1605,8 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           kind: string
+          org_contact_email: string | null
+          org_contact_phone: string | null
           org_name: string
           spec_version: string
           subject_first_name: string
@@ -1650,6 +1658,7 @@ export type Database = {
           p_assessment: string
           p_circumferences: Json
           p_engine_version: string
+          p_expected_updated_at?: string
           p_height_cm: number
           p_medications?: string
           p_notes?: string
@@ -1677,6 +1686,51 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "assessments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      save_workout_plan: {
+        Args: {
+          p_days: Json
+          p_expected_updated_at?: string
+          p_goal: string | null
+          p_name: string
+          p_notes: string | null
+          p_overrides: Json
+          p_plan: string
+          p_source_assessment_id?: string | null
+          p_source_posture_session_id?: string | null
+          p_starts_on: string | null
+          p_status: string
+          p_volume: Json
+          p_volume_engine_version: string
+          p_weeks: number
+          p_weeks_meta: Json
+          p_weekly_schedule: Json
+        }
+        Returns: {
+          created_at: string
+          evaluator_id: string
+          goal: string | null
+          id: string
+          name: string
+          notes: string | null
+          org_id: string
+          source_assessment_id: string | null
+          source_posture_session_id: string | null
+          starts_on: string | null
+          status: string
+          subject_id: string
+          updated_at: string
+          volume: Json | null
+          volume_engine_version: string | null
+          weekly_schedule: string[]
+          weeks: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workout_plans"
           isOneToOne: true
           isSetofReturn: false
         }

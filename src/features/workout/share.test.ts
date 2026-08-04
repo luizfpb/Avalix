@@ -42,6 +42,61 @@ describe('planShareText', () => {
   it('termina com a atribuição do Avalix', () => {
     expect(text.trimEnd().endsWith('Plano feito no Avalix.')).toBe(true)
   })
+
+  it('imprime descanso e cadência, como o PDF', () => {
+    expect(text).toContain('1. Crucifixo — 4×8-12 (RIR 2) · 90s')
+    expect(text).toContain('2. Supino — 3×10 · 60s')
+  })
+})
+
+// Regressão: o texto do WhatsApp e o PDF são os dois documentos oficiais do
+// mesmo plano e diziam coisas diferentes. Sem overrides nem weekly_schedule, o
+// aluno recebia a semana 1 como se valesse para o mesociclo inteiro.
+describe('planShareText não pode contradizer o PDF', () => {
+  const planComSequencia = { ...plan, weeks: 3, weekly_schedule: ['A', 'B', 'A'] } as WorkoutPlanRow
+  const overrides = [
+    {
+      id: 'o1', org_id: 'o1', plan_id: 'p1', workout_exercise_id: 'x1',
+      week_number: 2, sets: 5, reps: '6-8', rir: 1, rest_seconds: 120,
+      is_skipped: false, notes: null, created_at: 'x',
+    },
+    {
+      id: 'o2', org_id: 'o1', plan_id: 'p1', workout_exercise_id: 'x3',
+      week_number: 3, sets: null, reps: null, rir: null, rest_seconds: null,
+      is_skipped: true, notes: null, created_at: 'x',
+    },
+  ] as unknown as Parameters<typeof planShareText>[0]['overrides']
+
+  const texto = planShareText({
+    orgName: 'Studio X',
+    plan: planComSequencia,
+    days,
+    exercises,
+    exerciseNames: names,
+    overrides,
+  })
+
+  it('mostra a sequência semanal (A · B · A), que antes sumia', () => {
+    expect(texto).toContain('Sequência da semana: A · B · A')
+  })
+
+  it('lista os ajustes por semana com o nome do exercício', () => {
+    expect(texto).toContain('*Ajustes por semana*')
+    expect(texto).toContain('*Semana 2*')
+    expect(texto).toContain('- Crucifixo: 5 séries · 6-8 reps · RIR 1 · 120s')
+  })
+
+  it('deixa claro quando o exercício sai da semana', () => {
+    expect(texto).toContain('*Semana 3*')
+    expect(texto).toContain('- Agachamento: não fazer nesta semana')
+  })
+
+  it('sem overrides, não inventa a seção', () => {
+    const semOverrides = planShareText({
+      orgName: 'Studio X', plan, days, exercises, exerciseNames: names,
+    })
+    expect(semOverrides).not.toContain('Ajustes por semana')
+  })
 })
 
 describe('whatsappUrl', () => {

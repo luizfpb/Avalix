@@ -15,8 +15,20 @@ export function isPublicPath(pathname: string): boolean {
 
 // Página pública da anamnese respondida pelo aluno (link com token). Fica fora
 // de toda a lógica de auth/org: qualquer visitante, logado ou não, acessa.
+//
+// Duas formas de URL, ambas públicas:
+//   /a          -> forma ATUAL, com o token no fragmento (#), que não é enviado
+//                  ao servidor nem entra em log/Referer.
+//   /a/<token>  -> forma LEGADA, ainda aceita para links já distribuídos.
+//
+// Esta função é a definição única de "rota pública do aluno". Ela existia aqui
+// cobrindo só `/a/`, enquanto App.tsx, features/pwa/updateCheck e
+// anamnesis/intake repetiam o predicado completo inline — ou seja, o guard de
+// rota tinha uma noção de rota pública DIFERENTE da do resto do app, sem cobrir
+// a forma que é a atual. Consolidado aqui para não haver duas respostas para a
+// mesma pergunta.
 export function isIntakePath(pathname: string): boolean {
-  return pathname.startsWith('/a/')
+  return pathname === '/a' || pathname.startsWith('/a/')
 }
 
 export type RedirectInput = {

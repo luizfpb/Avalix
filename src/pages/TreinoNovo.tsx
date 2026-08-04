@@ -30,6 +30,7 @@ import {
   type ExerciseMeta,
 } from '../features/workout/builder'
 import { GOAL_OPTIONS } from '../features/workout/schema'
+import { clearDraft, useFormDraft } from '../lib/draft'
 import {
   snapshotVolumeItems,
   type MovementPattern,
@@ -133,6 +134,7 @@ export default function TreinoNovo() {
       exercises={exercisesQuery.data ?? []}
       initial={initial}
       planId={isEdit ? planId : undefined}
+      planUpdatedAt={isEdit ? planQuery.data?.plan?.updated_at ?? null : null}
     />
   )
 }
@@ -144,6 +146,7 @@ function Builder({
   exercises,
   initial,
   planId,
+  planUpdatedAt,
 }: {
   subjectId: string
   subjectName: string
@@ -151,17 +154,30 @@ function Builder({
   exercises: ExerciseRow[]
   initial: EditorPlan
   planId?: string
+  // Versão do plano que ESTA tela carregou, para a concorrência otimista da
+  // migration 0023: salvar por cima de uma edição feita em outro dispositivo
+  // passa a ser recusado em vez de sobrescrever em silêncio.
+  planUpdatedAt?: string | null
 }) {
   const navigate = useNavigate()
   const isEdit = !!planId
   const createMut = useCreateWorkoutPlan(subjectId)
-  const updateMut = useUpdateWorkoutPlan(subjectId, planId)
+  const updateMut = useUpdateWorkoutPlan(subjectId, planId, planUpdatedAt)
   const mut = isEdit ? updateMut : createMut
   const anamneseQ = useAnamneses(subjectId)
 
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [showCalc, setShowCalc] = useState(false)
+
+  // Montar um mesociclo (divisões, exercícios, séries/reps/RIR/descanso,
+  // sequência semanal e overrides por semana) é o trabalho mais longo do app e
+  // vivia só em memória: um toque em Voltar, um F5 ou o Android descartando a
+  // aba jogava tudo fora. Mesmo escopo/TTL dos outros formulários longos.
+  // Só no modo criação: na edição o servidor já é a fonte de verdade e um
+  // rascunho velho poderia ressuscitar dados por cima do plano salvo.
+  const draftKey = isEdit ? null : `treino:${subjectId}`
+  const draft = useFormDraft<EditorPlan>(draftKey, plan, (d) => setPlan(d))
   const [dragDay, setDragDay] = useState<number | null>(null)
   const [dragEx, setDragEx] = useState<{ dayKey: string; idx: number } | null>(null)
 
@@ -390,6 +406,7 @@ function Builder({
     try {
       const save = editorToSaveInput(plan, { orgId, subjectId }, snapshot)
       const saved = await mut.mutateAsync(save)
+      if (draftKey) clearDraft(draftKey)
       navigate(`/avaliados/${subjectId}/treinos/${saved.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -421,6 +438,20 @@ function Builder({
         </Link>
         <h1 className="mt-2 text-xl font-semibold">{isEdit ? 'Editar plano' : 'Novo plano de treino'}</h1>
       </div>
+
+      {draft.restored ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+          <button
+            type="button"
+            onClick={draft.dismiss}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Fechar aviso de rascunho"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <AnamneseFlag subjectId={subjectId} />
 

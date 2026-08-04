@@ -4,6 +4,7 @@ import {
   fatMassKg,
   leanMassKg,
   type ProtocolInput,
+  type ResultWarning,
   type Sex,
 } from './protocols'
 
@@ -17,6 +18,11 @@ export type AssessmentResultSnapshot = {
   conversions: { siri: number; brozek: number } | null
   fatMassKg: number
   leanMassKg: number
+  // Ressalvas de domínio no momento do cálculo. Fica no snapshot (e não é
+  // recalculado na leitura) pelo mesmo motivo do resto: o laudo precisa
+  // continuar dizendo o que dizia quando foi emitido. Opcional porque os
+  // snapshots gravados antes da 1.1.0 não têm o campo.
+  warnings?: ResultWarning[]
   inputs: {
     sex: Sex
     ageYears: number
@@ -41,6 +47,7 @@ export function buildAssessmentResult(
     conversions: r.conversions,
     fatMassKg: fatMassKg(weightKg, r.bodyFatPct),
     leanMassKg: leanMassKg(weightKg, r.bodyFatPct),
+    warnings: r.warnings,
     inputs: {
       sex: input.sex,
       ageYears: input.ageYears,

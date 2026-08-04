@@ -1,5 +1,5 @@
 import type { ActivePlanSummary, LogSummary } from './api'
-import { adherencePct, plannedSessions } from './progress'
+import { adherencePct, plannedSessionsToDate } from './progress'
 import { daysSince, dueForReassessment } from '../../lib/reminders'
 
 // dias sem treino registrado (com plano ativo) que pedem atenção do profissional
@@ -45,10 +45,21 @@ export function buildCarteira(input: {
     let quiet = false
     if (plan) {
       const summary = input.logSummary[plan.planId] ?? { count: 0, lastDate: null }
-      const planned = plannedSessions(plan.weeks, plan.sessionsPerWeek)
-      adherence = planned > 0 ? adherencePct(summary.count, planned) : null
+      // Denominador por semanas já fechadas: enquanto a primeira semana corre,
+      // não há percentual a cobrar (null), em vez de 0%.
+      const planned = plannedSessionsToDate(
+        plan.weeks,
+        plan.sessionsPerWeek,
+        plan.startedOn,
+        input.now
+      )
+      adherence = planned != null && planned > 0 ? adherencePct(summary.count, planned) : null
       lastLogAt = summary.lastDate
-      const since = lastLogAt ? daysSince(lastLogAt, input.now) : Infinity
+      // Sem log nenhum, o silêncio conta a partir do início do plano — antes
+      // era Infinity, então um plano criado no mesmo dia já entrava como "sem
+      // treino recente" e ia para o topo da lista de atenção.
+      const referencia = lastLogAt ?? plan.startedOn
+      const since = referencia ? daysSince(referencia, input.now) : 0
       quiet = since >= quietDays
     }
 

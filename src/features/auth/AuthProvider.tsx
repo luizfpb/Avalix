@@ -5,6 +5,7 @@ import { clearPersistedAuthSession, supabase } from '../../lib/supabase'
 import { AuthContext, type AuthContextValue, type MfaStatus } from './context'
 import type { AuthStatus } from '../../lib/routing'
 import {
+  classifySessionTransition,
   clearPrivateClientState,
   identityChanged,
   setPrivateClientScope,
@@ -27,9 +28,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Falha ao consultar AAL nunca libera o shell. O usuario recebe uma acao de
   // retry; apenas uma resposta valida do Supabase muda unknown para ok/required.
-  const refreshMfa = useCallback(async () => {
+  //
+  // mode 'revalidate' mantem o ultimo status conhecido enquanto reconsulta, em
+  // vez de regredir para 'unknown'. Isso e para os eventos que o supabase-js
+  // reemite com a MESMA identidade (visibilitychange, TOKEN_REFRESHED): ali o
+  // 'unknown' nao acrescenta seguranca — o RLS ja barra tudo por
+  // app.mfa_satisfied() no banco, que e a fronteira de verdade — e custa a
+  // desmontagem da arvore de rotas, levando junto o formulario aberto. Se a
+  // resposta chegar dizendo 'required', o gate fecha do mesmo jeito.
+  const refreshMfa = useCallback(async (mode: 'block' | 'revalidate' = 'block') => {
     const attempt = ++mfaAttempt.current
-    setMfaStatus('unknown')
+    if (mode === 'block') setMfaStatus('unknown')
     setMfaError(null)
     try {
       const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -54,16 +63,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback(
     (newSession: Session | null) => {
       const nextUserId = newSession?.user.id ?? null
+      const transition = classifySessionTransition(lastObservedUserId, nextUserId)
       if (identityChanged(lastObservedUserId, nextUserId)) {
         clearPrivateClientState(queryClient)
       }
       lastObservedUserId = nextUserId
-      // O org sera acrescentado pela fronteira dentro de OrganizationProvider.
-      setPrivateClientScope(nextUserId, null)
       setSession(newSession)
       setStatus(newSession ? 'signedIn' : 'signedOut')
+      if (transition === 'revalidated') {
+        // Mesma identidade: o escopo de rascunho ja esta completo (userId+orgId,
+        // aplicado por PrivateScope) e precisa continuar valendo — zera-lo aqui
+        // desligaria o autosave sem nada reativa-lo.
+        void refreshMfa('revalidate')
+        return
+      }
+      // O org sera acrescentado pela fronteira dentro de OrganizationProvider.
+      setPrivateClientScope(nextUserId, null)
       if (newSession) {
-        void refreshMfa()
+        void refreshMfa('block')
       } else {
         ++mfaAttempt.current
         setMfaError(null)

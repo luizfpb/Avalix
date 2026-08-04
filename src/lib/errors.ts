@@ -68,6 +68,14 @@ export function normalizeDbError(error: unknown): string {
   if (code === '42501' || text.includes('row-level security')) {
     return 'Ação bloqueada pelas regras de acesso — confira se o consentimento está vigente e se você tem permissão.'
   }
+  // 40001: conflito de concorrência otimista das RPCs save_* (migration 0023).
+  // A mensagem do banco já vem em pt-BR e é específica (avaliação x plano),
+  // então passa direto em vez de virar um texto genérico.
+  if (code === '40001') {
+    return message && message.trim().length > 0
+      ? message
+      : 'Este registro foi alterado em outro dispositivo. Recarregue a tela antes de salvar.'
+  }
   if (text.includes('jwt expired') || text.includes('jwt is expired')) {
     return 'Sessão expirada. Faça login de novo.'
   }

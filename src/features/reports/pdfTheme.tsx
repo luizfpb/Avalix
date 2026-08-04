@@ -1,5 +1,6 @@
-import { Image, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Image, StyleSheet, View } from '@react-pdf/renderer'
 import type { ReactNode } from 'react'
+import { Text } from './pdfText'
 
 // Hex direto porque o renderer não interpreta os tokens CSS do app.
 export const palette = {
@@ -166,6 +167,22 @@ export const pdfTheme = StyleSheet.create({
     color: '#7B8590',
   },
   footerBrand: { fontFamily: 'Helvetica-Bold', color: palette.plum, letterSpacing: 0.5 },
+
+  methodNote: {
+    marginTop: 10,
+    padding: 8,
+    borderWidth: 0.6,
+    borderColor: palette.hairline,
+    borderRadius: 3,
+    backgroundColor: palette.surface,
+  },
+  methodNoteText: { fontSize: 7.5, color: palette.muted, lineHeight: 1.45 },
+  methodNoteWarn: {
+    fontSize: 7.5,
+    color: palette.magenta,
+    lineHeight: 1.45,
+    marginTop: 4,
+  },
 })
 
 export type InfoItem = { label: string; value: string; wide?: boolean }
@@ -245,13 +262,42 @@ export function SectionTitle({ children }: { children: ReactNode }) {
   )
 }
 
-export function ReportFooter({ note }: { note: string }) {
+// evaluator: quem assina o documento. Um laudo de saúde sem identificação do
+// profissional responsável não é um documento profissional — e o dado já
+// existia no banco (evaluator_id), só não chegava ao papel.
+export function ReportFooter({ note, evaluator }: { note: string; evaluator?: string | null }) {
   return (
     <View style={pdfTheme.footer} fixed>
       <Text>
         <Text style={pdfTheme.footerBrand}>AVALIX</Text> · {note}
+        {evaluator ? ` · ${evaluator}` : ''}
       </Text>
       <Text render={({ pageNumber, totalPages }) => `pág. ${pageNumber} de ${totalPages}`} />
+    </View>
+  )
+}
+
+// Ressalva obrigatória num documento que trata dado de saúde: avaliação física
+// estima, não diagnostica. Também é onde entram as ressalvas de domínio do
+// motor (idade extrapolada, soma acima do vértice da parábola), para que a
+// limitação viaje junto com o número em vez de ficar só na tela.
+export function MethodNote({
+  children,
+  warnings,
+}: {
+  children: ReactNode
+  warnings?: { code: string; message: string }[] | null
+}) {
+  return (
+    <View style={pdfTheme.methodNote}>
+      <Text style={pdfTheme.methodNoteText}>{children}</Text>
+      {warnings?.length
+        ? warnings.map((w) => (
+            <Text key={w.code} style={pdfTheme.methodNoteWarn}>
+              Ressalva: {w.message}
+            </Text>
+          ))
+        : null}
     </View>
   )
 }

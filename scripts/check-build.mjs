@@ -3,9 +3,34 @@ import { gzipSync } from 'node:zlib'
 import path from 'node:path'
 
 const DIST = path.resolve('dist')
-const MAX_ENTRY_RAW = 600_000
-const MAX_ENTRY_GZIP = 180_000
+
+// Orcamento do entry JS (o que o navegador baixa antes de qualquer tela).
+//
+// Estes limites ja estiveram calibrados em 600k/180k, com o build ocupando
+// 99,2% dos dois. Um orcamento cheio nao protege de nada: ele nao distingue
+// "alguem importou o @react-pdf no boot" de "alguem acrescentou um formulario",
+// e simplesmente bloqueia o proximo commit. O teto agora tem ~14% de folga
+// para caber trabalho normal, e o que de fato importa passou a ser conferido de
+// forma ESTRUTURAL logo abaixo (FORBIDDEN_IN_ENTRY): as bibliotecas pesadas nao
+// podem entrar no caminho de boot. Se o @react-pdf (1,4 MB) ou o recharts
+// (400 kB) vazarem para o entry, a checagem falha por nome, nao por byte.
+//
+// Composicao legitima do entry hoje: React + react-dom, @supabase/supabase-js
+// (auth e necessaria no boot), TanStack Query e react-router. Conferido.
+const MAX_ENTRY_RAW = 680_000
+const MAX_ENTRY_GZIP = 205_000
 const MAX_PRECACHE = 2_000_000
+
+// Marcadores de bibliotecas que NUNCA podem estar no entry: todas sao
+// carregadas sob demanda (PDF ao exportar, graficos na tela de evolucao,
+// MediaPipe na deteccao postural, CSV/ZIP na exportacao).
+const FORBIDDEN_IN_ENTRY = [
+  { nome: '@react-pdf/renderer', re: /_react-pdf|ReactPDF|@react-pdf/ },
+  { nome: 'recharts', re: /recharts/i },
+  { nome: '@mediapipe/tasks-vision', re: /mediapipe|vision_bundle/i },
+  { nome: 'papaparse', re: /papaparse/i },
+  { nome: 'fflate', re: /fflate/i },
+]
 const FORBIDDEN_PRECACHE = [
   /pdfTheme-/,
   /assessmentPdf-/,
@@ -36,6 +61,16 @@ if (entry.byteLength > MAX_ENTRY_RAW) {
 }
 if (entryGzip > MAX_ENTRY_GZIP) {
   fail(`entry JS gzip tem ${entryGzip} bytes; limite ${MAX_ENTRY_GZIP}`)
+}
+
+// Guarda estrutural: mais util que o byte count, porque nomeia o problema.
+const entryText = entry.toString('utf8')
+const leaked = FORBIDDEN_IN_ENTRY.filter(({ re }) => re.test(entryText)).map(({ nome }) => nome)
+if (leaked.length > 0) {
+  fail(
+    `biblioteca pesada no caminho de boot: ${leaked.join(', ')}. ` +
+      'Carregue sob demanda com import() dinâmico em vez de import estático.'
+  )
 }
 
 const sw = await readFile(path.join(DIST, 'sw.js'), 'utf8')

@@ -20,3 +20,8 @@ export {
   fatMassKg,
   leanMassKg,
 } from './bodyComposition'
+export {
+  ProtocolDomainError,
+  type ResultWarning,
+  type ResultWarningCode,
+} from './domain'
