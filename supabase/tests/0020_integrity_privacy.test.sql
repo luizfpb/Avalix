@@ -20,10 +20,15 @@ set local search_path = public, extensions, pg_catalog;
 
 select plan(39);
 
-select is(
-  public.app_schema_version(),
-  '0020',
-  'marcador publico confirma que o schema 0020 esta aplicado'
+-- Comparacao por >= e nao por igualdade: o marcador avanca a cada migration
+-- que muda contrato (0023, 0024, 0025...), e o que este arquivo precisa saber e
+-- que a 0020 JA ESTA aplicada, nao que ela seja a ultima. Com is() exato, toda
+-- migration futura quebrava este teste sem nenhum defeito real de
+-- comportamento. Os identificadores sao zero-padded, entao a comparacao
+-- lexicografica equivale a numerica.
+select ok(
+  public.app_schema_version() >= '0020',
+  'marcador publico confirma que a 0020 (ou posterior) esta aplicada'
 );
 
 -- Deterministic auth context for SQL-only tests. Supabase's built-in
