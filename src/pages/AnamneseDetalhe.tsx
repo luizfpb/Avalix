@@ -3,6 +3,11 @@ import { Pencil } from 'lucide-react'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
 import { parseAnswers } from '../features/anamnesis/parse'
+import { useSubject } from '../features/subjects/hooks'
+import { useOrganization } from '../features/organization/context'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildAnamnesePrompt } from '../features/prompts'
+import { logExport } from '../features/reports/audit'
 import { Button } from '@/components/ui/button'
 
 function formatDate(iso: string): string {
@@ -18,6 +23,9 @@ function formatDateTime(iso: string): string {
 export default function AnamneseDetalhe() {
   const { id, anamneseId } = useParams()
   const query = useAnamnese(anamneseId)
+  // o prompt precisa de idade e sexo; o nome entra abreviado
+  const subjectQuery = useSubject(id)
+  const { organization } = useOrganization()
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
   if (query.isError || !query.data) {
@@ -33,6 +41,7 @@ export default function AnamneseDetalhe() {
 
   const row = query.data
   const a = parseAnswers(row.payload)
+  const subject = subjectQuery.data
   // marca de correção: em dado de saúde importa saber que o registro mudou
   // depois de criado (a trilha completa fica em audit_logs)
   const edited = new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
@@ -59,6 +68,35 @@ export default function AnamneseDetalhe() {
           </Button>
         </div>
       </div>
+
+      {/* O prompt só aparece com o cadastro carregado: sem idade e sexo o
+          material sairia incompleto e a análise, enviesada. */}
+      {subject ? (
+        <CopyPromptButton
+          label="Copiar prompt de parecer"
+          build={() =>
+            buildAnamnesePrompt({
+              subject: {
+                fullName: subject.full_name,
+                birthDate: subject.birth_date,
+                sex: subject.sex,
+              },
+              assessedAt: row.assessed_at,
+              answers: a,
+            })
+          }
+          onCopied={() => {
+            if (!organization) return
+            void logExport({
+              orgId: organization.id,
+              action: 'AI_SUMMARY',
+              tableName: 'anamneses',
+              rowId: row.id,
+              subjectId: row.subject_id,
+            })
+          }}
+        />
+      ) : null}
 
       <AnamneseResumo answers={a} />
     </div>

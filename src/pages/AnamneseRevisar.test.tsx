@@ -23,10 +23,20 @@ vi.mock('../features/anamnesis/intakeHooks', () => ({
 
 vi.mock('../features/subjects/hooks', () => ({
   useSubjects: () => ({ data: [], isPending: false }),
+  // usado só para montar o prompt de parecer; nesta suíte o avaliado ainda
+  // não existe (fluxo de cadastro), então o botão não aparece
+  useSubject: () => ({ data: null, isPending: false }),
 }))
 
 vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org1' }, role: 'owner' }),
+}))
+
+// A trilha de auditoria do prompt importa lib/supabase, que LANÇA no import
+// quando não há VITE_SUPABASE_* — é o que acontece no CI, que roda sem
+// .env.local. Mockar aqui mantém a suíte independente de ambiente.
+vi.mock('../features/reports/audit', () => ({
+  logExport: vi.fn(),
 }))
 
 // o resumo da anamnese é display puro; fora do escopo deste teste

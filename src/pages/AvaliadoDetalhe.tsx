@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
-import { useAssessments } from '../features/assessment/hooks'
+import {
+  useAssessment,
+  useAssessments,
+  useSubjectCircumferences,
+} from '../features/assessment/hooks'
 import { useAnamneses } from '../features/anamnesis/hooks'
+import { parseAnswers } from '../features/anamnesis/parse'
 import {
   useSubjectIntakes,
   useGenerateIntakeLink,
@@ -14,6 +19,10 @@ import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { useWorkoutPlans } from '../features/workout/hooks'
 import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
+import type { AssessmentResultSnapshot } from '../features/assessment/result'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildBriefingPrompt, type AssessmentPromptPoint } from '../features/prompts'
+import type { SubjectRow } from '../features/subjects/api'
 import { useSessions } from '../features/posture/hooks'
 import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
 import { csvBlob, downloadBlob } from '../features/reports/download'
@@ -200,10 +209,109 @@ export default function AvaliadoDetalhe() {
 
       <AssessmentsSection subjectId={s.id} />
 
+      <BriefingSection subject={s} />
+
       <WorkoutSection subjectId={s.id} />
 
       <PosturalSection subjectId={s.id} />
     </div>
+  )
+}
+
+// Briefing de prescrição: junta a anamnese mais recente com a série de
+// avaliações num prompt só. É o cruzamento que nenhuma das duas telas mostra
+// sozinha — meta declarada que a triagem não autoriza, queixa de dor que
+// explica uma medida parada, perda de peso com perda de massa magra em quem
+// pediu hipertrofia.
+function BriefingSection({ subject }: { subject: SubjectRow }) {
+  const { organization } = useOrganization()
+  const { user } = useAuth()
+  const anamnesesQuery = useAnamneses(subject.id)
+  const assessmentsQuery = useAssessments(subject.id)
+  const circsQuery = useSubjectCircumferences(subject.id)
+
+  // listAnamneses já vem da mais recente para a mais antiga
+  const anamneseRow = (anamnesesQuery.data ?? [])[0] ?? null
+
+  const assessments = useMemo(
+    () =>
+      [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
+    [assessmentsQuery.data]
+  )
+  const lastAssessment = assessments.length > 0 ? assessments[assessments.length - 1] : null
+  // as dobras cruas só existem na consulta por avaliação; useAssessment fica
+  // desabilitado enquanto não há avaliação nenhuma
+  const lastDetailQuery = useAssessment(lastAssessment?.id)
+
+  const points: AssessmentPromptPoint[] = useMemo(() => {
+    const byDate = new Map<string, { site: string; valueCm: number }[]>()
+    for (const c of circsQuery.data ?? []) {
+      const arr = byDate.get(c.assessedAt) ?? []
+      arr.push({ site: c.site, valueCm: c.valueCm })
+      byDate.set(c.assessedAt, arr)
+    }
+    return assessments.map((a) => ({
+      assessedAt: a.assessed_at,
+      protocolId: a.protocol_id,
+      engineVersion: a.engine_version,
+      weightKg: a.weight_kg,
+      heightCm: a.height_cm,
+      results: a.results as AssessmentResultSnapshot | null,
+      circumferences: byDate.get(a.assessed_at) ?? [],
+    }))
+  }, [assessments, circsQuery.data])
+
+  // Sem anamnese e sem avaliação não há material nenhum para cruzar.
+  if (!anamneseRow && assessments.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Briefing para IA</CardTitle>
+        <CardDescription>
+          Anamnese e avaliações físicas num prompt só, para pedir a leitura cruzada antes de
+          prescrever.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <CopyPromptButton
+          label="Copiar briefing"
+          build={() =>
+            buildBriefingPrompt({
+              subject: {
+                fullName: subject.full_name,
+                birthDate: subject.birth_date,
+                sex: subject.sex,
+              },
+              anamnese: anamneseRow
+                ? {
+                    assessedAt: anamneseRow.assessed_at,
+                    answers: parseAnswers(anamneseRow.payload),
+                  }
+                : null,
+              points,
+              skinfolds: (lastDetailQuery.data?.skinfolds ?? []).map((sf) => ({
+                site: sf.site,
+                readings: [sf.reading_1, sf.reading_2, sf.reading_3].filter(
+                  (v): v is number => v != null
+                ),
+              })),
+            })
+          }
+          onCopied={() => {
+            if (!organization) return
+            void logExport({
+              orgId: organization.id,
+              userId: user?.id,
+              action: 'AI_SUMMARY',
+              tableName: 'assessments',
+              rowId: null,
+              subjectId: subject.id,
+            })
+          }}
+        />
+      </CardContent>
+    </Card>
   )
 }
 

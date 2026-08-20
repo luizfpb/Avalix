@@ -2,7 +2,7 @@
 
 As regras globais de `~/.claude/CLAUDE.md` valem integralmente aqui
 (nunca commitar — hook bloqueia; comandos de 1 linha em sintaxe cmd;
-pt-BR; commits sem cara de IA).
+pt-BR; commits sem cara de IA; Acentuação e pontuação corretas).
 
 ## Ler antes de começar (fonte de verdade, nesta ordem)
 

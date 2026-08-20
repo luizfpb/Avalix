@@ -23,6 +23,8 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildAssessmentPrompt } from '../features/prompts'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
@@ -200,6 +202,48 @@ export default function AvaliacaoDetalhe() {
         description="A avaliação e as medidas dela serão removidas. Esta ação é definitiva."
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <CopyPromptButton
+        label="Copiar prompt de parecer"
+        build={() =>
+          buildAssessmentPrompt({
+            subject: {
+              fullName: subjectQuery.data?.full_name,
+              birthDate: subjectQuery.data?.birth_date,
+              sex: subjectQuery.data?.sex,
+            },
+            point: {
+              assessedAt: assessment.assessed_at,
+              protocolId: assessment.protocol_id,
+              engineVersion: assessment.engine_version,
+              weightKg: assessment.weight_kg,
+              heightCm: assessment.height_cm,
+              results: result,
+              circumferences: circumferences.map((c) => ({ site: c.site, valueCm: c.value_cm })),
+            },
+            // as tres afericoes por ponto, nao a media: a amplitude entre elas
+            // e o unico sinal de reprodutibilidade que o material carrega
+            skinfolds: skinfolds.map((sf) => ({
+              site: sf.site,
+              readings: [sf.reading_1, sf.reading_2, sf.reading_3].filter(
+                (v): v is number => v != null
+              ),
+            })),
+            medications: assessment.medications,
+            notes: assessment.notes,
+          })
+        }
+        onCopied={() => {
+          if (!organization) return
+          void logExport({
+            orgId: organization.id,
+            userId: user?.id,
+            action: 'AI_SUMMARY',
+            tableName: 'assessments',
+            rowId: assessment.id,
+          })
+        }}
       />
 
       {result ? (

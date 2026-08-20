@@ -27,6 +27,8 @@ import { useAuth } from '../features/auth/context'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
 import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildAssessmentSeriesPrompt, type AssessmentPromptPoint } from '../features/prompts'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { QueryError } from '../components/QueryError'
@@ -67,6 +69,29 @@ export default function Evolucao() {
     () => [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
     [assessmentsQuery.data]
   )
+
+  // Pontos da série para o prompt de progressão. As circunferências chegam
+  // planas (data + sítio + valor) e são reagrupadas por data — mesma forma que
+  // o PDF de evolução usa. Duas avaliações na mesma data compartilham os
+  // pontos: a consulta não devolve o id da avaliação, e a limitação já vale
+  // para o PDF.
+  const seriesPoints: AssessmentPromptPoint[] = useMemo(() => {
+    const byDate = new Map<string, { site: string; valueCm: number }[]>()
+    for (const c of circsQuery.data ?? []) {
+      const arr = byDate.get(c.assessedAt) ?? []
+      arr.push({ site: c.site, valueCm: c.valueCm })
+      byDate.set(c.assessedAt, arr)
+    }
+    return assessments.map((a) => ({
+      assessedAt: a.assessed_at,
+      protocolId: a.protocol_id,
+      engineVersion: a.engine_version,
+      weightKg: a.weight_kg,
+      heightCm: a.height_cm,
+      results: a.results as AssessmentResultSnapshot | null,
+      circumferences: byDate.get(a.assessed_at) ?? [],
+    }))
+  }, [assessments, circsQuery.data])
 
   // PDF de evolução (P6): resumo do período + cartões de tendência, chunk lazy
   async function handlePdf() {
@@ -189,6 +214,35 @@ export default function Evolucao() {
       </div>
 
       {pdfError ? <p role="alert" className="text-sm text-destructive">{pdfError}</p> : null}
+
+      {/* Progressão: só faz sentido a partir de dois pontos. Com um ponto só,
+          o prompt da avaliação isolada está na tela da própria avaliação. */}
+      {assessments.length >= 2 ? (
+        <CopyPromptButton
+          label="Copiar prompt de progressão"
+          build={() =>
+            buildAssessmentSeriesPrompt({
+              subject: {
+                fullName: subject.full_name,
+                birthDate: subject.birth_date,
+                sex: subject.sex,
+              },
+              points: seriesPoints,
+            })
+          }
+          onCopied={() => {
+            if (!organization) return
+            void logExport({
+              orgId: organization.id,
+              userId: user?.id,
+              action: 'AI_SUMMARY',
+              tableName: 'assessments',
+              rowId: null,
+              subjectId: id,
+            })
+          }}
+        />
+      ) : null}
 
       {/* ===== ESTADO ATUAL ===== */}
       <Card>

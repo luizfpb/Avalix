@@ -4,8 +4,11 @@ import { useIntake, useAcceptIntake, useRejectIntake } from '../features/anamnes
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { subjectFormSchema, formToInsert, type SubjectFormValues } from '../features/subjects/schema'
-import { useSubjects } from '../features/subjects/hooks'
+import { useSubject, useSubjects } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildAnamnesePrompt } from '../features/prompts'
+import { logExport } from '../features/reports/audit'
 import { ageFromBirthDate } from '../lib/age'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,6 +32,9 @@ export default function AnamneseRevisar() {
   const { organization } = useOrganization()
   const query = useIntake(intakeId)
   const subjectsQuery = useSubjects(organization?.id)
+  // no fluxo de anamnese o avaliado ja existe; no de cadastro ele so nasce ao
+  // aceitar, e os dados vem do formulario que o aluno preencheu
+  const subjectQuery = useSubject(id)
   const accept = useAcceptIntake(id)
   const reject = useRejectIntake(id)
   const [confirmReject, setConfirmReject] = useState(false)
@@ -123,6 +129,24 @@ export default function AnamneseRevisar() {
 
   const busy = accept.isPending || reject.isPending
 
+  // Sexo e idade sao necessarios ao prompt (equacoes e blocos condicionais).
+  // Sem eles o botao nao aparece, em vez de gerar material incompleto.
+  const promptSubject = isCadastro
+    ? registration?.full_name && registration.birth_date && registration.sex
+      ? {
+          fullName: registration.full_name,
+          birthDate: registration.birth_date,
+          sex: registration.sex,
+        }
+      : null
+    : subjectQuery.data
+      ? {
+          fullName: subjectQuery.data.full_name,
+          birthDate: subjectQuery.data.birth_date,
+          sex: subjectQuery.data.sex,
+        }
+      : null
+
   return (
     <div className="max-w-2xl space-y-5">
       <div>
@@ -190,6 +214,31 @@ export default function AnamneseRevisar() {
           </p>
         </CardContent>
       </Card>
+
+      {promptSubject ? (
+        <CopyPromptButton
+          label="Copiar prompt de parecer"
+          build={() =>
+            buildAnamnesePrompt({
+              subject: promptSubject,
+              assessedAt: intake.submitted_at?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+              answers: answers!,
+            })
+          }
+          onCopied={() => {
+            // sem anamnese gravada ainda: a trilha aponta para o avaliado. No
+            // fluxo de cadastro nem avaliado existe, e nao ha o que registrar.
+            if (!organization || !intake.subject_id) return
+            void logExport({
+              orgId: organization.id,
+              action: 'AI_SUMMARY',
+              tableName: 'anamneses',
+              rowId: null,
+              subjectId: intake.subject_id,
+            })
+          }}
+        />
+      ) : null}
 
       <AnamneseResumo answers={answers} />
 
