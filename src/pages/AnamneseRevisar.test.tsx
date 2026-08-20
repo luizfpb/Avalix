@@ -23,6 +23,9 @@ vi.mock('../features/anamnesis/intakeHooks', () => ({
 
 vi.mock('../features/subjects/hooks', () => ({
   useSubjects: () => ({ data: [], isPending: false }),
+  // usado só para montar o prompt de parecer; nesta suíte o avaliado ainda
+  // não existe (fluxo de cadastro), então o botão não aparece
+  useSubject: () => ({ data: null, isPending: false }),
 }))
 
 vi.mock('../features/organization/context', () => ({
