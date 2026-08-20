@@ -32,6 +32,13 @@ vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org1' }, role: 'owner' }),
 }))
 
+// A trilha de auditoria do prompt importa lib/supabase, que LANÇA no import
+// quando não há VITE_SUPABASE_* — é o que acontece no CI, que roda sem
+// .env.local. Mockar aqui mantém a suíte independente de ambiente.
+vi.mock('../features/reports/audit', () => ({
+  logExport: vi.fn(),
+}))
+
 // o resumo da anamnese é display puro; fora do escopo deste teste
 vi.mock('../features/anamnesis/AnamneseResumo', () => ({
   AnamneseResumo: () => <div data-testid="resumo" />,
