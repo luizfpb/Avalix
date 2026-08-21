@@ -1,8 +1,8 @@
 # Instruções para a IA — Avalix
 
-As regras globais de `~/.claude/CLAUDE.md` valem integralmente aqui
-(nunca commitar — hook bloqueia; comandos de 1 linha em sintaxe cmd;
-pt-BR; commits sem cara de IA; Acentuação e pontuação corretas).
+As regras globais de `~/.codex/AGENTS.md` valem integralmente aqui
+(nunca operar git de escrita; comandos de 1 linha em sintaxe cmd;
+pt-BR; commits sem cara de IA; acentuação e pontuação corretas).
 
 ## Ler antes de começar (fonte de verdade, nesta ordem)
 
@@ -19,7 +19,7 @@ pt-BR; commits sem cara de IA; Acentuação e pontuação corretas).
 - Supabase: a IA escreve a migration numerada; **o usuário aplica no
   dashboard e regenera `database.types`**. O estado do banco em produção
   não é visível daqui.
-- Deploy: `git push` → build automático do Cloudflare Pages
-  (domínio avalixfit.com.br).
-- PDFs gerados (`@react-pdf/renderer`): inspecionar com o Read (pdftoppm
-  está instalado) — nunca iterar dataviz de PDF às cegas.
+- Deploy: push na `main` → build automático do Cloudflare Pages
+  (domínio avalixfit.com.br). Quem dá o push é o usuário.
+- PDFs gerados (`@react-pdf/renderer`): renderizar e **olhar a imagem**
+  (`pdftoppm` está instalado) — nunca iterar dataviz de PDF às cegas.

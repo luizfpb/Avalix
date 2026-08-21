@@ -323,7 +323,7 @@ Não avançar para features de avaliação física ainda.
 
 ---
 
-# Mensagem pronta para enviar ao Claude
+# Mensagem pronta para enviar à IA
 
 ```text
 Concluí a Etapa 3.1 do BodyTrack. O projeto já está rodando localmente e no Cloudflare Pages, com Supabase linkado, migrations aplicadas, types gerados, GitHub conectado e página de status funcionando.
