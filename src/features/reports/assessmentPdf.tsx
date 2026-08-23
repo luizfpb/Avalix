@@ -28,7 +28,7 @@ import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
-import { donutSlices } from './charts'
+import { axisDomain, donutSlices } from './charts'
 import {
   InfoCard,
   MethodNote,
@@ -163,14 +163,29 @@ export function buildCircSeries(
 }
 
 // métricas plotadas na evolução, na ordem de exibição. key bate com o ponto.
+//
+// minSpan: a menor janela que o eixo Y pode ter, na unidade da métrica (ver
+// axisDomain em charts.ts). Cada valor é da ordem da incerteza da medida, para
+// que o gráfico não desenhe ruído com cara de resultado: dobra cutânea carrega
+// erro padrão de alguns pontos percentuais, peso corporal oscila 1-2 kg no
+// mesmo dia, e fita métrica tem cerca de 1 cm de repetibilidade.
 type TrendKey = 'bodyFatPct' | 'weightKg' | 'bmi' | 'leanMassKg' | 'fatMassKg'
-const TREND_METRICS: { key: TrendKey; title: string; unit: string; color: string }[] = [
-  { key: 'bodyFatPct', title: '% de gordura', unit: '%', color: FAT },
-  { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.plum },
-  { key: 'bmi', title: 'IMC', unit: '', color: palette.violet },
-  { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN },
-  { key: 'fatMassKg', title: 'Massa gorda', unit: ' kg', color: FAT },
+const TREND_METRICS: {
+  key: TrendKey
+  title: string
+  unit: string
+  color: string
+  minSpan: number
+}[] = [
+  { key: 'bodyFatPct', title: '% de gordura', unit: '%', color: FAT, minSpan: 2 },
+  { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.plum, minSpan: 2 },
+  { key: 'bmi', title: 'IMC', unit: '', color: palette.violet, minSpan: 1 },
+  { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN, minSpan: 2 },
+  { key: 'fatMassKg', title: 'Massa gorda', unit: ' kg', color: FAT, minSpan: 2 },
 ]
+
+// circunferência em cm: 3 cm de janela mínima (fita repete dentro de ~1 cm)
+const CIRC_MIN_SPAN = 3
 
 const styles = StyleSheet.create({
   section: { marginBottom: 14 },
@@ -241,11 +256,15 @@ function TrendChart({
   unit,
   color,
   points,
+  minSpan,
 }: {
   title: string
   unit: string
   color: string
   points: TrendPoint[]
+  // menor janela do eixo Y, na unidade da métrica: impede que uma variação
+  // dentro do erro de medida seja desenhada como uma curva dramática
+  minSpan: number
 }) {
   const valid = points
     .map((p, i) => ({ value: p.value, date: p.date, i }))
@@ -253,8 +272,7 @@ function TrendChart({
   if (valid.length < 2) return null
 
   const nums = valid.map((p) => p.value)
-  const min = Math.min(...nums)
-  const max = Math.max(...nums)
+  const { min, max } = axisDomain(nums, minSpan)
   const span = max - min || 1
   const n = points.length
   const xOf = (i: number) => (n <= 1 ? (PX0 + PX1) / 2 : PX0 + (i / (n - 1)) * (PX1 - PX0))
@@ -356,7 +374,14 @@ function EvolutionSection({
       <SectionTitle>Evolução ao longo das avaliações</SectionTitle>
       <View style={styles.evoGrid}>
         {charts.map(({ m, points }) => (
-          <TrendChart key={m.key} title={m.title} unit={m.unit} color={m.color} points={points} />
+          <TrendChart
+            key={m.key}
+            title={m.title}
+            unit={m.unit}
+            color={m.color}
+            points={points}
+            minSpan={m.minSpan}
+          />
         ))}
       </View>
       <Text style={[styles.muted, { fontSize: 8 }]}>
@@ -375,7 +400,14 @@ function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
       <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
       <View style={styles.evoGrid}>
         {series.map((s) => (
-          <TrendChart key={s.label} title={s.label} unit=" cm" color={palette.plum} points={s.points} />
+          <TrendChart
+            key={s.label}
+            title={s.label}
+            unit=" cm"
+            color={palette.plum}
+            points={s.points}
+            minSpan={CIRC_MIN_SPAN}
+          />
         ))}
       </View>
     </View>

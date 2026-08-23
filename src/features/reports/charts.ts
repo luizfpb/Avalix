@@ -60,6 +60,41 @@ export function donutSlices(
   return out
 }
 
+// Domínio do eixo Y com SPAN MÍNIMO — a correção de um gráfico que mentia.
+//
+// Escalando só de min a max dos dados, QUALQUER variação preenche a altura
+// inteira do gráfico. Massa magra de 65,5 -> 65,6 kg (0,1 kg, dentro do erro
+// da própria balança) saía como uma queda-e-subida dramática, igualzinha a uma
+// perda real de 5 kg. Quem lê o laudo não confere a escala: lê a FORMA da
+// linha. Um gráfico que dá a mesma forma para ruído e para resultado é pior do
+// que não ter gráfico.
+//
+// Com um piso, variação pequena desenha uma linha quase reta — que é a
+// verdade. Quando a variação supera o piso, a escala volta a ser justa aos
+// dados e nada se perde.
+export function axisDomain(values: number[], minSpan: number): { min: number; max: number } {
+  const nums = values.filter((v) => Number.isFinite(v))
+  if (nums.length === 0) return { min: 0, max: minSpan > 0 ? minSpan : 1 }
+
+  let min = Math.min(...nums)
+  let max = Math.max(...nums)
+
+  if (max - min < minSpan && minSpan > 0) {
+    const mid = (min + max) / 2
+    // Arredonda para múltiplos de meio piso: sem isso a escala imprime
+    // "64,6 / 65,6 / 66,6" (o meio da janela é um número qualquer) em vez de
+    // "64 / 65,5 / 67".
+    const step = minSpan / 2
+    min = Math.floor((mid - minSpan / 2) / step) * step
+    max = Math.ceil((mid + minSpan / 2) / step) * step
+  }
+
+  if (max === min) max = min + (minSpan > 0 ? minSpan : 1)
+  return { min: r4(min), max: r4(max) }
+}
+
+const r4 = (n: number) => Math.round(n * 10000) / 10000
+
 export type LineLayout = {
   points: string // "x,y x,y ..." (só pontos válidos)
   coords: { x: number; y: number; valid: boolean }[]

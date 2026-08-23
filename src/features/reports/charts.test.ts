@@ -1,5 +1,39 @@
 import { describe, it, expect } from 'vitest'
-import { barLayout, donutSlices, linePath } from './charts'
+import { axisDomain, barLayout, donutSlices, linePath } from './charts'
+
+describe('axisDomain', () => {
+  it('variação maior que o piso: escala justa aos dados', () => {
+    expect(axisDomain([22, 20, 18], 2)).toEqual({ min: 18, max: 22 })
+  })
+
+  it('variação abaixo do piso: abre a janela até o piso mínimo', () => {
+    // o caso real do laudo: massa magra 65,5 -> 65,6 kg desenhava um "V"
+    // dramático porque o eixo cabia só os 0,1 kg de diferença
+    const d = axisDomain([65.5, 65.6, 65.6], 2)
+    expect(d.max - d.min).toBeGreaterThanOrEqual(2)
+    expect(d.min).toBeLessThanOrEqual(65.5)
+    expect(d.max).toBeGreaterThanOrEqual(65.6)
+    // com a janela aberta, os 0,1 kg ocupam no máximo 5% da altura
+    expect(0.1 / (d.max - d.min)).toBeLessThan(0.05)
+  })
+
+  it('abre em números redondos, não no meio de lugar nenhum', () => {
+    expect(axisDomain([65.5, 65.6], 2)).toEqual({ min: 64, max: 67 })
+  })
+
+  it('todos os valores iguais não geram span zero', () => {
+    const d = axisDomain([80, 80], 2)
+    expect(d.max).toBeGreaterThan(d.min)
+  })
+
+  it('série vazia devolve uma janela utilizável', () => {
+    expect(axisDomain([], 2)).toEqual({ min: 0, max: 2 })
+  })
+
+  it('piso zero mantém o comportamento de escala automática', () => {
+    expect(axisDomain([10, 20], 0)).toEqual({ min: 10, max: 20 })
+  })
+})
 
 describe('donutSlices', () => {
   it('duas fatias iguais → 50% cada', () => {
