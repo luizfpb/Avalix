@@ -9,6 +9,42 @@
     <meta name="theme-color" content="#2A0E52" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>Avalix</title>
+    <meta
+      name="description"
+      content="Avaliações, evolução e prescrição reunidas em um fluxo seguro, para profissionais de Educação Física."
+    />
+
+    <!-- Cartão de preview do link (WhatsApp, Telegram, Slack). Sem og:image o
+         WhatsApp cai no apple-touch-icon: 180x180 esticado no cartão (borrado)
+         e com os cantos arredondados TRANSPARENTES compostos sobre o cartão
+         branco, o que desenhava quatro cantos brancos em volta do logo.
+         og-avalix.png é 1200x630 e sem canal alfa, de propósito.
+         As URLs precisam ser ABSOLUTAS: o crawler não resolve caminho relativo.
+         O noindex acima não atrapalha — o crawler de preview não é indexador.
+         Vale para toda rota: /a/* (link de anamnese do aluno, o mais
+         compartilhado) é reescrito para / em public/_redirects, então herda
+         estas tags. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Avalix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://avalixfit.com.br/" />
+    <meta property="og:title" content="Avalix · Avaliação física e postural" />
+    <meta
+      property="og:description"
+      content="Avaliações, evolução e prescrição reunidas em um fluxo seguro, para profissionais de Educação Física."
+    />
+    <meta property="og:image" content="https://avalixfit.com.br/og-avalix.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Avalix — avaliação física e postural" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Avalix · Avaliação física e postural" />
+    <meta
+      name="twitter:description"
+      content="Avaliações, evolução e prescrição reunidas em um fluxo seguro, para profissionais de Educação Física."
+    />
+    <meta name="twitter:image" content="https://avalixfit.com.br/og-avalix.png" />
     <script src="/theme-init.js"></script>
   </head>
   <body>

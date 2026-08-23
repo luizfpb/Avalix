@@ -48,6 +48,9 @@ export default defineConfig({
         // poseDetect/vision_bundle (MediaPipe) idem: só baixam quando o
         // recurso é usado e o modelo/wasm vêm de CDN — fora do precache.
         globIgnores: [
+          // og-avalix.png só é lido por crawler de preview de link (WhatsApp e
+          // afins), nunca pelo app: 20 KB que não fazem falta na instalação.
+          "og-avalix.png",
           "**/pdfTheme-*.js",
           "**/assessmentPdf-*.js",
           "**/workoutPdf-*.js",

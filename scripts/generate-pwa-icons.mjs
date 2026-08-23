@@ -142,11 +142,13 @@ function insideRounded(x, y, S, R) {
   return dx * dx + dy * dy <= R * R
 }
 
-// desenha o ícone (size px) com supersampling ss; maskable = sem cantos (full bleed)
-function drawIcon(size, { maskable = false } = {}) {
+// desenha o ícone (size px) com supersampling ss; maskable = sem cantos (full
+// bleed) e com margem maior; fullBleed = quadrado inteiro opaco, margem normal
+function drawIcon(size, { maskable = false, fullBleed = false } = {}) {
   const ss = 2
   const S = size * ss
-  const R = maskable ? 0 : S * 0.22
+  const bleed = maskable || fullBleed
+  const R = bleed ? 0 : S * 0.22
   const target = S * (maskable ? 0.5 : 0.56) // margem segura
   const scale = target / Math.max(GB.w, GB.h)
   const cx = S / 2, cy = S / 2
@@ -166,7 +168,7 @@ function drawIcon(size, { maskable = false } = {}) {
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const px = x + 0.5, py = y + 0.5
-      const inBg = maskable || insideRounded(px, py, S, R)
+      const inBg = bleed || insideRounded(px, py, S, R)
       const col = inBg && insideEdges(px, py, edges) ? INK : PURPLE
       const i = (y * S + x) * 4
       big[i] = col[0]
@@ -233,7 +235,11 @@ const png = (size, opt) => pngFromRGBA(size, drawIcon(size, opt))
 writeFileSync('public/pwa-192.png', png(192))
 writeFileSync('public/pwa-512.png', png(512))
 writeFileSync('public/maskable-512.png', png(512, { maskable: true }))
-writeFileSync('public/apple-touch-icon.png', png(180))
+// apple-touch-icon quadrado e OPACO, sem arredondar. É o que a Apple pede (o
+// iOS aplica a própria máscara), e evita o efeito que aparecia quando um
+// agregador usava este arquivo como imagem de preview: os cantos transparentes
+// compostos sobre fundo branco viravam quatro cantos brancos em volta do logo.
+writeFileSync('public/apple-touch-icon.png', png(180, { fullBleed: true }))
 writeFileSync('public/favicon.ico', ico(64))
 writeFileSync('public/favicon.svg', faviconSvg())
 console.log('gerados: pwa-192/512, maskable-512, apple-touch-icon, favicon.ico, favicon.svg')
