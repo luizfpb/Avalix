@@ -167,7 +167,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 8,
   },
-  weekOverride: { fontSize: 8, color: palette.muted, marginTop: 3, marginLeft: 3, lineHeight: 1.4 },
+  // "sem alteração": a semana existe e segue a prescrição base. Dizer isso é
+  // informação — a ausência de linha deixaria dúvida se faltou preencher.
+  // Sem fontStyle italic: só Manrope 400/700 normal são registradas em
+  // pdfFonts, e pedir um itálico inexistente derruba a geração inteira
+  // ("Could not resolve font for Manrope, fontStyle italic").
+  weekSame: { fontSize: 8, color: '#8A939D', marginLeft: 7 },
+  // Uma alteração: quem muda (plum, com peso) e o que muda (cinza). Separar os
+  // dois em linhas próprias é o que faz a coluna ser varrível de cima a baixo.
+  weekChange: { marginTop: 4, marginLeft: 3, borderLeftWidth: 1.6, borderLeftColor: '#D9D1EA', paddingLeft: 7 },
+  weekChangeLabel: { fontSize: 8, fontFamily: 'Manrope', fontWeight: 700, color: PLUM, lineHeight: 1.35 },
+  weekChangeDesc: { fontSize: 8, color: palette.muted, lineHeight: 1.4 },
 
   // ---- Observações (callout) ----
   notesBox: {
@@ -209,23 +219,63 @@ function fmtSets(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
-// cadência e nota do exercício, quando houver, viram uma sublinha discreta
-function exerciseSub(ex: WorkoutExerciseRow): string {
+// Cadência compartilhada por TODOS os exercícios do dia, se houver. Sobe para o
+// cabeçalho da divisão em vez de ser repetida embaixo de cada linha: numa
+// divisão de seis exercícios com a mesma cadência, a repetição não informava
+// nada e era a sujeira mais visível da tabela. Num dia de um exercício só não
+// há o que economizar, então continua inline.
+function commonTempo(rows: WorkoutExerciseRow[]): string | null {
+  const first = rows[0]?.tempo
+  if (!first || rows.length < 2) return null
+  return rows.every((r) => r.tempo === first) ? first : null
+}
+
+// cadência e nota do exercício viram uma sublinha discreta. `hoisted` é a
+// cadência já anunciada no cabeçalho do dia — essa não se repete.
+function exerciseSub(ex: WorkoutExerciseRow, hoisted: string | null): string {
   const parts: string[] = []
-  if (ex.tempo) parts.push(`cadência ${ex.tempo}`)
+  if (ex.tempo && ex.tempo !== hoisted) parts.push(`cadência ${ex.tempo}`)
   if (ex.notes) parts.push(ex.notes)
   return parts.join(' · ')
+}
+
+// Acima disto o cartão deixa de ser atômico. A folha A4 com as margens de
+// pdfTheme.page tem 760 pt úteis (842 - 34 - 48); 440 é pouco mais da metade —
+// o maior buraco que se aceita no pé de uma página para manter uma divisão
+// inteira, e com folga larga para o erro da estimativa não estourar a folha.
+const LIMITE_CARTAO_ATOMICO = 440
+
+// Altura estimada do cartão da divisão, em pontos. Grosseira de propósito —
+// serve só para decidir se a divisão cabe inteira numa folha, e o limite acima
+// tem folga de sobra para o erro da estimativa.
+function estimateDayCardHeight(rows: WorkoutExerciseRow[], tempo: string | null): number {
+  const CABECALHO = 42
+  const THEAD = 16
+  const LINHA = 22
+  const SUBLINHA = 11
+  const bordas = 12
+  return (
+    CABECALHO +
+    THEAD +
+    bordas +
+    rows.reduce((h, ex) => h + LINHA + (exerciseSub(ex, tempo) ? SUBLINHA : 0), 0)
+  )
 }
 
 // Uma divisão (Treino A/B/C) como cartão: cabeçalho com a letra num selo e o
 // nome, seguido da tabela de exercícios (nº, exercício, séries, reps, RIR,
 // descanso) com zebra pra leitura.
 //
-// A altura depende do número de exercícios, então o cartão PODE quebrar entre
-// páginas. Com wrap={false} um cartão mais alto que a página não "não partia":
-// ele transbordava e o texto saía sobreposto e ilegível, sem nenhum aviso ao
-// profissional. O que se evita aqui é só o cabeçalho órfão no pé da página
-// (minPresenceAhead) — quebrar a tabela é aceitável, imprimir lixo não.
+// A altura depende do número de exercícios, e é ela que decide se o cartão
+// quebra ou não — ver o comentário dentro da função. Fica registrado o que NÃO
+// funciona no @react-pdf, para ninguém tentar de novo:
+//
+// - wrap={false} em cartão maior que a folha não impede a quebra: transborda
+//   sobreposto e ilegível, sem aviso nenhum.
+// - minPresenceAhead num container que quebra exige espaço para o elemento
+//   INTEIRO mais a margem, não para o começo dele. Posto no cartão, empurrava
+//   uma divisão de seis exercícios para a página seguinte com meia folha vazia.
+// - minPresenceAhead é ignorado em elemento `fixed`.
 function DayCard({
   day,
   exercises,
@@ -239,29 +289,47 @@ function DayCard({
     .filter((e) => e.day_id === day.id)
     .slice()
     .sort((a, b) => a.position - b.position)
+  const tempo = commonTempo(rows)
+  // Uma divisão que cabe numa folha é indivisível: quem leva a ficha para a
+  // academia quer o treino do dia inteiro numa página, e um cartão atômico não
+  // pode nem partir a tabela nem deixar cabeçalho órfão. O preço é um espaço em
+  // branco no pé da página anterior, limitado à altura do cartão — por isso o
+  // teto de LIMITE_CARTAO_ATOMICO.
+  //
+  // Acima desse limite (divisão muito longa) o cartão volta a quebrar. Aí o
+  // cabeçalho de coluna precisa ser `fixed` para reaparecer na continuação:
+  // sem ele as linhas que sobravam caíam na folha seguinte como quatro números
+  // sem rótulo nenhum. E `fixed` só entra NESSE caso porque ele desenha na
+  // origem do cartão em toda página que o cartão ocupa — inclusive numa em que
+  // o cartão começa e não cabe nenhuma linha, o que imprimia uma faixa de
+  // cabeçalho vazia no pé da página.
+  //
+  // wrap={false} nunca em cartão maior que a folha: aí ele não "não parte", ele
+  // TRANSBORDA sobreposto, que é o jeito mais fácil de gerar um PDF ilegível.
+  const parte = estimateDayCardHeight(rows, tempo) > LIMITE_CARTAO_ATOMICO
 
   return (
-    <View style={styles.dayCard}>
-      {/* minPresenceAhead só precisa garantir que o cabeçalho da divisão não
-          fique órfão no pé da página: ele mais uma linha de exercício. Com 72
-          o cartão inteiro era empurrado mesmo sobrando meia página, deixando um
-          buraco grande antes do "Treino B". 46 protege do órfão e aproveita o
-          papel. */}
-      <View style={styles.dayHeader} wrap={false} minPresenceAhead={46}>
+    <View style={styles.dayCard} wrap={parte}>
+      <View style={styles.dayHeader} wrap={false}>
         <View style={styles.dayBadge}>
           <Text style={styles.dayBadgeText}>{day.label}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.dayName}>{day.name ? day.name : `Treino ${day.label}`}</Text>
+          {/* "Treino A" saiu daqui: o selo à esquerda e o nome logo acima já
+              dizem isso duas vezes. Sobra a contagem e a cadência da divisão. */}
           <Text style={styles.daySub}>
-            Treino {day.label} · {rows.length} {rows.length === 1 ? 'exercício' : 'exercícios'}
+            {rows.length} {rows.length === 1 ? 'exercício' : 'exercícios'}
+            {tempo ? ` · cadência ${tempo} em todos` : ''}
           </Text>
         </View>
       </View>
 
-      <View style={styles.thead}>
+      {/* O rótulo da divisão vai junto na coluna do exercício: na continuação
+          de um cartão que partiu, o selo "A" ficou na página anterior. */}
+      <View style={styles.thead} fixed={parte}>
         <Text style={[styles.th, styles.colNum]}>#</Text>
-        <Text style={[styles.th, styles.colName]}>Exercício</Text>
+        <Text style={[styles.th, styles.colName]}>Exercício · Treino {day.label}</Text>
         <Text style={[styles.th, styles.colSets]}>Séries</Text>
         <Text style={[styles.th, styles.colReps]}>Reps</Text>
         <Text style={[styles.th, styles.colRir]}>RIR</Text>
@@ -269,7 +337,7 @@ function DayCard({
       </View>
 
       {rows.map((ex, i) => {
-        const sub = exerciseSub(ex)
+        const sub = exerciseSub(ex, tempo)
         const last = i === rows.length - 1
         return (
           // A linha em si nunca parte: com o cartão podendo quebrar entre
@@ -300,57 +368,142 @@ function DayCard({
   )
 }
 
-function overrideDesc(o: WorkoutWeekOverrideRow): string {
+// O que este override muda EM RELAÇÃO À PRESCRIÇÃO BASE do exercício — só os
+// campos diferentes. Antes imprimia-se o override inteiro, incluindo os campos
+// que repetiam a tabela acima; string vazia = override que não altera nada.
+function overrideDiff(o: WorkoutWeekOverrideRow, base: WorkoutExerciseRow | undefined): string {
   if (o.is_skipped) return 'não executar'
   const parts: string[] = []
-  if (o.sets != null) parts.push(`${o.sets} séries`)
-  if (o.reps != null) parts.push(`${o.reps} reps`)
-  if (o.rir != null) parts.push(`RIR ${fmtSets(o.rir)}`)
-  if (o.rest_seconds != null) parts.push(`${o.rest_seconds}s`)
-  return parts.length ? parts.join(' · ') : 'ajuste'
+  if (o.sets != null && o.sets !== base?.sets) parts.push(`${fmtSets(o.sets)} séries`)
+  if (o.reps != null && o.reps !== base?.reps) parts.push(`${o.reps} reps`)
+  if (o.rir != null && o.rir !== base?.rir) parts.push(`RIR ${fmtSets(o.rir)}`)
+  if (o.rest_seconds != null && o.rest_seconds !== base?.rest_seconds) {
+    parts.push(`${o.rest_seconds}s de descanso`)
+  }
+  if (o.notes && o.notes !== base?.notes) parts.push(o.notes)
+  return parts.join(' · ')
+}
+
+export type WeekChangeGroup = { label: string; desc: string }
+
+// Agrupa os overrides de UMA semana por alteração idêntica, para que a mesma
+// mudança aplicada a vários exercícios vire uma linha só.
+//
+// É a correção do trecho mais confuso do documento. Um mesociclo de 8 semanas
+// com override em 6 exercícios imprimia 48 linhas quase iguais — duas páginas
+// repetindo "5 séries · 6-10 reps · RIR 1 · 120s" — e o profissional tinha de
+// caçar no meio disso o que de fato mudava. Agrupado e diferenciado contra a
+// base, vira uma linha por semana.
+//
+// O rótulo do grupo sobe de nível quando dá: um grupo que cobre o plano
+// inteiro é "Todos os exercícios"; um que cobre exatamente uma divisão é
+// "Treino A · todos os exercícios"; fora isso, os nomes mesmo.
+export function weekChangeGroups(
+  overrides: WorkoutWeekOverrideRow[],
+  exercises: WorkoutExerciseRow[],
+  days: WorkoutDayRow[],
+  exerciseNames: Record<string, string>
+): WeekChangeGroup[] {
+  const baseById = new Map(exercises.map((e) => [e.id, e]))
+  const perDay = new Map<string, number>()
+  for (const e of exercises) perDay.set(e.day_id, (perDay.get(e.day_id) ?? 0) + 1)
+  const dayLabel = new Map(days.map((d) => [d.id, d.label]))
+  const multiDay = days.length > 1
+
+  // desc -> exercícios que sofreram exatamente essa alteração
+  const byDesc = new Map<string, WorkoutExerciseRow[]>()
+  const order: string[] = []
+  for (const o of overrides) {
+    const base = baseById.get(o.workout_exercise_id)
+    const desc = overrideDiff(o, base)
+    if (!desc) continue // override que não altera nada: não é notícia
+    if (!byDesc.has(desc)) {
+      byDesc.set(desc, [])
+      order.push(desc)
+    }
+    if (base) byDesc.get(desc)!.push(base)
+  }
+
+  return order.map((desc) => {
+    const group = byDesc.get(desc)!
+    const dayIds = new Set(group.map((e) => e.day_id))
+    let label: string
+    if (group.length === exercises.length && exercises.length > 1) {
+      label = 'Todos os exercícios'
+      // "todos os exercícios" só compensa a partir de dois: numa divisão de um
+      // exercício só, o atalho esconde o nome e não economiza nada.
+    } else if (
+      dayIds.size === 1 &&
+      group.length > 1 &&
+      group.length === perDay.get(group[0].day_id)
+    ) {
+      label = `Treino ${dayLabel.get(group[0].day_id) ?? '?'} · todos os exercícios`
+    } else {
+      label = group
+        .map((e) => {
+          const nome = exerciseNames[e.exercise_id] ?? 'Exercício'
+          return multiDay ? `${dayLabel.get(e.day_id) ?? '?'} · ${nome}` : nome
+        })
+        .join(', ')
+    }
+    return { label, desc }
+  })
 }
 
 function WeeksSection({ data }: { data: WorkoutPdfData }) {
-  const { weeks, overrides, exercises, exerciseNames } = data
+  const { weeks, overrides, exercises, days, exerciseNames } = data
   if (weeks.length === 0 && overrides.length === 0) return null
 
-  // workout_exercise_id -> nome do exercício, pros overrides
-  const exNameById = new Map(
-    exercises.map((e) => [e.id, exerciseNames[e.exercise_id] ?? 'Exercício'])
-  )
-  const weekLabel = new Map(weeks.map((w) => [w.week_number, w]))
+  const weekMeta = new Map(weeks.map((w) => [w.week_number, w]))
   const weeksWithOverrides = [...new Set(overrides.map((o) => o.week_number))].sort((a, b) => a - b)
   const allWeeks = [...new Set([...weeks.map((w) => w.week_number), ...weeksWithOverrides])].sort(
     (a, b) => a - b
   )
 
-  // Altura proporcional a semanas x overrides: um mesociclo de 8 semanas com
-  // overrides em vários exercícios passa de uma página. Antes, wrap={false}
-  // fazia esse bloco transbordar sobreposto — o caso mais fácil de reproduzir
-  // de PDF corrompido. Cada linha de semana continua inteira.
+  const rows = allWeeks.map((n) => ({
+    n,
+    meta: weekMeta.get(n),
+    groups: weekChangeGroups(
+      overrides.filter((o) => o.week_number === n),
+      exercises,
+      days,
+      exerciseNames
+    ),
+  }))
+
+  // Altura proporcional a semanas x alterações: o bloco pode passar de uma
+  // página. Antes, wrap={false} fazia ele transbordar sobreposto — o caso mais
+  // fácil de reproduzir de PDF corrompido. Cada semana continua inteira.
   return (
     <View style={styles.section}>
       <SectionTitle>Organização por semana</SectionTitle>
+      <Text style={styles.intro}>
+        Só o que muda em relação à prescrição das divisões acima. Semana sem alteração segue a
+        tabela do treino como está.
+      </Text>
       <View style={styles.weekWrap}>
-        {allWeeks.map((n, idx) => {
-          const meta = weekLabel.get(n)
-          const ovs = overrides.filter((o) => o.week_number === n)
-          const last = idx === allWeeks.length - 1
-          return (
-            <View key={n} style={[styles.weekRow, ...(last ? [styles.trLast] : [])]}>
-              <View style={styles.weekHead}>
-                <Text style={styles.weekNum}>Semana {n}</Text>
-                {meta?.label ? <Text style={styles.weekLabel}>{meta.label}</Text> : null}
-                {meta?.is_deload ? <Text style={styles.deloadPill}>Deload</Text> : null}
-              </View>
-              {ovs.map((o) => (
-                <Text key={o.id} style={styles.weekOverride}>
-                  · {exNameById.get(o.workout_exercise_id) ?? 'Exercício'}: {overrideDesc(o)}
-                </Text>
-              ))}
+        {rows.map(({ n, meta, groups }, idx) => (
+          <View
+            key={n}
+            wrap={false}
+            style={[styles.weekRow, ...(idx === rows.length - 1 ? [styles.trLast] : [])]}
+          >
+            <View style={styles.weekHead}>
+              <Text style={styles.weekNum}>Semana {n}</Text>
+              {meta?.label ? <Text style={styles.weekLabel}>{meta.label}</Text> : null}
+              {meta?.is_deload ? <Text style={styles.deloadPill}>Deload</Text> : null}
+              {groups.length === 0 ? (
+                <Text style={styles.weekSame}>sem alteração</Text>
+              ) : null}
             </View>
-          )
-        })}
+            {groups.map((g, i) => (
+              <View key={i} style={styles.weekChange}>
+                <Text style={styles.weekChangeLabel}>{g.label}</Text>
+                <Text style={styles.weekChangeDesc}>{g.desc}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
       </View>
     </View>
   )
@@ -458,12 +611,10 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   return (
     <Document>
       <Page size="A4" style={pdfTheme.page}>
-        <ReportHeader
-          logoUrl={data.logoUrl}
-          orgName={data.orgName}
-          title="Plano de Treino"
-          subtitle={plan.name}
-        />
+        {/* Sem subtítulo: era o nome do plano, que o cartão logo abaixo já
+            traz no campo "Plano". Repetido a três centímetros de distância não
+            ajudava a ler nada. */}
+        <ReportHeader logoUrl={data.logoUrl} orgName={data.orgName} title="Plano de Treino" />
 
         <InfoCard items={info} />
 
@@ -482,7 +633,10 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
           // não pode ser wrap={false}.
           <View style={styles.section}>
             <SectionTitle>Observações</SectionTitle>
-            <View style={styles.notesBox}>
+            {/* minPresenceAhead: sem ele a caixa começava no pé da página e o
+                texto inteiro ia para a seguinte, deixando um retângulo vazio de
+                dois milímetros embaixo do título. 46 = três linhas de texto. */}
+            <View style={styles.notesBox} minPresenceAhead={46}>
               <Text style={styles.notesText}>{plan.notes}</Text>
             </View>
           </View>
