@@ -9,18 +9,9 @@ import type {
   WorkoutWeekOverrideRow,
   WorkoutWeekRow,
 } from '../workout/api'
-import type { VolumeSnapshot, LandmarkZone } from '../workout/volume'
 import { weekSessionLabels } from '../workout/progress'
 import { registerReportFonts } from './pdfFonts'
-import {
-  MUSCLE_LABELS,
-  MUSCLE_ORDER,
-  VOLUME_METHOD_NOTE,
-  VOLUME_LANDMARKS_NOTE,
-  ZONE_LABELS,
-  goalLabel,
-  landmarkBar,
-} from '../workout/volume'
+import { goalLabel } from '../workout/volume'
 import {
   InfoCard,
   MethodNote,
@@ -34,17 +25,6 @@ import {
 } from './pdfTheme'
 
 const PLUM = palette.plum
-
-// cor da zona de volume no PDF (hex; sem CSS var aqui)
-const ZONE_HEX: Record<LandmarkZone, string> = {
-  below: '#B57A35',
-  effective: '#6C8D9F',
-  optimal: palette.violet,
-  high: '#9B678F',
-  above: '#B94B59',
-}
-// ordem de exibição da legenda de zonas
-const ZONE_ORDER: LandmarkZone[] = ['below', 'effective', 'optimal', 'high', 'above']
 
 export type WorkoutPdfData = {
   orgName: string
@@ -189,27 +169,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   notesText: { fontSize: 9.5, lineHeight: 1.5, color: palette.ink },
-
-  // ---- Volume (apêndice) ----
-  legendRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: 13, marginBottom: 3 },
-  legendSwatch: { width: 8, height: 8, borderRadius: 2, marginRight: 4 },
-  legendText: { fontSize: 7.5, color: palette.muted },
-  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  barLabel: { width: 104, fontSize: 8, color: palette.ink },
-  barTrack: {
-    position: 'relative',
-    width: 252,
-    height: 8,
-    backgroundColor: '#E8EDF0',
-    borderRadius: 4,
-  },
-  barBand: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#D9D1EA' },
-  barFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 4 },
-  barMrv: { position: 'absolute', top: -1.5, bottom: -1.5, width: 1.2, backgroundColor: '#596572' },
-  barValue: { width: 24, textAlign: 'right', fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
-  barZone: { width: 84, textAlign: 'right', fontSize: 7, color: palette.muted },
-  method: { fontSize: 7.5, color: palette.muted, marginTop: 8, lineHeight: 1.45 },
 
   reproNote: { fontSize: 8, color: palette.muted, marginTop: 10, lineHeight: 1.4 },
 })
@@ -509,71 +468,92 @@ function WeeksSection({ data }: { data: WorkoutPdfData }) {
   )
 }
 
-// Apêndice de volume, na última folha (break): barras por grupo muscular contra
-// a faixa recomendada (MAV) e o teto (MRV), com legenda das zonas.
-function VolumeAppendix({ snapshot }: { snapshot: VolumeSnapshot }) {
-  const items = MUSCLE_ORDER.map((m) => ({
-    muscle: m,
-    label: MUSCLE_LABELS[m],
-    value: snapshot.typicalByMuscle[m] ?? 0,
-  })).filter((it) => it.value > 0)
-  if (items.length === 0) return null
+// Largura útil do texto dentro da caixa de observações, em pontos: a folha A4
+// (595) menos as margens da página (36 de cada lado), o padding da caixa (12 de
+// cada lado) e o fio da borda esquerda (3).
+const NOTES_LARGURA = 595 - 36 * 2 - 12 * 2 - 3
+// Largura média de caractere em Manrope 400, como fração do corpo. Medida na
+// renderização real: 111 caracteres de texto corrido em português couberam nos
+// 496 pt da linha, ou seja 0,47em. 0,52 estima por cima de propósito — o erro
+// da conta tem de sobrar linha, nunca faltar.
+const NOTES_CHARS_LINHA = Math.floor(NOTES_LARGURA / (9.5 * 0.52))
+// fontSize x lineHeight de notesText.
+const NOTES_ALTURA_LINHA = 9.5 * 1.5
+
+// Acima disto a observação deixa de ser atômica. A folha tem 760 pt úteis
+// (842 - 34 - 48) e 560 são ~36 linhas de texto. A folga de 200 pt é a margem
+// de erro da estimativa: mesmo num texto todo em maiúsculas (~0,62em por
+// caractere, o pior caso plausível) a altura real fica em ~700 pt e ainda cabe
+// na folha — o que não pode acontecer nunca é wrap={false} num bloco maior que
+// a página, porque aí ele não deixa de partir, TRANSBORDA sobreposto.
+const LIMITE_OBSERVACAO_ATOMICA = 560
+
+// Altura estimada do bloco "Observações" (título + caixa), em pontos.
+// Grosseira de propósito — serve só para decidir se o bloco cabe inteiro numa
+// folha, e o limite acima tem folga de sobra para o erro da estimativa.
+export function estimateNotesHeight(notes: string): number {
+  const TITULO = 21 // faixa da SectionTitle + margem inferior
+  const CAIXA = 20 // padding vertical da caixa (9 + 9) + folga da borda
+  let linhas = 0
+  for (const paragrafo of notes.split('\n')) {
+    const palavras = paragrafo.split(/\s+/).filter(Boolean)
+    if (palavras.length === 0) {
+      linhas += 1 // linha em branco entre parágrafos também ocupa altura
+      continue
+    }
+    let atual = 0
+    for (const palavra of palavras) {
+      if (palavra.length > NOTES_CHARS_LINHA) {
+        // palavra maior que a linha inteira (URL colada, por exemplo): quebra
+        // dentro dela mesma
+        linhas += Math.ceil(palavra.length / NOTES_CHARS_LINHA)
+        atual = palavra.length % NOTES_CHARS_LINHA
+      } else if (atual === 0) {
+        linhas += 1
+        atual = palavra.length
+      } else if (atual + 1 + palavra.length > NOTES_CHARS_LINHA) {
+        linhas += 1
+        atual = palavra.length
+      } else {
+        atual += 1 + palavra.length
+      }
+    }
+  }
+  return TITULO + CAIXA + linhas * NOTES_ALTURA_LINHA
+}
+
+// Texto livre do profissional. Uma observação que cabe numa folha não parte:
+// cortada no meio entre duas páginas era o defeito mais visível do documento,
+// e é justamente o trecho que o aluno precisa ler inteiro de uma vez.
+//
+// O bloco inteiro (título + caixa) é que fica atômico — deixar só a caixa
+// indivisível ainda permitia o título "Observações" órfão no pé da página.
+function NotesSection({ notes }: { notes: string }) {
+  // Acima do limite volta a quebrar: wrap={false} em bloco maior que a folha
+  // não impede a quebra, TRANSBORDA sobreposto e ilegível.
+  const parte = estimateNotesHeight(notes) > LIMITE_OBSERVACAO_ATOMICA
 
   return (
-    <View style={styles.section} break>
-      <SectionTitle>Volume semanal por grupo muscular</SectionTitle>
-      <Text style={styles.intro}>
-        Séries semanais somadas por grupo (contagem fracionada: primário 1,0 · secundário 0,5), na
-        semana {snapshot.typicalWeek}. A faixa clara marca o volume recomendado (MAV) e o traço, o
-        teto (MRV).
-      </Text>
-
-      <View style={styles.legendRow}>
-        {ZONE_ORDER.map((z) => (
-          <View key={z} style={styles.legendItem}>
-            <View style={[styles.legendSwatch, { backgroundColor: ZONE_HEX[z] }]} />
-            <Text style={styles.legendText}>{ZONE_LABELS[z]}</Text>
-          </View>
-        ))}
+    // A observação que não cabe numa folha começa numa folha limpa (break) e
+    // gasta a página inteira antes de partir — assim ela parte no máximo uma
+    // vez, e no meio do texto, nunca logo abaixo do título.
+    //
+    // minPresenceAhead NÃO resolve esse caso, e a tentativa anterior de usá-lo
+    // aqui era pior que nada: o shouldBreak do @react-pdf/layout só o consulta
+    // quando o bloco CABE inteiro na sobra da página; num bloco que precisa
+    // partir ele é ignorado, e o que saía impresso era o título "Observações"
+    // sozinho no pé da folha com um talo vazio da caixa embaixo.
+    <View style={styles.section} wrap={parte} break={parte}>
+      <SectionTitle>Observações</SectionTitle>
+      <View style={styles.notesBox}>
+        <Text style={styles.notesText}>{notes}</Text>
       </View>
-
-      {items.map((it) => {
-        const bar = landmarkBar(it.muscle, it.value)
-        const color = bar.zone ? ZONE_HEX[bar.zone] : '#A99BCB'
-        return (
-          <View key={it.muscle} style={styles.barRow}>
-            <Text style={styles.barLabel}>{it.label}</Text>
-            <View style={styles.barTrack}>
-              {bar.zone ? (
-                <View
-                  style={[
-                    styles.barBand,
-                    {
-                      left: `${bar.mavLowPct * 100}%`,
-                      width: `${Math.max(0, bar.mavHighPct - bar.mavLowPct) * 100}%`,
-                    },
-                  ]}
-                />
-              ) : null}
-              <View style={[styles.barFill, { width: `${bar.fillPct * 100}%`, backgroundColor: color }]} />
-              {bar.zone && bar.mrvPct < 1 ? (
-                <View style={[styles.barMrv, { left: `${bar.mrvPct * 100}%` }]} />
-              ) : null}
-            </View>
-            <Text style={styles.barValue}>{fmtSets(it.value)}</Text>
-            <Text style={styles.barZone}>{bar.zone ? ZONE_LABELS[bar.zone] : 'sem ref.'}</Text>
-          </View>
-        )
-      })}
-      <Text style={styles.method}>{VOLUME_METHOD_NOTE}</Text>
-      <Text style={styles.method}>{VOLUME_LANDMARKS_NOTE}</Text>
     </View>
   )
 }
 
 function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
   const { plan, days, exercises, exerciseNames } = data
-  const snapshot = plan.volume as VolumeSnapshot | null
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = fmtDate(plan.starts_on)
   const schedule =
@@ -628,19 +608,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
 
         <WeeksSection data={data} />
 
-        {plan.notes ? (
-          // Texto livre do profissional: sem limite de tamanho, então também
-          // não pode ser wrap={false}.
-          <View style={styles.section}>
-            <SectionTitle>Observações</SectionTitle>
-            {/* minPresenceAhead: sem ele a caixa começava no pé da página e o
-                texto inteiro ia para a seguinte, deixando um retângulo vazio de
-                dois milímetros embaixo do título. 46 = três linhas de texto. */}
-            <View style={styles.notesBox} minPresenceAhead={46}>
-              <Text style={styles.notesText}>{plan.notes}</Text>
-            </View>
-          </View>
-        ) : null}
+        {plan.notes ? <NotesSection notes={plan.notes} /> : null}
 
         <MethodNote>
           Plano reproduzível a partir do snapshot registrado. Prescrição de exercício elaborada
@@ -649,8 +617,12 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
           mal-estar e comunique o profissional responsável.
         </MethodNote>
 
-        {/* Gráfico de volume como apêndice na última folha (não na frente do treino). */}
-        {snapshot ? <VolumeAppendix snapshot={snapshot} /> : null}
+        {/* Sem apêndice de volume: o PDF é o documento do ALUNO — vai para o
+            WhatsApp dele e para a academia. Séries por grupo muscular contra
+            MEV/MAV/MRV é ferramenta de quem prescreve, e o profissional já a
+            tem ao vivo no VolumeLandmarkPanel, no builder e no detalhe do
+            plano, onde ela serve para decidir. No papel do aluno era jargão
+            que ele não usa e uma folha a mais para imprimir. */}
 
         <ReportFooter note="Montado no Avalix" evaluator={data.evaluatorName} />
       </Page>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
-import { generateWorkoutPdf, weekChangeGroups } from './workoutPdf'
+import { estimateNotesHeight, generateWorkoutPdf, weekChangeGroups } from './workoutPdf'
 import { registerReportFontsFrom } from './pdfFonts'
 import type {
   WorkoutDayRow,
@@ -134,6 +134,16 @@ describe('weekChangeGroups', () => {
   })
 })
 
+// A observação do profissional partia no meio entre duas páginas — justo o
+// trecho que o aluno precisa ler inteiro. O bloco virou atômico, e é a
+// estimativa de altura que decide até onde isso vale: acima do limite ele tem
+// de voltar a quebrar, porque wrap={false} em bloco maior que a folha
+// transborda sobreposto em vez de não partir.
+const LONGA = Array.from(
+  { length: 40 },
+  (_, i) => `Linha ${i + 1}: aquecer bem antes de cada série pesada e registrar a carga usada.`
+).join('\n')
+
 // Render de fumaça: o plano de treino não tinha nenhum, e a falta custou caro
 // — um `fontStyle: 'italic'` num estilo derrubava a geração inteira com
 // "Could not resolve font for Manrope, fontStyle italic", porque pdfFonts só
@@ -173,5 +183,42 @@ describe('generateWorkoutPdf', () => {
       exerciseNames: NOMES,
     })
     expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
+  })
+
+  it('gera bytes com observação longa (bloco que volta a quebrar)', async () => {
+    const blob = await generateWorkoutPdf({
+      orgName: 'Estúdio Teste',
+      subjectName: 'Fulano de Tal',
+      plan: { ...plan, notes: LONGA } as unknown as WorkoutPlanRow,
+      days: DIAS,
+      exercises: EXERCICIOS,
+      weeks: [semana(1)],
+      overrides: [],
+      exerciseNames: NOMES,
+    })
+    expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
+  })
+})
+
+describe('estimateNotesHeight', () => {
+  it('observação curta cabe folgado numa folha', () => {
+    expect(estimateNotesHeight('Aquecer 10 minutos antes.')).toBeLessThan(100)
+  })
+
+  it('cresce com as quebras de linha do texto', () => {
+    const uma = estimateNotesHeight('Aquecer.')
+    const cinco = estimateNotesHeight('Aquecer.\n\n\n\nAlongar.')
+    expect(cinco).toBeGreaterThan(uma)
+  })
+
+  it('observação longa passa do limite de bloco atômico (560)', () => {
+    expect(estimateNotesHeight(LONGA)).toBeGreaterThan(560)
+  })
+
+  it('observação de trinta linhas ainda cabe inteira numa folha', () => {
+    // o caso do profissional detalhista, que é o ponto da correção: continua
+    // abaixo do limite, logo continua atômica
+    const trinta = Array.from({ length: 30 }, () => 'Série pesada com carga registrada.').join('\n')
+    expect(estimateNotesHeight(trinta)).toBeLessThan(560)
   })
 })
