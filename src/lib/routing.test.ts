@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRedirect, isPublicPath, isIntakePath } from './routing'
+import {
+  resolveRedirect,
+  isPublicPath,
+  isIntakePath,
+  isWorkoutLinkPath,
+  isPublicTokenPath,
+} from './routing'
 import { isPublicIntakeLocation } from '../features/pwa/updateCheck'
 
 describe('isPublicPath', () => {
@@ -31,6 +37,49 @@ describe('isIntakePath', () => {
   it('o predicado do PWA e o do roteamento respondem a mesma coisa', () => {
     for (const p of ['/a', '/a/x', '/avaliados', '/agenda', '/', '/login']) {
       expect(isPublicIntakeLocation(p)).toBe(isIntakePath(p))
+    }
+  })
+})
+
+describe('isWorkoutLinkPath / isPublicTokenPath', () => {
+  it('reconhece a pagina do treino do aluno', () => {
+    expect(isWorkoutLinkPath('/t')).toBe(true)
+    expect(isWorkoutLinkPath('/t/qualquer')).toBe(true)
+  })
+
+  it('nao confunde rotas que apenas comecam com t', () => {
+    expect(isWorkoutLinkPath('/treinos')).toBe(false)
+    expect(isWorkoutLinkPath('/dashboard')).toBe(false)
+    expect(isWorkoutLinkPath('/a')).toBe(false)
+  })
+
+  it('o predicado combinado cobre os dois fluxos por token', () => {
+    for (const p of ['/a', '/a/x', '/t', '/t/x']) {
+      expect(isPublicTokenPath(p)).toBe(true)
+    }
+    for (const p of ['/login', '/dashboard', '/avaliados', '/treinos']) {
+      expect(isPublicTokenPath(p)).toBe(false)
+    }
+  })
+
+  it('o predicado do PWA acompanha o combinado, nao so a anamnese', () => {
+    // a regressao que isto trava: a pagina do aluno abrir e o PWA trata-la
+    // como rota autenticada, ou o guard mandar o aluno para /login
+    for (const p of ['/a', '/t', '/t/x', '/dashboard']) {
+      expect(isPublicIntakeLocation(p)).toBe(isPublicTokenPath(p))
+    }
+  })
+
+  it('a pagina do treino nunca redireciona, deslogado ou logado', () => {
+    for (const authStatus of ['signedOut', 'signedIn'] as const) {
+      expect(
+        resolveRedirect({
+          authStatus,
+          orgStatus: 'absent',
+          pathname: '/t',
+          isRecovering: false,
+        })
+      ).toBeNull()
     }
   })
 })

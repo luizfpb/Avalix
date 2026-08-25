@@ -31,6 +31,25 @@ export function isIntakePath(pathname: string): boolean {
   return pathname === '/a' || pathname.startsWith('/a/')
 }
 
+// Página pública do treino do aluno (link com token). Nasce só na forma com o
+// token no fragmento (`/t#<token>`) — a forma com token no path, que a anamnese
+// ainda aceita por causa de links já distribuídos, não existe aqui: ela põe o
+// segredo em log de servidor e em Referer.
+//
+// `/t` sem fragmento também é público: depois da primeira visita o token fica
+// no aparelho do aluno, e é assim que a página abre instalada e sem rede.
+export function isWorkoutLinkPath(pathname: string): boolean {
+  return pathname === '/t' || pathname.startsWith('/t/')
+}
+
+// "Rota pública alcançada por token", que é o que o guard de rota, o App e o
+// PWA precisam saber. Os predicados específicos continuam existindo porque
+// cada fluxo (anamnese, treino) precisa reconhecer o SEU caminho — o que não
+// pode voltar a acontecer é cada arquivo ter a sua própria noção do conjunto.
+export function isPublicTokenPath(pathname: string): boolean {
+  return isIntakePath(pathname) || isWorkoutLinkPath(pathname)
+}
+
 export type RedirectInput = {
   authStatus: AuthStatus
   orgStatus: OrgStatus
@@ -43,7 +62,7 @@ export type RedirectInput = {
 export function resolveRedirect(input: RedirectInput): string | null {
   const { authStatus, orgStatus, pathname, isRecovering, mfaRequired = false } = input
 
-  if (isIntakePath(pathname)) return null
+  if (isPublicTokenPath(pathname)) return null
   if (authStatus === 'loading') return null
 
   if (isRecovering) {

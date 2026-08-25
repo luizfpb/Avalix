@@ -55,6 +55,25 @@ export function completedWeeks(startedOn: string | null, now: Date): number | nu
   return Math.floor(dias / 7)
 }
 
+// Semana do mesociclo que está correndo agora, limitada ao tamanho do plano.
+// É a semana que a página do aluno pré-seleciona, e o complemento natural de
+// completedWeeks: a primeira semana é a 1, não a 0. Plano sem data de início
+// não tem semana corrente — aí quem escolhe é o aluno.
+//
+// Depois do fim do mesociclo devolve a última semana, em vez de um número que
+// não existe no plano: quem continua treinando o plano vencido está repetindo
+// a última semana, e é isso que a tela deve mostrar.
+export function currentWeek(
+  weeks: number,
+  startedOn: string | null,
+  now: Date
+): number | null {
+  const fechadas = completedWeeks(startedOn, now)
+  if (fechadas == null) return null
+  const total = Math.max(1, Math.floor(weeks))
+  return Math.min(fechadas + 1, total)
+}
+
 // Sessões esperadas ATÉ AGORA, e não no plano inteiro.
 //
 // O denominador antigo era `weeks * dayCount`, o plano completo, o que fazia

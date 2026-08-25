@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       anamnese_intakes: {
@@ -1172,6 +1197,79 @@ export type Database = {
           },
         ]
       }
+      workout_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          last_seen_at: string | null
+          last_write_at: string | null
+          org_id: string
+          sessions_count: number
+          status: string
+          subject_id: string
+          token_hash: string
+          updated_at: string
+          write_window_at: string | null
+          writes_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          expires_at: string
+          id?: string
+          last_seen_at?: string | null
+          last_write_at?: string | null
+          org_id: string
+          sessions_count?: number
+          status?: string
+          subject_id: string
+          token_hash: string
+          updated_at?: string
+          write_window_at?: string | null
+          writes_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          last_seen_at?: string | null
+          last_write_at?: string | null
+          org_id?: string
+          sessions_count?: number
+          status?: string
+          subject_id?: string
+          token_hash?: string
+          updated_at?: string
+          write_window_at?: string | null
+          writes_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_links_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_log_sets: {
         Row: {
           created_at: string
@@ -1232,6 +1330,7 @@ export type Database = {
       }
       workout_logs: {
         Row: {
+          client_ref: string | null
           created_at: string
           day_label: string | null
           id: string
@@ -1239,11 +1338,13 @@ export type Database = {
           org_id: string
           performed_at: string
           plan_id: string
+          source: string
           subject_id: string
           updated_at: string
           week_number: number | null
         }
         Insert: {
+          client_ref?: string | null
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1251,11 +1352,13 @@ export type Database = {
           org_id: string
           performed_at?: string
           plan_id: string
+          source?: string
           subject_id: string
           updated_at?: string
           week_number?: number | null
         }
         Update: {
+          client_ref?: string | null
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1263,6 +1366,7 @@ export type Database = {
           org_id?: string
           performed_at?: string
           plan_id?: string
+          source?: string
           subject_id?: string
           updated_at?: string
           week_number?: number | null
@@ -1605,6 +1709,7 @@ export type Database = {
           p_week_number?: number
         }
         Returns: {
+          client_ref: string | null
           created_at: string
           day_label: string | null
           id: string
@@ -1612,6 +1717,7 @@ export type Database = {
           org_id: string
           performed_at: string
           plan_id: string
+          source: string
           subject_id: string
           updated_at: string
           week_number: number | null
@@ -1640,6 +1746,40 @@ export type Database = {
           subject_sex: string
         }[]
       }
+      get_workout_for_link: { Args: { p_token: string }; Returns: Json }
+      get_workout_history_for_link: {
+        Args: { p_before?: string; p_limit?: number; p_token: string }
+        Returns: Json
+      }
+      get_workout_plan_for_link: {
+        Args: { p_plan: string; p_token: string }
+        Returns: Json
+      }
+      issue_workout_link: {
+        Args: { p_expires_at: string; p_subject: string; p_token_hash: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          last_seen_at: string | null
+          last_write_at: string | null
+          org_id: string
+          sessions_count: number
+          status: string
+          subject_id: string
+          token_hash: string
+          updated_at: string
+          write_window_at: string | null
+          writes_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workout_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       log_data_action: {
         Args: {
           p_action: string
@@ -1665,6 +1805,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      purge_expired_workout_links: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       reject_anamnese_intake: { Args: { p_intake: string }; Returns: undefined }
       replace_assessment_readings: {
         Args: {
@@ -1679,6 +1823,7 @@ export type Database = {
         Returns: undefined
       }
       revoke_consent: { Args: { p_consent: string }; Returns: undefined }
+      revoke_workout_link: { Args: { p_link: string }; Returns: undefined }
       save_assessment: {
         Args: {
           p_assessed_at: string
@@ -1774,6 +1919,19 @@ export type Database = {
           p_user_agent: string
         }
         Returns: undefined
+      }
+      submit_workout_session: {
+        Args: {
+          p_client_ref: string
+          p_day_label?: string
+          p_notes?: string
+          p_performed_at?: string
+          p_plan?: string
+          p_sets: Json
+          p_token: string
+          p_week_number?: number
+        }
+        Returns: Json
       }
     }
     Enums: {
@@ -1903,6 +2061,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

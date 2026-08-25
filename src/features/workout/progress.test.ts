@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   adherencePct,
   completedWeeks,
+  currentWeek,
   exerciseProgression,
   plannedSessions,
   plannedSessionsToDate,
@@ -33,6 +34,34 @@ describe('sessões da semana (regra que estava duplicada em 3 arquivos)', () => 
   it('divisão repetida na semana conta em dobro (ABA = 3 sessões)', () => {
     expect(weekSessionLabels(['A', 'B', 'A'], ['A', 'B'])).toEqual(['A', 'B', 'A'])
     expect(sessionsPerWeek(['A', 'B', 'A'], 2)).toBe(3)
+  })
+})
+
+describe('currentWeek', () => {
+  const agora = new Date('2026-06-24T10:00:00')
+
+  it('a primeira semana e a 1, nao a 0', () => {
+    expect(currentWeek(8, '2026-06-24', agora)).toBe(1)
+    expect(currentWeek(8, '2026-06-18', agora)).toBe(1)
+  })
+
+  it('avanca a cada semana fechada', () => {
+    expect(currentWeek(8, '2026-06-17', agora)).toBe(2)
+    expect(currentWeek(8, '2026-06-10', agora)).toBe(3)
+  })
+
+  it('nao passa do tamanho do mesociclo', () => {
+    // quem continua treinando o plano vencido esta repetindo a ultima semana,
+    // e e ela que a tela do aluno deve mostrar - nao uma semana inexistente
+    expect(currentWeek(2, '2026-01-01', agora)).toBe(2)
+  })
+
+  it('sem data de inicio nao ha semana corrente', () => {
+    expect(currentWeek(8, null, agora)).toBeNull()
+  })
+
+  it('plano agendado para o futuro comeca na semana 1', () => {
+    expect(currentWeek(8, '2026-07-01', agora)).toBe(1)
   })
 })
 
