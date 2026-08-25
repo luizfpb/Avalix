@@ -11,6 +11,7 @@ import type {
 } from '../workout/api'
 import { weekSessionLabels } from '../workout/progress'
 import { registerReportFonts } from './pdfFonts'
+import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { goalLabel } from '../workout/volume'
 import {
   InfoCard,
@@ -472,54 +473,18 @@ function WeeksSection({ data }: { data: WorkoutPdfData }) {
 // (595) menos as margens da página (36 de cada lado), o padding da caixa (12 de
 // cada lado) e o fio da borda esquerda (3).
 const NOTES_LARGURA = 595 - 36 * 2 - 12 * 2 - 3
-// Largura média de caractere em Manrope 400, como fração do corpo. Medida na
-// renderização real: 111 caracteres de texto corrido em português couberam nos
-// 496 pt da linha, ou seja 0,47em. 0,52 estima por cima de propósito — o erro
-// da conta tem de sobrar linha, nunca faltar.
-const NOTES_CHARS_LINHA = Math.floor(NOTES_LARGURA / (9.5 * 0.52))
-// fontSize x lineHeight de notesText.
-const NOTES_ALTURA_LINHA = 9.5 * 1.5
-
-// Acima disto a observação deixa de ser atômica. A folha tem 760 pt úteis
-// (842 - 34 - 48) e 560 são ~36 linhas de texto. A folga de 200 pt é a margem
-// de erro da estimativa: mesmo num texto todo em maiúsculas (~0,62em por
-// caractere, o pior caso plausível) a altura real fica em ~700 pt e ainda cabe
-// na folha — o que não pode acontecer nunca é wrap={false} num bloco maior que
-// a página, porque aí ele não deixa de partir, TRANSBORDA sobreposto.
-const LIMITE_OBSERVACAO_ATOMICA = 560
 
 // Altura estimada do bloco "Observações" (título + caixa), em pontos.
 // Grosseira de propósito — serve só para decidir se o bloco cabe inteiro numa
-// folha, e o limite acima tem folga de sobra para o erro da estimativa.
+// folha, e LIMITE_BLOCO_ATOMICO tem folga de sobra para o erro da estimativa.
 export function estimateNotesHeight(notes: string): number {
   const TITULO = 21 // faixa da SectionTitle + margem inferior
   const CAIXA = 20 // padding vertical da caixa (9 + 9) + folga da borda
-  let linhas = 0
-  for (const paragrafo of notes.split('\n')) {
-    const palavras = paragrafo.split(/\s+/).filter(Boolean)
-    if (palavras.length === 0) {
-      linhas += 1 // linha em branco entre parágrafos também ocupa altura
-      continue
-    }
-    let atual = 0
-    for (const palavra of palavras) {
-      if (palavra.length > NOTES_CHARS_LINHA) {
-        // palavra maior que a linha inteira (URL colada, por exemplo): quebra
-        // dentro dela mesma
-        linhas += Math.ceil(palavra.length / NOTES_CHARS_LINHA)
-        atual = palavra.length % NOTES_CHARS_LINHA
-      } else if (atual === 0) {
-        linhas += 1
-        atual = palavra.length
-      } else if (atual + 1 + palavra.length > NOTES_CHARS_LINHA) {
-        linhas += 1
-        atual = palavra.length
-      } else {
-        atual += 1 + palavra.length
-      }
-    }
-  }
-  return TITULO + CAIXA + linhas * NOTES_ALTURA_LINHA
+  return (
+    TITULO +
+    CAIXA +
+    estimateTextHeight({ text: notes, fontSize: 9.5, lineHeight: 1.5, width: NOTES_LARGURA })
+  )
 }
 
 // Texto livre do profissional. Uma observação que cabe numa folha não parte:
@@ -531,7 +496,7 @@ export function estimateNotesHeight(notes: string): number {
 function NotesSection({ notes }: { notes: string }) {
   // Acima do limite volta a quebrar: wrap={false} em bloco maior que a folha
   // não impede a quebra, TRANSBORDA sobreposto e ilegível.
-  const parte = estimateNotesHeight(notes) > LIMITE_OBSERVACAO_ATOMICA
+  const parte = estimateNotesHeight(notes) > LIMITE_BLOCO_ATOMICO
 
   return (
     // A observação que não cabe numa folha começa numa folha limpa (break) e

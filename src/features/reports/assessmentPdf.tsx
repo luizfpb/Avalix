@@ -24,6 +24,7 @@ import type {
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { protocolLabel } from '../assessment/protocols'
 import { registerReportFonts } from './pdfFonts'
+import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
@@ -423,6 +424,37 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+// Largura útil do texto solto: a folha A4 (595) menos as margens da página
+// (36 de cada lado). Sem caixa, ao contrário do PDF de treino.
+const TEXTO_LIVRE_LARGURA = 595 - 36 * 2
+
+// Texto livre digitado pelo profissional — medicamentos e observações. Recebe o
+// mesmo tratamento do PDF de treino: enquanto couber numa folha, o bloco
+// (título + texto) é atômico e não parte na virada de página; acima disso ele
+// começa numa folha limpa (break) e parte no meio do texto, nunca logo abaixo
+// do título.
+//
+// minPresenceAhead não serve aqui: o shouldBreak do @react-pdf/layout só o
+// consulta quando o bloco CABE inteiro na sobra da página.
+//
+// A altura de linha usada na conta é a natural da Manrope (ascent - descent +
+// lineGap = 1,366 do corpo), porque estes dois blocos não declaram lineHeight;
+// 1,4 arredonda por cima, que é o lado seguro do erro.
+function FreeTextSection({ title, text }: { title: string; text: string }) {
+  const TITULO = 21 // faixa da SectionTitle + margem inferior
+  const altura =
+    TITULO +
+    estimateTextHeight({ text, fontSize: 10, lineHeight: 1.4, width: TEXTO_LIVRE_LARGURA })
+  const parte = altura > LIMITE_BLOCO_ATOMICO
+
+  return (
+    <View style={styles.section} wrap={parte} break={parte}>
+      <SectionTitle>{title}</SectionTitle>
+      <Text>{text}</Text>
+    </View>
+  )
+}
+
 function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   const { assessment, skinfolds, circumferences } = data
   const r = assessment.results as AssessmentResultSnapshot | null
@@ -531,17 +563,11 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
         ) : null}
 
         {assessment.medications ? (
-          <View style={styles.section}>
-            <SectionTitle>Medicamentos em uso</SectionTitle>
-            <Text>{assessment.medications}</Text>
-          </View>
+          <FreeTextSection title="Medicamentos em uso" text={assessment.medications} />
         ) : null}
 
         {assessment.notes ? (
-          <View style={styles.section}>
-            <SectionTitle>Observações</SectionTitle>
-            <Text>{assessment.notes}</Text>
-          </View>
+          <FreeTextSection title="Observações" text={assessment.notes} />
         ) : null}
 
         <MethodNote warnings={r?.warnings}>

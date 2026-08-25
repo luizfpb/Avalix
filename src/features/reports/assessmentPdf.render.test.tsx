@@ -67,6 +67,26 @@ describe('render do PDF de avaliação', () => {
     },
     15_000
   )
+
+  // Observações e medicamentos são texto livre do profissional: o bloco é
+  // atômico enquanto cabe numa folha e ganha `break` quando não cabe. Os dois
+  // caminhos passam por aqui, que é onde um `break` mal colocado ou uma conta
+  // que lance apareceriam.
+  it(
+    'gera com texto livre longo em observações e medicamentos',
+    async () => {
+      const blob = await generateAssessmentPdf({
+        ...data,
+        assessment: {
+          ...assessment,
+          medications: 'Losartana 50 mg pela manhã, conforme prescrição médica.',
+          notes: 'Relato de desconforto lombar ao final da série. '.repeat(90),
+        } as unknown as AssessmentRow,
+      })
+      expect(blob.size).toBeGreaterThan(1000)
+    },
+    15_000
+  )
 })
 
 describe('buildCircSeries', () => {
