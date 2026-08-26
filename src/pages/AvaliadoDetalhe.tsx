@@ -36,7 +36,7 @@ import {
 } from '../features/consent/hooks'
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
-import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle, Download } from 'lucide-react'
+import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle, Download, ClipboardList } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { initials } from '../lib/initials'
@@ -345,10 +345,10 @@ function WorkoutSection({
       ) : plans.length > 0 ? (
         <ul className="divide-y rounded-md border bg-card">
           {plans.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="flex items-center gap-1 pr-2">
               <Link
                 to={`/avaliados/${subjectId}/treinos/${p.id}`}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
               >
                 <span className="min-w-0 truncate">
                   {p.name}{' '}
@@ -356,10 +356,27 @@ function WorkoutSection({
                     · {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'sem' : 'sems'}
                   </span>
                 </span>
-                {p.status !== 'active' ? (
+                {p.status === 'active' ? (
+                  <Badge variant="secondary">Vigente</Badge>
+                ) : (
                   <Badge variant="secondary">{p.status === 'draft' ? 'Rascunho' : 'Arquivado'}</Badge>
-                ) : null}
+                )}
               </Link>
+              {/* Atalho para o treino vigente: ver como foi o treino era o
+                  caminho mais percorrido do app e custava quatro cliques
+                  (avaliados -> aluno -> plano -> execução). Só aparece no
+                  vigente porque, desde a 0027, ele é único por aluno — no plano
+                  arquivado a execução continua na tela do próprio plano. */}
+              {p.status === 'active' ? (
+                <Button asChild size="xs" variant="outline">
+                  <Link
+                    to={`/avaliados/${subjectId}/treinos/${p.id}/execucao`}
+                    aria-label={`Execução do plano ${p.name}`}
+                  >
+                    <ClipboardList /> Execução
+                  </Link>
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
