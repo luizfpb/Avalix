@@ -1,4 +1,4 @@
-# Anamnese BodyTrack — Especificação
+# Anamnese Avalix — Especificação 1.3
 
 Estrutura em duas camadas. **Camada A** é gate de segurança (decide liberação). **Camada B** é contexto de avaliação. Campos marcados `[gate]` alimentam a lógica de encaminhamento médico.
 
@@ -29,8 +29,8 @@ Regra: `liberado = todos os 7 == Não`. Caso contrário, exibir orientação de 
 Quatro entradas, combinadas em matriz:
 
 - `ativo_regular` — `bool` — Pratica exercício estruturado regular há ≥3 meses (≥30 min, ≥3x/semana, intensidade ao menos moderada)?
-- `doenca_cmr` — `multi` — Doença diagnosticada: nenhuma / cardiovascular / metabólica (DM1, DM2) / renal
-- `sinais_sintomas` — `multi` — Presença atual de: dor/desconforto torácico; dispneia anormal ao esforço ou repouso; tontura/síncope; ortopneia ou dispneia noturna; edema de tornozelos; palpitações/taquicardia; claudicação intermitente; sopro cardíaco conhecido; fadiga desproporcional. (nenhum = vazio)
+- `doenca_cmr` — `multi` — Doença diagnosticada: cardiovascular / metabólica (DM1, DM2) / renal. Array vazio significa “nenhuma” somente quando `doenca_cmr_confirmada == true`.
+- `sinais_sintomas` — `multi` — Presença atual de: dor/desconforto torácico; dispneia anormal ao esforço ou repouso; tontura/síncope; ortopneia ou dispneia noturna; edema de tornozelos; palpitações/taquicardia; claudicação intermitente; sopro cardíaco conhecido; fadiga desproporcional. Array vazio significa “nenhum” somente quando `sinais_sintomas_confirmados == true`.
 - `intensidade_desejada` — `enum` — leve / moderada / vigorosa  *(reuso de B1)*
 
 **Matriz de decisão (modelo ACSM atual):**
@@ -177,8 +177,8 @@ Estas indicam que o caso não é de treino e sim de avaliação médica. Para um
 
 ## Notas de implementação
 
-- **Lógica de gate centralizada:** calcule `liberado` / `nivel_encaminhamento` / `flag_encaminhamento` num único módulo puro, testável, separado da UI. Facilita teste e auditoria.
-- **Versões da spec:** `SPEC_VERSION` em `spec.ts` (1.1 atual). Payloads são jsonb; leitura SEMPRE via `parseAnswers()`, que completa campos ausentes de versões antigas e converte `historia_familiar_dcv` booleano (1.0) pro enum. Campo novo = bump de versão + default em `emptyAnamnesis()`.
+- **Lógica de gate centralizada:** o módulo TS puro calcula `liberado` / `nivel_encaminhamento` / `flag_encaminhamento` para feedback imediato e testes; desde a migration 0028, o banco valida A1/A2 e deriva as mesmas três colunas em trigger. O servidor é a autoridade de persistência.
+- **Versões da spec:** `SPEC_VERSION` em `spec.ts` (1.3 atual). A 1.3 acrescenta confirmações explícitas das duas listas A2 e transforma ausência de resposta em estado incompleto, nunca em “nenhum”. Payloads são jsonb; leitura SEMPRE via `parseAnswers()`, que completa/converte versões antigas para exibição. Salvar ou aceitar exige confirmação no formato vigente.
 - **Linguagem neutra pro aluno:** a página pública NUNCA exibe a mecânica do gate (siglas PAR-Q+/ACSM, "qualquer Sim retira a liberação", resultado da triagem) — isso induz resposta falsa de quem quer treinar. Títulos/descrições têm variante `isAluno` no `AnamneseForm`; o resultado só aparece pro personal (GateBox na revisão/detalhe). O termo LGPD segue declarando a finalidade.
 - **Persistência versionada:** anamnese muda ao longo do tempo (lesão nova, gravidez, medicação). Guarde por avaliação com `data_avaliacao`, não sobrescreva. Permite comparar reavaliações, que é metade do valor de um app de acompanhamento.
 - **Condicionais:** B6 só aparece por sexo; campos "se Sim → especificar" devem ser progressive disclosure para não inflar o formulário.

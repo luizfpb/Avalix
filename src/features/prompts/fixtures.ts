@@ -18,6 +18,9 @@ export const SUBJECT: PromptSubject = {
 export function anamneseBase(): AnamnesisAnswers {
   const a = emptyAnamnesis()
   for (const k of Object.keys(a.parq)) a.parq[k] = false
+  a.ativo_regular = false
+  a.doenca_cmr_confirmada = true
+  a.sinais_sintomas_confirmados = true
   return a
 }
 

@@ -43,7 +43,12 @@ export function AppProviders() {
   useEffect(() => startDraftHousekeeping(), [])
 
   if (isPublicIntake) {
-    return <PublicScope><App /></PublicScope>
+    return (
+      <PublicScope>
+        <App />
+        <PwaUpdatePrompt />
+      </PublicScope>
+    )
   }
 
   return (

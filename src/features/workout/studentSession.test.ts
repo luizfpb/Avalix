@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { buildSets, isNetworkFailure, resolveStudentToken } from './studentSession'
+import {
+  buildSets,
+  isInvalidStudentLinkError,
+  isNetworkFailure,
+  isStudentLinkExpired,
+  reconcileSetRows,
+  resolveStudentToken,
+  suggestedWorkoutDayId,
+  withStudentSyncLock,
+} from './studentSession'
 import { loadStudentToken } from './studentStore'
 
 const TOKEN = 'A'.repeat(43)
@@ -48,19 +57,74 @@ describe('resolveStudentToken', () => {
     expect(semFragmento).toBe(TOKEN)
   })
 
-  it('token malformado não vira credencial nem apaga o que estava guardado', () => {
+  it('token malformado explícito não cai no treino antigo guardado', () => {
     resolveStudentToken({ pathname: '/t', hash: `#${TOKEN}`, search: '' }, { replaceState: vi.fn(), state: null })
     const resultado = resolveStudentToken(
       { pathname: '/t', hash: '#nao-e-um-token', search: '' },
       { replaceState: vi.fn(), state: null }
     )
-    expect(resultado).toBe(TOKEN)
+    expect(resultado).toBeNull()
+    expect(loadStudentToken()).toBe(TOKEN)
   })
 
   it('sem token nenhum devolve null', () => {
     expect(
       resolveStudentToken({ pathname: '/t', hash: '', search: '' }, { replaceState: vi.fn(), state: null })
     ).toBeNull()
+  })
+})
+
+describe('grade e divisão sugerida', () => {
+  it('acrescenta séries prescritas e remove apenas excedentes vazios', () => {
+    const preenchida = { weight: '40', reps: '10', rir: '2' }
+    const vazia = { weight: '', reps: '', rir: '' }
+
+    expect(reconcileSetRows([preenchida], 3)).toEqual([preenchida, vazia, vazia])
+    expect(reconcileSetRows([preenchida, vazia, vazia], 1)).toEqual([preenchida])
+    expect(reconcileSetRows([preenchida, { weight: '42', reps: '8', rir: '' }], 1)).toHaveLength(2)
+  })
+
+  it('usa a sequência semanal e a quantidade concluída para sugerir a próxima divisão', () => {
+    const days = [
+      { id: 'd-a', label: 'A' },
+      { id: 'd-b', label: 'B' },
+    ]
+    expect(suggestedWorkoutDayId(['A', 'B', 'A'], days, 0)).toBe('d-a')
+    expect(suggestedWorkoutDayId(['A', 'B', 'A'], days, 1)).toBe('d-b')
+    expect(suggestedWorkoutDayId(['A', 'B', 'A'], days, 2)).toBe('d-a')
+    expect(suggestedWorkoutDayId(['A', 'B', 'A'], days, 3)).toBe('d-a')
+  })
+})
+
+describe('serialização do envio', () => {
+  it('não deixa o flush antigo correr em paralelo com um envio mais novo do mesmo link', async () => {
+    const events: string[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const first = withStudentSyncLock('mesmo-escopo', async () => {
+      events.push('primeiro:inicio')
+      await gate
+      events.push('primeiro:fim')
+    })
+    await Promise.resolve()
+    const second = withStudentSyncLock('mesmo-escopo', async () => {
+      events.push('segundo:inicio')
+      events.push('segundo:fim')
+    })
+    await Promise.resolve()
+
+    expect(events).toEqual(['primeiro:inicio'])
+    release()
+    await Promise.all([first, second])
+    expect(events).toEqual([
+      'primeiro:inicio',
+      'primeiro:fim',
+      'segundo:inicio',
+      'segundo:fim',
+    ])
   })
 })
 
@@ -78,6 +142,20 @@ describe('isNetworkFailure', () => {
     expect(isNetworkFailure({ message: 'link invalido ou expirado' })).toBe(false)
     expect(isNetworkFailure({ message: 'limite de sessoes para esta data' })).toBe(false)
     expect(isNetworkFailure({ message: 'exercicio desconhecido' })).toBe(false)
+  })
+})
+
+describe('revogação e expiração do link', () => {
+  it('reconhece somente a recusa inequívoca da credencial', () => {
+    expect(isInvalidStudentLinkError({ message: 'link invalido ou expirado' })).toBe(true)
+    expect(isInvalidStudentLinkError({ message: 'plano nao pertence a este aluno' })).toBe(false)
+  })
+
+  it('considera expirado no instante limite', () => {
+    expect(isStudentLinkExpired('2026-08-26T12:00:00Z', Date.parse('2026-08-26T12:00:00Z'))).toBe(true)
+    expect(isStudentLinkExpired('2026-08-26T12:00:01Z', Date.parse('2026-08-26T12:00:00Z'))).toBe(false)
+    expect(isStudentLinkExpired('validade-corrompida')).toBe(true)
+    expect(isStudentLinkExpired(undefined)).toBe(false)
   })
 })
 

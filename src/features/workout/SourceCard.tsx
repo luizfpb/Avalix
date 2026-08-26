@@ -43,8 +43,9 @@ export function SourceCard({
       <CardContent className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Avaliação física de origem</Label>
+            <Label htmlFor="workout-source-assessment">Avaliação física de origem</Label>
             <select
+              id="workout-source-assessment"
               className={controlClass}
               value={assessmentId ?? ''}
               onChange={(e) => onChange({ sourceAssessmentId: e.target.value || null })}
@@ -62,8 +63,9 @@ export function SourceCard({
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Avaliação postural de origem</Label>
+            <Label htmlFor="workout-source-posture">Avaliação postural de origem</Label>
             <select
+              id="workout-source-posture"
               className={controlClass}
               value={sessionId ?? ''}
               onChange={(e) => onChange({ sourcePostureSessionId: e.target.value || null })}

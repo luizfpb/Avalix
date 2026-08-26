@@ -6,7 +6,9 @@
 // 1.1: + motivação (B1), logística e preferências de treino (B1b), lesões
 // diagnosticadas (B3); historia_familiar_dcv vira enum com "não sei" (era
 // booleano na 1.0 — parseAnswers converte payloads antigos).
-export const SPEC_VERSION = '1.2'
+// 1.3: + confirmação explícita das duas listas da camada A2; array vazio sem
+// confirmação volta a significar pergunta não respondida, nunca ausência.
+export const SPEC_VERSION = '1.3'
 
 export type Option = { value: string; label: string }
 
@@ -234,7 +236,11 @@ export type AnamnesisAnswers = {
   // A2 ACSM
   ativo_regular: boolean | null
   doenca_cmr: string[]
+  // Arrays vazios significam "nenhuma" somente depois de uma confirmação
+  // explícita. Sem estes marcadores, o payload continua incompleto.
+  doenca_cmr_confirmada: boolean
   sinais_sintomas: string[]
+  sinais_sintomas_confirmados: boolean
   // B1
   objetivo_principal: string[]
   objetivo_motivo: string
@@ -312,7 +318,9 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     parq_medicacao_cronica_qual: '',
     ativo_regular: null,
     doenca_cmr: [],
+    doenca_cmr_confirmada: false,
     sinais_sintomas: [],
+    sinais_sintomas_confirmados: false,
     objetivo_principal: [],
     objetivo_motivo: '',
     objetivo_6meses: '',
@@ -369,4 +377,3 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     observacoes: '',
   }
 }
-

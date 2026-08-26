@@ -68,7 +68,14 @@ function PedirReset() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Enviando...' : 'Enviar link'}
         </Button>
@@ -119,7 +126,14 @@ function DefinirNovaSenha({ onDone }: { onDone: () => Promise<void> }) {
           />
           <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres.</p>
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Salvando...' : 'Salvar nova senha'}
         </Button>

@@ -26,6 +26,7 @@ import { protocolLabel } from '../assessment/protocols'
 import { registerReportFonts } from './pdfFonts'
 import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
+import { sortAssessmentsChronologically } from '../assessment/timeline'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
@@ -116,20 +117,33 @@ export function buildCircSeries(
   maxCharts: number,
   maxPoints: number
 ): { label: string; points: TrendPoint[] }[] {
-  const dates = [...new Set(rows.map((r) => r.assessedAt))].sort().slice(-maxPoints)
-  const dateSet = new Set(dates)
-  const byDateSite = new Map<string, number>()
+  const assessmentsById = new Map<
+    string,
+    { id: string; assessed_at: string; created_at: string }
+  >()
+  for (const row of rows) {
+    assessmentsById.set(row.assessmentId, {
+      id: row.assessmentId,
+      assessed_at: row.assessedAt,
+      created_at: row.assessmentCreatedAt,
+    })
+  }
+  const assessments = sortAssessmentsChronologically([...assessmentsById.values()]).slice(
+    -maxPoints
+  )
+  const assessmentIds = new Set(assessments.map((assessment) => assessment.id))
+  const byAssessmentSite = new Map<string, number>()
   const seen = new Set<string>()
   for (const r of rows) {
-    if (!dateSet.has(r.assessedAt)) continue
-    byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
+    if (!assessmentIds.has(r.assessmentId)) continue
+    byAssessmentSite.set(`${r.assessmentId}|${r.site}`, r.valueCm)
     seen.add(r.site)
   }
 
-  // média dos lados medidos numa data, pra um conjunto de chaves
-  const meanAt = (d: string, keys: string[]): number | null => {
+  // média dos lados medidos numa avaliação, pra um conjunto de chaves
+  const meanAt = (assessmentId: string, keys: string[]): number | null => {
     const vals = keys
-      .map((k) => byDateSite.get(`${d}|${k}`))
+      .map((k) => byAssessmentSite.get(`${assessmentId}|${k}`))
       .filter((v): v is number => v != null)
     if (vals.length === 0) return null
     return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
@@ -141,22 +155,25 @@ export function buildCircSeries(
     if (out.length >= maxCharts) return out
     if (!g.keys.some((k) => seen.has(k))) continue
     g.keys.forEach((k) => consumed.add(k))
-    const points = dates.map((d) => ({ value: meanAt(d, g.keys), date: shortDate(d) }))
+    const points = assessments.map((assessment) => ({
+      value: meanAt(assessment.id, g.keys),
+      date: shortDate(assessment.assessed_at),
+    }))
     if (points.filter((p) => p.value != null).length >= 2) out.push({ label: g.label, points })
   }
 
   // sobrou espaço? sites medidos fora do catálogo (customizados), por nº de medidas
   const counts = new Map<string, number>()
   for (const r of rows) {
-    if (dateSet.has(r.assessedAt) && !consumed.has(r.site)) {
+    if (assessmentIds.has(r.assessmentId) && !consumed.has(r.site)) {
       counts.set(r.site, (counts.get(r.site) ?? 0) + 1)
     }
   }
   for (const [site] of [...counts.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1])) {
     if (out.length >= maxCharts) break
-    const points = dates.map((d) => ({
-      value: byDateSite.get(`${d}|${site}`) ?? null,
-      date: shortDate(d),
+    const points = assessments.map((assessment) => ({
+      value: byAssessmentSite.get(`${assessment.id}|${site}`) ?? null,
+      date: shortDate(assessment.assessed_at),
     }))
     out.push({ label: circumferenceLabel(site), points })
   }

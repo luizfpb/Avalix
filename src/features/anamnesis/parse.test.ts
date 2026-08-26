@@ -18,6 +18,8 @@ describe('parseAnswers — compatibilidade entre versões da spec', () => {
     expect(a.treino_freq_semana).toBe('')
     expect(a.lesoes_diagnosticadas).toEqual([])
     expect(a.pref_veto).toBe('')
+    expect(a.doenca_cmr_confirmada).toBe(false)
+    expect(a.sinais_sintomas_confirmados).toBe(false)
   })
 
   it('historia_familiar_dcv booleano (spec 1.0) converte pro enum', () => {
@@ -31,6 +33,17 @@ describe('parseAnswers — compatibilidade entre versões da spec', () => {
     const a = parseAnswers({ parq: { cardio_dx: true } })
     expect(a.parq.cardio_dx).toBe(true)
     expect(a.parq.dor_toracica).toBeNull()
+  })
+
+  it('preserva as confirmações explícitas da camada A2', () => {
+    const a = parseAnswers({
+      doenca_cmr: [],
+      doenca_cmr_confirmada: true,
+      sinais_sintomas: [],
+      sinais_sintomas_confirmados: true,
+    })
+    expect(a.doenca_cmr_confirmada).toBe(true)
+    expect(a.sinais_sintomas_confirmados).toBe(true)
   })
 })
 

@@ -65,12 +65,14 @@ describe('buildAnamnesePrompt — semântica das ausências', () => {
     expect(p).toContain('Esporte/modalidade: não respondido')
   })
 
-  it('múltipla escolha vazia vira "nenhuma opção marcada", não "não respondido"', () => {
-    // é o que o gate usa no cálculo; "não respondido" faria a IA tratar
-    // sintoma ausente como sintoma desconhecido
+  it('ausência na A2 só aparece como confirmada depois da ação explícita', () => {
     const p = prompt()
-    expect(p).toContain('Sinais/sintomas atuais: nenhuma opção marcada')
+    expect(p).toContain('Sinais/sintomas atuais: Nenhum (ausência confirmada)')
     expect(p).not.toContain('Sinais/sintomas atuais: não respondido')
+
+    const incomplete = anamneseBase()
+    incomplete.sinais_sintomas_confirmados = false
+    expect(prompt(incomplete)).toContain('Sinais/sintomas atuais: não respondido')
   })
 
   it('explica as duas convenções no cabeçalho das respostas', () => {
@@ -125,6 +127,13 @@ describe('buildAnamnesePrompt — triagem como entrada fixa', () => {
     const p = prompt(anamneseBase())
     expect(p).toContain('Liberado na triagem: sim')
     expect(p).toContain('Motivos registrados pelo sistema: nenhum')
+  })
+
+  it('triagem incompleta não publica liberação ou encaminhamento calculados', () => {
+    const p = prompt({ ...anamneseBase(), ativo_regular: null })
+    expect(p).toContain('Estado da triagem: incompleta — liberação não calculada')
+    expect(p).toContain('Liberado na triagem: não calculado')
+    expect(p).toContain('Nível de encaminhamento: não calculado')
   })
 })
 

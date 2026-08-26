@@ -10,6 +10,7 @@ import {
 } from '../features/assessment/hooks'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { parseAnswers } from '../features/anamnesis/parse'
+import { computeGate } from '../features/anamnesis/gate'
 import {
   useSubjectIntakes,
   useGenerateIntakeLink,
@@ -21,6 +22,10 @@ import { WorkoutLinkCard } from '../features/workout/WorkoutLinkCard'
 import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
+import {
+  groupCircumferencesByAssessment,
+  sortAssessmentsChronologically,
+} from '../features/assessment/timeline'
 import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
 import { buildBriefingPrompt, type AssessmentPromptPoint } from '../features/prompts'
 import type { SubjectRow } from '../features/subjects/api'
@@ -235,8 +240,7 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
   const anamneseRow = (anamnesesQuery.data ?? [])[0] ?? null
 
   const assessments = useMemo(
-    () =>
-      [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
+    () => sortAssessmentsChronologically(assessmentsQuery.data ?? []),
     [assessmentsQuery.data]
   )
   const lastAssessment = assessments.length > 0 ? assessments[assessments.length - 1] : null
@@ -245,12 +249,7 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
   const lastDetailQuery = useAssessment(lastAssessment?.id)
 
   const points: AssessmentPromptPoint[] = useMemo(() => {
-    const byDate = new Map<string, { site: string; valueCm: number }[]>()
-    for (const c of circsQuery.data ?? []) {
-      const arr = byDate.get(c.assessedAt) ?? []
-      arr.push({ site: c.site, valueCm: c.valueCm })
-      byDate.set(c.assessedAt, arr)
-    }
+    const byAssessment = groupCircumferencesByAssessment(circsQuery.data ?? [])
     return assessments.map((a) => ({
       assessedAt: a.assessed_at,
       protocolId: a.protocol_id,
@@ -258,7 +257,7 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
       weightKg: a.weight_kg,
       heightCm: a.height_cm,
       results: a.results as AssessmentResultSnapshot | null,
-      circumferences: byDate.get(a.assessed_at) ?? [],
+      circumferences: byAssessment.get(a.id) ?? [],
     }))
   }, [assessments, circsQuery.data])
 
@@ -522,7 +521,12 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
         </div>
       </div>
 
-      {genError ? <p className="text-sm text-destructive">{genError}</p> : null}
+      {genError ? <p role="alert" className="text-sm text-destructive">{genError}</p> : null}
+      {cancel.error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {normalizeDbError(cancel.error)}
+        </p>
+      ) : null}
 
       {generatedUrl ? (
         <Card className="border-primary/30 bg-primary/5">
@@ -603,7 +607,8 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
       ) : items.length > 0 ? (
         <ul className="divide-y rounded-md border bg-card">
           {items.map((an) => {
-            const ok = an.liberado && !an.flag_encaminhamento
+            const gate = computeGate(parseAnswers(an.payload))
+            const ok = gate.status === 'liberado'
             return (
               <li key={an.id}>
                 <Link
@@ -611,8 +616,12 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent"
                 >
                   <span>{formatDate(an.assessed_at)}</span>
-                  <Badge variant={ok ? 'success' : 'warn'}>
-                    {ok ? 'Liberado' : 'Encaminhamento'}
+                  <Badge variant={gate.status === 'incompleto' ? 'secondary' : ok ? 'success' : 'warn'}>
+                    {gate.status === 'incompleto'
+                      ? 'Incompleta'
+                      : ok
+                        ? 'Liberado'
+                        : 'Encaminhamento'}
                   </Badge>
                 </Link>
               </li>

@@ -15,14 +15,6 @@ export function PwaUpdatePrompt() {
   const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null)
 
   useEffect(() => {
-    // O aluno recebe apenas a pagina publica; ela nao registra nem inicializa o
-    // PWA profissional. O path legado entra aqui antes de ser higienizado.
-    if (isPublicIntake) {
-      updateRef.current = null
-      setNeedRefresh(false)
-      return
-    }
-
     let active = true
     let registration: ServiceWorkerRegistration | undefined
     let interval: number | undefined
@@ -35,6 +27,10 @@ export function PwaUpdatePrompt() {
       immediate: true,
       onNeedRefresh() {
         if (!active) return
+        // As paginas publicas tambem precisam registrar o SW para abrir offline,
+        // mas nunca interrompem um formulario ou treino com prompt de update.
+        // O worker novo fica esperando e sera aplicado numa visita profissional.
+        if (isPublicIntake) return
         setNeedRefresh(true)
         setStatus('checking')
         void verifyPublishedShell().then((valid) => {

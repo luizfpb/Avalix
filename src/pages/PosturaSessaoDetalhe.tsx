@@ -58,6 +58,7 @@ export default function PosturaSessaoDetalhe() {
   const [selectedUrlError, setSelectedUrlError] = useState<string | null>(null)
   const selectedAnnotation = useAnnotation(selected?.id)
   const lightboxRef = useRef<HTMLDialogElement>(null)
+  const selectedUrlRequestRef = useRef(0)
 
   useEffect(() => {
     const dialog = lightboxRef.current
@@ -87,16 +88,26 @@ export default function PosturaSessaoDetalhe() {
   }
 
   async function openPhoto(photo: PosturePhotoRow) {
+    const requestId = ++selectedUrlRequestRef.current
     setSelected(photo)
     setSelectedUrl(null)
     setSelectedUrlError(null)
     try {
       const map = await signedUrls([photo.storage_path])
+      if (requestId !== selectedUrlRequestRef.current) return
       setSelectedUrl(map[photo.storage_path] ?? null)
     } catch {
+      if (requestId !== selectedUrlRequestRef.current) return
       setSelectedUrl(null)
       setSelectedUrlError('Não foi possível carregar a imagem ampliada.')
     }
+  }
+
+  function onCloseLightbox() {
+    selectedUrlRequestRef.current += 1
+    setSelected(null)
+    setSelectedUrl(null)
+    setSelectedUrlError(null)
   }
 
   const [confirmPhoto, setConfirmPhoto] = useState<PosturePhotoRow | null>(null)
@@ -120,8 +131,7 @@ export default function PosturaSessaoDetalhe() {
   if (
     sessionQuery.isPending ||
     photosQuery.isPending ||
-    thumbUrlsQuery.isPending ||
-    annotatedQuery.isPending
+    (photos.length > 0 && (thumbUrlsQuery.isPending || annotatedQuery.isPending))
   ) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
@@ -179,7 +189,10 @@ export default function PosturaSessaoDetalhe() {
       </div>
 
       {deleteSessionMut.error ? (
-        <p className="text-sm text-destructive">{normalizeDbError(deleteSessionMut.error)}</p>
+        <p role="alert" className="text-sm text-destructive">{normalizeDbError(deleteSessionMut.error)}</p>
+      ) : null}
+      {deleteMut.error ? (
+        <p role="alert" className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
 
       <ConfirmDialog
@@ -303,7 +316,7 @@ export default function PosturaSessaoDetalhe() {
         <dialog
           ref={lightboxRef}
           aria-labelledby="posture-lightbox-title"
-          onClose={() => setSelected(null)}
+          onClose={onCloseLightbox}
           onClick={(event) => {
             if (event.target === event.currentTarget) event.currentTarget.close()
           }}

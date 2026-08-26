@@ -6,12 +6,16 @@ import { emptyAnamnesis, type AnamnesisAnswers } from './spec'
 function base(): AnamnesisAnswers {
   const a = emptyAnamnesis()
   for (const k of Object.keys(a.parq)) a.parq[k] = false
+  a.ativo_regular = false
+  a.doenca_cmr_confirmada = true
+  a.sinais_sintomas_confirmados = true
   return a
 }
 
 describe('computeGate — PAR-Q', () => {
   it('todos Não → liberado, sem flag', () => {
     const r = computeGate(base())
+    expect(r.status).toBe('liberado')
     expect(r.liberado).toBe(true)
     expect(r.flagEncaminhamento).toBe(false)
   })
@@ -19,8 +23,30 @@ describe('computeGate — PAR-Q', () => {
     const a = base()
     a.parq.cardio_dx = true
     const r = computeGate(a)
+    expect(r.status).toBe('encaminhamento')
     expect(r.liberado).toBe(false)
     expect(r.flagEncaminhamento).toBe(true)
+  })
+})
+
+describe('computeGate — respostas incompletas', () => {
+  it('falha fechado quando o PAR-Q não foi respondido', () => {
+    const r = computeGate(emptyAnamnesis())
+    expect(r.status).toBe('incompleto')
+    expect(r.liberado).toBe(false)
+    expect(r.nivelEncaminhamento).toBe('antes_iniciar')
+  })
+
+  it('não reinterpreta arrays vazios como confirmação de ausência', () => {
+    const a = base()
+    a.doenca_cmr_confirmada = false
+    a.sinais_sintomas_confirmados = false
+
+    const r = computeGate(a)
+    expect(r.status).toBe('incompleto')
+    expect(r.liberado).toBe(false)
+    expect(r.motivos.join(' ')).toContain('doenças diagnosticadas')
+    expect(r.motivos.join(' ')).toContain('sinais e sintomas atuais')
   })
 })
 

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { cloneElement, useId, useState, type ReactElement } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Pill, Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -131,11 +131,19 @@ export default function AvaliacaoNova() {
   )
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactElement<{ id?: string }>
+}) {
+  const generatedId = useId()
+  const id = children.props.id ?? generatedId
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {cloneElement(children, { id })}
     </div>
   )
 }
@@ -207,6 +215,7 @@ function CircumferencesCard({
           {custom.map((c, i) => (
             <div key={i} className="flex items-center gap-2">
               <Input
+                aria-label={`Nome da circunferência personalizada ${i + 1}`}
                 placeholder="Nome (ex.: Tornozelo D)"
                 value={c.site}
                 onChange={(e) =>
@@ -214,6 +223,7 @@ function CircumferencesCard({
                 }
               />
               <Input
+                aria-label={`Medida da circunferência personalizada ${i + 1} em centímetros`}
                 className="w-24"
                 type="number"
                 inputMode="decimal"
@@ -529,7 +539,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
                   key={site}
                   className="flex flex-wrap items-center justify-between gap-2"
                 >
-                  <Label className="w-28 text-sm">{SKINFOLD_LABELS[site]}</Label>
+                  <span className="w-28 text-sm">{SKINFOLD_LABELS[site]}</span>
                   <div className="flex items-center gap-2">
                     {[0, 1, 2].map((i) => (
                       <Input
@@ -608,10 +618,11 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       )}
 
       <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
-        <Label className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
+        <Label htmlFor="assessment-medications" className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
           <Pill className="size-4" /> Medicamentos em uso
         </Label>
         <textarea
+          id="assessment-medications"
           rows={2}
           className={controlClass}
           value={medications}
@@ -632,7 +643,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         />
       </Field>
 
-      {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+      {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 
       <div className="flex gap-3">
         <Button onClick={handleSave} disabled={mut.isPending || !result}>

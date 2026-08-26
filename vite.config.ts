@@ -5,6 +5,14 @@ import { VitePWA } from "vite-plugin-pwa"
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
+  build: {
+    // O maior chunk é @react-pdf, carregado só ao gerar laudo e excluído do
+    // precache. O limite padrão de 500 kB também sinalizava o entry legítimo
+    // (React + Auth Supabase + Query + Router) sem distinguir regressão. Os
+    // tetos reais, gzip e vazamentos estruturais são bloqueados por
+    // scripts/check-build.mjs; este valor apenas alinha o aviso do Rollup.
+    chunkSizeWarningLimit: 1600,
+  },
   plugins: [
     react(),
     tailwindcss(),

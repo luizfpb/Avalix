@@ -76,19 +76,20 @@ export default function PosturaSessaoNova() {
 
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <Label>Data</Label>
-          <Input type="date" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
+          <Label htmlFor="posture-session-date">Data</Label>
+          <Input id="posture-session-date" type="date" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>Observações (opcional)</Label>
+          <Label htmlFor="posture-session-notes">Observações (opcional)</Label>
           <textarea
+            id="posture-session-notes"
             rows={3}
             className={controlClass}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div className="flex gap-3">
           <Button onClick={handleCreate} disabled={createMut.isPending}>
             {createMut.isPending ? 'Criando...' : 'Criar sessão'}

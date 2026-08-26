@@ -4,6 +4,8 @@ import { useSubject } from '../features/subjects/hooks'
 import { useAssessment, useAssessments } from '../features/assessment/hooks'
 import { buildComparison, type ComparePoint, type CompareRow } from '../features/assessment/compare'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
+import { sortAssessmentsChronologically } from '../features/assessment/timeline'
+import { protocolLabel } from '../features/assessment/protocols/registry'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { controlClass } from '@/lib/ui'
@@ -11,6 +13,19 @@ import { controlClass } from '@/lib/ui'
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
+}
+
+function assessmentOptionLabel(assessment: {
+  assessed_at: string
+  created_at: string
+  protocol_id: string | null
+}): string {
+  const time = /T(\d{2}):(\d{2})/.exec(assessment.created_at)
+  const registeredAt = time ? `${time[1]}:${time[2]}` : 'horario indisponivel'
+  const protocol = assessment.protocol_id
+    ? protocolLabel(assessment.protocol_id)
+    : 'Protocolo não informado'
+  return `${formatDate(assessment.assessed_at)} · registro ${registeredAt} · ${protocol}`
 }
 
 // "Antes → depois" entre duas avaliações (P1 da auditoria v2.0). Defaults:
@@ -22,8 +37,7 @@ export default function AvaliacoesComparar() {
 
   // cronológica ascendente pra "de → para" fazer sentido
   const assessments = useMemo(
-    () =>
-      [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
+    () => sortAssessmentsChronologically(assessmentsQuery.data ?? []),
     [assessmentsQuery.data]
   )
 
@@ -66,29 +80,31 @@ export default function AvaliacoesComparar() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>De (antes)</Label>
+          <Label htmlFor="comparison-from">De (antes)</Label>
           <select
+            id="comparison-from"
             className={controlClass}
             value={effectiveFrom}
             onChange={(e) => setFromId(e.target.value)}
           >
             {assessments.map((a) => (
               <option key={a.id} value={a.id}>
-                {formatDate(a.assessed_at)}
+                {assessmentOptionLabel(a)}
               </option>
             ))}
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label>Para (depois)</Label>
+          <Label htmlFor="comparison-to">Para (depois)</Label>
           <select
+            id="comparison-to"
             className={controlClass}
             value={effectiveTo}
             onChange={(e) => setToId(e.target.value)}
           >
             {assessments.map((a) => (
               <option key={a.id} value={a.id}>
-                {formatDate(a.assessed_at)}
+                {assessmentOptionLabel(a)}
               </option>
             ))}
           </select>

@@ -9,6 +9,7 @@ import { downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
 import { loadOrgLogoDataUrl } from '../features/organization/logo'
 import { listSubjectCircumferences } from '../features/assessment/api'
+import { sortAssessmentsChronologically } from '../features/assessment/timeline'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -90,8 +91,7 @@ export default function AvaliacaoDetalhe() {
     setPdfError(null)
     try {
       const { generateAssessmentPdf } = await import('../features/reports/assessmentPdf')
-      const history = [...(assessmentsQuery.data ?? [])]
-        .sort((x, y) => x.assessed_at.localeCompare(y.assessed_at))
+      const history = sortAssessmentsChronologically(assessmentsQuery.data ?? [])
         .map((x) => {
           const rr = x.results as AssessmentResultSnapshot | null
           const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.assessed_at)
@@ -193,7 +193,7 @@ export default function AvaliacaoDetalhe() {
       {pdfError ? <p role="alert" className="text-sm text-destructive">{pdfError}</p> : null}
 
       {deleteMut.error ? (
-        <p className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
+        <p role="alert" className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
 
       <ConfirmDialog

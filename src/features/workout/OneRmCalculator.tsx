@@ -11,10 +11,10 @@ import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label htmlFor={id} className="text-xs">{label}</Label>
       {children}
     </div>
   )
@@ -33,8 +33,9 @@ export function OneRmCalculator() {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
-        <Field label="Carga (kg)">
+        <Field id="one-rm-weight" label="Carga (kg)">
           <Input
+            id="one-rm-weight"
             type="number"
             inputMode="decimal"
             min={0}
@@ -42,8 +43,9 @@ export function OneRmCalculator() {
             onChange={(e) => setWeight(e.target.value)}
           />
         </Field>
-        <Field label="Repetições">
+        <Field id="one-rm-reps" label="Repetições">
           <Input
+            id="one-rm-reps"
             type="number"
             inputMode="numeric"
             min={1}
@@ -51,8 +53,9 @@ export function OneRmCalculator() {
             onChange={(e) => setReps(e.target.value)}
           />
         </Field>
-        <Field label="Fórmula">
+        <Field id="one-rm-formula" label="Fórmula">
           <select
+            id="one-rm-formula"
             className={controlClass}
             value={formula}
             onChange={(e) => setFormula(e.target.value as OneRmFormula)}

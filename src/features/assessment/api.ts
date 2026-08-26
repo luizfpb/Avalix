@@ -28,50 +28,41 @@ export type CreateAssessmentInput = {
   circumferences: NewCircumferenceReading[]
 }
 
-// Troca as leituras pela RPC replace_assessment_readings (migration 0016):
-// delete + reinsert rodam numa transação só, então falha no meio (rede, RLS,
-// consentimento revogado) reverte inteiro em vez de deixar estado parcial.
-async function replaceReadings(assessmentId: string, input: CreateAssessmentInput): Promise<void> {
-  const { error } = await supabase.rpc('replace_assessment_readings', {
-    p_assessment: assessmentId,
-    p_skinfolds: input.skinfolds.map((s) => ({
-      site: s.site,
-      reading_1: s.reading_1,
-      reading_2: s.reading_2,
-      reading_3: s.reading_3,
-    })) as unknown as Json,
-    p_circumferences: input.circumferences.map((c) => ({
-      site: c.site,
-      value_cm: c.value_cm,
-      is_custom: c.is_custom ?? false,
-    })) as unknown as Json,
-  })
-  if (error) throw error
+function skinfoldPayload(input: CreateAssessmentInput): Json {
+  return input.skinfolds.map((s) => ({
+    site: s.site,
+    reading_1: s.reading_1,
+    reading_2: s.reading_2,
+    reading_3: s.reading_3,
+  })) as unknown as Json
 }
 
-// Insere a avaliação e, em seguida, as leituras (org_id é recopiado pelos
-// triggers a partir do pai). O snapshot em results já contém todos os números,
-// então a avaliação é a fonte de verdade do laudo mesmo se uma leitura falhar.
-export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
-  const { data: assessment, error } = await supabase
-    .from('assessments')
-    .insert({
-      org_id: input.orgId,
-      subject_id: input.subjectId,
-      assessed_at: input.assessedAt,
-      protocol_id: input.protocolId,
-      weight_kg: input.weightKg,
-      height_cm: input.heightCm,
-      medications: input.medications,
-      notes: input.notes,
-      results: input.result as unknown as Json,
-      engine_version: input.result.engineVersion,
-    })
-    .select('*')
-    .single()
-  if (error) throw error
+function circumferencePayload(input: CreateAssessmentInput): Json {
+  return input.circumferences.map((c) => ({
+    site: c.site,
+    value_cm: c.value_cm,
+    is_custom: c.is_custom ?? false,
+  })) as unknown as Json
+}
 
-  await replaceReadings(assessment.id, input)
+// Cabeçalho e leituras nascem na mesma transação. Se qualquer leitura, trigger,
+// RLS ou consentimento falhar, nenhuma avaliação órfã fica persistida.
+export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
+  const { data: assessment, error } = await supabase.rpc('create_assessment', {
+    p_subject: input.subjectId,
+    p_assessed_at: input.assessedAt,
+    p_protocol_id: input.protocolId,
+    p_weight_kg: input.weightKg,
+    p_height_cm: input.heightCm,
+    p_results: input.result as unknown as Json,
+    p_engine_version: input.result.engineVersion,
+    p_skinfolds: skinfoldPayload(input),
+    p_circumferences: circumferencePayload(input),
+    ...(input.medications != null ? { p_medications: input.medications } : {}),
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+  })
+  if (error) throw error
+  if (!assessment) throw new Error('A criação da avaliação não retornou o registro criado.')
   return assessment
 }
 
@@ -122,7 +113,13 @@ export async function deleteAssessment(id: string): Promise<void> {
   if (error) throw error
 }
 
-export type SubjectCircumference = { assessedAt: string; site: string; valueCm: number }
+export type SubjectCircumference = {
+  assessmentId: string
+  assessedAt: string
+  assessmentCreatedAt: string
+  site: string
+  valueCm: number
+}
 
 // Todas as circunferências do avaliado ao longo das avaliações (via join),
 // pra montar a evolução por ponto. RLS continua valendo por avaliação.
@@ -138,13 +135,15 @@ export async function listSubjectCircumferences(subjectId: string): Promise<Subj
   const rows: Array<{
     site: string
     value_cm: number
-    assessments: { assessed_at: string } | { assessed_at: string }[]
+    assessments:
+      | { id: string; assessed_at: string; created_at: string }
+      | { id: string; assessed_at: string; created_at: string }[]
   }> = []
   const pageSize = 500
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('circumference_readings')
-      .select('id, site, value_cm, assessments!inner(subject_id, assessed_at)')
+      .select('id, site, value_cm, assessments!inner(id, subject_id, assessed_at, created_at)')
       .eq('assessments.subject_id', subjectId)
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1)
@@ -155,16 +154,24 @@ export async function listSubjectCircumferences(subjectId: string): Promise<Subj
   return mapCircumferences(rows)
 }
 
-function mapCircumferences(
+export function mapCircumferences(
   rows: Array<{
     site: string
     value_cm: number
-    assessments: { assessed_at: string } | { assessed_at: string }[]
+    assessments:
+      | { id: string; assessed_at: string; created_at: string }
+      | { id: string; assessed_at: string; created_at: string }[]
   }>
 ): SubjectCircumference[] {
   return rows.map(({ site, value_cm, assessments }) => {
     const a = Array.isArray(assessments) ? assessments[0] : assessments
-    return { assessedAt: a?.assessed_at ?? '', site, valueCm: value_cm }
+    return {
+      assessmentId: a?.id ?? '',
+      assessedAt: a?.assessed_at ?? '',
+      assessmentCreatedAt: a?.created_at ?? '',
+      site,
+      valueCm: value_cm,
+    }
   })
 }
 
@@ -191,6 +198,8 @@ export async function listAssessments(subjectId: string): Promise<AssessmentRow[
     .select('*')
     .eq('subject_id', subjectId)
     .order('assessed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
   if (error) throw error
   return data ?? []
 }

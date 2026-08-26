@@ -17,7 +17,12 @@ import {
 } from 'recharts'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments, useSubjectCircumferences } from '../features/assessment/hooks'
-import type { AssessmentRow } from '../features/assessment/api'
+import type { AssessmentRow, SubjectCircumference } from '../features/assessment/api'
+import {
+  buildCircumferenceTimeline,
+  groupCircumferencesByAssessment,
+  sortAssessmentsChronologically,
+} from '../features/assessment/timeline'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
@@ -53,7 +58,7 @@ function dateShort(iso: string): string {
 }
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-type SeriesPoint = { date: string; value: number | null }
+type SeriesPoint = { id: string; date: string; value: number | null }
 
 export default function Evolucao() {
   const { id } = useParams()
@@ -66,22 +71,14 @@ export default function Evolucao() {
   const [pdfError, setPdfError] = useState<string | null>(null)
 
   const assessments = useMemo(
-    () => [...(assessmentsQuery.data ?? [])].sort((a, b) => a.assessed_at.localeCompare(b.assessed_at)),
+    () => sortAssessmentsChronologically(assessmentsQuery.data ?? []),
     [assessmentsQuery.data]
   )
 
-  // Pontos da série para o prompt de progressão. As circunferências chegam
-  // planas (data + sítio + valor) e são reagrupadas por data — mesma forma que
-  // o PDF de evolução usa. Duas avaliações na mesma data compartilham os
-  // pontos: a consulta não devolve o id da avaliação, e a limitação já vale
-  // para o PDF.
+  // Cada circunferência permanece ligada à avaliação que a originou. A data
+  // sozinha não é identidade: o profissional pode avaliar duas vezes no dia.
   const seriesPoints: AssessmentPromptPoint[] = useMemo(() => {
-    const byDate = new Map<string, { site: string; valueCm: number }[]>()
-    for (const c of circsQuery.data ?? []) {
-      const arr = byDate.get(c.assessedAt) ?? []
-      arr.push({ site: c.site, valueCm: c.valueCm })
-      byDate.set(c.assessedAt, arr)
-    }
+    const byAssessment = groupCircumferencesByAssessment(circsQuery.data ?? [])
     return assessments.map((a) => ({
       assessedAt: a.assessed_at,
       protocolId: a.protocol_id,
@@ -89,7 +86,7 @@ export default function Evolucao() {
       weightKg: a.weight_kg,
       heightCm: a.height_cm,
       results: a.results as AssessmentResultSnapshot | null,
-      circumferences: byDate.get(a.assessed_at) ?? [],
+      circumferences: byAssessment.get(a.id) ?? [],
     }))
   }, [assessments, circsQuery.data])
 
@@ -178,7 +175,7 @@ export default function Evolucao() {
   // séries por métrica (uma por gráfico)
   const dates = assessments.map((a) => dateShort(a.assessed_at))
   const series = (pick: (a: AssessmentRow) => number | null): SeriesPoint[] =>
-    assessments.map((a, i) => ({ date: dates[i], value: pick(a) }))
+    assessments.map((a, i) => ({ id: a.id, date: dates[i], value: pick(a) }))
 
   const fatPct = series((a) => (a.results as AssessmentResultSnapshot | null)?.bodyFatPct ?? null)
   const bmiSeries = series((a) => round1(computeBmi(a.weight_kg, a.height_cm)))
@@ -329,7 +326,11 @@ function MetricChart({
   betterUp?: boolean
   betterDown?: boolean
 }) {
-  const valid = series.filter((s) => s.value != null) as { date: string; value: number }[]
+  const valid = series.filter((s) => s.value != null) as {
+    id: string
+    date: string
+    value: number
+  }[]
   if (valid.length < 2) return null
   const vals = valid.map((s) => s.value)
   const min = Math.min(...vals)
@@ -378,7 +379,7 @@ function MetricChart({
           <thead><tr><th scope="col">Data</th><th scope="col" className="text-right">{title}</th></tr></thead>
           <tbody>
             {valid.map((point) => (
-              <tr key={point.date}><td>{point.date}</td><td className="text-right tabular-nums">{point.value.toFixed(1)}{u}</td></tr>
+              <tr key={point.id}><td>{point.date}</td><td className="text-right tabular-nums">{point.value.toFixed(1)}{u}</td></tr>
             ))}
           </tbody>
         </table>
@@ -417,9 +418,17 @@ function CircumferencesCharts({
   rows,
 }: {
   loading: boolean
-  rows: { assessedAt: string; site: string; valueCm: number }[]
+  rows: SubjectCircumference[]
 }) {
-  const { current, siteSeries } = useMemo(() => buildCircData(rows), [rows])
+  const timeline = useMemo(() => buildCircumferenceTimeline(rows), [rows])
+  const current = timeline.current
+    .map((item) => ({
+      site: item.site,
+      label: circumferenceLabel(item.site),
+      value: item.valueCm,
+    }))
+    .sort((a, b) => b.value - a.value)
+  const { siteSeries } = timeline
   if (loading) return <p className="text-sm text-muted-foreground">Carregando circunferências...</p>
   if (rows.length === 0) {
     return (
@@ -456,7 +465,7 @@ function CircumferencesCharts({
             <summary className="cursor-pointer">Ver medidas em tabela</summary>
             <table className="mt-2 w-full text-left">
               <thead><tr><th scope="col">Ponto</th><th scope="col" className="text-right">Medida</th></tr></thead>
-              <tbody>{current.map((item) => <tr key={item.label}><td>{item.label}</td><td className="text-right tabular-nums">{item.value} cm</td></tr>)}</tbody>
+              <tbody>{current.map((item) => <tr key={item.site}><td>{item.label}</td><td className="text-right tabular-nums">{item.value} cm</td></tr>)}</tbody>
             </table>
           </details>
         </CardContent>
@@ -472,7 +481,11 @@ function CircumferencesCharts({
                 title={circumferenceLabel(s.site)}
                 unit="cm"
                 color={`var(--color-chart-${(i % 5) + 1})`}
-                series={s.series}
+                series={s.series.map((point) => ({
+                  id: point.assessmentId,
+                  date: dateShort(point.assessedAt),
+                  value: point.valueCm,
+                }))}
               />
             ))}
           </div>
@@ -480,32 +493,4 @@ function CircumferencesCharts({
       ) : null}
     </>
   )
-}
-
-// Agrupa as circunferências: barras do estado atual + uma série por ponto medido.
-function buildCircData(rows: { assessedAt: string; site: string; valueCm: number }[]) {
-  const dates = [...new Set(rows.map((r) => r.assessedAt))].sort()
-  const byDateSite = new Map<string, number>()
-  const count = new Map<string, number>()
-  for (const r of rows) {
-    byDateSite.set(`${r.assessedAt}|${r.site}`, r.valueCm)
-    count.set(r.site, (count.get(r.site) ?? 0) + 1)
-  }
-  // um gráfico por ponto com ≥2 medidas
-  const sites = [...count.entries()]
-    .filter(([, c]) => c >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .map(([s]) => s)
-  const siteSeries = sites.map((site) => ({
-    site,
-    series: dates.map((d) => ({ date: dateShort(d), value: byDateSite.get(`${d}|${site}`) ?? null })),
-  }))
-
-  const lastDate = dates[dates.length - 1]
-  const current = rows
-    .filter((r) => r.assessedAt === lastDate)
-    .map((r) => ({ label: circumferenceLabel(r.site), value: r.valueCm }))
-    .sort((a, b) => b.value - a.value)
-
-  return { current, siteSeries }
 }

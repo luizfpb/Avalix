@@ -22,6 +22,7 @@ import {
 import type { ExerciseRow } from '../features/workout/api'
 import {
   emptyEditorPlan,
+  duplicateExerciseInDay,
   planDetailToEditor,
   snapshotFromEditor,
   editorToSaveInput,
@@ -68,10 +69,10 @@ function arrayMove<T>(arr: T[], from: number, to: number): T[] {
   return next
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
   )
@@ -280,6 +281,12 @@ function Builder({
     }))
   }
   function addExercise(dayKey: string, exerciseId: string) {
+    const day = plan.days.find((candidate) => candidate.key === dayKey)
+    if (day?.exercises.some((exercise) => exercise.exerciseId === exerciseId)) {
+      setSubmitError('Este exercício já está nesta divisão.')
+      return
+    }
+    setSubmitError(null)
     setPlan((p) => ({
       ...p,
       days: p.days.map((d) =>
@@ -412,6 +419,10 @@ function Builder({
     if (plan.days.some((d) => !d.label.trim())) {
       return setSubmitError('Toda divisão precisa de um rótulo (A, B, C...).')
     }
+    const duplicate = duplicateExerciseInDay(plan)
+    if (duplicate) {
+      return setSubmitError(`O mesmo exercício aparece mais de uma vez na divisão ${duplicate.dayLabel}.`)
+    }
     try {
       const save = editorToSaveInput(plan, { orgId, subjectId }, snapshot)
       const saved = await mut.mutateAsync(save)
@@ -484,11 +495,12 @@ function Builder({
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Nome do plano">
-          <Input value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
+        <Field id="workout-plan-name" label="Nome do plano">
+          <Input id="workout-plan-name" value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
         </Field>
-        <Field label="Objetivo">
+        <Field id="workout-plan-goal" label="Objetivo">
           <select
+            id="workout-plan-goal"
             className={controlClass}
             value={plan.goal ?? ''}
             onChange={(e) => setPlan((p) => ({ ...p, goal: e.target.value || null }))}
@@ -501,8 +513,9 @@ function Builder({
             ))}
           </select>
         </Field>
-        <Field label="Semanas (mesociclo)">
+        <Field id="workout-plan-weeks" label="Semanas (mesociclo)">
           <Input
+            id="workout-plan-weeks"
             type="number"
             inputMode="numeric"
             min={1}
@@ -511,15 +524,17 @@ function Builder({
             onChange={(e) => setPlan((p) => ({ ...p, weeks: Math.max(1, Number(e.target.value) || 1) }))}
           />
         </Field>
-        <Field label="Início (opcional)">
+        <Field id="workout-plan-start" label="Início (opcional)">
           <Input
+            id="workout-plan-start"
             type="date"
             value={plan.startsOn ?? ''}
             onChange={(e) => setPlan((p) => ({ ...p, startsOn: e.target.value || null }))}
           />
         </Field>
-        <Field label="Situação">
+        <Field id="workout-plan-status" label="Situação">
           <select
+            id="workout-plan-status"
             className={controlClass}
             value={plan.status}
             onChange={(e) => setPlan((p) => ({ ...p, status: e.target.value }))}
@@ -594,11 +609,13 @@ function Builder({
               </span>
               <Input
                 className="w-16"
+                aria-label={`Rótulo da divisão ${dayIndex + 1}`}
                 value={day.label}
                 onChange={(e) => patchDay(day.key, { label: e.target.value })}
                 placeholder="A"
               />
               <Input
+                aria-label={`Nome da divisão ${day.label || dayIndex + 1}`}
                 value={day.name ?? ''}
                 onChange={(e) => patchDay(day.key, { name: e.target.value || null })}
                 placeholder="Nome (ex.: Peito e tríceps)"
@@ -699,8 +716,10 @@ function Builder({
                     </button>
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-2">
-                    <Field label="Séries">
+                    <Field id={`exercise-${ex.key}-sets`} label="Séries">
                       <Input
+                        id={`exercise-${ex.key}-sets`}
+                        aria-label={`Séries de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
                         type="number"
                         min={1}
                         max={20}
@@ -710,14 +729,18 @@ function Builder({
                         }
                       />
                     </Field>
-                    <Field label="Reps">
+                    <Field id={`exercise-${ex.key}-reps`} label="Reps">
                       <Input
+                        id={`exercise-${ex.key}-reps`}
+                        aria-label={`Repetições de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
                         value={ex.reps}
                         onChange={(e) => patchExercise(day.key, ex.key, { reps: e.target.value })}
                       />
                     </Field>
-                    <Field label="RIR">
+                    <Field id={`exercise-${ex.key}-rir`} label="RIR">
                       <Input
+                        id={`exercise-${ex.key}-rir`}
+                        aria-label={`RIR de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
                         type="number"
                         min={0}
                         max={10}
@@ -729,8 +752,10 @@ function Builder({
                         }
                       />
                     </Field>
-                    <Field label="Descanso (s)">
+                    <Field id={`exercise-${ex.key}-rest`} label="Descanso (s)">
                       <Input
+                        id={`exercise-${ex.key}-rest`}
+                        aria-label={`Descanso de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
                         type="number"
                         min={0}
                         max={600}
@@ -748,6 +773,7 @@ function Builder({
               <ExercisePicker
                 exercises={exercises}
                 orgId={orgId}
+                excludedExerciseIds={new Set(day.exercises.map((exercise) => exercise.exerciseId))}
                 onPick={(exerciseId) => addExercise(day.key, exerciseId)}
               />
             </CardContent>
@@ -846,8 +872,9 @@ function Builder({
         ) : null}
       </Card>
 
-      <Field label="Observações (opcional)">
+      <Field id="workout-plan-notes" label="Observações (opcional)">
         <textarea
+          id="workout-plan-notes"
           rows={3}
           className={controlClass}
           value={plan.notes ?? ''}

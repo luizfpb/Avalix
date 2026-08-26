@@ -16,10 +16,12 @@ import { controlClass } from '@/lib/ui'
 export function ExercisePicker({
   exercises,
   orgId,
+  excludedExerciseIds,
   onPick,
 }: {
   exercises: ExerciseRow[]
   orgId: string
+  excludedExerciseIds?: ReadonlySet<string>
   onPick: (exerciseId: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -31,12 +33,13 @@ export function ExercisePicker({
     const q = search.trim().toLowerCase()
     return exercises
       .filter((e) => {
+        if (excludedExerciseIds?.has(e.id)) return false
         if (muscle && e.primary_muscle !== muscle && !e.secondary_muscles.includes(muscle)) return false
         if (q && !e.name.toLowerCase().includes(q)) return false
         return true
       })
       .slice(0, 60)
-  }, [exercises, search, muscle])
+  }, [excludedExerciseIds, exercises, search, muscle])
 
   if (!open) {
     return (

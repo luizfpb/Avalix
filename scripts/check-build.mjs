@@ -20,6 +20,7 @@ const DIST = path.resolve('dist')
 const MAX_ENTRY_RAW = 680_000
 const MAX_ENTRY_GZIP = 205_000
 const MAX_PRECACHE = 2_000_000
+const MAX_LAZY_CHUNK_RAW = 1_600_000
 
 // Marcadores de bibliotecas que NUNCA podem estar no entry: todas sao
 // carregadas sob demanda (PDF ao exportar, graficos na tela de evolucao,
@@ -108,6 +109,12 @@ if (precacheBytes > MAX_PRECACHE) {
 // Também impede que o build volte a emitir subconjuntos de fontes fora do uso
 // do app em pt-BR.
 const assets = await readdir(path.join(DIST, 'assets'))
+for (const asset of assets.filter((name) => name.endsWith('.js'))) {
+  const size = (await stat(path.join(DIST, 'assets', asset))).size
+  if (size > MAX_LAZY_CHUNK_RAW) {
+    fail(`chunk ${asset} tem ${size} bytes; limite ${MAX_LAZY_CHUNK_RAW}`)
+  }
+}
 const foreignFonts = assets.filter((name) =>
   /-(vietnamese|cyrillic|greek|cyrillic-ext)-/i.test(name)
 )

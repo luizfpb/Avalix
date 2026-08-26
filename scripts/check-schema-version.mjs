@@ -1,4 +1,4 @@
-const EXPECTED_SCHEMA_VERSION = '0027'
+const EXPECTED_SCHEMA_VERSION = '0028'
 const REQUEST_TIMEOUT_MS = 15_000
 
 function requiredEnv(name) {

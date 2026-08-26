@@ -42,6 +42,9 @@ function answersFixture() {
   return {
     ...emptyAnamnesis(),
     parq: Object.fromEntries(PARQ_ITEMS.map((i) => [i.key, false])),
+    ativo_regular: false,
+    doenca_cmr_confirmada: true,
+    sinais_sintomas_confirmados: true,
     ocupacao: 'Professora',
     declaracao_veracidade: true,
     consentimento_lgpd: true,
@@ -138,5 +141,16 @@ describe('AnamneseNova — edição', () => {
     const salvar = screen.getByRole('button', { name: 'Salvar anamnese' }) as HTMLButtonElement
     expect(salvar.disabled).toBe(true)
     expect(updateMock).not.toHaveBeenCalled()
+  })
+
+  it('associa os campos centrais e as confirmações explícitas da A2 a nomes acessíveis', () => {
+    useAnamneseMock.mockReturnValue({ data: anamneseFixture(), isPending: false, isError: false })
+    renderPage('/avaliados/s1/anamnese/an1/editar')
+
+    expect(screen.getByLabelText('Data da anamnese')).toBeTruthy()
+    expect(screen.getByLabelText('Nenhuma doença diagnosticada')).toBeTruthy()
+    expect(screen.getByLabelText('Nenhum sinal ou sintoma atual')).toBeTruthy()
+    expect(screen.getByLabelText('Esporte/modalidade (opcional)')).toBeTruthy()
+    expect(screen.getByLabelText('Experiência de treino')).toBeTruthy()
   })
 })

@@ -38,6 +38,16 @@ const assessment = {
   updated_at: '2026-06-01',
 } as unknown as AssessmentRow
 
+function circumference(
+  assessmentId: string,
+  assessedAt: string,
+  site: string,
+  valueCm: number,
+  assessmentCreatedAt = `${assessedAt}T10:00:00Z`
+): SubjectCircumference {
+  return { assessmentId, assessedAt, assessmentCreatedAt, site, valueCm }
+}
+
 const data: AssessmentPdfData = {
   orgName: 'Estúdio Teste',
   subjectName: 'Fulano de Tal',
@@ -50,11 +60,11 @@ const data: AssessmentPdfData = {
     { date: '01/06', weightKg: 80, bmi: 25.3, bodyFatPct: 18, leanMassKg: 65.6, fatMassKg: 14.4 },
   ],
   circumferenceHistory: [
-    { assessedAt: '2026-01-01', site: 'waist', valueCm: 92 },
-    { assessedAt: '2026-03-01', site: 'waist', valueCm: 89 },
-    { assessedAt: '2026-06-01', site: 'waist', valueCm: 86 },
-    { assessedAt: '2026-01-01', site: 'abdomen', valueCm: 95 },
-    { assessedAt: '2026-06-01', site: 'abdomen', valueCm: 90 },
+    circumference('a-jan', '2026-01-01', 'waist', 92),
+    circumference('a-mar', '2026-03-01', 'waist', 89),
+    circumference('a-jun', '2026-06-01', 'waist', 86),
+    circumference('a-jan', '2026-01-01', 'abdomen', 95),
+    circumference('a-jun', '2026-06-01', 'abdomen', 90),
   ],
 }
 
@@ -92,16 +102,16 @@ describe('render do PDF de avaliação', () => {
 describe('buildCircSeries', () => {
   const rows: SubjectCircumference[] = [
     // coxa medial bilateral (D/E) em 2 datas
-    { assessedAt: '2026-01-01', site: 'thigh_mid_r', valueCm: 60 },
-    { assessedAt: '2026-01-01', site: 'thigh_mid_l', valueCm: 62 },
-    { assessedAt: '2026-06-01', site: 'thigh_mid_r', valueCm: 58 },
-    { assessedAt: '2026-06-01', site: 'thigh_mid_l', valueCm: 60 },
+    circumference('a-jan', '2026-01-01', 'thigh_mid_r', 60),
+    circumference('a-jan', '2026-01-01', 'thigh_mid_l', 62),
+    circumference('a-jun', '2026-06-01', 'thigh_mid_r', 58),
+    circumference('a-jun', '2026-06-01', 'thigh_mid_l', 60),
     // panturrilha só um lado
-    { assessedAt: '2026-01-01', site: 'calf_r', valueCm: 40 },
-    { assessedAt: '2026-06-01', site: 'calf_r', valueCm: 39 },
+    circumference('a-jan', '2026-01-01', 'calf_r', 40),
+    circumference('a-jun', '2026-06-01', 'calf_r', 39),
     // tronco
-    { assessedAt: '2026-01-01', site: 'waist', valueCm: 92 },
-    { assessedAt: '2026-06-01', site: 'waist', valueCm: 86 },
+    circumference('a-jan', '2026-01-01', 'waist', 92),
+    circumference('a-jun', '2026-06-01', 'waist', 86),
   ]
 
   it('inclui membros inferiores e tira a média dos lados D/E', () => {
@@ -117,5 +127,16 @@ describe('buildCircSeries', () => {
     const series = buildCircSeries(rows, 2, 10)
     expect(series).toHaveLength(2)
     expect(series[0].label).toBe('Cintura')
+  })
+
+  it('preserva dois pontos medidos no mesmo dia', () => {
+    const sameDay = [
+      circumference('a-1', '2026-08-20', 'waist', 90, '2026-08-20T09:00:00Z'),
+      circumference('a-2', '2026-08-20', 'waist', 88, '2026-08-20T10:00:00Z'),
+    ]
+
+    const waist = buildCircSeries(sameDay, 1, 10)[0]
+    expect(waist.points.map((point) => point.value)).toEqual([90, 88])
+    expect(waist.points.map((point) => point.date)).toEqual(['20/08', '20/08'])
   })
 })

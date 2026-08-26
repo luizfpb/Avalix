@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import AnamneseRevisar from './AnamneseRevisar'
+import { emptyAnamnesis, PARQ_ITEMS } from '../features/anamnesis/spec'
 
 // Fluxo crítico (v2.0): o aceite de um intake de CADASTRO cria avaliado +
 // consentimento + anamnese. Os hooks de dados são mockados; o que se testa é
@@ -45,11 +46,16 @@ vi.mock('../features/anamnesis/AnamneseResumo', () => ({
 }))
 
 function intakeFixture(over: Record<string, unknown> = {}) {
+  const payload = emptyAnamnesis()
+  for (const item of PARQ_ITEMS) payload.parq[item.key] = false
+  payload.ativo_regular = false
+  payload.doenca_cmr_confirmada = true
+  payload.sinais_sintomas_confirmados = true
   return {
     id: 'i1',
     kind: 'cadastro_anamnese',
     status: 'submitted',
-    payload: { objetivo_principal: ['saude'] },
+    payload,
     registration: {
       full_name: 'João Teste',
       birth_date: '1990-05-10',
@@ -146,5 +152,17 @@ describe('AnamneseRevisar — aceite de cadastro', () => {
     renderPage()
     expect(screen.getByText(/já foi aceita/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Aceitar/ })).toBeNull()
+  })
+
+  it('não permite aceitar payload cuja triagem está incompleta', () => {
+    useIntakeMock.mockReturnValue({
+      data: intakeFixture({ payload: {} }),
+      isPending: false,
+      isError: false,
+    })
+    renderPage()
+
+    const acceptButton = screen.getByRole('button', { name: /Aceitar e cadastrar/ })
+    expect((acceptButton as HTMLButtonElement).disabled).toBe(true)
   })
 })

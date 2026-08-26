@@ -15,7 +15,8 @@ describe('OneRmCalculator', () => {
 
   it('calcula o 1RM (Epley) e monta a tabela de %', () => {
     render(<OneRmCalculator />)
-    const [carga, reps] = screen.getAllByRole('spinbutton')
+    const carga = screen.getByLabelText('Carga (kg)')
+    const reps = screen.getByLabelText('Repetições')
     fireEvent.change(carga, { target: { value: '100' } })
     fireEvent.change(reps, { target: { value: '5' } })
     // Epley: 100 * (1 + 5/30) = 116,7 -> arredondado a 2,5 = 117,5
@@ -26,10 +27,11 @@ describe('OneRmCalculator', () => {
 
   it('troca de fórmula recalcula (Brzycki)', () => {
     render(<OneRmCalculator />)
-    const [carga, reps] = screen.getAllByRole('spinbutton')
+    const carga = screen.getByLabelText('Carga (kg)')
+    const reps = screen.getByLabelText('Repetições')
     fireEvent.change(carga, { target: { value: '100' } })
     fireEvent.change(reps, { target: { value: '5' } })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'brzycki' } })
+    fireEvent.change(screen.getByLabelText('Fórmula'), { target: { value: 'brzycki' } })
     // Brzycki: 100 * 36 / 32 = 112,5
     expect(screen.getByText(/112\.5 kg/)).toBeTruthy()
   })

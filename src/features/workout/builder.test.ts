@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   duplicatePlanEditor,
+  duplicateExerciseInDay,
   editorToSaveInput,
   editorToVolumePlan,
   emptyEditorPlan,
@@ -165,5 +166,22 @@ describe('duplicatePlanEditor', () => {
   it('mantém a origem no mesmo aluno e limpa ao duplicar para outro', () => {
     expect(duplicatePlanEditor(detail, { name: 'x', keepSources: true }).sourceAssessmentId).toBe('a1')
     expect(duplicatePlanEditor(detail, { name: 'x', keepSources: false }).sourceAssessmentId).toBeNull()
+  })
+})
+
+describe('duplicateExerciseInDay', () => {
+  it('bloqueia repetição dentro da divisão e permite o mesmo exercício em outra', () => {
+    const base = plan()
+    expect(duplicateExerciseInDay(base)).toBeNull()
+
+    const repetido: EditorPlan = {
+      ...base,
+      days: base.days.map((day, index) =>
+        index === 0
+          ? { ...day, exercises: [...day.exercises, { ...day.exercises[0], key: 'outra-chave' }] }
+          : day
+      ),
+    }
+    expect(duplicateExerciseInDay(repetido)).toEqual({ dayLabel: 'A', exerciseId: 'ex-sup' })
   })
 })

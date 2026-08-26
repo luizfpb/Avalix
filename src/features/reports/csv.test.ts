@@ -28,4 +28,21 @@ describe('buildAssessmentsCsv', () => {
     expect(csv).toContain('14,6')
     expect(csv).toContain('1,0654')
   })
+
+  it.each(['=', '+', '-', '@', '\t', '\r']) (
+    'neutraliza fórmula iniciada por %j nos dois dialetos',
+    (prefix) => {
+      const dangerous = [{ ...records[0], protocolo: `${prefix}SUM(A1:A2)` }]
+
+      for (const dialect of ['intl', 'br'] as const) {
+        const csv = buildAssessmentsCsv(dangerous, dialect)
+        expect(csv).toContain(`'${prefix}SUM(A1:A2)`)
+        expect(csv).not.toMatch(new RegExp(`(?:^|[,;])${escapeRegExp(prefix)}SUM`, 'm'))
+      }
+    }
+  )
 })
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

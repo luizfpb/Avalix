@@ -2,6 +2,8 @@
 # /index.html e canonicalizado para / e quebra o rewrite. Nao use fallback
 # global: um JS inexistente precisa responder 404, nunca o shell com status 200.
 /a                   /   200
+/t                   /   200
+/t/                  /   200
 /login               /   200
 /cadastro            /   200
 /recuperar-senha     /   200

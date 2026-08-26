@@ -16,6 +16,11 @@ const FIELDS = [
   'densidade',
 ] as const
 
+// PapaParse protege qualquer célula textual perigosa, inclusive campos que
+// venham a ser acrescentados ao relatório no futuro. Tratar só o protocolo
+// conhecido deixaria a mesma vulnerabilidade reaparecer no próximo campo livre.
+const CSV_OPTIONS = { escapeFormulae: true } as const
+
 function round(n: number, decimals: number): number {
   const f = 10 ** decimals
   return Math.round(n * f) / f
@@ -48,7 +53,13 @@ export function buildAssessmentsCsv(
       }
       return out
     })
-    return Papa.unparse({ fields: [...FIELDS], data }, { delimiter: ';' })
+    return Papa.unparse(
+      { fields: [...FIELDS], data },
+      { ...CSV_OPTIONS, delimiter: ';' }
+    )
   }
-  return Papa.unparse({ fields: [...FIELDS], data: records }, { delimiter: ',' })
+  return Papa.unparse(
+    { fields: [...FIELDS], data: records },
+    { ...CSV_OPTIONS, delimiter: ',' }
+  )
 }
