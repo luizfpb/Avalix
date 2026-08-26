@@ -773,13 +773,24 @@ function Builder({
                   className="flex items-center gap-1 rounded-md border bg-card py-1 pl-2 pr-1"
                 >
                   <span className="text-xs text-muted-foreground">{i + 1}</span>
+                  {/* Fundo e cor EXPLÍCITOS, não bg-transparent. Num select
+                      nativo sem cor de fundo própria, o Chrome no Windows
+                      desenha a lista aberta sobre uma superfície clara e ainda
+                      assim herda a cor do texto do tema — no modo escuro isso
+                      dava letra clara sobre fundo claro, e a divisão só
+                      aparecia ao passar o mouse. As <option> também levam cor
+                      própria: onde o navegador respeita o estilo, é o que
+                      garante contraste nos dois temas; onde ignora, o
+                      color-scheme do index.css já resolve. Era o único select
+                      do app fora do controlClass. */}
                   <select
-                    className="bg-transparent text-sm outline-none"
+                    className="rounded bg-card text-sm text-foreground outline-none"
                     value={label}
+                    aria-label={`Divisão da sessão ${i + 1} da semana`}
                     onChange={(e) => setScheduleSlot(i, e.target.value)}
                   >
                     {dayLabels.map((l) => (
-                      <option key={l} value={l}>
+                      <option key={l} value={l} className="bg-card text-foreground">
                         {l}
                       </option>
                     ))}
