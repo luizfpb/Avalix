@@ -34,6 +34,7 @@ import {
 } from '../features/workout/studentStore'
 import { applyStudentManifest } from '../features/workout/studentPwa'
 import { effectivePrescription, overrideFor, overrideIndex } from '../features/workout/effective'
+import { SessionSets } from '../features/workout/SessionSets'
 import { currentWeek } from '../features/workout/progress'
 import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from '../features/workout/api'
 import { BrandMark } from '../components/BrandLogo'
@@ -803,34 +804,22 @@ function Historico({ token, scope }: { token: string; scope: string }) {
             {s.plan_name}
             {s.week_number != null ? ` · semana ${s.week_number}` : ''}
           </p>
-          <ul className="mt-1.5 space-y-0.5">
-            {agruparPorExercicio(s.sets).map(([nome, sets]) => (
-              <li key={nome} className="text-xs">
-                <span className="text-muted-foreground">{nome}: </span>
-                {sets
-                  .map(
-                    (x) =>
-                      `${x.weight_kg ?? '—'}×${x.reps ?? '—'}${x.rir != null ? ` (${x.rir})` : ''}`
-                  )
-                  .join(' · ')}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-1.5">
+            <SessionSets
+              sets={s.sets.map((x) => ({
+                exerciseName: x.exercise_name,
+                setNumber: x.set_number,
+                weightKg: x.weight_kg,
+                reps: x.reps,
+                rir: x.rir,
+              }))}
+            />
+          </div>
           {s.notes ? <p className="mt-1 text-[11px] italic text-muted-foreground">{s.notes}</p> : null}
         </div>
       ))}
     </div>
   )
-}
-
-function agruparPorExercicio(sets: StudentHistorySession['sets']) {
-  const mapa = new Map<string, StudentHistorySession['sets']>()
-  for (const s of sets) {
-    const atual = mapa.get(s.exercise_name) ?? []
-    atual.push(s)
-    mapa.set(s.exercise_name, atual)
-  }
-  return [...mapa.entries()]
 }
 
 function Anteriores({

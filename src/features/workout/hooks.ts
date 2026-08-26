@@ -11,6 +11,7 @@ import {
   listOrgActivePlans,
   listOrgWorkoutLogSummary,
   listPlanSetHistory,
+  listWorkoutLogSets,
   listWorkoutLogs,
   listWorkoutPlans,
   setWorkoutPlanStatus,
@@ -143,6 +144,17 @@ export function useOrgWorkoutLogSummary(orgId: string | null | undefined) {
     queryKey: ['org-log-summary', orgId],
     queryFn: () => listOrgWorkoutLogSummary(orgId as string),
     enabled: !!orgId,
+  })
+}
+
+// Séries de UMA sessão, carregadas quando o educador abre a linha. Sob demanda
+// porque a lista inteira de séries do plano só é necessária na progressão, que
+// já tem a sua própria consulta.
+export function useWorkoutLogSets(logId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-log-sets', logId],
+    queryFn: () => listWorkoutLogSets(logId as string),
+    enabled: !!logId,
   })
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
   useCreateWorkoutLog,
@@ -8,6 +8,7 @@ import {
   useExercises,
   usePlanSetHistory,
   useWorkoutLogs,
+  useWorkoutLogSets,
   useWorkoutPlan,
 } from '../features/workout/hooks'
 import type { NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
@@ -36,6 +37,8 @@ import { QueryError } from '../components/QueryError'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { ensureLogRows, type LogRow } from '../features/workout/logRows'
+import { SessionSets, type SessionSet } from '../features/workout/SessionSets'
+import type { WorkoutLogRow } from '../features/workout/api'
 
 function todayLocal(): string {
   const d = new Date()
@@ -55,6 +58,7 @@ export default function Execucao() {
   const historyQuery = usePlanSetHistory(planId)
   const deleteMut = useDeleteWorkoutLog(planId)
   const [confirmLogId, setConfirmLogId] = useState<string | null>(null)
+  const [openLogId, setOpenLogId] = useState<string | null>(null)
 
   const names = useMemo(() => {
     const m: Record<string, string> = {}
@@ -203,30 +207,15 @@ export default function Execucao() {
         ) : (
           <ul className="divide-y rounded-md border bg-card">
             {logs.map((log) => (
-              <li key={log.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span>
-                  {formatDate(log.performed_at)}
-                  {log.day_label ? <span className="text-muted-foreground"> · Treino {log.day_label}</span> : null}
-                  {log.week_number ? <span className="text-muted-foreground"> · semana {log.week_number}</span> : null}
-                  {/* Quem digitou. O acesso do aluno é anônimo, então
-                      audit_logs.user_id fica nulo: sem esta marca ninguém
-                      distingue o registro dele do seu. */}
-                  {log.source === 'student' ? (
-                    <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
-                      registrado pelo aluno
-                    </span>
-                  ) : null}
-                </span>
-                <button
-                  onClick={() => setConfirmLogId(log.id)}
-                  disabled={deleteMut.isPending}
-                  className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Excluir"
-                  aria-label={`Excluir sessão de ${formatDate(log.performed_at)}`}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </li>
+              <LogRowItem
+                key={log.id}
+                log={log}
+                names={names}
+                aberto={openLogId === log.id}
+                onAlternar={() => setOpenLogId(openLogId === log.id ? null : log.id)}
+                onExcluir={() => setConfirmLogId(log.id)}
+                excluindo={deleteMut.isPending}
+              />
             ))}
           </ul>
         )}
@@ -288,6 +277,101 @@ export default function Execucao() {
         onCancel={() => setConfirmLogId(null)}
       />
     </div>
+  )
+}
+
+// Uma sessão registrada. Fechada mostra quando e quem digitou; aberta mostra o
+// que foi feito — carga, repetições e RIR de cada série.
+//
+// O educador não enxergava isso: a lista só dizia a data, então o registro do
+// aluno chegava como um número na adesão, sem o conteúdo. Sem ver a série, não
+// há como decidir a progressão da semana seguinte, que é o motivo de existir o
+// registro.
+function LogRowItem({
+  log,
+  names,
+  aberto,
+  onAlternar,
+  onExcluir,
+  excluindo,
+}: {
+  log: WorkoutLogRow
+  names: Record<string, string>
+  aberto: boolean
+  onAlternar: () => void
+  onExcluir: () => void
+  excluindo: boolean
+}) {
+  const setsQuery = useWorkoutLogSets(aberto ? log.id : undefined)
+
+  const sets: SessionSet[] = (setsQuery.data ?? []).map((s) => ({
+    exerciseName: names[s.exercise_id] ?? 'Exercício',
+    setNumber: s.set_number,
+    weightKg: s.weight_kg,
+    reps: s.reps,
+    rir: s.rir,
+  }))
+
+  return (
+    <li className="text-sm">
+      <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={onAlternar}
+          aria-expanded={aberto}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {aberto ? (
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+          <span className="min-w-0">
+            {formatDate(log.performed_at)}
+            {log.day_label ? (
+              <span className="text-muted-foreground"> · Treino {log.day_label}</span>
+            ) : null}
+            {log.week_number ? (
+              <span className="text-muted-foreground"> · semana {log.week_number}</span>
+            ) : null}
+            {/* Quem digitou. O acesso do aluno é anônimo, então
+                audit_logs.user_id fica nulo: sem esta marca ninguém distingue
+                o registro dele do seu. */}
+            {log.source === 'student' ? (
+              <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+                registrado pelo aluno
+              </span>
+            ) : null}
+          </span>
+        </button>
+        <button
+          onClick={onExcluir}
+          disabled={excluindo}
+          className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Excluir"
+          aria-label={`Excluir sessão de ${formatDate(log.performed_at)}`}
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+
+      {aberto ? (
+        <div className="border-t bg-muted/20 px-4 py-2.5">
+          {setsQuery.isPending ? (
+            <p className="text-xs text-muted-foreground">Carregando séries...</p>
+          ) : setsQuery.isError ? (
+            <p className="text-xs text-muted-foreground">
+              Não foi possível carregar as séries desta sessão.
+            </p>
+          ) : (
+            <SessionSets sets={sets} />
+          )}
+          {log.notes ? (
+            <p className="mt-2 border-t pt-2 text-xs italic text-muted-foreground">{log.notes}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
   )
 }
 
