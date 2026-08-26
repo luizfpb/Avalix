@@ -37,6 +37,7 @@ import {
   type MuscleGroup,
 } from '../features/workout/volume'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
+import { useWorkoutPlans } from '../features/workout/hooks'
 import { OneRmCalculator } from '../features/workout/OneRmCalculator'
 import { AnamneseFlag } from '../features/workout/AnamneseFlag'
 import { SourceCard } from '../features/workout/SourceCard'
@@ -168,6 +169,14 @@ function Builder({
 
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Qual plano perde a vigência ao salvar este como ativo. Nulo quando não há
+  // outro ativo, ou quando o outro é este mesmo (edição).
+  const planosQ = useWorkoutPlans(subjectId)
+  const planoAtivoQueSeraArquivado =
+    plan.status === 'active'
+      ? ((planosQ.data ?? []).find((p) => p.status === 'active' && p.id !== planId) ?? null)
+      : null
   const [showCalc, setShowCalc] = useState(false)
 
   // Montar um mesociclo (divisões, exercícios, séries/reps/RIR/descanso,
@@ -519,6 +528,14 @@ function Builder({
             <option value="active">Ativo</option>
             <option value="archived">Arquivado</option>
           </select>
+          {/* Um aluno tem um treino vigente só (0027). O banco arquiva o
+              anterior sozinho; a surpresa seria do usuário, não do banco. */}
+          {planoAtivoQueSeraArquivado ? (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              Este passa a ser o treino vigente. O plano “{planoAtivoQueSeraArquivado.name}” será
+              arquivado — o histórico dele continua disponível.
+            </p>
+          ) : null}
         </Field>
       </div>
 

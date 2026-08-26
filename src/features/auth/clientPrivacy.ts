@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { clearAllIntakeLinksLocal, setIntakeLinkScope } from '../anamnesis/linkStore'
+import { clearAllWorkoutLinksLocal, setWorkoutLinkScope } from '../workout/linkStore'
 import { clearAllPrivateDrafts, setPrivateDraftScope } from '../../lib/draft'
 import { setErrlogOrg } from '../../lib/errlog'
 
@@ -43,6 +44,7 @@ export function clearPrivateClientState(queryClient: ClearableQueryClient): void
   queryClient.clear()
   clearAllPrivateDrafts()
   clearAllIntakeLinksLocal()
+  clearAllWorkoutLinksLocal()
   setErrlogOrg(null)
 }
 
@@ -52,5 +54,6 @@ export function setPrivateClientScope(
 ): void {
   setPrivateDraftScope(userId, orgId)
   setIntakeLinkScope(userId, orgId)
+  setWorkoutLinkScope(userId, orgId)
   if (!userId || !orgId) setErrlogOrg(null)
 }

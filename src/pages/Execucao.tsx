@@ -208,6 +208,14 @@ export default function Execucao() {
                   {formatDate(log.performed_at)}
                   {log.day_label ? <span className="text-muted-foreground"> · Treino {log.day_label}</span> : null}
                   {log.week_number ? <span className="text-muted-foreground"> · semana {log.week_number}</span> : null}
+                  {/* Quem digitou. O acesso do aluno é anônimo, então
+                      audit_logs.user_id fica nulo: sem esta marca ninguém
+                      distingue o registro dele do seu. */}
+                  {log.source === 'student' ? (
+                    <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+                      registrado pelo aluno
+                    </span>
+                  ) : null}
                 </span>
                 <button
                   onClick={() => setConfirmLogId(log.id)}

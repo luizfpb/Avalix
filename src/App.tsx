@@ -21,6 +21,7 @@ const AnamneseNova = lazy(() => import('./pages/AnamneseNova'))
 const AnamneseDetalhe = lazy(() => import('./pages/AnamneseDetalhe'))
 const AnamneseRevisar = lazy(() => import('./pages/AnamneseRevisar'))
 const AnamnesePublica = lazy(() => import('./pages/AnamnesePublica'))
+const TreinoAluno = lazy(() => import('./pages/TreinoAluno'))
 const TreinoNovo = lazy(() => import('./pages/TreinoNovo'))
 const TreinoDetalhe = lazy(() => import('./pages/TreinoDetalhe'))
 const Execucao = lazy(() => import('./pages/Execucao'))
@@ -56,6 +57,9 @@ export default function App() {
         <Routes>
           <Route path="/a" element={<AnamnesePublica />} />
           <Route path="/a/:token" element={<AnamnesePublica />} />
+          {/* Treino do aluno: token no fragmento, e /t sem fragmento para
+              reabrir instalado ou offline (o token fica no aparelho). */}
+          <Route path="/t" element={<TreinoAluno />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />

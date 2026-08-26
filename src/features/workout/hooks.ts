@@ -21,6 +21,7 @@ import {
   type SaveWorkoutPlanInput,
   type UpdateExerciseInput,
 } from './api'
+import { getWorkoutLink, issueWorkoutLink, revokeWorkoutLink } from './link'
 
 export function useExercises(orgId: string | undefined) {
   return useQuery({
@@ -193,6 +194,36 @@ export function useSetWorkoutPlanStatus(
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------- link do aluno
+
+export function useWorkoutLink(subjectId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-link', subjectId],
+    queryFn: () => getWorkoutLink(subjectId as string),
+    enabled: !!subjectId,
+  })
+}
+
+export function useIssueWorkoutLink(subjectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => issueWorkoutLink(subjectId as string),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-link', subjectId] })
+    },
+  })
+}
+
+export function useRevokeWorkoutLink(subjectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (linkId: string) => revokeWorkoutLink(linkId, subjectId as string),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-link', subjectId] })
     },
   })
 }

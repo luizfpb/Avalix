@@ -17,6 +17,7 @@ import {
 } from '../features/anamnesis/intakeHooks'
 import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { useWorkoutPlans } from '../features/workout/hooks'
+import { WorkoutLinkCard } from '../features/workout/WorkoutLinkCard'
 import { goalLabel } from '../features/workout/volume'
 import { protocolLabel } from '../features/assessment/protocols'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
@@ -211,7 +212,7 @@ export default function AvaliadoDetalhe() {
 
       <BriefingSection subject={s} />
 
-      <WorkoutSection subjectId={s.id} />
+      <WorkoutSection subjectId={s.id} subjectName={s.full_name} orgName={organization?.name ?? ''} />
 
       <PosturalSection subjectId={s.id} />
     </div>
@@ -315,7 +316,15 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
   )
 }
 
-function WorkoutSection({ subjectId }: { subjectId: string }) {
+function WorkoutSection({
+  subjectId,
+  subjectName,
+  orgName,
+}: {
+  subjectId: string
+  subjectName: string
+  orgName: string
+}) {
   const plansQuery = useWorkoutPlans(subjectId)
   const plans = plansQuery.data ?? []
 
@@ -357,6 +366,8 @@ function WorkoutSection({ subjectId }: { subjectId: string }) {
       ) : (
         <p className="text-sm text-muted-foreground">Nenhum plano de treino ainda.</p>
       )}
+
+      <WorkoutLinkCard subjectId={subjectId} subjectName={subjectName} orgName={orgName} />
     </section>
   )
 }
