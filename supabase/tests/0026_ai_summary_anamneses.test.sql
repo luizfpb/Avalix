@@ -72,10 +72,9 @@ select throws_ok(
   'sem sessao autenticada a RPC recusa mesmo com acao e alvo validos'
 );
 
-select is(
-  public.app_schema_version(),
-  '0026',
-  'o carimbo de versao do schema subiu para 0026'
+select ok(
+  public.app_schema_version() >= '0026',
+  'o carimbo confirma a 0026 ou uma versao posterior'
 );
 
 select * from finish();

@@ -79,6 +79,14 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Testes que importam o cliente Supabase precisam de uma configuração
+    // sintaticamente válida, mas nunca devem depender do .env.local nem das
+    // credenciais reais do projeto. Mantemos valores inertes e determinísticos
+    // dentro do próprio runner para que a suíte seja hermética no CI.
+    env: {
+      VITE_SUPABASE_URL: "https://example.supabase.co",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+    },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // A suite completa roda arquivos jsdom pesados em paralelo. Em runners
     // Windows/CI mais lentos, testes que levam <2 s isoladamente podem passar
