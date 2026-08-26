@@ -11,6 +11,9 @@ export type CarteiraRow = {
   lastAssessedAt: string | null
   reassessDue: boolean
   planName: string | null
+  // id do plano ativo, para a linha levar direto à execução dele. Sem isto a
+  // Carteira sabia que o aluno está sem treinar mas não sabia para onde apontar.
+  planId: string | null
   adherencePct: number | null // null = sem plano ativo
   lastLogAt: string | null
   quiet: boolean // plano ativo mas sem treino registrado há QUIET_DAYS+
@@ -74,6 +77,7 @@ export function buildCarteira(input: {
       lastAssessedAt,
       reassessDue,
       planName: plan?.name ?? null,
+      planId: plan?.planId ?? null,
       adherencePct: adherence,
       lastLogAt,
       quiet: !!(plan && quiet),

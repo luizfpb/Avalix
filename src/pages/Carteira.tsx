@@ -8,6 +8,8 @@ import { buildCarteira } from '../features/workout/carteira'
 import { relativeDayLabel } from '../lib/reminders'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ClipboardList } from 'lucide-react'
 import { QueryError } from '../components/QueryError'
 
 export default function Carteira() {
@@ -82,10 +84,10 @@ export default function Carteira() {
       ) : (
         <ul className="space-y-2">
           {rows.map((r) => (
-            <li key={r.subjectId}>
+            <li key={r.subjectId} className="overflow-hidden rounded-md border bg-card">
               <Link
                 to={`/avaliados/${r.subjectId}`}
-                className="block rounded-md border bg-card p-3 transition-colors hover:bg-accent"
+                className="block p-3 transition-colors hover:bg-accent"
               >
                 <div className="flex items-start justify-between gap-3">
                   <span className="min-w-0 truncate font-medium">{r.name}</span>
@@ -128,6 +130,24 @@ export default function Carteira() {
                   </div>
                 ) : null}
               </Link>
+
+              {/* Atalho para a execução do plano vigente. Esta é a tela onde o
+                  profissional VÊ o problema ("sem treino recente"), e até agora
+                  ela não levava a lugar nenhum além do cadastro do aluno. Fica
+                  fora do <Link> do card porque âncora dentro de âncora é HTML
+                  inválido — e o card inteiro continua clicável. */}
+              {r.planId ? (
+                <div className="flex justify-end border-t px-2 py-1">
+                  <Button asChild size="xs" variant="ghost">
+                    <Link
+                      to={`/avaliados/${r.subjectId}/treinos/${r.planId}/execucao`}
+                      aria-label={`Execução do treino de ${r.name}`}
+                    >
+                      <ClipboardList /> Execução
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

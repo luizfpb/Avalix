@@ -34,6 +34,17 @@ describe('buildCarteira', () => {
     expect(rows).toHaveLength(3)
   })
 
+  it('carrega o id do plano ativo, para a linha levar direto à execução', () => {
+    // sem isto a Carteira aponta o problema ("sem treino recente") mas não
+    // consegue levar a lugar nenhum além do cadastro do aluno
+    expect(rows.find((r) => r.subjectId === 's1')!.planId).toBe('p1')
+    expect(rows.find((r) => r.subjectId === 's2')!.planId).toBe('p2')
+  })
+
+  it('aluno sem plano ativo não tem para onde apontar', () => {
+    expect(rows.find((r) => r.subjectId === 's3')!.planId).toBeNull()
+  })
+
   it('calcula adesão, reavaliação e ausência de treino recente', () => {
     const ana = rows.find((r) => r.subjectId === 's1')!
     expect(ana.adherencePct).toBeCloseTo(10 / 12, 5)
