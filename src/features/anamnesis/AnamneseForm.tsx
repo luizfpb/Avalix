@@ -9,7 +9,6 @@ import {
   EXPERIENCIA,
   DOENCAS_CRONICAS,
   REGIAO_DOR,
-  TEMPO_EVOLUCAO,
   RED_FLAGS,
   TABAGISMO,
   ALCOOL,
@@ -442,26 +441,33 @@ export function AnamneseCamadaB({
 
       <Section
         title={isAluno ? 'Dores e desconfortos' : 'B3. Dor e sistema musculoesquelético'}
-        desc="Adicione uma queixa por região."
+        desc={
+          isAluno
+            ? 'Marque onde dói e depois conte, com suas palavras, como é essa dor.'
+            : 'Região da queixa e, ao final do bloco, a narrativa da dor.'
+        }
       >
+        {/* A grade ficou só com o que uma máquina precisa ler: a REGIÃO cruza
+            com os exercícios do plano em contraindications.ts, e
+            intensidade/lesão prévia decidem se o sinal aparece para o
+            profissional revisar. Tempo de evolução e os campos "piora com" /
+            "melhora com" saíram na spec 1.2 — a segunda pergunta aberta, no fim
+            do bloco, cobre isso com as palavras da pessoa. */}
         <RepeatList
-          label="Queixas de dor"
+          label={isAluno ? 'Onde você sente dor' : 'Regiões com queixa de dor'}
           items={a.dor_queixas}
           onAdd={() =>
             set({
               dor_queixas: [
                 ...a.dor_queixas,
-                { regiao: '', intensidade: 0, tempo_evolucao: '', fatores_piora: '', fatores_melhora: '', lesao_previa_regiao: false },
+                { regiao: '', intensidade: 0, lesao_previa_regiao: false },
               ],
             })
           }
           onRemove={(i) => set({ dor_queixas: a.dor_queixas.filter((_, idx) => idx !== i) })}
           render={(q, i) => (
             <div className="space-y-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Select value={q.regiao} onChange={(v) => updateItem('dor_queixas', i, { regiao: v }, a, set)} options={REGIAO_DOR} placeholder="Região" />
-                <Select value={q.tempo_evolucao} onChange={(v) => updateItem('dor_queixas', i, { tempo_evolucao: v }, a, set)} options={TEMPO_EVOLUCAO} placeholder="Tempo de evolução" />
-              </div>
+              <Select value={q.regiao} onChange={(v) => updateItem('dor_queixas', i, { regiao: v }, a, set)} options={REGIAO_DOR} placeholder="Região" />
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Intensidade</span>
                 <input
@@ -473,10 +479,6 @@ export function AnamneseCamadaB({
                   className="flex-1"
                 />
                 <span className="w-6 text-right text-sm tabular-nums">{q.intensidade}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Input placeholder="Piora com..." value={q.fatores_piora} onChange={(e) => updateItem('dor_queixas', i, { fatores_piora: e.target.value }, a, set)} />
-                <Input placeholder="Melhora com..." value={q.fatores_melhora} onChange={(e) => updateItem('dor_queixas', i, { fatores_melhora: e.target.value }, a, set)} />
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={q.lesao_previa_regiao} onChange={(e) => updateItem('dor_queixas', i, { lesao_previa_regiao: e.target.checked }, a, set)} />
@@ -517,6 +519,40 @@ export function AnamneseCamadaB({
         >
           <MultiCheck options={RED_FLAGS} value={a.red_flags} onChange={(v) => set({ red_flags: v })} />
         </Field>
+
+        {/* Narrativa da dor (spec 1.2), no fim do bloco e só quando há queixa.
+            Dor não é só nocicepção: o que a pessoa entende sobre ela, o que já
+            tentou, o que deixou de fazer e o que teme mudam a conduta tanto
+            quanto a região dolorida. Perguntas abertas de propósito — em grade
+            de caixinhas essa informação não cabe. */}
+        {a.dor_queixas.length > 0 ? (
+          <>
+            <Field label="Conte com suas palavras a história da sua dor e como ela é.">
+              <textarea
+                rows={4}
+                className={controlClass}
+                value={a.dor_historia}
+                onChange={(e) => set({ dor_historia: e.target.value })}
+              />
+            </Field>
+            <Field label="Já tentou fazer algo pra resolver sua dor? O que funcionou e o que não funcionou? E o que costuma piorar e melhorar a sua dor?">
+              <textarea
+                rows={4}
+                className={controlClass}
+                value={a.dor_tentativas}
+                onChange={(e) => set({ dor_tentativas: e.target.value })}
+              />
+            </Field>
+            <Field label="Você deixa de fazer algo que considera importante por causa dessa dor? Qual seu maior medo em relação a ela?">
+              <textarea
+                rows={4}
+                className={controlClass}
+                value={a.dor_impacto_medo}
+                onChange={(e) => set({ dor_impacto_medo: e.target.value })}
+              />
+            </Field>
+          </>
+        ) : null}
       </Section>
 
       <Section title={isAluno ? 'Hábitos de vida' : 'B4. Hábitos de vida'}>

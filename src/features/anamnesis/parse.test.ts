@@ -73,6 +73,43 @@ describe('parseAnswers — payload hostil/malformado (fronteira anônima, v2.0)'
     expect(parseAnswers({ dor_queixas: [q] }).dor_queixas).toEqual([q])
   })
 
+  // A spec 1.2 tirou tempo de evolução e fatores do formulário e pôs três
+  // perguntas abertas no lugar. Registro gravado antes disso é PRONTUÁRIO: tem
+  // de continuar legível, com os campos antigos intactos.
+  it('anamnese das specs 1.0/1.1 continua legível com os campos antigos', () => {
+    const antiga = {
+      regiao: 'lombar',
+      intensidade: 7,
+      tempo_evolucao: 'cronica',
+      fatores_piora: 'ficar sentado',
+      fatores_melhora: 'caminhar',
+      lesao_previa_regiao: true,
+    }
+    const a = parseAnswers({ dor_queixas: [antiga] })
+    expect(a.dor_queixas[0]).toEqual(antiga)
+    // e os campos novos simplesmente não existem lá
+    expect(a.dor_historia).toBe('')
+  })
+
+  it('queixa da spec 1.2 dispensa os campos que saíram do formulário', () => {
+    const a = parseAnswers({
+      dor_queixas: [{ regiao: 'ombro_d', intensidade: 4, lesao_previa_regiao: false }],
+    })
+    expect(a.dor_queixas).toHaveLength(1)
+    expect(a.dor_queixas[0].regiao).toBe('ombro_d')
+  })
+
+  it('lê a narrativa da dor', () => {
+    const a = parseAnswers({
+      dor_historia: 'começou depois de uma mudança',
+      dor_tentativas: 'fisioterapia ajudou, remédio não',
+      dor_impacto_medo: 'parei de jogar bola; tenho medo de piorar',
+    })
+    expect(a.dor_historia).toContain('mudança')
+    expect(a.dor_tentativas).toContain('fisioterapia')
+    expect(a.dor_impacto_medo).toContain('medo')
+  })
+
   it('nunca lança, mesmo com payload absurdo', () => {
     expect(() => parseAnswers([1, 2, 3])).not.toThrow()
     expect(() => parseAnswers('lixo')).not.toThrow()

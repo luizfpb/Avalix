@@ -95,12 +95,33 @@ adesão (preferências e vetos).
 
 Crítico para o módulo postural. Repetível por região.
 
-Por queixa:
+Por queixa *(reduzido na spec 1.2 ao que uma máquina lê)*:
 - `regiao` — `enum` — cervical / ombro D / ombro E / dorsal / lombar / quadril D / quadril E / joelho D / joelho E / tornozelo-pé / cotovelo-punho / outra
 - `intensidade` — `vas` (0-10)
-- `tempo_evolucao` — `enum` — aguda (<6 sem) / subaguda (6-12 sem) / crônica (>12 sem)
-- `fatores_piora` — `text` ; `fatores_melhora` — `text`
 - `lesao_previa_regiao` — `bool`
+- `tempo_evolucao`, `fatores_piora`, `fatores_melhora` — **descontinuados na
+  spec 1.2**: saíram do formulário e viraram narrativa (abaixo). Continuam
+  sendo lidos e exibidos nos registros gravados em 1.0/1.1 — prontuário antigo
+  não perde informação por mudança de formulário.
+
+Os três campos que sobraram são exatamente os que `contraindications.ts` cruza
+com os exercícios do plano: a região localiza, e intensidade (>= 3) ou lesão
+prévia decidem se o sinal de revisão aparece para o profissional.
+
+**Narrativa da dor** *(spec 1.2, no FIM do bloco, condicional a haver queixa)* —
+a dor deixa de ser tratada como fenômeno puramente biológico. O que a pessoa
+entende sobre a própria dor, o que já tentou, o que deixou de fazer e o que teme
+mudam a conduta tanto quanto a região dolorida, e não cabem em grade de
+caixinhas. Perguntas abertas, com o texto exato exibido:
+
+- `dor_historia` — `text` — "Conte com suas palavras a história da sua dor e como ela é."
+- `dor_tentativas` — `text` — "Já tentou fazer algo pra resolver sua dor? O que funcionou e o que não funcionou? E o que costuma piorar e melhorar a sua dor?"
+- `dor_impacto_medo` — `text` — "Você deixa de fazer algo que considera importante por causa dessa dor? Qual seu maior medo em relação a ela?"
+
+No briefing de IA a narrativa vem ANTES da lista de regiões: um briefing é lido
+de cima para baixo, e enterrá-la no fim devolveria na prática o recorte que a
+1.2 abandonou. Nenhuma dessas respostas entra no gate — o gate continua sendo
+PAR-Q, sinais/sintomas, doença CMR, red flags e gestação.
 
 Histórico estruturado de lesões *(desde a spec 1.1)* — o que era só texto em
 cirurgias/queixas vira dado acionável:

@@ -155,14 +155,28 @@ function dorBlock(a: AnamnesisAnswers): string {
     return [
       `- Queixa ${i + 1} — ${regiao}`,
       `  - Intensidade (escala 0 a 10): ${q.intensidade ?? 0}`,
-      `  - Tempo de evolução: ${optionLabel(TEMPO_EVOLUCAO, q.tempo_evolucao) ?? 'não respondido'}`,
-      `  - Piora com: ${q.fatores_piora?.trim() || 'não respondido'}`,
-      `  - Melhora com: ${q.fatores_melhora?.trim() || 'não respondido'}`,
       `  - Lesão prévia nesta região: ${q.lesao_previa_regiao ? 'sim' : 'não'}`,
+      // registros das specs 1.0/1.1 têm estes campos; a partir da 1.2 a mesma
+      // informação vem na narrativa, em vez de em campos de uma linha
+      ...(q.tempo_evolucao
+        ? [`  - Tempo de evolução: ${optionLabel(TEMPO_EVOLUCAO, q.tempo_evolucao) ?? q.tempo_evolucao}`]
+        : []),
+      ...(q.fatores_piora?.trim() ? [`  - Piora com: ${q.fatores_piora.trim()}`] : []),
+      ...(q.fatores_melhora?.trim() ? [`  - Melhora com: ${q.fatores_melhora.trim()}`] : []),
     ]
   })
 
+  // A narrativa vai ANTES das listas: é o que contextualiza tudo o que vem
+  // depois, e num briefing lido de cima para baixo enterrar isso no fim
+  // devolveria o recorte puramente biológico que a spec 1.2 saiu de.
+  const narrativa = [
+    optionalLine('História da dor, nas palavras da pessoa', a.dor_historia),
+    optionalLine('O que já tentou, o que piora e o que melhora', a.dor_tentativas),
+    optionalLine('O que deixou de fazer por causa da dor, e o que teme', a.dor_impacto_medo),
+  ].filter(Boolean)
+
   return block('B3. DOR E SISTEMA MUSCULOESQUELÉTICO', [
+    ...narrativa,
     ...(queixas.length > 0 ? queixas : ['- Queixas de dor: nenhuma registrada']),
     multiLine('Lesões com diagnóstico médico/cirúrgico', LESOES, a.lesoes_diagnosticadas),
     optionalLine(

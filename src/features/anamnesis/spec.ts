@@ -6,7 +6,7 @@
 // 1.1: + motivação (B1), logística e preferências de treino (B1b), lesões
 // diagnosticadas (B3); historia_familiar_dcv vira enum com "não sei" (era
 // booleano na 1.0 — parseAnswers converte payloads antigos).
-export const SPEC_VERSION = '1.1'
+export const SPEC_VERSION = '1.2'
 
 export type Option = { value: string; label: string }
 
@@ -206,13 +206,24 @@ export const ALTERACAO_POSTURAL: Option[] = [
 // ---- Estruturas do payload --------------------------------------------
 export type Cirurgia = { descricao: string; ano: string; regiao: string }
 export type Medicamento = { nome: string; dose: string }
+// Onde dói, no mínimo que uma máquina precisa: a região é o que cruza com os
+// exercícios do plano (contraindications.ts), e intensidade/lesão prévia são o
+// que decide se o sinal aparece para o profissional revisar.
+//
+// O que ERA coletado em grade — tempo de evolução, "piora com", "melhora com" —
+// saiu do formulário na spec 1.2 e virou narrativa (dor_historia e
+// dor_tentativas, abaixo): a segunda pergunta aberta cobre piora/melhora com as
+// palavras da pessoa, que dizem mais do que dois campos de uma linha. Os campos
+// continuam OPCIONAIS no tipo porque anamneses gravadas nas versões 1.0 e 1.1
+// os têm, e prontuário antigo não pode virar ilegível.
 export type QueixaDor = {
   regiao: string
   intensidade: number
-  tempo_evolucao: string
-  fatores_piora: string
-  fatores_melhora: string
   lesao_previa_regiao: boolean
+  // preenchidos apenas em registros das specs 1.0/1.1
+  tempo_evolucao?: string
+  fatores_piora?: string
+  fatores_melhora?: string
 }
 
 export type AnamnesisAnswers = {
@@ -255,6 +266,13 @@ export type AnamnesisAnswers = {
   lesoes_diagnosticadas: string[]
   lesoes_estado_atual: string
   red_flags: string[]
+  // Narrativa da dor (spec 1.2). Dor não é só nocicepção: o que a pessoa
+  // entende, o que já tentou, o que deixou de fazer e o que teme mudam a
+  // conduta tanto quanto a região dolorida. Estas três respostas ficam no FIM
+  // do bloco, depois do rastreio de sinais de alerta.
+  dor_historia: string
+  dor_tentativas: string
+  dor_impacto_medo: string
   // B4
   atividade_tipo: string
   atividade_freq_semanal: string
@@ -317,6 +335,9 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     tabagismo_macos_ano: '',
     alcool: '',
     dor_queixas: [],
+    dor_historia: '',
+    dor_tentativas: '',
+    dor_impacto_medo: '',
     lesoes_diagnosticadas: [],
     lesoes_estado_atual: '',
     red_flags: [],

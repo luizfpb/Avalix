@@ -17,13 +17,16 @@ const zarr = z.array(z.string()).catch([])
 
 const cirurgiaSchema = z.object({ descricao: zs, ano: zs, regiao: zs })
 const medicamentoSchema = z.object({ nome: zs, dose: zs })
+// tempo_evolucao/fatores_* saíram do formulário na spec 1.2, mas continuam
+// sendo lidos: anamneses de 1.0/1.1 os têm gravados e precisam continuar
+// legíveis no resumo.
 const queixaDorSchema = z.object({
   regiao: zs,
   intensidade: z.number().catch(0),
+  lesao_previa_regiao: z.boolean().catch(false),
   tempo_evolucao: zs,
   fatores_piora: zs,
   fatores_melhora: zs,
-  lesao_previa_regiao: z.boolean().catch(false),
 })
 
 const answersSchema = z.object({
@@ -55,6 +58,9 @@ const answersSchema = z.object({
   tabagismo_macos_ano: zs,
   alcool: zs,
   dor_queixas: z.array(queixaDorSchema).catch([]),
+  dor_historia: zs,
+  dor_tentativas: zs,
+  dor_impacto_medo: zs,
   lesoes_diagnosticadas: zarr,
   lesoes_estado_atual: zs,
   red_flags: zarr,

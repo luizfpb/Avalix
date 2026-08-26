@@ -115,11 +115,23 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
           <Item
             key={`q${i}`}
             label={labelOf(REGIAO_DOR, q.regiao)}
-            value={`${q.intensidade}/10 · ${q.tempo_evolucao ? labelOf(TEMPO_EVOLUCAO, q.tempo_evolucao) : ''}${
-              q.lesao_previa_regiao ? ' · lesão prévia' : ''
-            }`}
+            // tempo de evolução e fatores saíram do formulário na spec 1.2, mas
+            // seguem exibidos quando o registro é anterior: prontuário antigo
+            // não pode perder informação por causa de mudança de formulário.
+            value={[
+              `${q.intensidade}/10`,
+              q.tempo_evolucao ? labelOf(TEMPO_EVOLUCAO, q.tempo_evolucao) : '',
+              q.lesao_previa_regiao ? 'lesão prévia' : '',
+              q.fatores_piora ? `piora: ${q.fatores_piora}` : '',
+              q.fatores_melhora ? `melhora: ${q.fatores_melhora}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           />
         ))}
+        <Item label="História da dor" value={a.dor_historia} />
+        <Item label="O que já tentou / piora e melhora" value={a.dor_tentativas} />
+        <Item label="Impacto e medo" value={a.dor_impacto_medo} />
         <Item label="Lesões diagnosticadas" value={labelsOf(LESOES, a.lesoes_diagnosticadas ?? [])} />
         <Item label="Estado das lesões" value={a.lesoes_estado_atual} />
         <Item label="Red flags" value={labelsOf(RED_FLAGS, a.red_flags ?? [])} />

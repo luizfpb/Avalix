@@ -77,6 +77,16 @@ export function anamneseCompleta(): AnamnesisAnswers {
       lesao_previa_regiao: true,
     },
   ]
+  // narrativa da dor (spec 1.2). A fixture mantém DE PROPÓSITO os campos antigos
+  // nas queixas acima: é assim que um registro real de 1.1 chega ao prompt, e o
+  // briefing tem de continuar carregando os dois.
+  a.dor_historia =
+    'comecou ha uns dois anos, depois que mudei de setor e passei a ficar mais tempo sentado; e uma dor que aperta e piora no fim do dia'
+  a.dor_tentativas =
+    'fiz fisioterapia por dois meses e ajudou bastante, anti-inflamatorio so tira na hora; piora quando fico parado e melhora quando caminho'
+  a.dor_impacto_medo =
+    'parei de jogar futebol com meus amigos no sabado; tenho medo de ter uma hernia e precisar operar'
+
   a.lesoes_diagnosticadas = ['menisco']
   a.lesoes_estado_atual = 'operei em 2019, médico liberou, mas às vezes trava'
 

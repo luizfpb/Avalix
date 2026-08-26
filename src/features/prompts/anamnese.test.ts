@@ -38,6 +38,17 @@ describe('buildAnamnesePrompt — completude', () => {
     expect(p).toContain('tem pressa pra começar, viagem em 3 meses')
   })
 
+  it('leva a narrativa da dor ao briefing, e antes da lista de regiões', () => {
+    // Um briefing é lido de cima para baixo. Enterrar a história, o que a
+    // pessoa já tentou e o que ela teme depois da lista de regiões devolveria
+    // o recorte puramente biológico que a spec 1.2 abandonou.
+    const p = prompt()
+    expect(p).toContain('mudei de setor')
+    expect(p).toContain('fisioterapia por dois meses e ajudou')
+    expect(p).toContain('medo de ter uma hernia')
+    expect(p.indexOf('mudei de setor')).toBeLessThan(p.indexOf('Queixa 1 — Lombar'))
+  })
+
   it('detalha cada queixa de dor com intensidade, evolução e fatores', () => {
     const p = prompt()
     expect(p).toContain('Queixa 1 — Lombar')
