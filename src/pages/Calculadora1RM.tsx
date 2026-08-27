@@ -7,7 +7,7 @@ export default function Calculadora1RM() {
     <div className="max-w-md space-y-5">
       <div>
         <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Configurações
+          ← Ajustes
         </Link>
         <h1 className="mt-2 text-xl font-semibold">Calculadora de carga (1RM)</h1>
         <p className="text-sm text-muted-foreground">

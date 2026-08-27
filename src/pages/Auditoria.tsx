@@ -59,7 +59,7 @@ export default function Auditoria() {
     return (
       <div className="space-y-3">
         <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Configurações
+          ← Ajustes
         </Link>
         <h1 className="text-xl font-semibold">Auditoria</h1>
         <p className="text-sm text-muted-foreground">
@@ -73,7 +73,7 @@ export default function Auditoria() {
     <div className="max-w-3xl space-y-6">
       <div>
         <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Configurações
+          ← Ajustes
         </Link>
         <h1 className="mt-2 text-xl font-semibold">Auditoria</h1>
         <p className="mt-1 text-sm text-muted-foreground">

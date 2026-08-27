@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { NavLink, Link, Outlet, useLocation } from 'react-router'
 import {
-  CalendarDays,
-  ClipboardList,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -45,8 +43,6 @@ export function AppShell() {
   const navItems: NavItem[] = useMemo(() => [
     { to: '/dashboard', label: 'Início', icon: LayoutDashboard },
     { to: '/avaliados', label: subjectLabel, icon: Users },
-    { to: '/carteira', label: 'Carteira', icon: ClipboardList },
-    { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/configuracoes', label: 'Ajustes', icon: Settings },
   ], [subjectLabel])
 
@@ -180,7 +176,10 @@ export function AppShell() {
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/92 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_30px_color-mix(in_oklab,var(--foreground)_6%,transparent)] backdrop-blur-xl lg:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/92 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_30px_color-mix(in_oklab,var(--foreground)_6%,transparent)] backdrop-blur-xl lg:hidden"
+        aria-label="Navegação principal"
+      >
         <div className="mx-auto flex max-w-xl">
           {navItems.map((item) => (
             <NavLink
