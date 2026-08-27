@@ -12,6 +12,11 @@ import { useAnamneses } from '../features/anamnesis/hooks'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { computeGate } from '../features/anamnesis/gate'
 import {
+  anamneseAlerta,
+  declaracaoFromAnswers,
+  liberacaoFromRow,
+} from '../features/anamnesis/clearance'
+import {
   useSubjectIntakes,
   useGenerateIntakeLink,
   useCancelIntake,
@@ -287,6 +292,7 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
                 ? {
                     assessedAt: anamneseRow.assessed_at,
                     answers: parseAnswers(anamneseRow.payload),
+                    liberacao: liberacaoFromRow(anamneseRow),
                   }
                 : null,
               points,
@@ -607,8 +613,16 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
       ) : items.length > 0 ? (
         <ul className="divide-y rounded-md border bg-card">
           {items.map((an) => {
-            const gate = computeGate(parseAnswers(an.payload))
-            const ok = gate.status === 'liberado'
+            // O badge mostra o estado ATUAL: a triagem cruzada com o parecer
+            // médico registrado sobre ela.
+            const answers = parseAnswers(an.payload)
+            const alerta = anamneseAlerta({
+              gate: computeGate(answers),
+              liberacao: liberacaoFromRow(an),
+              declaracao: declaracaoFromAnswers(answers),
+              assessedAt: an.assessed_at,
+              updatedAt: an.updated_at,
+            })
             return (
               <li key={an.id}>
                 <Link
@@ -616,13 +630,7 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
                   className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent"
                 >
                   <span>{formatDate(an.assessed_at)}</span>
-                  <Badge variant={gate.status === 'incompleto' ? 'secondary' : ok ? 'success' : 'warn'}>
-                    {gate.status === 'incompleto'
-                      ? 'Incompleta'
-                      : ok
-                        ? 'Liberado'
-                        : 'Encaminhamento'}
-                  </Badge>
+                  <Badge variant={alerta.badge.variant}>{alerta.badge.label}</Badge>
                 </Link>
               </li>
             )

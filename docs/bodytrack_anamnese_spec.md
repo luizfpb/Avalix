@@ -1,4 +1,4 @@
-# Anamnese Avalix — Especificação 1.3
+# Anamnese Avalix — Especificação 1.3 (+ A3, aditivo)
 
 Estrutura em duas camadas. **Camada A** é gate de segurança (decide liberação). **Camada B** é contexto de avaliação. Campos marcados `[gate]` alimentam a lógica de encaminhamento médico.
 
@@ -44,6 +44,15 @@ Quatro entradas, combinadas em matriz:
 | Sem doença, sem sintomas, **inativo** | Liberado para leve→moderada; progredir gradualmente |
 
 Saída: `nivel_encaminhamento ∈ {liberado, antes_vigorosa, antes_iniciar}`.
+
+### A3. Parecer médico recente (autorrelato) — **fora do gate**
+
+- `liberacao_declarada` — `bool` — "Nos últimos 12 meses, algum médico avaliou você e liberou a prática de exercícios físicos?"
+- `liberacao_declarada_em` — `date` opcional — só é perguntada depois de um "Sim".
+
+**Não** entra em `computeGate` nem nas colunas derivadas: autorrelato não é documento, e um campo que abrandasse a triagem sozinho seria a primeira coisa que alguém com pressa de treinar aprenderia a marcar. O que ela faz é mudar o aviso de "procure um médico" para "peça o documento e registre", e pré-preencher a data no card de liberação. A liberação com efeito é a registrada pelo profissional em `anamneses.liberacao_medica` (migration 0029).
+
+Acrescentada depois da spec 1.3 **sem bumpar `SPEC_VERSION`**: o campo é opcional e não é lido pelo gate, e `'1.3'` é contrato de banco em três pontos da 0028 (o trigger carimba, o submit e o aceite recusam outra versão) — bumpar exigiria migration e invalidaria todo link de anamnese já enviado a aluno. Payload sem o campo lê como "não respondido".
 
 ---
 
@@ -177,8 +186,10 @@ Estas indicam que o caso não é de treino e sim de avaliação médica. Para um
 
 ## Notas de implementação
 
+- **Desfecho da triagem (liberação médica):** desde a migration 0029 a anamnese guarda o parecer médico obtido DEPOIS dela (`liberacao_medica` + data, validade, observações, autor e carimbo). O parecer não altera as três colunas derivadas do payload — a triagem continua contando o que as respostas disseram; o que muda é o tom do aviso em cada tela, decidido por `clearance.ts`. Anamnese nova nasce sem parecer, e validade vencida devolve o aviso original.
 - **Lógica de gate centralizada:** o módulo TS puro calcula `liberado` / `nivel_encaminhamento` / `flag_encaminhamento` para feedback imediato e testes; desde a migration 0028, o banco valida A1/A2 e deriva as mesmas três colunas em trigger. O servidor é a autoridade de persistência.
 - **Versões da spec:** `SPEC_VERSION` em `spec.ts` (1.3 atual). A 1.3 acrescenta confirmações explícitas das duas listas A2 e transforma ausência de resposta em estado incompleto, nunca em “nenhum”. Payloads são jsonb; leitura SEMPRE via `parseAnswers()`, que completa/converte versões antigas para exibição. Salvar ou aceitar exige confirmação no formato vigente.
+- **O desfecho não aparece para quem responde:** desde a v2.10 nem a tela do profissional (`AnamneseNova`) mostra o resultado ao vivo — ele fica atrás de um "Ver resultado da triagem", fechado por padrão. Motivo: essa tela é usada com o aluno ao lado e às vezes é ele quem digita; ver "encaminhamento recomendado" surgir ao marcar um "Sim" ensina qual resposta produz qual desfecho, e a resposta seguinte deixa de ser honesta. Enquanto a triagem está incompleta aparece só a pendência de preenchimento, que é estado de formulário e não resultado clínico.
 - **Linguagem neutra pro aluno:** a página pública NUNCA exibe a mecânica do gate (siglas PAR-Q+/ACSM, "qualquer Sim retira a liberação", resultado da triagem) — isso induz resposta falsa de quem quer treinar. Títulos/descrições têm variante `isAluno` no `AnamneseForm`; o resultado só aparece pro personal (GateBox na revisão/detalhe). O termo LGPD segue declarando a finalidade.
 - **Persistência versionada:** anamnese muda ao longo do tempo (lesão nova, gravidez, medicação). Guarde por avaliação com `data_avaliacao`, não sobrescreva. Permite comparar reavaliações, que é metade do valor de um app de acompanhamento.
 - **Condicionais:** B6 só aparece por sexo; campos "se Sim → especificar" devem ser progressive disclosure para não inflar o formulário.

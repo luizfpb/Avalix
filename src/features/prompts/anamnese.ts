@@ -37,6 +37,7 @@ import {
   type AnamnesisAnswers,
 } from '../anamnesis/spec'
 import { computeGate, NIVEL_LABEL } from '../anamnesis/gate'
+import { resolveLiberacao, SEM_LIBERACAO, type Liberacao } from '../anamnesis/clearance'
 import { posturalEmphasis } from '../workout/contraindications'
 import { abbreviateName, ageAt, sexLabel, type PromptSubject } from './identity'
 import {
@@ -56,6 +57,7 @@ export type AnamnesePromptInput = {
   subject: PromptSubject
   assessedAt: string
   answers: AnamnesisAnswers
+  liberacao?: Liberacao
 }
 
 export function identificacaoBlock(subject: PromptSubject, referenceIso: string): string {
@@ -72,7 +74,7 @@ export function identificacaoBlock(subject: PromptSubject, referenceIso: string)
 // ACSM). Entra no prompt como resultado fechado justamente para a IA não
 // refazer a matriz por conta própria e chegar num nível diferente do que a tela
 // mostra ao profissional.
-export function triagemBlock(answers: AnamnesisAnswers): string {
+export function triagemBlock(answers: AnamnesisAnswers, liberacao?: Liberacao): string {
   const gate = computeGate(answers)
   const incomplete = gate.status === 'incompleto'
   return block('RESULTADO DA TRIAGEM — JÁ CALCULADO PELO SISTEMA', [
@@ -93,7 +95,45 @@ export function triagemBlock(answers: AnamnesisAnswers): string {
     ...(gate.motivos.length > 0
       ? ['- Motivos registrados pelo sistema:', ...gate.motivos.map((m) => `  - ${m}`)]
       : ['- Motivos registrados pelo sistema: nenhum']),
+    declaracaoLine(answers),
+    ...liberacaoLines(liberacao),
   ])
+}
+
+// Autorrelato do avaliado (A3). Entra rotulado como tal: é informação útil
+// para a conduta ("existe documento a pedir"), mas não é liberação, e a IA não
+// pode tratar as duas como a mesma coisa.
+function declaracaoLine(a: AnamnesisAnswers): string {
+  const rotulo = 'Avaliado declara liberação médica recente (autorrelato)'
+  if (a.liberacao_declarada === false) return line(rotulo, 'não')
+  if (a.liberacao_declarada !== true) return line(rotulo, null)
+  const quando = a.liberacao_declarada_em ? ` em ${fmtDate(a.liberacao_declarada_em)}` : ''
+  return line(rotulo, `sim${quando} — NÃO confirmado por documento`)
+}
+
+// Desfecho médico da triagem. Sem estas linhas a IA analisaria um
+// encaminhamento já resolvido como se ainda estivesse aberto — e devolveria
+// "encaminhe ao médico" para quem acabou de voltar dele.
+function liberacaoLines(liberacao?: Liberacao): (string | null)[] {
+  const l = resolveLiberacao(liberacao ?? SEM_LIBERACAO)
+  if (l.status === 'pendente') {
+    return ['- Parecer médico registrado depois da triagem: nenhum.']
+  }
+  const rotulo =
+    l.status === 'nao_liberado'
+      ? 'o médico avaliou e NÃO liberou a prática'
+      : l.vencida
+        ? `liberação médica ${l.status === 'liberado_com_restricoes' ? 'com restrições ' : ''}VENCIDA`
+        : l.status === 'liberado_com_restricoes'
+          ? 'liberado pelo médico, com restrições'
+          : 'liberado pelo médico'
+  return [
+    `- Parecer médico registrado depois da triagem: ${rotulo}.`,
+    line('Data do parecer', fmtDate(l.em)),
+    line('Validade do parecer', l.validade ? fmtDate(l.validade) : 'sem validade declarada'),
+    optionalLine('Restrições/observações do parecer', l.obs),
+    '- O parecer é fato registrado pelo profissional, não recalculável: trate-o como entrada fixa e leve-o em conta antes de sugerir qualquer encaminhamento.',
+  ]
 }
 
 function parqBlock(a: AnamnesisAnswers): string {
@@ -341,12 +381,12 @@ Responda nesta ordem, com estes títulos:
    sustentar decisão, e o que seria preciso coletar.`
 
 export function buildAnamnesePrompt(input: AnamnesePromptInput): string {
-  const { subject, assessedAt, answers } = input
+  const { subject, assessedAt, answers, liberacao } = input
   return joinBlocks([
     PAPEL,
     `MATERIAL: anamnese e triagem de prontidão registradas em ${fmtDate(assessedAt)}.`,
     identificacaoBlock(subject, assessedAt),
-    triagemBlock(answers),
+    triagemBlock(answers, liberacao),
     ...respostasBlocks(answers, subject.sex),
     sinaisBlock(answers),
     TAREFA,

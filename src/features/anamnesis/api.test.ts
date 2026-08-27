@@ -16,7 +16,7 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-import { updateAnamnese } from './api'
+import { setLiberacaoMedica, updateAnamnese } from './api'
 import { emptyAnamnesis, PARQ_ITEMS, SPEC_VERSION } from './spec'
 import type { AnamnesisAnswers } from './spec'
 
@@ -113,5 +113,75 @@ describe('updateAnamnese', () => {
       })
     ).rejects.toThrow(/Triagem incompleta/)
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+})
+
+// O parecer médico é um fato separado da triagem: registrar não pode reescrever
+// as colunas derivadas do payload, nem carimbar autoria pelo cliente (o
+// servidor faz isso na 0029).
+describe('setLiberacaoMedica', () => {
+  it('grava só o bloco do parecer', async () => {
+    await setLiberacaoMedica('an-1', {
+      status: 'liberado_com_restricoes',
+      em: '2026-08-20',
+      validade: '2027-02-20',
+      obs: '  Sem carga axial pesada  ',
+    })
+
+    const row = updatedRow()
+    expect(row).toEqual({
+      liberacao_medica: 'liberado_com_restricoes',
+      liberacao_medica_em: '2026-08-20',
+      liberacao_medica_validade: '2027-02-20',
+      liberacao_medica_obs: 'Sem carga axial pesada',
+    })
+    expect(mocks.eq).toHaveBeenCalledWith('id', 'an-1')
+  })
+
+  it('retirar o registro zera o bloco inteiro', async () => {
+    await setLiberacaoMedica('an-1', {
+      status: 'pendente',
+      em: '2026-08-20',
+      validade: '2027-02-20',
+      obs: 'ignorado',
+    })
+
+    expect(updatedRow()).toEqual({
+      liberacao_medica: 'pendente',
+      liberacao_medica_em: null,
+      liberacao_medica_validade: null,
+      liberacao_medica_obs: null,
+    })
+  })
+
+  it('registro inválido não chega ao servidor', async () => {
+    await expect(
+      setLiberacaoMedica('an-1', {
+        status: 'liberado',
+        em: null,
+        validade: null,
+        obs: null,
+      })
+    ).rejects.toThrow(/data do parecer/)
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('mensagem do trigger vira texto em pt-BR', async () => {
+    mocks.single.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'P0001',
+        message: 'consentimento revogado: nao e possivel registrar parecer medico novo',
+      },
+    })
+
+    await expect(
+      setLiberacaoMedica('an-1', {
+        status: 'liberado',
+        em: '2026-08-20',
+        validade: null,
+        obs: null,
+      })
+    ).rejects.toThrow(/consentimento deste avaliado está revogado/)
   })
 })

@@ -176,6 +176,12 @@ export type Database = {
           evaluator_id: string
           flag_encaminhamento: boolean
           id: string
+          liberacao_medica: string
+          liberacao_medica_em: string | null
+          liberacao_medica_obs: string | null
+          liberacao_medica_por: string | null
+          liberacao_medica_registrada_em: string | null
+          liberacao_medica_validade: string | null
           liberado: boolean
           nivel_encaminhamento: string
           org_id: string
@@ -190,6 +196,12 @@ export type Database = {
           evaluator_id?: string
           flag_encaminhamento: boolean
           id?: string
+          liberacao_medica?: string
+          liberacao_medica_em?: string | null
+          liberacao_medica_obs?: string | null
+          liberacao_medica_por?: string | null
+          liberacao_medica_registrada_em?: string | null
+          liberacao_medica_validade?: string | null
           liberado: boolean
           nivel_encaminhamento: string
           org_id: string
@@ -204,6 +216,12 @@ export type Database = {
           evaluator_id?: string
           flag_encaminhamento?: boolean
           id?: string
+          liberacao_medica?: string
+          liberacao_medica_em?: string | null
+          liberacao_medica_obs?: string | null
+          liberacao_medica_por?: string | null
+          liberacao_medica_registrada_em?: string | null
+          liberacao_medica_validade?: string | null
           liberado?: boolean
           nivel_encaminhamento?: string
           org_id?: string
@@ -216,6 +234,13 @@ export type Database = {
           {
             foreignKeyName: "anamneses_evaluator_id_fkey"
             columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamneses_liberacao_medica_por_fkey"
+            columns: ["liberacao_medica_por"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

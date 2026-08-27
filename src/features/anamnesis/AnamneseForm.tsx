@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useId, type ReactNode } from 'react'
-import { Plus, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import {
   PARQ_ITEMS,
   DOENCA_CMR,
@@ -27,6 +27,14 @@ import {
   type Option,
 } from './spec'
 import { NIVEL_LABEL, type computeGate } from './gate'
+import {
+  anamneseAlerta,
+  ALERTA_CLASSES,
+  ALERTA_ICON_CLASSES,
+  type Declaracao,
+  type Liberacao,
+} from './clearance'
+import { ALERTA_ICONE } from './alertaIcone'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -391,6 +399,52 @@ export function AnamneseCamadaA({
           />
         </Field>
       </Section>
+
+      {/* A3 — autorrelato, fora do gate. Para o aluno a pergunta é sobre um
+          fato ("um médico te liberou?"), não sobre o resultado da triagem:
+          quem responde não fica sabendo que ela abranda aviso nenhum. Ela não
+          abranda mesmo — só avisa o profissional de que existe documento a
+          pedir. */}
+      <Section
+        title={isAluno ? 'Acompanhamento médico' : 'A3. Parecer médico recente (autorrelato)'}
+        desc={
+          isAluno
+            ? 'Se você já passou por avaliação médica, conte aqui.'
+            : 'Declaração do avaliado. Não entra no cálculo da triagem; a liberação vale quando você registra o parecer.'
+        }
+      >
+        <Row
+          label={
+            isAluno
+              ? 'Nos últimos 12 meses, algum médico avaliou você e liberou a prática de exercícios físicos?'
+              : 'Declara liberação médica nos últimos 12 meses?'
+          }
+        >
+          <YesNo
+            value={a.liberacao_declarada}
+            onChange={(v) =>
+              set({
+                liberacao_declarada: v,
+                ...(v ? null : { liberacao_declarada_em: '' }),
+              })
+            }
+          />
+        </Row>
+        {a.liberacao_declarada === true ? (
+          <Field label={isAluno ? 'Quando foi? (se lembrar a data)' : 'Data declarada (opcional)'}>
+            <Input
+              type="date"
+              value={a.liberacao_declarada_em}
+              onChange={(e) => set({ liberacao_declarada_em: e.target.value })}
+            />
+          </Field>
+        ) : null}
+        {isAluno && a.liberacao_declarada === true ? (
+          <p className="text-xs text-muted-foreground">
+            Leve o documento no seu primeiro atendimento, se tiver.
+          </p>
+        ) : null}
+      </Section>
     </>
   )
 }
@@ -738,33 +792,34 @@ export function AnamneseCamadaB({
 }
 
 // ---- caixa do gate (resultado da triagem) -----------------------------
-export function GateBox({ gate }: { gate: ReturnType<typeof computeGate> }) {
+// Mostra a triagem e, quando existe, o parecer médico registrado sobre ela.
+// Com parecer vigente o tom muda e a mecânica da triagem (nível ACSM e
+// motivos) sai da frente para dentro de um "ver detalhes": continua acessível
+// para quem precisa conferir, sem repetir um alarme já respondido.
+export function GateBox({
+  gate,
+  liberacao,
+  declaracao,
+  assessedAt,
+  updatedAt,
+}: {
+  gate: ReturnType<typeof computeGate>
+  liberacao?: Liberacao
+  declaracao?: Declaracao
+  assessedAt?: string | null
+  updatedAt?: string | null
+}) {
+  const alerta = anamneseAlerta({ gate, liberacao, declaracao, assessedAt, updatedAt })
   const incomplete = gate.status === 'incompleto'
-  const ok = gate.status === 'liberado'
-  return (
-    <div
-      className={[
-        'rounded-md border p-4',
-        ok ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10',
-      ].join(' ')}
-    >
-      <div className="flex items-center gap-2">
-        {ok ? (
-          <ShieldCheck className="size-5 text-success" />
-        ) : (
-          <AlertTriangle className="size-5 text-warning" />
-        )}
-        <span className="font-medium">
-          {incomplete
-            ? 'Triagem incompleta — liberação não calculada'
-            : ok
-              ? 'Liberado para avaliação'
-              : 'Atenção: encaminhamento recomendado'}
-        </span>
-      </div>
+  const Icon = ALERTA_ICONE[alerta.nivel]
+  const detalhesTriagem = (
+    <>
       {incomplete ? null : (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nível ACSM: <span className="font-medium text-foreground">{NIVEL_LABEL[gate.nivelEncaminhamento]}</span>
+        <p className="text-sm text-muted-foreground">
+          Nível ACSM:{' '}
+          <span className="font-medium text-foreground">
+            {NIVEL_LABEL[gate.nivelEncaminhamento]}
+          </span>
         </p>
       )}
       {gate.motivos.length > 0 ? (
@@ -774,6 +829,42 @@ export function GateBox({ gate }: { gate: ReturnType<typeof computeGate> }) {
           ))}
         </ul>
       ) : null}
+    </>
+  )
+
+  return (
+    <div className={['rounded-md border p-4', ALERTA_CLASSES[alerta.nivel]].join(' ')}>
+      <div className="flex items-center gap-2">
+        <Icon className={`size-5 ${ALERTA_ICON_CLASSES[alerta.nivel]}`} />
+        <span className="font-medium">{alerta.titulo}</span>
+      </div>
+
+      {alerta.linhas.map((linha, i) => (
+        <p key={i} className="mt-1 text-sm">
+          {linha}
+        </p>
+      ))}
+
+      {alerta.ressalvas.map((r, i) => (
+        <p key={i} className="mt-1 text-xs text-muted-foreground">
+          {r}
+        </p>
+      ))}
+
+      {/* Recolher só faz sentido quando a triagem apontou algo e o parecer já
+          respondeu: numa triagem limpa não há o que esconder atrás de um
+          botão, e o nível continua à vista como sempre esteve. */}
+      {!alerta.destacarMotivos && alerta.pedeLiberacao ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+            O que a triagem apontou
+          </summary>
+          <div className="mt-2">{detalhesTriagem}</div>
+        </details>
+      ) : (
+        <div className="mt-1">{detalhesTriagem}</div>
+      )}
+
       <p className="mt-2 text-xs text-muted-foreground">
         Triagem baseada no PAR-Q+ e nas diretrizes de pré-participação do ACSM (redação própria). Não
         substitui avaliação médica.

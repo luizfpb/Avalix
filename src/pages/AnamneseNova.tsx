@@ -5,6 +5,7 @@ import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
 import { useAnamnese, useCreateAnamnese, useUpdateAnamnese } from '../features/anamnesis/hooks'
 import { computeGate } from '../features/anamnesis/gate'
+import { declaracaoFromAnswers } from '../features/anamnesis/clearance'
 import { AnamneseCamadaA, AnamneseCamadaB, GateBox } from '../features/anamnesis/AnamneseForm'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
@@ -189,7 +190,32 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
       </div>
 
       <AnamneseCamadaA a={a} set={set} />
-      <GateBox gate={gate} />
+
+      {/* O resultado da triagem não fica aberto enquanto se responde. Esta
+          tela é usada com o aluno ao lado (e às vezes é ele quem digita): ver
+          "encaminhamento recomendado" surgir ao marcar um "Sim" ensina qual
+          resposta produz qual desfecho, e a próxima resposta deixa de ser
+          honesta. É o mesmo motivo pelo qual a página pública nunca mostrou o
+          gate. Incompleta, aparece só a pendência de preenchimento — que é
+          estado do formulário, não resultado clínico. */}
+      {gate.status === 'incompleto' ? (
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+          Triagem incompleta — responda todos os itens das seções A1 e A2 para salvar.
+        </p>
+      ) : (
+        <details className="rounded-md border bg-card p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Ver resultado da triagem
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              só para você — não mostre ao aluno enquanto ele responde
+            </span>
+          </summary>
+          <div className="mt-3">
+            <GateBox gate={gate} declaracao={declaracaoFromAnswers(a)} />
+          </div>
+        </details>
+      )}
+
       <AnamneseCamadaB a={a} set={set} isFemale={isFemale} />
 
       <div className="space-y-2 rounded-md border p-4">

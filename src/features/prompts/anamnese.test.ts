@@ -135,6 +135,76 @@ describe('buildAnamnesePrompt — triagem como entrada fixa', () => {
     expect(p).toContain('Liberado na triagem: não calculado')
     expect(p).toContain('Nível de encaminhamento: não calculado')
   })
+
+  // Sem estas linhas a IA leria um encaminhamento já resolvido como aberto e
+  // devolveria "procure um médico" para quem acabou de voltar de um.
+  it('declara explicitamente quando não há parecer médico registrado', () => {
+    expect(prompt()).toContain('Parecer médico registrado depois da triagem: nenhum.')
+  })
+
+  it('separa autorrelato de parecer registrado', () => {
+    expect(prompt()).toContain(
+      'Avaliado declara liberação médica recente (autorrelato): não respondido'
+    )
+    expect(
+      prompt({ ...anamneseCompleta(), liberacao_declarada: true, liberacao_declarada_em: '2026-07-10' })
+    ).toContain(
+      'Avaliado declara liberação médica recente (autorrelato): sim em 10/07/2026 — NÃO confirmado por documento'
+    )
+  })
+
+  it('publica o parecer registrado como entrada fixa', () => {
+    const p = buildAnamnesePrompt({
+      subject: SUBJECT,
+      assessedAt: '2026-08-20',
+      answers: anamneseCompleta(),
+      liberacao: {
+        status: 'liberado_com_restricoes',
+        em: '2026-08-25',
+        validade: '2027-02-25',
+        obs: 'Sem exercício vigoroso por 60 dias',
+        registradaEm: '2026-08-25T12:00:00.000Z',
+      },
+    })
+    expect(p).toContain('Parecer médico registrado depois da triagem: liberado pelo médico, com restrições.')
+    expect(p).toContain('Data do parecer: 25/08/2026')
+    expect(p).toContain('Validade do parecer: 25/02/2027')
+    expect(p).toContain('Restrições/observações do parecer: Sem exercício vigoroso por 60 dias')
+    expect(p).toContain('trate-o como entrada fixa')
+  })
+
+  it('parecer vencido não é publicado como liberação vigente', () => {
+    const p = buildAnamnesePrompt({
+      subject: SUBJECT,
+      assessedAt: '2026-08-20',
+      answers: anamneseCompleta(),
+      liberacao: {
+        status: 'liberado',
+        em: '2020-01-01',
+        validade: '2020-06-01',
+        obs: null,
+        registradaEm: '2020-01-02T12:00:00.000Z',
+      },
+    })
+    expect(p).toContain('Parecer médico registrado depois da triagem: liberação médica VENCIDA.')
+  })
+
+  it('recusa médica aparece em letras próprias', () => {
+    const p = buildAnamnesePrompt({
+      subject: SUBJECT,
+      assessedAt: '2026-08-20',
+      answers: anamneseCompleta(),
+      liberacao: {
+        status: 'nao_liberado',
+        em: '2026-08-25',
+        validade: null,
+        obs: 'Reavaliar em 90 dias',
+        registradaEm: '2026-08-25T12:00:00.000Z',
+      },
+    })
+    expect(p).toContain('o médico avaliou e NÃO liberou a prática')
+    expect(p).toContain('Validade do parecer: sem validade declarada')
+  })
 })
 
 describe('buildAnamnesePrompt — blocos condicionais', () => {

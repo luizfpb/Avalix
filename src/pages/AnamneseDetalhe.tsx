@@ -2,6 +2,8 @@ import { Link, useParams } from 'react-router'
 import { Pencil } from 'lucide-react'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
+import { LiberacaoMedicaCard } from '../features/anamnesis/LiberacaoMedicaCard'
+import { liberacaoFromRow } from '../features/anamnesis/clearance'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { useSubject } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
@@ -83,6 +85,7 @@ export default function AnamneseDetalhe() {
               },
               assessedAt: row.assessed_at,
               answers: a,
+              liberacao: liberacaoFromRow(row),
             })
           }
           onCopied={() => {
@@ -98,7 +101,15 @@ export default function AnamneseDetalhe() {
         />
       ) : null}
 
-      <AnamneseResumo answers={a} />
+      <AnamneseResumo
+        answers={a}
+        liberacao={liberacaoFromRow(row)}
+        assessedAt={row.assessed_at}
+        updatedAt={row.updated_at}
+        afterGate={
+          id ? <LiberacaoMedicaCard subjectId={id} anamnese={row} answers={a} /> : null
+        }
+      />
     </div>
   )
 }

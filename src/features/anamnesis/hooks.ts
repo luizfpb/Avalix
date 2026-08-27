@@ -3,10 +3,12 @@ import {
   createAnamnese,
   getAnamnese,
   listAnamneses,
+  setLiberacaoMedica,
   updateAnamnese,
   type CreateAnamneseInput,
   type UpdateAnamneseInput,
 } from './api'
+import type { LiberacaoInput } from './clearance'
 
 export function useAnamneses(subjectId: string | undefined) {
   return useQuery({
@@ -38,6 +40,19 @@ export function useUpdateAnamnese(subjectId: string | undefined, id: string | un
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: UpdateAnamneseInput) => updateAnamnese(id as string, input),
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: ['anamneses', subjectId] })
+      qc.invalidateQueries({ queryKey: ['anamnese', row.id] })
+    },
+  })
+}
+
+// Parecer médico: invalida as mesmas duas chaves da edição, porque o registro
+// muda o tom do aviso no detalhe, no badge do perfil e no banner do builder.
+export function useSetLiberacaoMedica(subjectId: string | undefined, id: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: LiberacaoInput) => setLiberacaoMedica(id as string, input),
     onSuccess: (row) => {
       qc.invalidateQueries({ queryKey: ['anamneses', subjectId] })
       qc.invalidateQueries({ queryKey: ['anamnese', row.id] })

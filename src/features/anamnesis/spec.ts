@@ -8,6 +8,13 @@
 // booleano na 1.0 — parseAnswers converte payloads antigos).
 // 1.3: + confirmação explícita das duas listas da camada A2; array vazio sem
 // confirmação volta a significar pergunta não respondida, nunca ausência.
+//
+// A3 (liberacao_declarada) entrou DEPOIS da 1.3 sem bumpar a versão, e isso é
+// deliberado: o campo é opcional, não é lido pelo gate, e '1.3' é contrato de
+// banco em três pontos da migration 0028 (o trigger carimba, o submit e o
+// aceite recusam outra versão). Bumpar exigiria migration e invalidaria TODO
+// link de anamnese já enviado a aluno — preço alto para uma pergunta que não
+// muda a matriz. Payload sem o campo lê como "não respondido" e nada abranda.
 export const SPEC_VERSION = '1.3'
 
 export type Option = { value: string; label: string }
@@ -241,6 +248,14 @@ export type AnamnesisAnswers = {
   doenca_cmr_confirmada: boolean
   sinais_sintomas: string[]
   sinais_sintomas_confirmados: boolean
+  // A3 — o que o PRÓPRIO avaliado declara sobre parecer médico recente. NÃO
+  // entra no gate (computeGate nem lê): autorrelato não é documento, e um
+  // campo que abrandasse a triagem sozinho seria a primeira coisa que alguém
+  // com pressa de treinar aprenderia a marcar. Serve para o profissional saber
+  // que existe um papel a pedir; a liberação de verdade é registrada por ele
+  // em anamneses.liberacao_medica (migration 0029).
+  liberacao_declarada: boolean | null
+  liberacao_declarada_em: string
   // B1
   objetivo_principal: string[]
   objetivo_motivo: string
@@ -321,6 +336,8 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     doenca_cmr_confirmada: false,
     sinais_sintomas: [],
     sinais_sintomas_confirmados: false,
+    liberacao_declarada: null,
+    liberacao_declarada_em: '',
     objetivo_principal: [],
     objetivo_motivo: '',
     objetivo_6meses: '',

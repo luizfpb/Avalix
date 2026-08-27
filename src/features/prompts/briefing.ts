@@ -11,6 +11,7 @@
 // em quem disse querer hipertrofia.
 
 import type { AnamnesisAnswers } from '../anamnesis/spec'
+import type { Liberacao } from '../anamnesis/clearance'
 import { identificacaoBlock, respostasBlocks, sinaisBlock, triagemBlock } from './anamnese'
 import {
   circunferenciasBlock,
@@ -27,7 +28,7 @@ import { FECHAMENTO, PAPEL, REGRAS_DE_RIGOR } from './guardrails'
 
 export type BriefingPromptInput = {
   subject: PromptSubject
-  anamnese: { assessedAt: string; answers: AnamnesisAnswers } | null
+  anamnese: { assessedAt: string; answers: AnamnesisAnswers; liberacao?: Liberacao } | null
   // ordem cronológica ascendente; pode vir vazia
   points: AssessmentPromptPoint[]
   skinfolds?: SkinfoldReading[]
@@ -102,7 +103,7 @@ export function buildBriefingPrompt(input: BriefingPromptInput): string {
     PAPEL,
     `MATERIAL: briefing para revisão de conduta — ${materialParts.join(' e ')}. As duas fontes vêm do mesmo avaliado e devem ser lidas em conjunto.`,
     identificacaoBlock(subject, referencia),
-    anamnese ? triagemBlock(anamnese.answers) : null,
+    anamnese ? triagemBlock(anamnese.answers, anamnese.liberacao) : null,
     ...(anamnese ? respostasBlocks(anamnese.answers, subject.sex) : []),
     anamnese ? sinaisBlock(anamnese.answers) : null,
     ultima ? resultadoBlock(ultima, subject) : null,

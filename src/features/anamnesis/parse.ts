@@ -38,6 +38,8 @@ const answersSchema = z.object({
   doenca_cmr_confirmada: z.boolean().catch(false),
   sinais_sintomas: zarr,
   sinais_sintomas_confirmados: z.boolean().catch(false),
+  liberacao_declarada: zbn,
+  liberacao_declarada_em: zs,
   objetivo_principal: zarr,
   objetivo_motivo: zs,
   objetivo_6meses: zs,

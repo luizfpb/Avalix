@@ -25,6 +25,7 @@ import {
 } from './spec'
 import { computeGate } from './gate'
 import { GateBox } from './AnamneseForm'
+import { declaracaoFromAnswers, formatDataBr, type Liberacao } from './clearance'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 // Resumo read-only das respostas + resultado da triagem. Usado na tela de
@@ -60,14 +61,37 @@ function Item({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
+export function AnamneseResumo({
+  answers: a,
+  liberacao,
+  assessedAt,
+  updatedAt,
+  afterGate,
+}: {
+  answers: AnamnesisAnswers
+  // Só o detalhe de uma anamnese salva tem parecer médico; a revisão de um
+  // intake pendente ainda não virou registro.
+  liberacao?: Liberacao
+  assessedAt?: string | null
+  updatedAt?: string | null
+  // slot logo abaixo do resultado da triagem, onde mora a ação que responde a
+  // ele (registrar a liberação médica)
+  afterGate?: ReactNode
+}) {
   const gate = computeGate(a)
   const parqYes = PARQ_ITEMS.filter((i) => a.parq?.[i.key] === true)
   const parqMissing = PARQ_ITEMS.filter((i) => typeof a.parq?.[i.key] !== 'boolean')
 
   return (
     <div className="space-y-5">
-      <GateBox gate={gate} />
+      <GateBox
+        gate={gate}
+        liberacao={liberacao}
+        declaracao={declaracaoFromAnswers(a)}
+        assessedAt={assessedAt}
+        updatedAt={updatedAt}
+      />
+      {afterGate}
 
       <Block title="Triagem (PAR-Q+)">
         {parqMissing.length > 0 ? (
@@ -95,6 +119,16 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
             a.sinais_sintomas ?? [],
             a.sinais_sintomas_confirmados
           )}
+        />
+        <Item
+          label="Declara liberação médica recente"
+          value={
+            a.liberacao_declarada === true
+              ? `Sim${a.liberacao_declarada_em ? ` · ${formatDataBr(a.liberacao_declarada_em)}` : ''} (autorrelato)`
+              : a.liberacao_declarada === false
+                ? 'Não'
+                : 'Não respondido'
+          }
         />
       </Block>
 

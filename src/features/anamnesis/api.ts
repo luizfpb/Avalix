@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase'
 import type { Database, Json } from '../../lib/database.types'
 import type { AnamnesisAnswers } from './spec'
 import { assertGateComplete } from './gate'
+import { validarLiberacao, type LiberacaoInput } from './clearance'
 import { SPEC_VERSION } from './spec'
 
 export type AnamneseRow = Database['public']['Tables']['anamneses']['Row']
@@ -71,6 +72,69 @@ export async function updateAnamnese(
     throw new Error('Esta anamnese não está mais disponível para edição. Recarregue a página.')
   }
   if (error) throw error
+  return data
+}
+
+// As mensagens dos triggers vêm em ASCII (convenção das migrations, para o
+// SQL Editor não depender de codificação); a versão que o profissional lê sai
+// daqui. A validação do cliente já barra quase tudo antes de sair — o que
+// sobra é o que só o servidor sabe, como consentimento revogado.
+const ERROS_LIBERACAO: Record<string, string> = {
+  'consentimento revogado: nao e possivel registrar parecer medico novo':
+    'O consentimento deste avaliado está revogado — não é possível registrar um parecer novo. Retirar o registro atual continua permitido.',
+  'informe a data do parecer medico': 'Informe a data do parecer médico.',
+  'a data do parecer medico nao pode estar no futuro':
+    'A data do parecer não pode estar no futuro.',
+  'a validade do parecer nao pode ser anterior a data dele':
+    'A validade não pode ser anterior à data do parecer.',
+  'descreva as restricoes indicadas pelo medico':
+    'Descreva as restrições indicadas pelo médico.',
+  'observacoes do parecer excedem 2000 caracteres':
+    'As observações do parecer passam de 2000 caracteres.',
+  'sessao invalida para registrar parecer medico':
+    'Sessão expirada. Entre de novo para registrar o parecer.',
+}
+
+// Registra, corrige ou retira (status 'pendente') o parecer médico sobre uma
+// anamnese. As colunas da triagem NÃO entram no update: elas descrevem as
+// respostas e continuam derivadas do payload pelo banco. Autoria e carimbo são
+// escritos pelo servidor (migration 0029) e por isso não são enviados daqui.
+export async function setLiberacaoMedica(
+  id: string,
+  input: LiberacaoInput
+): Promise<AnamneseRow> {
+  const invalido = validarLiberacao(input)
+  if (invalido) throw new Error(invalido)
+
+  const registro =
+    input.status === 'pendente'
+      ? {
+          liberacao_medica: 'pendente',
+          liberacao_medica_em: null,
+          liberacao_medica_validade: null,
+          liberacao_medica_obs: null,
+        }
+      : {
+          liberacao_medica: input.status,
+          liberacao_medica_em: input.em,
+          liberacao_medica_validade: input.validade || null,
+          liberacao_medica_obs: (input.obs ?? '').trim() || null,
+        }
+
+  const { data, error } = await supabase
+    .from('anamneses')
+    .update(registro)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error?.code === 'PGRST116') {
+    throw new Error('Esta anamnese não está mais disponível para edição. Recarregue a página.')
+  }
+  if (error) {
+    const traduzido = ERROS_LIBERACAO[(error.message ?? '').trim()]
+    if (traduzido) throw new Error(traduzido)
+    throw error
+  }
   return data
 }
 

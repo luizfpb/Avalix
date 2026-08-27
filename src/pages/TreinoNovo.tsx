@@ -476,20 +476,18 @@ function Builder({
       <AnamneseFlag subjectId={subjectId} />
 
       {totalCautions > 0 || posturalNotes.length > 0 ? (
-        <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-400/30 dark:bg-amber-400/10">
-          <p className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
-            <AlertTriangle className="size-4" /> Atenção pela anamnese
+        <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="size-4 text-warning" /> Atenção pela anamnese
           </p>
           {totalCautions > 0 ? (
-            <p className="text-amber-900 dark:text-amber-100">
+            <p>
               {totalCautions} exercício{totalCautions > 1 ? 's' : ''} deste plano merece
               {totalCautions > 1 ? 'm' : ''} revisão pela queixa do aluno (marcados com ⚠ abaixo).
             </p>
           ) : null}
           {posturalNotes.map((n, i) => (
-            <p key={i} className="text-amber-900 dark:text-amber-100">
-              {n}
-            </p>
+            <p key={i}>{n}</p>
           ))}
         </div>
       ) : null}

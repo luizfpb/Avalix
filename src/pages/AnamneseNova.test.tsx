@@ -123,6 +123,51 @@ describe('AnamneseNova — edição', () => {
     expect(updateMock.mock.calls[0][0].answers.parq[PARQ_ITEMS[0].key]).toBe(true)
   })
 
+  // Quem responde costuma estar olhando esta tela. Ver "encaminhamento
+  // recomendado" surgir ao marcar um "Sim" ensina qual resposta produz qual
+  // desfecho — e a próxima resposta deixa de ser honesta.
+  it('o resultado da triagem não fica aberto enquanto se responde', () => {
+    useAnamneseMock.mockReturnValue({
+      data: anamneseFixture({
+        payload: { ...answersFixture(), parq: { ...answersFixture().parq, cardio_dx: true } },
+      }),
+      isPending: false,
+      isError: false,
+    })
+    renderPage('/avaliados/s1/anamnese/an1/editar')
+
+    const resumo = screen.getByText('Ver resultado da triagem')
+    const box = resumo.closest('details') as HTMLDetailsElement
+    expect(box.open).toBe(false)
+
+    // o conteúdo só é revelado por um clique deliberado de quem prescreve
+    fireEvent.click(resumo)
+    expect(screen.getByText('Atenção: encaminhamento recomendado')).toBeTruthy()
+  })
+
+  it('triagem incompleta mostra a pendência de preenchimento, não o desfecho', () => {
+    renderPage('/avaliados/s1/anamnese/nova')
+
+    expect(screen.getByText(/Triagem incompleta — responda todos os itens/)).toBeTruthy()
+    expect(screen.queryByText('Ver resultado da triagem')).toBeNull()
+    expect(screen.queryByText(/encaminhamento recomendado/)).toBeNull()
+    expect(screen.queryByText(/Nível ACSM/)).toBeNull()
+  })
+
+  it('a pergunta sobre parecer médico recente entra no payload salvo', async () => {
+    useAnamneseMock.mockReturnValue({ data: anamneseFixture(), isPending: false, isError: false })
+    renderPage('/avaliados/s1/anamnese/an1/editar')
+
+    const grupo = screen.getByRole('group', {
+      name: 'Declara liberação médica nos últimos 12 meses?',
+    })
+    fireEvent.click(grupo.querySelector('button') as HTMLButtonElement)
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1))
+    expect(updateMock.mock.calls[0][0].answers.liberacao_declarada).toBe(true)
+  })
+
   it('anamnese de outro avaliado na URL não abre para edição', () => {
     useAnamneseMock.mockReturnValue({
       data: anamneseFixture({ subject_id: 's-outro' }),

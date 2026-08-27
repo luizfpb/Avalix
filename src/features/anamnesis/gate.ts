@@ -103,6 +103,33 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
   }
 }
 
+// Resumo do gate como ele foi PERSISTIDO. Desde a 0028 o banco é a autoridade
+// das três colunas, então quem já tem a linha lê daí em vez de recalcular do
+// payload; quem só tem as respostas (formulário ao vivo, revisão de intake)
+// continua usando computeGate. Uma linha salva nunca está incompleta — o
+// payload incompleto é recusado na escrita.
+export type GateSummary = Pick<
+  GateResult,
+  'status' | 'liberado' | 'nivelEncaminhamento' | 'flagEncaminhamento'
+>
+
+const NIVEIS: NivelEncaminhamento[] = ['liberado', 'antes_vigorosa', 'antes_iniciar']
+
+export function gateFromRow(row: {
+  liberado: boolean
+  nivel_encaminhamento: string
+  flag_encaminhamento: boolean
+}): GateSummary {
+  return {
+    status: row.liberado && !row.flag_encaminhamento ? 'liberado' : 'encaminhamento',
+    liberado: row.liberado,
+    // valor fora do domínio conhecido cai no mais restritivo, nunca no permissivo
+    nivelEncaminhamento:
+      NIVEIS.find((n) => n === row.nivel_encaminhamento) ?? 'antes_iniciar',
+    flagEncaminhamento: row.flag_encaminhamento,
+  }
+}
+
 export function assertGateComplete(a: AnamnesisAnswers): GateResult {
   const gate = computeGate(a)
   if (gate.status === 'incompleto') {
