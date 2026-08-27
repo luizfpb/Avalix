@@ -9,7 +9,8 @@ import {
   intakeDraftFingerprint,
   submitIntake,
 } from '../features/anamnesis/intake'
-import { emptyAnamnesis, PARQ_ITEMS, type AnamnesisAnswers } from '../features/anamnesis/spec'
+import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
+import { computeGate } from '../features/anamnesis/gate'
 import { AnamneseCamadaA, AnamneseCamadaB } from '../features/anamnesis/AnamneseForm'
 import { subjectFormSchema, emptySubjectForm, type SubjectFormValues } from '../features/subjects/schema'
 import { ageFromBirthDate } from '../lib/age'
@@ -170,8 +171,8 @@ function Form({
     setA((prev) => ({ ...prev, ...patch }))
   }
 
-  const parqComplete = PARQ_ITEMS.every((i) => a.parq[i.key] !== null)
-  const canSubmit = parqComplete && signerName.trim().length >= 3 && accepted
+  const gateComplete = computeGate(a).status !== 'incompleto'
+  const canSubmit = gateComplete && signerName.trim().length >= 3 && accepted
 
   const submit = useMutation({
     mutationFn: (registration: SubjectFormValues | undefined) =>
@@ -216,7 +217,9 @@ function Form({
       const ok = await trigger()
       if (!ok) return setError('Confira os campos do cadastro destacados em vermelho.')
     }
-    if (!parqComplete) return setError('Responda todos os itens da seção "Sobre sua saúde".')
+    if (!gateComplete) {
+      return setError('Responda todos os itens das seções de saúde e confirme “Nenhuma” quando aplicável.')
+    }
     if (signerName.trim().length < 3) return setError('Preencha o nome de quem está aceitando o termo.')
     if (!accepted) return setError('É preciso aceitar o termo de consentimento para enviar.')
     if (isMinor && signerKind !== 'responsavel')

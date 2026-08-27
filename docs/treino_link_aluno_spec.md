@@ -1,5 +1,46 @@
 # Treino executado pelo aluno (link) — Especificação
 
+> **Estado atual (schema 0028).** Este documento preserva abaixo o desenho-base
+> que originou a migration 0027. O contrato operacional vigente inclui também a
+> estabilização da 0028; em qualquer divergência, `docs/DECISIONS.md`, as
+> migrations e o bloco a seguir prevalecem sobre os exemplos históricos.
+
+## Atualização de estabilização — 0028
+
+- `/t` e `/t/` são rewrites explícitos do Cloudflare Pages, sempre `no-store`;
+  `treino.webmanifest` tem `id`, `start_url` e `scope` em `/t`. A rota pública
+  registra o service worker silenciosamente para o shell abrir offline, sem
+  interromper treino ou anamnese com aviso de atualização.
+- O pacote público informa `link_expires_at` e `current_plan_sessions`. Cache
+  legado sem validade, validade malformada ou expirada falha fechado. Expiração,
+  revogação observada e saída do aparelho removem token, pacote, histórico,
+  planos, rascunhos e fila; outras abas convergem pela mudança do token.
+- Rascunho e fila ficam no IndexedDB, isolados por hash do token, plano,
+  divisão e data. “Salvar progresso” e “Concluir treino” reutilizam o
+  `client_ref` somente dentro dessa sessão; trocar divisão ou data recupera ou
+  cria outra identidade. Cada envio reserva atomicamente uma `client_revision`
+  crescente, inclusive entre abas. Uma confirmação só aparece depois que o
+  rascunho/outbox necessário termina; recusa definitiva permanece visível até
+  o aluno descartá-la.
+- `p_plan` é aceito somente como referência do plano em que a sessão offline foi
+  executada: ele precisa pertencer ao mesmo avaliado e estar `active` ou
+  `archived`; `draft` é recusado no banco. Os exercícios continuam limitados ao
+  catálogo global ou à organização do link, para uma fila legítima sobreviver à
+  edição posterior da prescrição.
+- Plano histórico só abre com status `archived`; `draft` nunca é publicado. O
+  histórico usa `get_workout_history_page_for_link` com cursor composto
+  `(performed_at, created_at, id)`, evitando perda ou repetição quando várias
+  sessões têm a mesma data. Respostas atrasadas de outro plano são ignoradas.
+- Toda RPC pública preserva `NULL` como sinal de link inválido. Histórico e
+  detalhe anterior convergem para o mesmo purge central; um epoch de acesso
+  impede resposta em voo de regravar estado ou cache depois da revogação.
+- A última série é escolhida primeiro pela sessão mais recente e só então pela
+  melhor série dentro dela. A próxima divisão deriva da sequência semanal e do
+  número de sessões do plano atual, não do histórico inteiro.
+- Um exercício não pode aparecer duas vezes na mesma divisão, por validação no
+  editor e `unique (day_id, exercise_id)` no banco. A migration 0028 possui
+  preflight somente leitura e suíte pgTAP própria.
+
 Objetivo: o treinador emite um treino, ele passa a ser o **treino vigente** do
 aluno, e o aluno abre um **link** (sem login) para ver o treino do dia e ir
 marcando o que fez — série a série, com carga, repetições e RIR. O registro cai
@@ -33,7 +74,9 @@ O modelo do caminho anônimo é `docs/anamnese_link_aluno_spec.md` (migration
 - `Execucao.tsx` já monta a grade de séries a partir da prescrição, numera as
   séries por exercício e grava tudo numa transação via `create_workout_log`.
 
-O que falta é a porta do aluno, o conceito de plano vigente e o link.
+Esse era o escopo que faltava antes da 0027; a porta do aluno, o plano vigente e
+o link já estão implementados e foram estabilizados na 0028 conforme o bloco
+acima.
 
 ---
 
@@ -92,10 +135,13 @@ origem, anamnese, postura, telefone, e-mail, nascimento, nome completo, nem dado
 de qualquer outro avaliado. O bloco "Base da prescrição" que existe no PDF **não**
 vai para a página.
 
-**D6. O plano nunca vem do cliente.** A RPC de envio recebe o token, não o
-`plan_id`: ela resolve o avaliado pelo token e o plano vigente pelo avaliado. Cada
-`exercise_id` das séries é conferido contra os exercícios do plano vigente. Sem
-isso, quem tem um token válido escreveria log em plano de qualquer avaliado.
+**D6. O token delimita o aluno; o cliente apenas referencia o plano de origem.**
+A RPC resolve o avaliado pelo token. Sem `p_plan`, usa o plano vigente; com
+`p_plan` — necessário para sincronizar uma sessão feita offline depois da troca
+de mesociclo — exige que ele pertença ao mesmo avaliado e esteja `active` ou
+`archived`. `draft` é sempre recusado. Cada `exercise_id` precisa ser global ou
+da organização do link. Assim a fila sobrevive a uma edição posterior sem abrir
+escrita em plano ou catálogo de terceiros.
 
 **D7. Sem consentimento novo, com transparência.** Pela decisão da 0009 execução é
 dado operacional e não abre gate de consentimento; além disso, o link não coleta
@@ -364,9 +410,10 @@ Agendar com `service_role`, ao menos diariamente, junto dos purges que já exist
 
 ### 3e. Versão de schema
 
-A migration carimba `app_schema_version` em `'0027'` e
-`scripts/check-schema-version.mjs` sobe `EXPECTED_SCHEMA_VERSION` junto — o gate
-de deploy bloqueia a ordem errada (front novo com banco velho).
+A migration-base carimbava `0027`; a estabilização vigente carimba
+`app_schema_version` em `'0028'`, e `scripts/check-schema-version.mjs` exige a
+mesma versão. O gate de deploy bloqueia a ordem errada (front novo com banco
+velho).
 
 ---
 
@@ -412,6 +459,8 @@ Conteúdo (D5), na forma que a página consome:
 {
   "org_name": "Estúdio Corpo & Movimento",
   "subject_first_name": "Maria",
+  "link_expires_at": "2026-12-01T00:00:00Z",
+  "current_plan_sessions": 7,
   "plan": { "id": "...", "name": "...", "goal": "hypertrophy", "weeks": 8,
             "starts_on": "2026-06-01", "weekly_schedule": ["A","B","A","C"],
             "notes": "..." },
@@ -457,14 +506,16 @@ submit_workout_session(
   p_week_number  int,
   p_performed_at date,
   p_sets         jsonb,     -- [{exercise_id, set_number, weight_kg, reps, rir}]
-  p_notes        text
+  p_notes        text,
+  p_plan         uuid       -- plano de origem da fila; não amplia o aluno do token
 ) returns jsonb              -- { "ok": true, "log_id": "..." }
 ```
 
 Validação, nesta ordem (a primeira que falhar aborta):
 
 1. link `active`, não expirado → senão `'link invalido ou expirado'`;
-2. plano vigente do subject existe → senão `'sem treino vigente'`;
+2. plano vigente existe ou `p_plan` pertence ao mesmo subject e está
+   `active/archived` → senão `'sem treino vigente'` ou recusa do plano;
 3. rate limit da janela (§4d);
 4. `pg_column_size(p_sets) <= 16384` e `jsonb_array_length(p_sets) between 1 and 60`;
 5. `char_length(p_notes) <= 600`;
@@ -475,7 +526,7 @@ Validação, nesta ordem (a primeira que falhar aborta):
    quarta sem sinal e só voltou a ter rede no domingo precisa que a sessão suba
    com a data em que aconteceu, senão o histórico mente e a adesão da semana some.
    Reescrever data antiga além disso continua sendo do treinador;
-9. **todo `exercise_id` das séries pertence ao plano vigente** (D6);
+9. **todo `exercise_id` é global ou pertence à organização do link** (D6);
 10. `set_number` entre 1 e 50 e `(exercise_id, set_number)` sem repetição no
     payload — a `unique (log_id, exercise_id, set_number)` da 0009 já barraria,
     mas o erro precisa ser legível.
@@ -484,7 +535,7 @@ Efeito:
 
 ```text
 1. localiza log por (plan_id, client_ref); insere se não existe (source='student'),
-   senão atualiza day_label/week_number/performed_at/notes
+   senão atualiza day_label/week_number/notes e preserva `performed_at` da criação
 2. delete das séries daquele log + insert das novas (mesmo padrão "apaga filhas e
    regrava" que save_workout_plan usa)
 3. contadores do link: writes_count + 1, last_write_at = now();
@@ -523,12 +574,17 @@ base.
 plano de qualquer avaliado da base pelo id. Plano de outro avaliado devolve `null`,
 igual a plano inexistente.
 
-### 4f. `get_workout_history_for_link(p_token text, p_limit int, p_before date)` — anon lê o histórico
+### 4f. `get_workout_history_page_for_link(...)` — anon lê o histórico
 
 `security definer`, `grant to anon, authenticated`. Sessões do próprio aluno, mais
 recentes primeiro, com as séries de cada uma; `p_limit` entre 1 e 60 (padrão 30) e
-`p_before` para paginar. **Todos os planos**, não só o vigente (D10), com o nome do
-plano e do exercício já resolvidos — o cliente anônimo não faz join.
+cursor opcional formado por `performed_at`, `created_at` e `id`. O cursor só é
+aceito completo e a comparação lexicográfica impede saltar ou repetir sessões da
+mesma data. Como `performed_at`, `created_at` e `id` são imutáveis para a sessão,
+uma revisão concorrente também não consegue mover uma linha já vista para o outro
+lado do cursor. A RPC antiga permanece apenas para a janela de compatibilidade da
+0027. **Todos os planos**, não só o vigente (D10), com nomes já resolvidos — o
+cliente anônimo não faz join.
 
 Uma sessão traz: `id`, `performed_at`, `day_label`, `week_number`, `plan_name`,
 `source`, `notes` e as séries (`exercise_id`, `exercise_name`, `set_number`,
@@ -583,10 +639,10 @@ Fluxo na tela:
    passam a derivar dele o "o que muda" (diff = comparar efetivo contra base) em
    vez de recalcular. Se isso não couber na v1, fica registrado como dívida — mas
    os três não podem divergir.
-4. **Marcar conforme faz.** Estado local, rascunho em `sessionStorage` via
-   `useDraft(..., { storage: 'session' })` — a regra que o `draft.ts` já
-   estabelece para página pública (o dado some ao fechar a aba e nunca cruza para
-   outro link).
+4. **Marcar conforme faz.** Estado local e rascunho no IndexedDB, isolado pelo
+   hash do token, plano, divisão e data. Fechar a aba não perde a sessão em
+   andamento, trocar de treino não sobrescreve a anterior e um mesociclo novo
+   não herda linhas do anterior.
 5. **Salvar** a qualquer momento (D4) e **Concluir treino** no fim. Os dois
    chamam a mesma RPC com o mesmo `client_ref`; o segundo apenas atualiza.
 6. Estados: carregando → treino → salvo ("Registrado!") → erro de rede com
@@ -594,13 +650,16 @@ Fluxo na tela:
    expirado"; ou "seu treinador ainda não publicou um treino" (link válido, sem
    plano vigente).
 
-O `client_ref` é gerado uma vez por sessão de treino (divisão + data) e vive no
-rascunho: reabrir a aba no mesmo dia continua a mesma sessão em vez de criar outra.
+O `client_ref` é gerado uma vez por sessão de treino (plano + divisão + data) e
+vive no rascunho: reabrir a aba continua a mesma sessão em vez de criar outra.
+Cada salvamento reserva uma `client_revision` monotônica em transação IndexedDB;
+o banco ignora revisão menor. Assim, nem replay tardio nem outra aba consegue
+substituir um treino mais completo por um payload parcial.
 
 Nada de PDF, nada de percentual de gordura, nada de anamnese nessa página (D5).
 
 Além do treino do dia, a página tem duas abas rasas: **Histórico** (as sessões
-registradas, com as séries, paginadas por `get_workout_history_for_link`) e
+registradas, com as séries, paginadas por `get_workout_history_page_for_link`) e
 **Treinos anteriores** (os mesociclos passados, abertos sob demanda por
 `get_workout_plan_for_link`). Sem gráfico, sem e1RM, sem comparação — isso é do
 treinador, e o aluno que quer ler número já tem a última carga em cada exercício.
@@ -620,9 +679,10 @@ local não seja em si uma cópia da credencial:
 
 | O que | Quando grava | Validade |
 | --- | --- | --- |
-| Pacote do treino vigente (§4b) | A cada abertura com rede | Sem TTL; substituído na próxima sincronização |
+| Pacote do treino vigente (§4b) | A cada abertura com rede | Até `link_expires_at`; cache legado ou validade inválida é recusado |
 | Últimas 30 sessões do histórico | Ao abrir a aba Histórico com rede | Idem |
 | Planos anteriores já abertos | Ao abrir cada um com rede | Idem |
+| Rascunhos por plano + divisão + data | Ao editar e ao salvar progresso | Até concluir a sessão ou sair do aparelho |
 | Fila de saída (sessões não enviadas) | Ao salvar sem rede | Até subir |
 | Token | Primeira visita com fragmento | Até "sair deste aparelho" ou revogação |
 
@@ -630,13 +690,15 @@ O service worker **não** entra nisso: ele continua cuidando só do shell estát
 a regra "nunca cachear o Supabase" fica intacta (D11). Quem persiste dado é o app,
 deliberadamente, e só o pacote de divulgação mínima.
 
-**Fila de saída.** Salvar sem rede grava na fila e a tela diz "salvo no aparelho —
-vai subir quando houver internet", com o contador de pendências visível. A subida
-tenta no `online`, ao reabrir e ao voltar a aba para o primeiro plano. Cada item
-carrega seu `client_ref`, então reenviar é inofensivo (D4); item aceito sai da
-fila; item recusado por regra de negócio (link revogado, plano trocado) sai da fila
-e vira aviso legível, porque insistir eternamente num envio que o servidor nunca
-vai aceitar é como se perde a confiança do usuário na fila.
+**Fila de saída.** Todo envio tenta primeiro atualizar um outbox durável e, sem
+rede, a tela diz "salvo no aparelho — vai subir quando houver internet", com o
+contador de pendências visível. As mutações da lista são transações IndexedDB
+atômicas; flush e envio direto usam Web Lock (com mutex local de fallback). A
+subida tenta no `online`, ao reabrir e ao voltar a aba para o primeiro plano.
+Cada item carrega `client_ref` e `client_revision`; item aceito sai da fila; item
+recusado por regra de negócio deixa de ser reenviado, mas permanece como aviso
+legível até o aluno descartá-lo. Assim a falha não some antes de ser vista, não
+entra em laço infinito e replay antigo não vence um envio novo.
 
 **Conflito de plano.** Se o treinador publicar um plano novo enquanto o aluno está
 offline, a sessão pendente foi feita sobre o plano antigo. A RPC resolve o plano
@@ -706,7 +768,7 @@ aluno; e qualquer conteúdo de avaliação, anamnese ou postura na página públ
 | Token vazado (WhatsApp encaminhado) | Revogação imediata pelo treinador; validade com teto de 180 dias; escopo mínimo (D5); nenhum dado sensível exposto |
 | Token no log do servidor / Referer | Token viaja no **fragmento**, que o navegador não envia |
 | Vazamento do banco | Só o `sha256` é gravado; hash não é token utilizável |
-| Escrita em plano alheio | O plano vem do token, nunca do cliente; cada exercício é conferido contra o plano vigente (D6) |
+| Escrita em plano alheio ou rascunho | O token delimita o aluno; `p_plan` só referencia plano `active/archived` dele; `draft` é recusado; exercício precisa ser global ou da mesma organização (D6) |
 | Cliente em laço / inflar base | Tetos de tamanho, séries, sessões/dia e gravações/hora (§4d) |
 | Duplicidade de sessão | `client_ref` único por plano (D4) |
 | Não saber quem digitou | `source='student'` + auditoria com ator nulo (D3) |
@@ -723,7 +785,8 @@ aluno; e qualquer conteúdo de avaliação, anamnese ou postura na página públ
 
 ## 9. Checklist de teste
 
-**Banco (pgTAP, `supabase/tests/0027_workout_link.test.sql`)** — estrutural, pelo
+**Banco (pgTAP, `supabase/tests/0027_workout_link.test.sql` e
+`0028_stabilization_and_security.test.sql`)** — estrutural, pelo
 motivo já registrado nos testes 0022/0026 (o `pg_prove` roda como `postgres`, sem
 `auth.uid()`):
 
@@ -773,7 +836,9 @@ motivo já registrado nos testes 0022/0026 (o `pg_prove` roda como `postgres`, s
 - [ ] Subir a fila duas vezes (forçando reenvio) → não duplica (`client_ref`).
 - [ ] Treinar offline por 3 dias e sincronizar tudo de uma vez → todas entram (teto por `performed_at`, não por data de envio).
 - [ ] Treinador publica plano novo enquanto a sessão está na fila → a sessão entra no plano em que foi feita.
-- [ ] Link revogado com item na fila → item sai da fila com aviso legível, sem laço infinito.
+- [ ] Link revogado com item na fila → credencial e dados locais são purgados;
+  uma recusa definitiva que não invalide o link permanece visível, sem reenvio,
+  até ser descartada.
 - [ ] "Sair deste aparelho" → token, cache e fila apagados; `/t` sem fragmento passa a mostrar "link inválido".
 - [ ] Instalar pelo Chrome/Android → abre em `/t` direto; conferir também no iOS e registrar o comportamento real.
 
@@ -787,7 +852,8 @@ predicados de rota que já existe.
 
 ## 10. Ordem de implementação
 
-1. **Migration 0027** + teste pgTAP + `EXPECTED_SCHEMA_VERSION`, e os módulos
+1. **Migration 0027**, seguida da estabilização **0028**, seus testes pgTAP e
+   `EXPECTED_SCHEMA_VERSION`, além dos módulos
    puros que não dependem dos tipos regenerados (`effective.ts`, `currentWeek`,
    predicado de rota). Aplicada por você no dashboard, com a conferência de §3a
    antes; `gen types` em seguida.

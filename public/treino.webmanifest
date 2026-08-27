@@ -3,6 +3,7 @@
   "short_name": "Meu Treino",
   "description": "Seu treino, para marcar as séries na academia — funciona sem internet.",
   "lang": "pt-BR",
+  "id": "/t",
   "start_url": "/t",
   "scope": "/t",
   "display": "standalone",

@@ -109,7 +109,12 @@ export default function Avaliados() {
         </div>
       </div>
 
-      {genError ? <p className="text-sm text-destructive">{genError}</p> : null}
+      {genError ? <p role="alert" className="text-sm text-destructive">{genError}</p> : null}
+      {cancel.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {normalizeDbError(cancel.error)}
+        </p>
+      ) : null}
 
       {generatedUrl ? (
         <Card className="border-primary/30 bg-primary/5">

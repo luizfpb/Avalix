@@ -5,8 +5,10 @@ import { PARQ_ITEMS, type AnamnesisAnswers } from './spec'
 // de pré-participação (matriz de encaminhamento). É TRIAGEM, não diagnóstico.
 
 export type NivelEncaminhamento = 'liberado' | 'antes_vigorosa' | 'antes_iniciar'
+export type GateStatus = 'incompleto' | 'liberado' | 'encaminhamento'
 
 export type GateResult = {
+  status: GateStatus
   // PAR-Q: liberado quando os 7 itens são "Não"
   liberado: boolean
   // matriz ACSM
@@ -26,8 +28,14 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
   const motivos: string[] = []
 
   // A1 — PAR-Q+: qualquer "Sim" tira a liberação automática
+  const parqComplete = PARQ_ITEMS.every((i) => typeof a.parq[i.key] === 'boolean')
+  const a2Complete =
+    typeof a.ativo_regular === 'boolean' &&
+    a.doenca_cmr_confirmada === true &&
+    a.sinais_sintomas_confirmados === true
+  const complete = parqComplete && a2Complete
   const parqYes = PARQ_ITEMS.some((i) => a.parq[i.key] === true)
-  const liberado = !parqYes
+  const liberado = complete && !parqYes
   if (parqYes) {
     motivos.push(
       'Triagem (PAR-Q+): ao menos uma resposta "Sim" — buscar liberação de profissional de saúde antes de progredir a intensidade.'
@@ -69,5 +77,36 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
 
   const flagEncaminhamento = parqYes || sintomas || cmr || redFlags || gestante
 
-  return { liberado, nivelEncaminhamento, flagEncaminhamento, motivos }
+  if (!complete) {
+    const pendencias: string[] = []
+    if (!parqComplete) pendencias.push('todos os itens do PAR-Q+')
+    if (typeof a.ativo_regular !== 'boolean') pendencias.push('prática regular de exercício')
+    if (!a.doenca_cmr_confirmada) pendencias.push('doenças diagnosticadas')
+    if (!a.sinais_sintomas_confirmados) pendencias.push('sinais e sintomas atuais')
+    motivos.unshift(`Triagem incompleta: responda ${pendencias.join(', ')}.`)
+  }
+
+  const status: GateStatus = !complete
+    ? 'incompleto'
+    : liberado && !flagEncaminhamento
+      ? 'liberado'
+      : 'encaminhamento'
+
+  return {
+    status,
+    liberado,
+    // Uma entrada incompleta nunca recebe um nível permissivo, mesmo se algum
+    // chamador ignorar a validação de persistência.
+    nivelEncaminhamento: complete ? nivelEncaminhamento : 'antes_iniciar',
+    flagEncaminhamento,
+    motivos,
+  }
+}
+
+export function assertGateComplete(a: AnamnesisAnswers): GateResult {
+  const gate = computeGate(a)
+  if (gate.status === 'incompleto') {
+    throw new Error('Triagem incompleta. Responda todos os itens das seções A1 e A2.')
+  }
+  return gate
 }

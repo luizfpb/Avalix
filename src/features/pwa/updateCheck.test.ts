@@ -59,6 +59,8 @@ describe('rota publica e PWA', () => {
   it('identifica a rota nova e o path legado', () => {
     expect(isPublicIntakeLocation('/a')).toBe(true)
     expect(isPublicIntakeLocation('/a/token-legado')).toBe(true)
+    expect(isPublicIntakeLocation('/t')).toBe(true)
+    expect(isPublicIntakeLocation('/t/')).toBe(true)
     expect(isPublicIntakeLocation('/agenda')).toBe(false)
   })
 })

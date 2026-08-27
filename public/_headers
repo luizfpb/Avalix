@@ -50,6 +50,14 @@
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
 
+/t
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
+/t/
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
 /dashboard
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
@@ -99,5 +107,9 @@
   Cloudflare-CDN-Cache-Control: no-store
 
 /manifest.webmanifest
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
+/treino.webmanifest
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store

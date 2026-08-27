@@ -57,6 +57,29 @@ create temporary table _privacy_state (
   value uuid not null
 );
 create temporary table _privacy_export (document jsonb not null);
+create temporary table _anamnese_payload (document jsonb not null);
+insert into pg_temp._anamnese_payload (document) values (
+  '{
+    "parq": {
+      "cardio_dx": false,
+      "dor_toracica": false,
+      "tontura_sincope": false,
+      "condicao_cronica": false,
+      "medicacao_cronica": false,
+      "lesao_atividade": false,
+      "supervisao_medica": false
+    },
+    "ativo_regular": false,
+    "doenca_cmr_confirmada": true,
+    "sinais_sintomas_confirmados": true,
+    "doenca_cmr": [],
+    "sinais_sintomas": [],
+    "red_flags": [],
+    "gestante": null,
+    "declaracao_veracidade": true,
+    "consentimento_lgpd": true
+  }'::jsonb
+);
 
 select lives_ok(
   $$
@@ -243,13 +266,14 @@ insert into public.anamnese_intakes
 select
   '40000000-0000-0000-0000-000000000099', value, 'cadastro_anamnese',
   encode(sha256(convert_to('registration-token-0000000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 select throws_ok(
   $$
     select public.submit_anamnese_intake(
-      'registration-token-0000000000001', '{}'::jsonb,
+      'registration-token-0000000000001',
+      (select document from pg_temp._anamnese_payload),
       'titular', 'Outra Pessoa', app.canonical_consent_version(),
       encode(sha256(convert_to(app.canonical_consent_text('Organizacao Teste 0020'), 'UTF8')), 'hex'),
       'pgTAP',
@@ -267,7 +291,7 @@ select
   '40000000-0000-0000-0000-000000000001', value,
   '20000000-0000-0000-0000-000000000001',
   encode(sha256(convert_to('cancel-token-00000000000000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 select lives_ok(
@@ -291,13 +315,14 @@ select
   '40000000-0000-0000-0000-000000000002', value,
   '20000000-0000-0000-0000-000000000001',
   encode(sha256(convert_to('reject-token-00000000000000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 select lives_ok(
   $$
     select public.submit_anamnese_intake(
-      'reject-token-00000000000000000001', '{"answer":true}'::jsonb,
+      'reject-token-00000000000000000001',
+      (select document from pg_temp._anamnese_payload),
       'titular', 'Titular Teste', app.canonical_consent_version(),
       encode(sha256(convert_to(app.canonical_consent_text('Organizacao Teste 0020'), 'UTF8')), 'hex'),
       'pgTAP', null
@@ -340,7 +365,7 @@ select
   '40000000-0000-0000-0000-000000000010', value,
   '20000000-0000-0000-0000-000000000001',
   encode(sha256(convert_to('expired-pending-token-00000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 insert into public.anamnese_intakes
@@ -349,11 +374,12 @@ select
   '40000000-0000-0000-0000-000000000011', value,
   '20000000-0000-0000-0000-000000000001',
   encode(sha256(convert_to('expired-submitted-token-0000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 select public.submit_anamnese_intake(
-  'expired-submitted-token-0000000001', '{"answer":"preserve"}'::jsonb,
+  'expired-submitted-token-0000000001',
+  (select document from pg_temp._anamnese_payload),
   'titular', 'Titular Teste', app.canonical_consent_version(),
   encode(sha256(convert_to(app.canonical_consent_text('Organizacao Teste 0020'), 'UTF8')), 'hex'),
   'pgTAP', null
@@ -391,18 +417,16 @@ select ok(
     select 1 from public.anamnese_intakes
      where id = '40000000-0000-0000-0000-000000000011'
        and status = 'submitted' and purged_at is null
-       and payload = '{"answer":"preserve"}'::jsonb
+       and payload = (select document from pg_temp._anamnese_payload)
        and signer_name = 'Titular Teste'
        and consent_text_snapshot is not null
   ),
   'submitted vencido permanece aguardando revisao com evidencia intacta'
 );
 
--- Reproduz um envio 1.0 que ja estava aguardando revisao quando a 0020 foi
--- aplicada. Desativa somente o guard de insert para montar essa fixture
--- pre-0020; os demais triggers continuam ativos. Somente a RPC de aceite pode
--- materializar o consentimento legado, sempre vinculado ao intake de origem e
--- sem inventar snapshot historico.
+-- Reproduz um envio antigo que já aguardava revisão. Mesmo que o JSON tenha a
+-- forma estrutural atual, a spec antiga não pode ser promovida silenciosamente:
+-- o profissional deve rejeitar e emitir um link 1.3.
 alter table public.anamnese_intakes
   disable trigger anamnese_intakes_b2_create_guard;
 insert into public.anamnese_intakes
@@ -413,37 +437,36 @@ select
   '40000000-0000-0000-0000-000000000012', value,
   '20000000-0000-0000-0000-000000000001', repeat('8', 64), 'submitted',
   now() - interval '1 day', 'legacy-spec', now() - interval '2 days',
-  '{"legacy":"preserve"}'::jsonb, '1.0', repeat('7', 64),
+  p.document, '1.0', repeat('7', 64),
   'titular', 'Titular Teste', 'legacy-agent'
-from pg_temp._privacy_state where key = 'org';
+from pg_temp._privacy_state s
+cross join pg_temp._anamnese_payload p
+where s.key = 'org';
 alter table public.anamnese_intakes
   enable trigger anamnese_intakes_b2_create_guard;
 
-select lives_ok(
+select throws_ok(
   $$
     select * from public.accept_anamnese_intake(
       '40000000-0000-0000-0000-000000000012', true, 'liberado', false, null
     )
   $$,
-  'RPC aceita submitted legado preservado durante o rollout'
+  'P0001',
+  'formulario desatualizado; rejeite e emita um novo link',
+  'RPC recusa submitted legado mesmo com JSON estruturalmente atual'
 );
 
 select ok(
   exists (
-    select 1
-      from public.anamnese_intakes i
-      join public.consent_records c on c.source_intake_id = i.id
+    select 1 from public.anamnese_intakes i
      where i.id = '40000000-0000-0000-0000-000000000012'
-       and i.status = 'accepted'
-       and i.payload = '{"legacy":"preserve"}'::jsonb
-       and i.consent_version = '1.0'
-       and i.consent_text_sha256 = repeat('7', 64)
-       and c.consent_version = '1.0'
-       and c.consent_text_sha256 = repeat('7', 64)
-       and c.controller_name_snapshot is null
-       and c.consent_text_snapshot is null
+       and i.status = 'submitted'
+       and i.payload = (select document from pg_temp._anamnese_payload)
+       and not exists (
+         select 1 from public.consent_records c where c.source_intake_id = i.id
+       )
   ),
-  'aceite legado preserva versao/hash e registra provenance sem snapshot inventado'
+  'intake legado permanece submitted e não gera consentimento'
 );
 
 insert into public.anamnese_intakes
@@ -452,13 +475,14 @@ select
   '40000000-0000-0000-0000-000000000003', value,
   '20000000-0000-0000-0000-000000000001',
   encode(sha256(convert_to('accept-token-00000000000000000001', 'UTF8')), 'hex'),
-  'test-spec', now() + interval '1 day'
+  '1.3', now() + interval '1 day'
 from pg_temp._privacy_state where key = 'org';
 
 select lives_ok(
   $$
     select public.submit_anamnese_intake(
-      'accept-token-00000000000000000001', '{"answer":true}'::jsonb,
+      'accept-token-00000000000000000001',
+      (select document from pg_temp._anamnese_payload),
       'titular', 'Titular Teste', app.canonical_consent_version(),
       encode(sha256(convert_to(app.canonical_consent_text('Organizacao Teste 0020'), 'UTF8')), 'hex'),
       'pgTAP', null

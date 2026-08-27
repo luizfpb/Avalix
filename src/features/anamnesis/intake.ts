@@ -4,7 +4,7 @@ import { isIntakePath } from '../../lib/routing'
 import { clearIntakeLinkLocal, purgeExpiredIntakeLinks, saveIntakeLinkLocal } from './linkStore'
 import type { Database, Json } from '../../lib/database.types'
 import { SPEC_VERSION, type AnamnesisAnswers } from './spec'
-import { computeGate } from './gate'
+import { assertGateComplete } from './gate'
 import { consentText, CONSENT_VERSION } from '../consent/text'
 import type { SignerKind } from '../consent/api'
 import type { SubjectInsert } from '../subjects/api'
@@ -196,7 +196,7 @@ export async function acceptIntake(input: {
   answers: AnamnesisAnswers
   subject?: SubjectInsert
 }): Promise<AcceptedIntake> {
-  const gate = computeGate(input.answers)
+  const gate = assertGateComplete(input.answers)
   const { data, error } = await supabase.rpc('accept_anamnese_intake', {
     p_intake: input.intakeId,
     p_liberado: gate.liberado,
@@ -258,6 +258,7 @@ export type SubmitIntakeInput = {
 // O hash do termo e do texto EXATO exibido (com o nome do Controlador), igual ao
 // fluxo de consentimento do personal. Prova depois qual texto o aluno leu.
 export async function submitIntake(input: SubmitIntakeInput): Promise<void> {
+  assertGateComplete(input.answers)
   const consentHash = await sha256Hex(consentText(input.orgName))
   const { error } = await supabase.rpc('submit_anamnese_intake', {
     p_token: input.token,

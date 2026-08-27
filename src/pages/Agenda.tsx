@@ -210,12 +210,18 @@ export default function Agenda() {
               />
             </div>
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <Button size="sm" onClick={create} disabled={createMut.isPending}>
             <CalendarPlus /> {createMut.isPending ? 'Agendando...' : 'Agendar'}
           </Button>
         </CardContent>
       </Card>
+
+      {deleteMut.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {normalizeDbError(deleteMut.error)}
+        </p>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Próximos</h2>

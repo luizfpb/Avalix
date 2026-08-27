@@ -7,7 +7,7 @@ import { useAnamnese, useCreateAnamnese, useUpdateAnamnese } from '../features/a
 import { computeGate } from '../features/anamnesis/gate'
 import { AnamneseCamadaA, AnamneseCamadaB, GateBox } from '../features/anamnesis/AnamneseForm'
 import { parseAnswers } from '../features/anamnesis/parse'
-import { emptyAnamnesis, PARQ_ITEMS, type AnamnesisAnswers } from '../features/anamnesis/spec'
+import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
 import type { AnamneseRow } from '../features/anamnesis/api'
 import type { SubjectRow } from '../features/subjects/api'
 import { Button } from '@/components/ui/button'
@@ -114,13 +114,15 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   }
 
   const gate = computeGate(a)
-  const parqComplete = PARQ_ITEMS.every((i) => a.parq[i.key] !== null)
-  const canSave = parqComplete && a.declaracao_veracidade && a.consentimento_lgpd && !!organization
+  const gateComplete = gate.status !== 'incompleto'
+  const canSave = gateComplete && a.declaracao_veracidade && a.consentimento_lgpd && !!organization
 
   async function handleSave() {
     setSubmitError(null)
     if (!organization) return
-    if (!parqComplete) return setSubmitError('Responda todos os itens da triagem (Camada A).')
+    if (!gateComplete) {
+      return setSubmitError('Responda todos os itens da triagem, incluindo as confirmações da seção A2.')
+    }
     if (!a.declaracao_veracidade || !a.consentimento_lgpd) {
       return setSubmitError('Confirme a declaração de veracidade e o consentimento.')
     }
@@ -181,8 +183,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Data da anamnese</Label>
-          <Input type="date" value={assessedAt} onChange={(e) => setAssessedAt(e.target.value)} />
+          <Label htmlFor="anamnesis-date">Data da anamnese</Label>
+          <Input id="anamnesis-date" type="date" value={assessedAt} onChange={(e) => setAssessedAt(e.target.value)} />
         </div>
       </div>
 
@@ -201,7 +203,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
         </label>
       </div>
 
-      {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+      {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 
       <div className="flex gap-3">
         <Button onClick={handleSave} disabled={!canSave || mut.isPending}>

@@ -21,6 +21,15 @@ export async function uploadOrgLogo(orgId: string, file: File): Promise<string> 
   if (up.error) throw up.error
   const upd = await supabase.from('organizations').update({ logo_path: path }).eq('id', orgId)
   if (upd.error) throw upd.error
+
+  // A policy da 0028 limita o namespace às três chaves canônicas. Depois de a
+  // organização apontar para o arquivo novo, removemos as extensões antigas;
+  // uma falha de limpeza não invalida o logo já salvo e nunca volta a permitir
+  // crescimento ilimitado.
+  const stalePaths = Object.values(MIME_EXT)
+    .filter((candidate) => candidate !== ext)
+    .map((candidate) => `${orgId}/logo.${candidate}`)
+  await supabase.storage.from('logos').remove(stalePaths)
   return path
 }
 

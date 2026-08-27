@@ -144,6 +144,12 @@ export default function Execucao() {
         <h1 className="mt-2 text-xl font-semibold">Execução do treino</h1>
       </div>
 
+      {deleteMut.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {normalizeDbError(deleteMut.error)}
+        </p>
+      ) : null}
+
       {historyDegraded ? (
         <QueryError
           message="Não foi possível carregar o histórico do treino, então a adesão e as sugestões de carga estão ocultas. O registro da sessão abaixo continua funcionando normalmente."

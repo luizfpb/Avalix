@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useIntake, useAcceptIntake, useRejectIntake } from '../features/anamnesis/intakeHooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
 import { parseAnswers } from '../features/anamnesis/parse'
+import { computeGate } from '../features/anamnesis/gate'
 import { subjectFormSchema, formToInsert, type SubjectFormValues } from '../features/subjects/schema'
 import { useSubject, useSubjects } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
@@ -58,6 +59,7 @@ export default function AnamneseRevisar() {
   const isCadastro = intake.kind === 'cadastro_anamnese'
   // payload pode ser de spec anterior: parseAnswers completa/converte campos
   const answers = intake.payload != null ? parseAnswers(intake.payload) : null
+  const gate = answers ? computeGate(answers) : null
   const registration = intake.registration as unknown as SubjectFormValues | null
 
   // aviso barato de duplicata: link de cadastro reenviado ou aluno ja existente
@@ -242,10 +244,10 @@ export default function AnamneseRevisar() {
 
       <AnamneseResumo answers={answers} />
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-3">
-        <Button onClick={handleAccept} disabled={busy}>
+        <Button onClick={handleAccept} disabled={busy || gate?.status === 'incompleto'}>
           {accept.isPending ? 'Aceitando...' : isCadastro ? 'Aceitar e cadastrar' : 'Aceitar e registrar'}
         </Button>
         {confirmReject ? (

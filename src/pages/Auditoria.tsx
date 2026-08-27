@@ -197,6 +197,11 @@ function ErrorsCard({ orgId }: { orgId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {clearMut.isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {normalizeDbError(clearMut.error)}
+          </p>
+        ) : null}
         {query.isPending ? (
           <p className="text-sm text-muted-foreground">Carregando...</p>
         ) : query.isError ? (

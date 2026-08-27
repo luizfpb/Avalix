@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useAuth } from '../auth/context'
 import { useCreateCustomExercise, useUpdateCustomExercise } from './hooks'
 import type { ExerciseRow } from './api'
@@ -35,6 +35,13 @@ export function ExerciseForm({
   onSaved: (row: ExerciseRow) => void
   onCancel?: () => void
 }) {
+  const formId = useId()
+  const nameId = `${formId}-name`
+  const primaryMuscleId = `${formId}-primary-muscle`
+  const equipmentId = `${formId}-equipment`
+  const movementId = `${formId}-movement`
+  const secondaryLabelId = `${formId}-secondary-label`
+  const cuesId = `${formId}-cues`
   const { user } = useAuth()
   const createMut = useCreateCustomExercise(orgId)
   const updateMut = useUpdateCustomExercise(orgId)
@@ -79,13 +86,16 @@ export function ExerciseForm({
 
   return (
     <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+      <Label htmlFor={nameId} className="sr-only">Nome do exercício</Label>
       <Input
+        id={nameId}
         placeholder="Nome do exercício"
         value={v.name}
         onChange={(e) => set('name', e.target.value)}
       />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <select className={controlClass} value={v.primary_muscle} onChange={(e) => set('primary_muscle', e.target.value)}>
+        <Label htmlFor={primaryMuscleId} className="sr-only">Músculo principal</Label>
+        <select id={primaryMuscleId} className={controlClass} value={v.primary_muscle} onChange={(e) => set('primary_muscle', e.target.value)}>
           <option value="">Músculo principal *</option>
           {MUSCLE_OPTIONS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -93,7 +103,8 @@ export function ExerciseForm({
             </option>
           ))}
         </select>
-        <select className={controlClass} value={v.equipment} onChange={(e) => set('equipment', e.target.value)}>
+        <Label htmlFor={equipmentId} className="sr-only">Equipamento</Label>
+        <select id={equipmentId} className={controlClass} value={v.equipment} onChange={(e) => set('equipment', e.target.value)}>
           <option value="">Equipamento *</option>
           {EQUIPMENT_OPTIONS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -101,7 +112,8 @@ export function ExerciseForm({
             </option>
           ))}
         </select>
-        <select className={controlClass} value={v.movement_pattern} onChange={(e) => set('movement_pattern', e.target.value)}>
+        <Label htmlFor={movementId} className="sr-only">Padrão de movimento</Label>
+        <select id={movementId} className={controlClass} value={v.movement_pattern} onChange={(e) => set('movement_pattern', e.target.value)}>
           <option value="">Padrão de movimento *</option>
           {MOVEMENT_OPTIONS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -120,8 +132,8 @@ export function ExerciseForm({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Músculos secundários (entram no volume com peso 0,5)</Label>
-        <div className="flex flex-wrap gap-1">
+        <Label id={secondaryLabelId} className="text-xs">Músculos secundários (entram no volume com peso 0,5)</Label>
+        <div role="group" aria-labelledby={secondaryLabelId} className="flex flex-wrap gap-1">
           {MUSCLE_OPTIONS.map((m) => {
             const on = (v.secondary_muscles as string[]).includes(m.value)
             const isPrimary = v.primary_muscle === m.value
@@ -130,6 +142,7 @@ export function ExerciseForm({
                 key={m.value}
                 type="button"
                 disabled={isPrimary}
+                aria-pressed={on}
                 onClick={() => toggleSecondary(m.value)}
                 className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
                   on
@@ -144,7 +157,9 @@ export function ExerciseForm({
         </div>
       </div>
 
+      <Label htmlFor={cuesId} className="sr-only">Dicas de execução (opcional)</Label>
       <textarea
+        id={cuesId}
         rows={2}
         className={controlClass}
         placeholder="Dicas de execução (opcional)"

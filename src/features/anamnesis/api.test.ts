@@ -18,9 +18,21 @@ vi.mock('../../lib/supabase', () => ({
 
 import { updateAnamnese } from './api'
 import { emptyAnamnesis, PARQ_ITEMS, SPEC_VERSION } from './spec'
+import type { AnamnesisAnswers } from './spec'
 
 function allNoParq(): Record<string, boolean> {
   return Object.fromEntries(PARQ_ITEMS.map((i) => [i.key, false]))
+}
+
+function completeAnswers(patch: Partial<AnamnesisAnswers> = {}): AnamnesisAnswers {
+  return {
+    ...emptyAnamnesis(),
+    parq: allNoParq(),
+    ativo_regular: false,
+    doenca_cmr_confirmada: true,
+    sinais_sintomas_confirmados: true,
+    ...patch,
+  }
 }
 
 beforeEach(() => {
@@ -35,14 +47,13 @@ function updatedRow(): Record<string, unknown> {
 
 describe('updateAnamnese', () => {
   it('recalcula o gate das respostas novas e grava a spec atual', async () => {
-    const answers = {
-      ...emptyAnamnesis(),
+    const answers = completeAnswers({
       parq: { ...allNoParq(), cardio_dx: true },
       doenca_cmr: ['cardiovascular'],
       ativo_regular: false,
       declaracao_veracidade: true,
       consentimento_lgpd: true,
-    }
+    })
 
     await updateAnamnese('an-1', { assessedAt: '2026-08-01', answers })
 
@@ -58,7 +69,7 @@ describe('updateAnamnese', () => {
   })
 
   it('respostas limpas voltam a liberar (o gate não fica preso no valor antigo)', async () => {
-    const answers = { ...emptyAnamnesis(), parq: allNoParq(), ativo_regular: true }
+    const answers = completeAnswers({ ativo_regular: true })
 
     await updateAnamnese('an-1', { assessedAt: '2026-08-01', answers })
 
@@ -77,7 +88,7 @@ describe('updateAnamnese', () => {
     await expect(
       updateAnamnese('an-1', {
         assessedAt: '2026-08-01',
-        answers: { ...emptyAnamnesis(), parq: allNoParq() },
+        answers: completeAnswers(),
       })
     ).rejects.toThrow(/não está mais disponível para edição/)
   })
@@ -85,12 +96,22 @@ describe('updateAnamnese', () => {
   it('não tenta escrever as colunas congeladas por trigger', async () => {
     await updateAnamnese('an-1', {
       assessedAt: '2026-08-01',
-      answers: { ...emptyAnamnesis(), parq: allNoParq() },
+      answers: completeAnswers(),
     })
 
     const row = updatedRow()
     expect(row).not.toHaveProperty('org_id')
     expect(row).not.toHaveProperty('subject_id')
     expect(row).not.toHaveProperty('evaluator_id')
+  })
+
+  it('recusa a persistência quando A1 ou A2 estão incompletas', async () => {
+    await expect(
+      updateAnamnese('an-1', {
+        assessedAt: '2026-08-01',
+        answers: emptyAnamnesis(),
+      })
+    ).rejects.toThrow(/Triagem incompleta/)
+    expect(mocks.update).not.toHaveBeenCalled()
   })
 })

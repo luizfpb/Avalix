@@ -99,6 +99,19 @@ export function emptyEditorPlan(): EditorPlan {
   }
 }
 
+export function duplicateExerciseInDay(plan: EditorPlan): { dayLabel: string; exerciseId: string } | null {
+  for (const day of plan.days) {
+    const seen = new Set<string>()
+    for (const exercise of day.exercises) {
+      if (seen.has(exercise.exerciseId)) {
+        return { dayLabel: day.label, exerciseId: exercise.exerciseId }
+      }
+      seen.add(exercise.exerciseId)
+    }
+  }
+  return null
+}
+
 // ---- editor -> entrada do motor de volume -----------------------------
 
 // Exercicios sem metadados conhecidos (ex.: exercicio removido do catalogo) sao

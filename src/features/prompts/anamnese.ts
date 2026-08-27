@@ -47,6 +47,7 @@ import {
   line,
   multiLine,
   optionLabel,
+  optionLabels,
   optionalLine,
 } from './format'
 import { FECHAMENTO, PAPEL, REGRAS_DE_RIGOR } from './guardrails'
@@ -73,11 +74,22 @@ export function identificacaoBlock(subject: PromptSubject, referenceIso: string)
 // mostra ao profissional.
 export function triagemBlock(answers: AnamnesisAnswers): string {
   const gate = computeGate(answers)
+  const incomplete = gate.status === 'incompleto'
   return block('RESULTADO DA TRIAGEM — JÁ CALCULADO PELO SISTEMA', [
     '- Saiu de regra fixa e auditada do app (triagem inspirada no PAR-Q+ e na matriz de pré-participação da ACSM). É entrada fixa: explique, não recalcule.',
-    line('Liberado na triagem', gate.liberado ? 'sim' : 'não'),
-    line('Nível de encaminhamento', NIVEL_LABEL[gate.nivelEncaminhamento]),
-    line('Sinaliza avaliação médica', gate.flagEncaminhamento ? 'sim' : 'não'),
+    line(
+      'Estado da triagem',
+      incomplete ? 'incompleta — liberação não calculada' : gate.status
+    ),
+    line('Liberado na triagem', incomplete ? 'não calculado' : gate.liberado ? 'sim' : 'não'),
+    line(
+      'Nível de encaminhamento',
+      incomplete ? 'não calculado' : NIVEL_LABEL[gate.nivelEncaminhamento]
+    ),
+    line(
+      'Sinaliza avaliação médica',
+      incomplete ? 'não calculado' : gate.flagEncaminhamento ? 'sim' : 'não'
+    ),
     ...(gate.motivos.length > 0
       ? ['- Motivos registrados pelo sistema:', ...gate.motivos.map((m) => `  - ${m}`)]
       : ['- Motivos registrados pelo sistema: nenhum']),
@@ -98,8 +110,18 @@ function acsmBlock(a: AnamnesisAnswers): string {
       'Pratica exercício estruturado regular há 3 meses ou mais (>= 30 min, >= 3x/semana, ao menos moderado)?',
       boolLabel(a.ativo_regular)
     ),
-    multiLine('Doença diagnosticada (cardiovascular / metabólica / renal)', DOENCA_CMR, a.doenca_cmr),
-    multiLine('Sinais/sintomas atuais', SINAIS_SINTOMAS, a.sinais_sintomas),
+    a.doenca_cmr_confirmada
+      ? line(
+          'Doença diagnosticada (cardiovascular / metabólica / renal)',
+          optionLabels(DOENCA_CMR, a.doenca_cmr) ?? 'Nenhuma (ausência confirmada)'
+        )
+      : line('Doença diagnosticada (cardiovascular / metabólica / renal)', null),
+    a.sinais_sintomas_confirmados
+      ? line(
+          'Sinais/sintomas atuais',
+          optionLabels(SINAIS_SINTOMAS, a.sinais_sintomas) ?? 'Nenhum (ausência confirmada)'
+        )
+      : line('Sinais/sintomas atuais', null),
   ])
 }
 

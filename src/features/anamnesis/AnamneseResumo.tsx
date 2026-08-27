@@ -34,6 +34,11 @@ const labelOf = (opts: Option[], v: string) => opts.find((o) => o.value === v)?.
 const labelsOf = (opts: Option[], vs: string[]) => vs.map((v) => labelOf(opts, v)).join(', ')
 const fmtBool = (v: boolean | null | undefined) => (v === true ? 'Sim' : v === false ? 'Não' : '')
 
+function confirmedLabels(opts: Option[], values: string[], confirmed: boolean): string {
+  if (!confirmed) return 'Não respondido'
+  return values.length > 0 ? labelsOf(opts, values) : 'Nenhuma'
+}
+
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
@@ -58,13 +63,19 @@ function Item({ label, value }: { label: string; value: string }) {
 export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
   const gate = computeGate(a)
   const parqYes = PARQ_ITEMS.filter((i) => a.parq?.[i.key] === true)
+  const parqMissing = PARQ_ITEMS.filter((i) => typeof a.parq?.[i.key] !== 'boolean')
 
   return (
     <div className="space-y-5">
       <GateBox gate={gate} />
 
       <Block title="Triagem (PAR-Q+)">
-        {parqYes.length === 0 ? (
+        {parqMissing.length > 0 ? (
+          <Item
+            label="Não respondidos"
+            value={parqMissing.map((item) => item.label).join(' · ')}
+          />
+        ) : parqYes.length === 0 ? (
           <Item label="Respostas" value="Todas 'Não'" />
         ) : (
           parqYes.map((i) => <Item key={i.key} label="Sim" value={i.label} />)
@@ -72,9 +83,19 @@ export function AnamneseResumo({ answers: a }: { answers: AnamnesisAnswers }) {
       </Block>
 
       <Block title="Refinamento (ACSM)">
-        <Item label="Ativo regular" value={fmtBool(a.ativo_regular)} />
-        <Item label="Doença diagnosticada" value={labelsOf(DOENCA_CMR, a.doenca_cmr ?? [])} />
-        <Item label="Sinais/sintomas" value={labelsOf(SINAIS_SINTOMAS, a.sinais_sintomas ?? [])} />
+        <Item label="Ativo regular" value={fmtBool(a.ativo_regular) || 'Não respondido'} />
+        <Item
+          label="Doença diagnosticada"
+          value={confirmedLabels(DOENCA_CMR, a.doenca_cmr ?? [], a.doenca_cmr_confirmada)}
+        />
+        <Item
+          label="Sinais/sintomas"
+          value={confirmedLabels(
+            SINAIS_SINTOMAS,
+            a.sinais_sintomas ?? [],
+            a.sinais_sintomas_confirmados
+          )}
+        />
       </Block>
 
       <Block title="Objetivo">

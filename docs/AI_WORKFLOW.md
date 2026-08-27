@@ -1,7 +1,7 @@
-# BodyTrack — Guia de Trabalho com IA
+# Avalix — Guia de Trabalho com IA
 ## 1. Objetivo deste documento
 
-Este arquivo define como a IA deve trabalhar no projeto BodyTrack.
+Este arquivo define como a IA deve trabalhar no projeto Avalix.
 
 A prioridade é:
 
@@ -267,7 +267,7 @@ A IA sempre deve:
 
 ## 8. LGPD
 
-O BodyTrack trata dados corporais, medidas, fotos posturais e histórico de evolução.
+O Avalix trata dados corporais, medidas, fotos posturais e histórico de evolução.
 
 A IA deve considerar por padrão:
 
@@ -279,7 +279,7 @@ A IA deve considerar por padrão:
 - mínimo necessário como princípio;
 - logs sem payload sensível;
 - profissional/academia como controlador;
-- BodyTrack como operador.
+- Avalix como operador.
 
 Quando implementar features ligadas a dados pessoais, sempre perguntar:
 
@@ -658,14 +658,14 @@ Uma etapa só é considerada concluída se:
 Use esta mensagem junto com `DECISIONS.md`:
 
 ```md
-Use `docs/DECISIONS.md` e `docs/AI_WORKFLOW.md` como fonte de verdade do BodyTrack. Responda em formato file-first, com economia de tokens, mas sem sacrificar segurança, LGPD, RLS, storage privado ou clareza operacional. Estou no Windows, VSCode, terminal integrado com Command Prompt/CMD. Gere arquivos completos quando possível, comandos mínimos, checklist de teste e atualização sugerida do DECISIONS.md. Não avance além da etapa pedida.
+Use `docs/DECISIONS.md` e `docs/AI_WORKFLOW.md` como fonte de verdade do Avalix. Responda em formato file-first, com economia de tokens, mas sem sacrificar segurança, LGPD, RLS, storage privado ou clareza operacional. Estou no Windows, VSCode, terminal integrado com Command Prompt/CMD. Gere arquivos completos quando possível, comandos mínimos, checklist de teste e atualização sugerida do DECISIONS.md. Não avance além da etapa pedida.
 ```
 
 ---
 
 ## 20. Regra final
 
-O BodyTrack deve evoluir como produto sério.
+O Avalix deve evoluir como produto sério.
 
 A IA deve preferir:
 

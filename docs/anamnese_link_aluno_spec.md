@@ -207,23 +207,23 @@ signer_name, signer_kind, consent_version, consent_text_sha256, user_agent.
 5. retorno mínimo: ok boolean (nada de dado de volta)
 ```
 
-Validação profunda do payload é client-side (zod, o mesmo do form) e **revalidada no
-aceite**. O gate NÃO é confiado do cliente do aluno: é recalculado
-no aceite, a partir do `payload`, pelo módulo puro `computeGate` (já é assim no
-`createAnamnese` hoje).
+O cliente valida o formulário para dar feedback imediato. Desde a migration
+0028, o servidor também exige A1/A2 completas (incluindo as confirmações
+explícitas de “nenhuma” em doença CMR e sinais/sintomas) antes de mudar o intake
+para `submitted`. Ausência, `null` ou tipo inválido falham fechado.
 
 ### 4d. `accept_anamnese_intake(p_intake, p_liberado, p_nivel, p_flag)` — personal aceita (atômico)
 
-`security invoker` (RLS do personal vale por dentro), no espírito da 0016. Numa
-transação: cria o `consent_records` (com a evidência do aluno; `collected_by` = o
+`security definer`, com autenticação, MFA e visibilidade revalidados dentro da
+função. Numa transação: cria o `consent_records` (com a evidência do aluno; `collected_by` = o
 personal que aceitou, `signer_kind`/`signer_name` do aluno) **e** cria a `anamnese`
 a partir do `payload`, e marca o intake `accepted` + `resulting_anamnese_id`.
 
 > Ordem importa: `anamneses_insert` exige `has_active_consent`. Por isso o
-> consent é criado **antes** da anamnese, na mesma transação. O gate
-> (`liberado`/`nível`/`flag`) é recalculado no TS do personal a partir do payload
-> (mesma confiança do `createAnamnese` atual, que já calcula no cliente) e passado
-> como parâmetro — a lógica clínica fica no módulo puro testado, não no banco.
+> consent é criado **antes** da anamnese, na mesma transação. O TS calcula o gate
+> para revisão humana; a RPC recalcula a partir do payload, recusa divergência e
+> persiste somente o resultado do servidor. O trigger de `anamneses` repete a
+> derivação como defesa para inserts/updates diretos.
 
 Recusar = RPC/update simples marcando `rejected`.
 

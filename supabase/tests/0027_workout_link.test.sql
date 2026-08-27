@@ -75,7 +75,7 @@ select ok(
   has_function_privilege('anon', 'public.get_workout_for_link(text)', 'execute')
   and has_function_privilege('anon', 'public.get_workout_plan_for_link(text, uuid)', 'execute')
   and has_function_privilege('anon', 'public.get_workout_history_for_link(text, int, date)', 'execute')
-  and has_function_privilege('anon', 'public.submit_workout_session(text, uuid, jsonb, text, int, date, text, uuid)', 'execute'),
+  and has_function_privilege('anon', 'public.submit_workout_session(text, uuid, jsonb, text, int, date, text, uuid, int)', 'execute'),
   'as quatro RPCs do aluno tem grant para anon'
 );
 
@@ -225,7 +225,10 @@ $$, 'plano nao pertence a este aluno',
 -- =====================================================================
 -- 4. CARIMBO DE VERSAO
 -- =====================================================================
-select is(public.app_schema_version(), '0027', 'carimbo de schema em 0027');
+select ok(
+  public.app_schema_version() >= '0027',
+  'carimbo confirma a 0027 ou uma versao posterior'
+);
 
 select * from finish();
 

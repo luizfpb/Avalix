@@ -79,6 +79,8 @@ export type StudentHistoryPlan = {
 export type StudentWorkout = {
   org_name: string
   subject_first_name: string
+  link_expires_at: string
+  current_plan_sessions: number
   plan: StudentPlan | null
   days: StudentDay[]
   exercises: StudentExercise[]
@@ -114,6 +116,17 @@ export type StudentHistorySession = {
   sets: StudentHistorySet[]
 }
 
+export type StudentHistoryCursor = {
+  performed_at: string
+  created_at: string
+  id: string
+}
+
+export type StudentHistoryPage = {
+  items: StudentHistorySession[]
+  next_cursor: StudentHistoryCursor | null
+}
+
 export async function getWorkoutForLink(token: string): Promise<StudentWorkout | null> {
   const { data, error } = await supabase.rpc('get_workout_for_link', { p_token: token })
   if (error) throw error
@@ -145,6 +158,33 @@ export async function getHistoryForLink(
   return (data as unknown as StudentHistorySession[] | null) ?? []
 }
 
+export async function getHistoryPageForLink(
+  token: string,
+  options: { limit?: number; cursor?: StudentHistoryCursor | null } = {}
+): Promise<StudentHistoryPage | null> {
+  const cursor = options.cursor
+  const { data, error } = await supabase.rpc('get_workout_history_page_for_link', {
+    p_token: token,
+    p_limit: options.limit ?? 30,
+    ...(cursor
+      ? {
+          p_before_performed_at: cursor.performed_at,
+          p_before_created_at: cursor.created_at,
+          p_before_id: cursor.id,
+        }
+      : {}),
+  })
+  if (error) throw error
+  const page = data as unknown as StudentHistoryPage | null
+  // NULL e o sinal autoritativo de credencial revogada/expirada. Nao o
+  // transforme em historico vazio: o chamador precisa purgar token e caches.
+  if (!page) return null
+  return {
+    items: Array.isArray(page.items) ? page.items : [],
+    next_cursor: page.next_cursor ?? null,
+  }
+}
+
 export type SubmitSet = {
   exercise_id: string
   set_number: number
@@ -166,15 +206,21 @@ export type SubmitSessionInput = {
   // tem de entrar no plano em que aconteceu. A RPC confere que o plano é do
   // mesmo aluno — quem delimita continua sendo o token.
   planId: string | null
+  // Monotono por client_ref. Replays antigos da fila nao podem substituir um
+  // payload mais novo que ja chegou ao servidor.
+  revision: number
 }
 
-export async function submitSession(input: SubmitSessionInput): Promise<{ logId: string }> {
+export async function submitSession(
+  input: SubmitSessionInput
+): Promise<{ logId: string; stale: boolean }> {
   // Argumento com default na RPC é opcional no tipo gerado (string | undefined,
   // não null): valor ausente se OMITE, e o banco aplica o default. Mandar null
   // explícito não compila — e, se compilasse, sobrescreveria o default.
   const { data, error } = await supabase.rpc('submit_workout_session', {
     p_token: input.token,
     p_client_ref: input.clientRef,
+    p_client_revision: input.revision,
     p_sets: input.sets,
     p_performed_at: input.performedAt,
     ...(input.dayLabel ? { p_day_label: input.dayLabel } : {}),
@@ -183,6 +229,6 @@ export async function submitSession(input: SubmitSessionInput): Promise<{ logId:
     ...(input.planId ? { p_plan: input.planId } : {}),
   })
   if (error) throw error
-  const row = data as unknown as { log_id?: string } | null
-  return { logId: row?.log_id ?? '' }
+  const row = data as unknown as { log_id?: string; stale?: boolean } | null
+  return { logId: row?.log_id ?? '', stale: row?.stale === true }
 }

@@ -75,14 +75,28 @@ const entryPath = rootHtml.match(
 )?.[1]
 if (!entryPath) throw new Error('smoke HTTP: entry JS não encontrado em /')
 
-for (const path of ['/login', '/dashboard', '/a/smoke-token-inexistente']) {
+for (const path of ['/login', '/dashboard', '/a/smoke-token-inexistente', '/t', '/t/']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)
+  expectHeader(response, 'cache-control', /(?:no-store|no-cache)/i, path)
   const html = await response.text()
   if (!html.includes(entryPath)) {
     throw new Error(`smoke HTTP: ${path} não serviu o mesmo shell de /`)
   }
+}
+
+const studentManifest = await request('/treino.webmanifest')
+expectStatus(studentManifest, 200, '/treino.webmanifest')
+expectHeader(studentManifest, 'content-type', /(?:application\/manifest\+json|application\/json)/i, '/treino.webmanifest')
+expectHeader(studentManifest, 'cache-control', /(?:no-store|no-cache)/i, '/treino.webmanifest')
+const studentManifestJson = await studentManifest.json()
+if (
+  studentManifestJson.id !== '/t' ||
+  studentManifestJson.start_url !== '/t' ||
+  studentManifestJson.scope !== '/t'
+) {
+  throw new Error('smoke HTTP: /treino.webmanifest nao aponta para o app /t')
 }
 
 const entry = await request(entryPath, { method: 'HEAD' })

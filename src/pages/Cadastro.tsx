@@ -48,7 +48,10 @@ export default function Cadastro() {
   }
 
   return (
-    <AuthLayout title="Criar conta">
+    <AuthLayout
+      title="Criar conta"
+      subtitle="Cadastre seu acesso profissional. Depois da confirmação do e-mail, você configura seu espaço no Avalix."
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="email">E-mail</Label>
@@ -74,7 +77,14 @@ export default function Cadastro() {
           />
           <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres.</p>
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Criando...' : 'Criar conta'}
         </Button>

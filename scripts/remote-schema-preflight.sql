@@ -93,7 +93,90 @@ with migration_checks(version, evidence, present) as (
           and column_name = 'consent_text_snapshot'
       )
       and to_regprocedure('public.prepare_subject_deletion(uuid)') is not null
-      and to_regprocedure('public.app_schema_version()') is not null)
+      and to_regprocedure('public.app_schema_version()') is not null),
+    ('0021', 'constraints retroativas validadas',
+      (
+        select count(*) = 3 and bool_and(c.convalidated)
+        from pg_constraint c
+        join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+        where n.nspname = 'public'
+          and (
+            (t.relname = 'consent_records' and c.conname = 'consent_records_v11_snapshot_chk')
+            or (t.relname = 'audit_logs' and c.conname in (
+              'audit_logs_action_chk', 'audit_logs_table_name_chk'
+            ))
+          )
+      )),
+    ('0022', 'MFA nas escritas de organizacao',
+      exists (
+        select 1 from pg_policies
+        where schemaname = 'public' and tablename = 'organizations'
+          and policyname = 'organizations_update'
+          and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) like '%mfa_satisfied%'
+      )),
+    ('0023', 'saves concorrentes + anotacao unica',
+      to_regprocedure(
+        'public.save_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text,timestamptz)'
+      ) is not null
+      and exists (
+        select 1 from pg_constraint
+        where conrelid = 'public.posture_annotations'::regclass
+          and conname = 'posture_annotations_photo_key'
+      )),
+    ('0024', 'contato LGPD da organizacao',
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'organizations'
+          and column_name = 'contact_email'
+      )
+      and exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'organizations'
+          and column_name = 'contact_phone'
+      )),
+    ('0025', 'save_workout_plan com argumentos opcionais',
+      exists (
+        select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'save_workout_plan'
+          and p.pronargdefaults >= 3
+      )),
+    ('0026', 'auditoria de resumo de anamnese por IA',
+      coalesce(position('AI_SUMMARY' in pg_get_functiondef(
+        to_regprocedure('public.log_data_action(uuid,text,text,uuid,uuid)')
+      )) > 0, false)),
+    ('0027', 'treino do aluno por link',
+      to_regclass('public.workout_links') is not null
+      and coalesce(
+        to_regprocedure('public.submit_workout_session(text,uuid,jsonb,text,integer,date,text,uuid)'),
+        to_regprocedure('public.submit_workout_session(text,uuid,jsonb,text,integer,date,text,uuid,integer)')
+      ) is not null
+      and exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'workout_logs'
+          and column_name = 'client_ref'
+      )),
+    ('0028', 'estabilizacao, gate server-side e historico composto',
+      to_regprocedure(
+        'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)'
+      ) is not null
+      and to_regprocedure(
+        'public.get_workout_history_page_for_link(text,integer,date,timestamp with time zone,uuid)'
+      ) is not null
+      and to_regprocedure(
+        'public.submit_workout_session(text,uuid,jsonb,text,integer,date,text,uuid,integer)'
+      ) is not null
+      and exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'workout_logs'
+          and column_name = 'client_revision'
+      )
+      and exists (
+        select 1 from pg_constraint
+        where conrelid = 'public.workout_exercises'::regclass
+          and conname = 'workout_exercises_day_exercise_key'
+      )
+      and public.app_schema_version() = '0028')
 )
 select c.version,
        c.evidence,

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -1331,6 +1331,7 @@ export type Database = {
       workout_logs: {
         Row: {
           client_ref: string | null
+          client_revision: number
           created_at: string
           day_label: string | null
           id: string
@@ -1345,6 +1346,7 @@ export type Database = {
         }
         Insert: {
           client_ref?: string | null
+          client_revision?: number
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1359,6 +1361,7 @@ export type Database = {
         }
         Update: {
           client_ref?: string | null
+          client_revision?: number
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1698,6 +1701,43 @@ export type Database = {
       }
       app_schema_version: { Args: never; Returns: string }
       cancel_anamnese_intake: { Args: { p_intake: string }; Returns: undefined }
+      create_assessment: {
+        Args: {
+          p_assessed_at: string
+          p_circumferences: Json
+          p_engine_version: string
+          p_height_cm: number
+          p_medications?: string
+          p_notes?: string
+          p_protocol_id: string
+          p_results: Json
+          p_skinfolds: Json
+          p_subject: string
+          p_weight_kg: number
+        }
+        Returns: {
+          assessed_at: string
+          created_at: string
+          engine_version: string | null
+          evaluator_id: string
+          height_cm: number
+          id: string
+          medications: string | null
+          notes: string | null
+          org_id: string
+          protocol_id: string | null
+          results: Json | null
+          subject_id: string
+          updated_at: string
+          weight_kg: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "assessments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_organization: { Args: { p_name: string }; Returns: string }
       create_workout_log: {
         Args: {
@@ -1710,6 +1750,7 @@ export type Database = {
         }
         Returns: {
           client_ref: string | null
+          client_revision: number
           created_at: string
           day_label: string | null
           id: string
@@ -1749,6 +1790,16 @@ export type Database = {
       get_workout_for_link: { Args: { p_token: string }; Returns: Json }
       get_workout_history_for_link: {
         Args: { p_before?: string; p_limit?: number; p_token: string }
+        Returns: Json
+      }
+      get_workout_history_page_for_link: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_before_performed_at?: string
+          p_limit?: number
+          p_token: string
+        }
         Returns: Json
       }
       get_workout_plan_for_link: {
@@ -1921,6 +1972,20 @@ export type Database = {
         Returns: undefined
       }
       submit_workout_session: {
+        Args: {
+          p_client_ref: string
+          p_client_revision?: number
+          p_day_label?: string
+          p_notes?: string
+          p_performed_at?: string
+          p_plan?: string
+          p_sets: Json
+          p_token: string
+          p_week_number?: number
+        }
+        Returns: Json
+      }
+      submit_workout_session_0027_internal: {
         Args: {
           p_client_ref: string
           p_day_label?: string

@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useId, type ReactNode } from 'react'
 import { Plus, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
 import {
   PARQ_ITEMS,
@@ -80,13 +80,20 @@ function Choice({
   options,
   value,
   onChange,
+  'aria-labelledby': ariaLabelledBy,
 }: {
   options: Option[]
   value: string
   onChange: (v: string) => void
+  'aria-labelledby'?: string
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap gap-1" role="group" aria-label="Resposta">
+    <div
+      className="flex shrink-0 flex-wrap gap-1"
+      role="group"
+      aria-label={ariaLabelledBy ? undefined : 'Resposta'}
+      aria-labelledby={ariaLabelledBy}
+    >
       {options.map((o) => (
         <button
           type="button"
@@ -121,16 +128,22 @@ function MultiCheck({
   options,
   value,
   onChange,
+  'aria-labelledby': ariaLabelledBy,
 }: {
   options: Option[]
   value: string[]
   onChange: (v: string[]) => void
+  'aria-labelledby'?: string
 }) {
   function toggle(v: string) {
     onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])
   }
   return (
-    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+    <div
+      className="grid grid-cols-1 gap-1.5 sm:grid-cols-2"
+      role="group"
+      aria-labelledby={ariaLabelledBy}
+    >
       {options.map((o) => (
         <label key={o.value} className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={value.includes(o.value)} onChange={() => toggle(o.value)} />
@@ -141,19 +154,85 @@ function MultiCheck({
   )
 }
 
+function ConfirmedMultiCheck({
+  options,
+  value,
+  confirmed,
+  noneLabel,
+  onChange,
+  'aria-labelledby': ariaLabelledBy,
+}: {
+  options: Option[]
+  value: string[]
+  confirmed: boolean
+  noneLabel: string
+  onChange: (value: string[], confirmed: boolean) => void
+  'aria-labelledby'?: string
+}) {
+  function toggle(option: string) {
+    const next = value.includes(option)
+      ? value.filter((item) => item !== option)
+      : [...value, option]
+    // Remover a ultima opcao positiva nao equivale a declarar explicitamente
+    // "Nenhuma". A confirmacao volta a ficar pendente para que ausencia de
+    // doenca/sintoma seja sempre uma resposta consciente do aluno.
+    onChange(next, next.length > 0)
+  }
+
+  return (
+    <div className="space-y-2" role="group" aria-labelledby={ariaLabelledBy}>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={confirmed && value.length === 0}
+            onChange={(event) => onChange([], event.target.checked)}
+          />
+          {noneLabel}
+        </label>
+        {options.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={value.includes(option.value)}
+              onChange={() => toggle(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      {!confirmed ? (
+        <p className="text-xs text-warning" role="status">
+          Se nenhuma opção se aplica, confirme a opção “Nenhuma”.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function Select({
   value,
   onChange,
   options,
   placeholder = 'Selecione',
+  'aria-labelledby': ariaLabelledBy,
+  'aria-label': ariaLabel,
 }: {
   value: string
   onChange: (v: string) => void
   options: Option[]
   placeholder?: string
+  'aria-labelledby'?: string
+  'aria-label'?: string
 }) {
   return (
-    <select className={controlClass} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select
+      className={controlClass}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-labelledby={ariaLabelledBy}
+      aria-label={ariaLabel}
+    >
       <option value="">{placeholder}</option>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -166,10 +245,15 @@ function Select({
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const labelId = useId()
+  const labelledChild = isValidElement<{ 'aria-labelledby'?: string }>(children)
+    ? cloneElement(children, {
+        'aria-labelledby': children.props['aria-labelledby'] ?? labelId,
+      })
+    : children
   return (
-    <div className="space-y-1.5" role="group" aria-labelledby={labelId}>
+    <div className="space-y-1.5">
       <Label id={labelId}>{label}</Label>
-      {children}
+      {labelledChild}
     </div>
   )
 }
@@ -190,7 +274,7 @@ function RepeatList<T>({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label>{label}</Label>
+        <span className="text-sm font-medium">{label}</span>
         <Button type="button" size="xs" variant="outline" onClick={onAdd}>
           <Plus /> Adicionar
         </Button>
@@ -285,13 +369,25 @@ export function AnamneseCamadaA({
           <YesNo value={a.ativo_regular} onChange={(v) => set({ ativo_regular: v })} />
         </Row>
         <Field label="Doença diagnosticada">
-          <MultiCheck options={DOENCA_CMR} value={a.doenca_cmr} onChange={(v) => set({ doenca_cmr: v })} />
+          <ConfirmedMultiCheck
+            options={DOENCA_CMR}
+            value={a.doenca_cmr}
+            confirmed={a.doenca_cmr_confirmada}
+            noneLabel="Nenhuma doença diagnosticada"
+            onChange={(value, confirmed) =>
+              set({ doenca_cmr: value, doenca_cmr_confirmada: confirmed })
+            }
+          />
         </Field>
         <Field label="Sinais/sintomas atuais">
-          <MultiCheck
+          <ConfirmedMultiCheck
             options={SINAIS_SINTOMAS}
             value={a.sinais_sintomas}
-            onChange={(v) => set({ sinais_sintomas: v })}
+            confirmed={a.sinais_sintomas_confirmados}
+            noneLabel="Nenhum sinal ou sintoma atual"
+            onChange={(value, confirmed) =>
+              set({ sinais_sintomas: value, sinais_sintomas_confirmados: confirmed })
+            }
           />
         </Field>
       </Section>
@@ -398,8 +494,8 @@ export function AnamneseCamadaB({
           onRemove={(i) => set({ cirurgias: a.cirurgias.filter((_, idx) => idx !== i) })}
           render={(c, i) => (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_5rem]">
-              <Input placeholder="Descrição" value={c.descricao} onChange={(e) => updateItem('cirurgias', i, { descricao: e.target.value }, a, set)} />
-              <Input placeholder="Ano" inputMode="numeric" value={c.ano} onChange={(e) => updateItem('cirurgias', i, { ano: e.target.value }, a, set)} />
+              <Input aria-label={`Cirurgia ${i + 1}: descrição`} placeholder="Descrição" value={c.descricao} onChange={(e) => updateItem('cirurgias', i, { descricao: e.target.value }, a, set)} />
+              <Input aria-label={`Cirurgia ${i + 1}: ano`} placeholder="Ano" inputMode="numeric" value={c.ano} onChange={(e) => updateItem('cirurgias', i, { ano: e.target.value }, a, set)} />
             </div>
           )}
         />
@@ -411,8 +507,8 @@ export function AnamneseCamadaB({
           onRemove={(i) => set({ medicamentos: a.medicamentos.filter((_, idx) => idx !== i) })}
           render={(m, i) => (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Input placeholder="Nome" value={m.nome} onChange={(e) => updateItem('medicamentos', i, { nome: e.target.value }, a, set)} />
-              <Input placeholder="Dose" value={m.dose} onChange={(e) => updateItem('medicamentos', i, { dose: e.target.value }, a, set)} />
+              <Input aria-label={`Medicamento ${i + 1}: nome`} placeholder="Nome" value={m.nome} onChange={(e) => updateItem('medicamentos', i, { nome: e.target.value }, a, set)} />
+              <Input aria-label={`Medicamento ${i + 1}: dose`} placeholder="Dose" value={m.dose} onChange={(e) => updateItem('medicamentos', i, { dose: e.target.value }, a, set)} />
             </div>
           )}
         />
@@ -467,10 +563,11 @@ export function AnamneseCamadaB({
           onRemove={(i) => set({ dor_queixas: a.dor_queixas.filter((_, idx) => idx !== i) })}
           render={(q, i) => (
             <div className="space-y-2">
-              <Select value={q.regiao} onChange={(v) => updateItem('dor_queixas', i, { regiao: v }, a, set)} options={REGIAO_DOR} placeholder="Região" />
+              <Select aria-label={`Queixa de dor ${i + 1}: região`} value={q.regiao} onChange={(v) => updateItem('dor_queixas', i, { regiao: v }, a, set)} options={REGIAO_DOR} placeholder="Região" />
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Intensidade</span>
                 <input
+                  aria-label={`Queixa de dor ${i + 1}: intensidade`}
                   type="range"
                   min={0}
                   max={10}
@@ -642,7 +739,8 @@ export function AnamneseCamadaB({
 
 // ---- caixa do gate (resultado da triagem) -----------------------------
 export function GateBox({ gate }: { gate: ReturnType<typeof computeGate> }) {
-  const ok = gate.liberado && !gate.flagEncaminhamento
+  const incomplete = gate.status === 'incompleto'
+  const ok = gate.status === 'liberado'
   return (
     <div
       className={[
@@ -657,12 +755,18 @@ export function GateBox({ gate }: { gate: ReturnType<typeof computeGate> }) {
           <AlertTriangle className="size-5 text-warning" />
         )}
         <span className="font-medium">
-          {ok ? 'Liberado para avaliação' : 'Atenção: encaminhamento recomendado'}
+          {incomplete
+            ? 'Triagem incompleta — liberação não calculada'
+            : ok
+              ? 'Liberado para avaliação'
+              : 'Atenção: encaminhamento recomendado'}
         </span>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Nível ACSM: <span className="font-medium text-foreground">{NIVEL_LABEL[gate.nivelEncaminhamento]}</span>
-      </p>
+      {incomplete ? null : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nível ACSM: <span className="font-medium text-foreground">{NIVEL_LABEL[gate.nivelEncaminhamento]}</span>
+        </p>
+      )}
       {gate.motivos.length > 0 ? (
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {gate.motivos.map((m, i) => (
