@@ -61,7 +61,7 @@ export default function ExerciciosBiblioteca() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Configurações
+            ← Ajustes
           </Link>
           <h1 className="mt-2 text-xl font-semibold">Biblioteca de exercícios</h1>
           <p className="text-sm text-muted-foreground">

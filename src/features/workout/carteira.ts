@@ -4,6 +4,7 @@ import { daysSince, dueForReassessment } from '../../lib/reminders'
 
 // dias sem treino registrado (com plano ativo) que pedem atenção do profissional
 export const QUIET_DAYS = 10
+export const LOW_ADHERENCE_RATIO = 0.5
 
 export type CarteiraRow = {
   subjectId: string
@@ -69,7 +70,7 @@ export function buildCarteira(input: {
     const attention =
       (reassessDue ? 2 : 0) +
       (plan && quiet ? 2 : 0) +
-      (adherence != null && adherence < 0.5 ? 1 : 0)
+      (adherence != null && adherence < LOW_ADHERENCE_RATIO ? 1 : 0)
 
     rows.push({
       subjectId: s.id,

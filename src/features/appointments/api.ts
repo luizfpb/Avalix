@@ -14,6 +14,16 @@ export type CreateAppointmentInput = {
   notes: string | null
 }
 
+type AppointmentJoinRow = AppointmentRow & {
+  subjects: { full_name: string } | { full_name: string }[]
+}
+
+function withSubjectName(row: AppointmentJoinRow): AppointmentWithSubject {
+  const { subjects: _subjects, ...appointment } = row
+  const subject = Array.isArray(row.subjects) ? row.subjects[0] : row.subjects
+  return { ...appointment, subjectName: subject?.full_name ?? '' }
+}
+
 // Agenda da org com o nome do avaliado (via join), ordenada por horário. RLS já
 // restringe; o filtro por org usa o índice e deixa explícito.
 export async function listAppointments(orgId: string): Promise<AppointmentWithSubject[]> {
@@ -31,14 +41,26 @@ export async function listAppointments(orgId: string): Promise<AppointmentWithSu
     pages.push(...(data ?? []))
     if ((data?.length ?? 0) < pageSize) break
   }
-  const rows = pages as Array<
-    AppointmentRow & { subjects: { full_name: string } | { full_name: string }[] }
-  >
-  return rows.map((r) => {
-    const { subjects: _subjects, ...appt } = r
-    const s = Array.isArray(r.subjects) ? r.subjects[0] : r.subjects
-    return { ...(appt as AppointmentRow), subjectName: s?.full_name ?? '' }
-  })
+  return (pages as AppointmentJoinRow[]).map(withSubjectName)
+}
+
+// O Início precisa somente da janela que exibe. Esta consulta evita baixar
+// todo o histórico da organização a cada abertura do painel.
+export async function listUpcomingAppointments(
+  orgId: string,
+  startsAt: string,
+  endsAt: string
+): Promise<AppointmentWithSubject[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*, subjects!inner(full_name)')
+    .eq('org_id', orgId)
+    .gte('starts_at', startsAt)
+    .lte('starts_at', endsAt)
+    .order('starts_at', { ascending: true })
+    .order('id', { ascending: true })
+  if (error) throw error
+  return ((data ?? []) as AppointmentJoinRow[]).map(withSubjectName)
 }
 
 // evaluator_id é omitido: default auth.uid() assume e o trigger check_evaluator

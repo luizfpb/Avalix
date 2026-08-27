@@ -20,7 +20,7 @@ export default function Configuracoes() {
   const { organization, role } = useOrganization()
   return (
     <div className="max-w-2xl space-y-5">
-      <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
 
       <AppearanceCard />
 

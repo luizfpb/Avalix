@@ -34,7 +34,6 @@ const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Agenda = lazy(() => import('./pages/Agenda'))
-const Carteira = lazy(() => import('./pages/Carteira'))
 const AvaliacoesComparar = lazy(() => import('./pages/AvaliacoesComparar'))
 const Auditoria = lazy(() => import('./pages/Auditoria'))
 
@@ -110,7 +109,7 @@ export default function App() {
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/auditoria" element={<Auditoria />} />
             <Route path="/agenda" element={<Agenda />} />
-            <Route path="/carteira" element={<Carteira />} />
+            <Route path="/carteira" element={<Navigate to="/dashboard" replace />} />
             <Route path="/exercicios" element={<ExerciciosBiblioteca />} />
             <Route path="/ferramentas/1rm" element={<Calculadora1RM />} />
           </Route>

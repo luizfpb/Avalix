@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router'
 import {
   ArrowRight,
@@ -9,50 +10,81 @@ import {
   ShieldCheck,
   UserPlus,
   Users,
+  type LucideIcon,
 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
-import { useAppointments } from '../features/appointments/hooks'
+import { useUpcomingAppointments } from '../features/appointments/hooks'
 import { useLastAssessmentBySubject } from '../features/assessment/hooks'
-import { relativeDayLabel, dueForReassessment, REASSESS_DAYS } from '../lib/reminders'
+import { useOrgActivePlans, useOrgWorkoutLogSummary } from '../features/workout/hooks'
+import {
+  buildCarteira,
+  LOW_ADHERENCE_RATIO,
+  QUIET_DAYS,
+} from '../features/workout/carteira'
+import { relativeDayLabel } from '../lib/reminders'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { QueryError } from '../components/QueryError'
 
 export default function Dashboard() {
   const { organization } = useOrganization()
+  const orgId = organization?.id
   const labels = subjectTermLabels(organization?.subject_term)
-  const subjectsQ = useSubjects(organization?.id)
+  const subjectsQ = useSubjects(orgId)
   const { data: subjects, isPending } = subjectsQ
 
   const total = subjects?.length ?? 0
   const ativos = subjects?.filter((s) => s.is_active).length ?? 0
   const isEmpty = !isPending && total === 0
 
-  const intakesQ = usePendingIntakes(organization?.id)
+  const intakesQ = usePendingIntakes(orgId)
   const pendingIntakes = intakesQ.data ?? []
-  const apptsQ = useAppointments(organization?.id)
-  const lastAssessQ = useLastAssessmentBySubject(organization?.id)
-  const now = new Date()
-  const sod = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const upcoming = (apptsQ.data ?? [])
-    .filter((a) => {
-      const t = new Date(a.starts_at).getTime()
-      return t >= sod && t <= now.getTime() + 7 * 86400000
-    })
-    .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-  const lastMap = lastAssessQ.data ?? {}
-  const dueList = (subjects ?? []).filter(
-    (s) => s.is_active && dueForReassessment(lastMap[s.id] ?? null, now)
+  const now = useMemo(() => new Date(), [])
+  const appointmentWindow = useMemo(() => {
+    const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const endsAt = new Date(now.getTime() + 7 * 86400000).toISOString()
+    return { startsAt, endsAt }
+  }, [now])
+  const apptsQ = useUpcomingAppointments(
+    orgId,
+    appointmentWindow.startsAt,
+    appointmentWindow.endsAt
   )
+  const lastAssessQ = useLastAssessmentBySubject(orgId)
+  const plansQ = useOrgActivePlans(orgId)
+  const logsQ = useOrgWorkoutLogSummary(orgId)
+  const upcoming = apptsQ.data ?? []
+  const rows = useMemo(
+    () =>
+      buildCarteira({
+        subjects: subjects ?? [],
+        lastAssessment: lastAssessQ.data ?? {},
+        activePlans: plansQ.data ?? [],
+        logSummary: logsQ.data ?? {},
+        now,
+      }),
+    [subjects, lastAssessQ.data, plansQ.data, logsQ.data, now]
+  )
+  const attentionRows = rows.filter((row) => row.attention > 0)
+  const reassessCount = rows.filter((row) => row.reassessDue).length
+  const quietCount = rows.filter((row) => row.quiet).length
+  const attentionPending =
+    subjectsQ.isPending || lastAssessQ.isPending || plansQ.isPending || logsQ.isPending
   const todayLabel = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
   }).format(now)
-  const hasLoadError = subjectsQ.isError || intakesQ.isError || apptsQ.isError || lastAssessQ.isError
+  const hasLoadError =
+    subjectsQ.isError ||
+    intakesQ.isError ||
+    lastAssessQ.isError ||
+    plansQ.isError ||
+    logsQ.isError
 
   return (
     <div className="space-y-8">
@@ -82,8 +114,9 @@ export default function Dashboard() {
             void Promise.all([
               subjectsQ.refetch(),
               intakesQ.refetch(),
-              apptsQ.refetch(),
               lastAssessQ.refetch(),
+              plansQ.refetch(),
+              logsQ.refetch(),
             ])
           }}
         />
@@ -114,8 +147,18 @@ export default function Dashboard() {
             hint="base completa"
           />
           <StatCard label="Ativos" value={isPending ? '—' : ativos} hint="em acompanhamento" tone="success" />
-          <StatCard label="Próximos 7 dias" value={apptsQ.isPending ? '—' : upcoming.length} hint="sessões agendadas" />
-          <StatCard label="Para reavaliar" value={lastAssessQ.isPending ? '—' : dueList.length} hint={`há ${REASSESS_DAYS}+ dias`} tone="warning" />
+          <StatCard
+            label="Para reavaliar"
+            value={attentionPending ? '—' : reassessCount}
+            hint="acompanhamento vencido"
+            tone="warning"
+          />
+          <StatCard
+            label="Sem treino recente"
+            value={attentionPending ? '—' : quietCount}
+            hint={`há ${QUIET_DAYS}+ dias`}
+            tone="warning"
+          />
         </section>
       )}
 
@@ -155,93 +198,151 @@ export default function Dashboard() {
         </Card>
       ) : null}
 
-      {!hasLoadError ? <section className="grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
-          <CardContent className="py-1">
-            <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                  Agenda
-                </p>
-                <h2 className="mt-1 text-xl font-semibold">Próximas sessões</h2>
+      {!hasLoadError ? (
+        <section className={`grid gap-4 ${upcoming.length > 0 ? 'lg:grid-cols-5' : ''}`}>
+          <Card className={upcoming.length > 0 ? 'lg:col-span-3' : ''}>
+            <CardContent className="py-1">
+              <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    Acompanhamento
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold">Precisam de atenção</h2>
+                </div>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/avaliados">
+                    Ver {labels.plural} <ArrowRight />
+                  </Link>
+                </Button>
               </div>
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/agenda">
-                  Ver agenda <ArrowRight />
-                </Link>
-              </Button>
-            </div>
 
-            {apptsQ.isPending ? (
-              <p role="status" className="py-6 text-sm text-muted-foreground">Carregando agenda...</p>
-            ) : upcoming.length === 0 ? (
-              <EmptyLine
-                icon={CalendarDays}
-                title="Agenda tranquila nos próximos 7 dias"
-                text="Novas sessões aparecerão aqui."
-              />
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {upcoming.slice(0, 5).map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 py-3.5">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <CalendarDays className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{a.subjectName}</span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{a.title}</span>
-                    </span>
-                    <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                      {relativeDayLabel(a.starts_at, now)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+              {attentionPending ? (
+                <p role="status" className="py-6 text-sm text-muted-foreground">
+                  Carregando acompanhamentos...
+                </p>
+              ) : attentionRows.length === 0 ? (
+                <EmptyLine
+                  icon={CheckCircle2}
+                  title="Acompanhamentos em dia"
+                  text="Nenhuma reavaliação, ausência recente ou baixa adesão exige ação agora."
+                  success
+                />
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {attentionRows.slice(0, 5).map((row) => {
+                    const lowAdherence =
+                      row.adherencePct != null && row.adherencePct < LOW_ADHERENCE_RATIO
+                    return (
+                      <li key={row.subjectId} className="py-3.5">
+                        <div className="flex items-start gap-3">
+                          <Link
+                            to={`/avaliados/${row.subjectId}`}
+                            className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                          >
+                            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+                              <Bell className="size-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{row.name}</span>
+                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                {row.planName ? `Plano ativo · ${row.planName}` : 'Sem plano ativo'}
+                              </span>
+                            </span>
+                            <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                          </Link>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-12">
+                          {row.reassessDue ? <Badge variant="warn">Reavaliar</Badge> : null}
+                          {row.quiet ? <Badge variant="warn">Sem treino recente</Badge> : null}
+                          {lowAdherence ? (
+                            <Badge variant="warn">
+                              {Math.round((row.adherencePct ?? 0) * 100)}% de adesão
+                            </Badge>
+                          ) : null}
+                          {row.planId ? (
+                            <Button asChild variant="ghost" size="sm" className="ml-auto h-7 px-2.5">
+                              <Link to={`/avaliados/${row.subjectId}/treinos/${row.planId}/execucao`}>
+                                Execução <ArrowRight />
+                              </Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {!attentionPending && attentionRows.length > 5 ? (
+                <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                  Mais {attentionRows.length - 5}{' '}
+                  {attentionRows.length - 5 === 1 ? 'acompanhamento precisa' : 'acompanhamentos precisam'} de atenção.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
 
-        <Card className="lg:col-span-2">
-          <CardContent className="py-1">
-            <div className="border-b border-border/70 pb-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                Acompanhamento
-              </p>
-              <h2 className="mt-1 text-xl font-semibold">Para reavaliar</h2>
-            </div>
-
-            {lastAssessQ.isPending ? (
-              <p role="status" className="py-6 text-sm text-muted-foreground">Carregando reavaliações...</p>
-            ) : dueList.length === 0 ? (
-              <EmptyLine
-                icon={CheckCircle2}
-                title="Acompanhamentos em dia"
-                text="Ninguém ultrapassou o intervalo de reavaliação."
-                success
-              />
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {dueList.slice(0, 5).map((subject) => (
-                  <li key={subject.id}>
-                    <Link
-                      to={`/avaliados/${subject.id}`}
-                      className="group flex items-center gap-3 py-3.5 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
-                    >
-                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
-                        <Bell className="size-4" />
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                        {subject.full_name}
-                      </span>
-                      <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          {upcoming.length > 0 ? (
+            <Card className="lg:col-span-2">
+              <CardContent className="py-1">
+                <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                      Próximos 7 dias
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold">Compromissos</h2>
+                  </div>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/agenda" aria-label="Abrir agenda completa">
+                      Agenda <ArrowRight />
                     </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </section> : null}
+                  </Button>
+                </div>
+
+                <ul className="divide-y divide-border/60">
+                  {upcoming.slice(0, 3).map((appointment) => (
+                    <li key={appointment.id}>
+                      <Link
+                        to={`/avaliados/${appointment.subject_id}`}
+                        className="group flex items-center gap-3 py-3.5 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                      >
+                        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                          <CalendarDays className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">
+                            {appointment.subjectName}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {appointment.title}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-[11px] font-semibold text-muted-foreground">
+                          <span className="block">{relativeDayLabel(appointment.starts_at, now)}</span>
+                          <span className="mt-0.5 block tabular-nums">
+                            {appointmentTimeLabel(appointment.starts_at)}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {upcoming.length > 3 ? (
+                  <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                    +{upcoming.length - 3} na agenda.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!hasLoadError && apptsQ.isError ? (
+        <QueryError
+          message="Não foi possível verificar os próximos compromissos."
+          onRetry={() => void apptsQ.refetch()}
+        />
+      ) : null}
 
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -268,7 +369,7 @@ export default function Dashboard() {
           <ActionCard
             to="/configuracoes"
             icon={Settings}
-            title="Configurações"
+            title="Ajustes"
             desc="Conta, segurança e organização."
           />
         </div>
@@ -322,7 +423,7 @@ function EmptyLine({
   text,
   success = false,
 }: {
-  icon: typeof CalendarDays
+  icon: LucideIcon
   title: string
   text: string
   success?: boolean
@@ -351,7 +452,7 @@ function ActionCard({
   desc,
 }: {
   to: string
-  icon: typeof Users
+  icon: LucideIcon
   title: string
   desc: string
 }) {
@@ -373,4 +474,11 @@ function ActionCard({
       </Card>
     </Link>
   )
+}
+
+function appointmentTimeLabel(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
 }
