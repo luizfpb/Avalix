@@ -30,6 +30,9 @@ import {
 } from '../features/workout/builder'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
+import { GroupBlock } from '../features/workout/GroupBlock'
+import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
+import { formatSetsReps } from '../features/workout/effective'
 import { planShareText, whatsappUrl } from '../features/workout/share'
 import { weekSessionLabels } from '../features/workout/progress'
 import { downloadBlob } from '../features/reports/download'
@@ -520,25 +523,40 @@ export default function TreinoDetalhe() {
                   {day.name ? <span className="text-muted-foreground"> — {day.name}</span> : null}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                {rows.map((ex, i) => {
-                  const meta = exerciseMeta(ex)
-                  const exName = exerciseNames[ex.exercise_id] ?? 'Exercício'
-                  return (
-                    <div key={ex.id} className="flex flex-col border-b py-1 last:border-0">
-                      <div className="flex justify-between gap-3">
-                        <span>
-                          {i + 1}. {exName}
-                        </span>
-                        <span className="font-semibold tabular-nums">
-                          {ex.sets}×{ex.reps}
-                        </span>
+              <CardContent className="space-y-2 text-sm">
+                {toRowBlocks(rows).map((block) => {
+                  const cartoes = block.items.map((ex, j) => {
+                    const meta = exerciseMeta(ex)
+                    const exName = exerciseNames[ex.exercise_id] ?? 'Exercício'
+                    const tecnica = techniqueLabel(ex.technique)
+                    return (
+                      <div key={ex.id} className="flex flex-col border-b py-1 last:border-0">
+                        <div className="flex justify-between gap-3">
+                          <span>
+                            {block.start + j + 1}. {exName}
+                            {tecnica ? (
+                              <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                {tecnica}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="shrink-0 font-semibold tabular-nums">
+                            {formatSetsReps(ex.sets, ex.reps)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
+                          <ExerciseDemoLink name={exName} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" />
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
-                        <ExerciseDemoLink name={exName} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" />
-                      </div>
-                    </div>
+                    )
+                  })
+                  return block.kind == null ? (
+                    cartoes
+                  ) : (
+                    <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
+                      {cartoes}
+                    </GroupBlock>
                   )
                 })}
               </CardContent>

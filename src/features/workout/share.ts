@@ -5,6 +5,8 @@ import type {
   WorkoutWeekOverrideRow,
 } from './api'
 import { goalLabel } from './volume'
+import { formatSetsReps } from './effective'
+import { groupHint, groupLabel, techniqueLabel, toRowBlocks } from './groups'
 
 function fmtRir(rir: number): string {
   return Number.isInteger(rir) ? String(rir) : rir.toFixed(1)
@@ -53,13 +55,28 @@ export function planShareText(input: {
       .filter((e) => e.day_id === day.id)
       .slice()
       .sort((a, b) => a.position - b.position)
-    rows.forEach((ex, i) => {
-      const rir = ex.rir != null ? ` (RIR ${fmtRir(ex.rir)})` : ''
-      const extra = `${fmtRest(ex.rest_seconds)}${ex.tempo ? ` · cadência ${ex.tempo}` : ''}`
-      lines.push(
-        `${i + 1}. ${exerciseNames[ex.exercise_id] ?? 'Exercício'} — ${ex.sets}×${ex.reps}${rir}${extra}`
-      )
-    })
+    // Super-série e circuito viram uma faixa antes dos membros, e os membros
+    // entram recuados. O aluno que recebe pelo WhatsApp precisa saber que dois
+    // exercícios são um bloco — sem isso ele executa três séries de um, depois
+    // três do outro, que é outro treino.
+    for (const bloco of toRowBlocks(rows)) {
+      if (bloco.kind != null) {
+        lines.push(
+          `_${groupLabel(bloco.kind, bloco.items.length)}: ${groupHint(bloco.kind, bloco.items.length)}_`
+        )
+      }
+      bloco.items.forEach((ex, j) => {
+        const rir = ex.rir != null ? ` (RIR ${fmtRir(ex.rir)})` : ''
+        const tecnica = techniqueLabel(ex.technique)
+        const extra = `${fmtRest(ex.rest_seconds)}${ex.tempo ? ` · cadência ${ex.tempo}` : ''}${
+          tecnica ? ` · ${tecnica}` : ''
+        }`
+        const recuo = bloco.kind != null ? '   ' : ''
+        lines.push(
+          `${recuo}${bloco.start + j + 1}. ${exerciseNames[ex.exercise_id] ?? 'Exercício'} — ${formatSetsReps(ex.sets, ex.reps)}${rir}${extra}`
+        )
+      })
+    }
   }
 
   // Ajustes por semana, agrupados como no PDF. Sem isto o plano enviado

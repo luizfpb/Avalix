@@ -10,6 +10,7 @@ import type {
   WorkoutWeekRow,
 } from '../workout/api'
 import { weekSessionLabels } from '../workout/progress'
+import { groupHint, groupLabel, techniqueLabel, toRowBlocks } from '../workout/groups'
 import { registerReportFonts } from './pdfFonts'
 import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { goalLabel } from '../workout/volume'
@@ -117,6 +118,43 @@ const styles = StyleSheet.create({
   tdStrong: { fontSize: 10, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
   tdCell: { fontSize: 8.5, color: '#46515D' },
 
+  // ---- Bloco (super-série / circuito) ----
+  // Faixa acima dos membros, com a instrução de execução junto: a ficha
+  // impressa é lida na academia por quem não sabe o jargão, e "Bi-set" sozinho
+  // não diz o que fazer entre um exercício e outro.
+  // A faixa e os membros dividem uma barra lateral contínua: sem ela dava para
+  // ver onde o bloco começava, mas não onde ele terminava — e "quantos
+  // exercícios entram na super-série" é justamente o que a ficha precisa dizer.
+  // O padding esquerdo desconta a barra para as colunas não saírem do prumo.
+  groupBand: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#EDE7F7',
+    paddingVertical: 3,
+    paddingRight: 11,
+    paddingLeft: 8.5,
+    borderLeftWidth: 2.5,
+    borderLeftColor: palette.violet,
+    borderBottomWidth: 0.5,
+    borderBottomColor: palette.hairline,
+  },
+  groupBandName: {
+    fontSize: 6.5,
+    fontFamily: 'Manrope', fontWeight: 700,
+    color: palette.violet,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  groupBandHint: { fontSize: 6.5, color: palette.muted, marginLeft: 6 },
+  // membro do bloco não entra na zebra: fundo próprio e a mesma barra lateral
+  // da faixa é o que delimita o bloco de ponta a ponta
+  trGroup: {
+    backgroundColor: '#F7F4FC',
+    paddingLeft: 8.5,
+    borderLeftWidth: 2.5,
+    borderLeftColor: palette.violet,
+  },
+
   // colunas da tabela de exercícios
   colNum: { width: 20, textAlign: 'center' },
   colName: { flex: 1, paddingRight: 8 },
@@ -194,6 +232,8 @@ function commonTempo(rows: WorkoutExerciseRow[]): string | null {
 // cadência já anunciada no cabeçalho do dia — essa não se repete.
 function exerciseSub(ex: WorkoutExerciseRow, hoisted: string | null): string {
   const parts: string[] = []
+  const tecnica = techniqueLabel(ex.technique)
+  if (tecnica) parts.push(tecnica)
   if (ex.tempo && ex.tempo !== hoisted) parts.push(`cadência ${ex.tempo}`)
   if (ex.notes) parts.push(ex.notes)
   return parts.join(' · ')
@@ -213,11 +253,14 @@ function estimateDayCardHeight(rows: WorkoutExerciseRow[], tempo: string | null)
   const THEAD = 16
   const LINHA = 22
   const SUBLINHA = 11
+  const FAIXA_BLOCO = 14
   const bordas = 12
+  const blocos = toRowBlocks(rows).filter((b) => b.kind != null).length
   return (
     CABECALHO +
     THEAD +
     bordas +
+    blocos * FAIXA_BLOCO +
     rows.reduce((h, ex) => h + LINHA + (exerciseSub(ex, tempo) ? SUBLINHA : 0), 0)
   )
 }
@@ -296,31 +339,53 @@ function DayCard({
         <Text style={[styles.th, styles.colRest]}>Descanso</Text>
       </View>
 
-      {rows.map((ex, i) => {
-        const sub = exerciseSub(ex, tempo)
-        const last = i === rows.length - 1
-        return (
-          // A linha em si nunca parte: com o cartão podendo quebrar entre
-          // páginas, sem isto um exercício ficava com o nome numa folha e as
-          // séries/reps na outra.
-          <View
-            key={ex.id}
-            wrap={false}
-            style={[styles.tr, ...(i % 2 === 1 ? [styles.trAlt] : []), ...(last ? [styles.trLast] : [])]}
-          >
-            <Text style={[styles.tdNum, styles.colNum]}>{i + 1}</Text>
-            <View style={styles.colName}>
-              <Text style={styles.tdName}>{names[ex.exercise_id] ?? 'Exercício'}</Text>
-              {sub ? <Text style={styles.tdNameSub}>{sub}</Text> : null}
+      {toRowBlocks(rows).map((block) => {
+        const linhas = block.items.map((ex, j) => {
+          const i = block.start + j
+          const sub = exerciseSub(ex, tempo)
+          const last = i === rows.length - 1
+          return (
+            // A linha em si nunca parte: com o cartão podendo quebrar entre
+            // páginas, sem isto um exercício ficava com o nome numa folha e as
+            // séries/reps na outra.
+            <View
+              key={ex.id}
+              wrap={false}
+              style={[
+                styles.tr,
+                ...(block.kind != null ? [styles.trGroup] : i % 2 === 1 ? [styles.trAlt] : []),
+                ...(last ? [styles.trLast] : []),
+              ]}
+            >
+              <Text style={[styles.tdNum, styles.colNum]}>{i + 1}</Text>
+              <View style={styles.colName}>
+                <Text style={styles.tdName}>{names[ex.exercise_id] ?? 'Exercício'}</Text>
+                {sub ? <Text style={styles.tdNameSub}>{sub}</Text> : null}
+              </View>
+              <Text style={[styles.tdStrong, styles.colSets]}>{fmtSets(ex.sets)}</Text>
+              {/* sem faixa prescrita (aquecimento, mobilidade, até a falha): o
+                  travessão é a resposta certa, não uma célula vazia */}
+              <Text style={[styles.tdStrong, styles.colReps]}>{ex.reps ?? '—'}</Text>
+              <Text style={[styles.tdCell, styles.colRir]}>
+                {ex.rir != null ? fmtSets(ex.rir) : '—'}
+              </Text>
+              <Text style={[styles.tdCell, styles.colRest]}>
+                {ex.rest_seconds != null ? `${ex.rest_seconds}s` : '—'}
+              </Text>
             </View>
-            <Text style={[styles.tdStrong, styles.colSets]}>{fmtSets(ex.sets)}</Text>
-            <Text style={[styles.tdStrong, styles.colReps]}>{ex.reps}</Text>
-            <Text style={[styles.tdCell, styles.colRir]}>
-              {ex.rir != null ? fmtSets(ex.rir) : '—'}
-            </Text>
-            <Text style={[styles.tdCell, styles.colRest]}>
-              {ex.rest_seconds != null ? `${ex.rest_seconds}s` : '—'}
-            </Text>
+          )
+        })
+        if (block.kind == null) return linhas
+        // O bloco não parte entre páginas: uma super-série com a faixa numa
+        // folha e o segundo exercício na outra não é executável a partir da
+        // ficha. São dois a quatro exercícios, então nunca estoura a folha.
+        return (
+          <View key={block.key} wrap={false}>
+            <View style={styles.groupBand}>
+              <Text style={styles.groupBandName}>{groupLabel(block.kind, block.items.length)}</Text>
+              <Text style={styles.groupBandHint}>{groupHint(block.kind, block.items.length)}</Text>
+            </View>
+            {linhas}
           </View>
         )
       })}

@@ -33,11 +33,17 @@ export type StudentExercise = {
   name: string
   position: number
   sets: number
-  reps: string
+  reps: string | null
   rir: number | null
   rest_seconds: number | null
   tempo: string | null
   notes: string | null
+  // Agrupamento e técnica (migration 0030). Opcionais no tipo porque um pacote
+  // em cache no aparelho do aluno pode ter sido baixado antes da 0030 — a tela
+  // trata ausente como exercício solto, nunca quebra.
+  group_key?: string | null
+  group_kind?: string | null
+  technique?: string | null
 }
 
 export type StudentWeek = {

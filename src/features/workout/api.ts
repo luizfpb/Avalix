@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { Database, Json } from '../../lib/database.types'
+import type { GroupKind, Technique } from './groups'
 import type { VolumeSnapshot } from './volume'
 
 export type ExerciseRow = Database['public']['Tables']['exercises']['Row']
@@ -185,11 +186,18 @@ export type PlanExerciseInput = {
   clientKey: string
   exerciseId: string
   sets: number
-  reps: string
+  // nulo = prescricao sem faixa de repeticao (aquecimento, mobilidade,
+  // trabalho ate a falha). A coluna deixou de ser NOT NULL na migration 0030.
+  reps: string | null
   rir: number | null
   restSeconds: number | null
   tempo: string | null
   notes: string | null
+  // agrupamento contiguo dentro da divisao (super-serie/circuito) e tecnica de
+  // intensidade do proprio exercicio. Ver features/workout/groups.ts.
+  groupKey: string | null
+  groupKind: GroupKind | null
+  technique: Technique | null
 }
 
 export type PlanDayInput = {
@@ -279,6 +287,9 @@ function planChildrenPayload(input: SaveWorkoutPlanInput) {
       rest_seconds: ex.restSeconds,
       tempo: ex.tempo,
       notes: ex.notes,
+      group_key: ex.groupKey,
+      group_kind: ex.groupKind,
+      technique: ex.technique,
     })),
   }))
   return {

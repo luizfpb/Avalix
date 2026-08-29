@@ -9,7 +9,7 @@ export type WeeksCardExercise = {
   tag: string
   name: string
   templateSets: number
-  templateReps: string
+  templateReps: string | null
   templateRir: number | null
   templateRest: number | null
 }
@@ -114,7 +114,7 @@ export function WeeksCard({
                         <Input
                           className="h-8 w-16"
                           aria-label={`Reps de ${ex.name} na semana ${week}`}
-                          placeholder={ex.templateReps}
+                          placeholder={ex.templateReps ?? 'livre'}
                           value={ov?.reps ?? ''}
                           disabled={skip}
                           onChange={(e) => onOverride(week, ex.key, { reps: e.target.value || null })}

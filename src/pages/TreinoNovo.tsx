@@ -10,6 +10,10 @@ import {
   Calculator,
   X,
   GripVertical,
+  Layers,
+  Link2,
+  Repeat,
+  Unlink,
 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -26,10 +30,26 @@ import {
   planDetailToEditor,
   snapshotFromEditor,
   editorToSaveInput,
+  type EditorDay,
+  type EditorExercise,
   type EditorOverride,
   type EditorPlan,
   type ExerciseMeta,
 } from '../features/workout/builder'
+import {
+  TECHNIQUE_OPTIONS,
+  circuitSetsMismatch,
+  groupHint,
+  groupLabel,
+  groupWithPrevious,
+  normalizeGroups,
+  setGroupKind,
+  toBlocks,
+  ungroupAt,
+  type Block,
+  type GroupKind,
+  type Technique,
+} from '../features/workout/groups'
 import { GOAL_OPTIONS } from '../features/workout/schema'
 import { clearDraft, useFormDraft } from '../lib/draft'
 import {
@@ -59,6 +79,13 @@ import { QueryError } from '../components/QueryError'
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
   return c?.randomUUID ? c.randomUUID() : `k-${Math.random().toString(36).slice(2)}`
+}
+
+// Etiqueta do bloco (super-série/circuito). Curta de propósito: a coluna aceita
+// 40 caracteres e a normalização deriva chaves a partir dela quando um bloco
+// parte em dois — com um uuid inteiro não sobraria espaço para o sufixo.
+function newGroupKey(): string {
+  return `g-${newKey().replace(/-/g, '').slice(0, 10)}`
 }
 
 // move um item de uma posicao para outra (reordenar dias/exercicios)
@@ -266,13 +293,32 @@ function Builder({
     if (to < 0 || to >= plan.days.length) return
     setPlan((p) => ({ ...p, days: arrayMove(p.days, from, to) }))
   }
-  function moveExercise(dayKey: string, from: number, to: number) {
+  // Toda escrita na lista de exercícios de uma divisão passa por aqui, e sai
+  // normalizada: contiguidade e tamanho mínimo dos blocos são invariantes, não
+  // algo para cada ação lembrar de manter. Mover um exercício para dentro de um
+  // bloco o inclui no bloco; tirá-lo de lá fecha o que sobrou.
+  function patchDayExercises(
+    dayKey: string,
+    fn: (list: EditorExercise[]) => EditorExercise[]
+  ) {
     setPlan((p) => ({
       ...p,
       days: p.days.map((d) =>
-        d.key === dayKey ? { ...d, exercises: arrayMove(d.exercises, from, to) } : d
+        d.key === dayKey ? { ...d, exercises: normalizeGroups(fn(d.exercises)) } : d
       ),
     }))
+  }
+  function moveExercise(dayKey: string, from: number, to: number) {
+    patchDayExercises(dayKey, (list) => arrayMove(list, from, to))
+  }
+  function groupExercise(dayKey: string, index: number) {
+    patchDayExercises(dayKey, (list) => groupWithPrevious(list, index, newGroupKey))
+  }
+  function ungroupExercise(dayKey: string, index: number) {
+    patchDayExercises(dayKey, (list) => ungroupAt(list, index))
+  }
+  function changeGroupKind(dayKey: string, groupKey: string, kind: GroupKind) {
+    patchDayExercises(dayKey, (list) => setGroupKind(list, groupKey, kind))
   }
   function patchDay(dayKey: string, patch: Partial<{ label: string; name: string | null }>) {
     setPlan((p) => ({
@@ -304,6 +350,9 @@ function Builder({
                   restSeconds: 90,
                   tempo: null,
                   notes: null,
+                  groupKey: null,
+                  groupKind: null,
+                  technique: null,
                 },
               ],
             }
@@ -315,7 +364,9 @@ function Builder({
     setPlan((p) => ({
       ...p,
       days: p.days.map((d) =>
-        d.key === dayKey ? { ...d, exercises: d.exercises.filter((e) => e.key !== exKey) } : d
+        d.key === dayKey
+          ? { ...d, exercises: normalizeGroups(d.exercises.filter((e) => e.key !== exKey)) }
+          : d
       ),
       // limpa overrides orfaos do exercicio removido
       overrides: p.overrides.filter((o) => o.exerciseKey !== exKey),
@@ -324,7 +375,13 @@ function Builder({
   function patchExercise(
     dayKey: string,
     exKey: string,
-    patch: Partial<{ sets: number; reps: string; rir: number | null; restSeconds: number | null }>
+    patch: Partial<{
+      sets: number
+      reps: string | null
+      rir: number | null
+      restSeconds: number | null
+      technique: Technique | null
+    }>
   ) {
     setPlan((p) => ({
       ...p,
@@ -404,6 +461,234 @@ function Builder({
       const labels = p.days.map((d) => d.label)
       return { ...p, weeklySchedule: [...baseSchedule(p), labels[0] ?? ''] }
     })
+  }
+
+  // ---- desenho de uma linha e de um bloco -----------------------------
+  // A linha saiu do JSX da divisão porque agora ela aparece em dois contextos —
+  // solta e dentro de um bloco — e ter duas cópias do formulário de
+  // séries/reps/RIR/descanso/técnica era garantir que um dia elas divergissem.
+  function renderExercise(day: EditorDay, ex: EditorExercise, i: number) {
+    const exName = nameOf(ex.exerciseId)
+    const cautions = cautionsFor(ex.exerciseId)
+    const previous = i > 0 ? day.exercises[i - 1] : null
+    // só oferece agrupar quando o de cima ainda não é do mesmo bloco
+    const canGroup = previous != null && (ex.groupKey == null || ex.groupKey !== previous.groupKey)
+    return (
+      <div
+        key={ex.key}
+        onDragOver={(e) => {
+          if (dragEx?.dayKey === day.key) e.preventDefault()
+        }}
+        onDrop={(e) => {
+          if (dragEx?.dayKey === day.key) {
+            e.preventDefault()
+            moveExercise(day.key, dragEx.idx, i)
+            setDragEx(null)
+          }
+        }}
+        className={`rounded-md border bg-muted/20 p-2 ${
+          dragEx?.dayKey === day.key && dragEx.idx !== i ? 'border-dashed border-primary/60' : ''
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            draggable
+            onDragStart={() => setDragEx({ dayKey: day.key, idx: i })}
+            onDragEnd={() => setDragEx(null)}
+            className="cursor-grab text-muted-foreground"
+            title="Arraste para reordenar"
+          >
+            <GripVertical className="size-4" />
+          </span>
+          <span className="flex flex-1 items-center gap-1.5 text-sm font-medium">
+            {i + 1}. {exName}
+            {cautions.length > 0 ? (
+              <span className="text-amber-500" title={`Revisar: ${cautions.join(' · ')}`}>
+                <AlertTriangle className="size-3.5" />
+              </span>
+            ) : null}
+          </span>
+          {canGroup ? (
+            <button
+              type="button"
+              onClick={() => groupExercise(day.key, i)}
+              className="text-muted-foreground hover:text-primary"
+              title="Agrupar com o exercício acima (super-série)"
+              aria-label={`Agrupar ${exName} com o exercício acima`}
+            >
+              <Link2 className="size-4" />
+            </button>
+          ) : null}
+          {ex.groupKey != null ? (
+            <button
+              type="button"
+              onClick={() => ungroupExercise(day.key, i)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Tirar do bloco"
+              aria-label={`Tirar ${exName} do bloco`}
+            >
+              <Unlink className="size-4" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => moveExercise(day.key, i, i - 1)}
+            disabled={i === 0}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+            title="Subir"
+          >
+            <ChevronUp className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => moveExercise(day.key, i, i + 1)}
+            disabled={i === day.exercises.length - 1}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+            title="Descer"
+          >
+            <ChevronDown className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => removeExercise(day.key, ex.key)}
+            className="text-destructive"
+            title="Remover exercício"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <Field id={`exercise-${ex.key}-sets`} label="Séries">
+            <Input
+              id={`exercise-${ex.key}-sets`}
+              aria-label={`Séries de ${exName} na divisão ${day.label}`}
+              type="number"
+              min={1}
+              max={20}
+              value={ex.sets}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, { sets: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </Field>
+          {/* Reps e RIR aceitam vazio: aquecimento, mobilidade e trabalho até a
+              falha são prescrição sem número. O placeholder diz isso em vez de
+              deixar o campo parecer um obrigatório esquecido. */}
+          <Field id={`exercise-${ex.key}-reps`} label="Reps">
+            <Input
+              id={`exercise-${ex.key}-reps`}
+              aria-label={`Repetições de ${exName} na divisão ${day.label}`}
+              placeholder="livre"
+              value={ex.reps ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, { reps: e.target.value === '' ? null : e.target.value })
+              }
+            />
+          </Field>
+          <Field id={`exercise-${ex.key}-rir`} label="RIR">
+            <Input
+              id={`exercise-${ex.key}-rir`}
+              aria-label={`RIR de ${exName} na divisão ${day.label}`}
+              type="number"
+              min={0}
+              max={10}
+              placeholder="livre"
+              value={ex.rir ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, {
+                  rir: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+          </Field>
+          <Field id={`exercise-${ex.key}-rest`} label="Descanso (s)">
+            <Input
+              id={`exercise-${ex.key}-rest`}
+              aria-label={`Descanso de ${exName} na divisão ${day.label}`}
+              type="number"
+              min={0}
+              max={600}
+              value={ex.restSeconds ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, {
+                  restSeconds: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+          </Field>
+          {/* Drop-set, rest-pause, cluster e myo-reps acontecem DENTRO do
+              exercício — por isso são um campo dele, e não um tipo de bloco. O
+              detalhe ("3 quedas de 20%") vai nas observações do plano. */}
+          <Field id={`exercise-${ex.key}-tech`} label="Técnica">
+            <select
+              id={`exercise-${ex.key}-tech`}
+              className={controlClass}
+              aria-label={`Técnica de intensidade de ${exName} na divisão ${day.label}`}
+              value={ex.technique ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, {
+                  technique: e.target.value ? (e.target.value as Technique) : null,
+                })
+              }
+            >
+              <option value="">Nenhuma</option>
+              {TECHNIQUE_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+    )
+  }
+
+  function renderBlock(day: EditorDay, block: Block<EditorExercise>) {
+    const kind = block.kind
+    const groupKey = block.key
+    if (kind == null || groupKey == null) return renderExercise(day, block.items[0], block.start)
+    // Num circuito o `sets` de cada exercício É o número de voltas (não existe
+    // coluna de voltas justamente para não haver duas contagens). Séries
+    // diferentes entre os membros é o único caso ambíguo de verdade, e a tela
+    // avisa em vez de escolher no lugar do profissional.
+    const voltasDivergentes = kind === 'circuit' && circuitSetsMismatch(block.items)
+    return (
+      <div key={groupKey} className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+            {kind === 'circuit' ? <Repeat className="size-3.5" /> : <Layers className="size-3.5" />}
+            {groupLabel(kind, block.items.length)}
+          </span>
+          {/* Fundo e cor explícitos pelo mesmo motivo do select da sequência
+              semanal: sem eles o Chrome no Windows abre a lista clara com o
+              texto do tema escuro. */}
+          <select
+            className="h-7 rounded border bg-card px-1 text-xs text-foreground outline-none"
+            aria-label={`Tipo do bloco que começa em ${nameOf(block.items[0].exerciseId)}`}
+            value={kind}
+            onChange={(e) => changeGroupKind(day.key, groupKey, e.target.value as GroupKind)}
+          >
+            <option value="superset" className="bg-card text-foreground">
+              Super-série
+            </option>
+            <option value="circuit" className="bg-card text-foreground">
+              Circuito
+            </option>
+          </select>
+          <span className="text-[11px] text-muted-foreground">
+            {groupHint(kind, block.items.length)}
+          </span>
+        </div>
+        {voltasDivergentes ? (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            Num circuito as séries de cada exercício são as voltas — aqui elas estão diferentes
+            entre si.
+          </p>
+        ) : null}
+        {block.items.map((ex, j) => renderExercise(day, ex, block.start + j))}
+      </div>
+    )
   }
 
   // ---- salvar ---------------------------------------------------------
@@ -579,7 +864,14 @@ function Builder({
           <p className="text-sm text-muted-foreground">
             Nenhuma divisão ainda. Crie A, B, C... e adicione exercícios.
           </p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Reps e RIR podem ficar em branco quando não há número definido
+            (aquecimento, mobilidade, trabalho até a falha). Use{' '}
+            <Link2 className="inline size-3.5 align-text-bottom" aria-hidden /> para juntar um
+            exercício ao de cima numa super-série ou circuito.
+          </p>
+        )}
         {plan.days.map((day, dayIndex) => (
           <Card
             key={day.key}
@@ -648,126 +940,7 @@ function Builder({
               </button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {day.exercises.map((ex, i) => (
-                <div
-                  key={ex.key}
-                  onDragOver={(e) => {
-                    if (dragEx?.dayKey === day.key) e.preventDefault()
-                  }}
-                  onDrop={(e) => {
-                    if (dragEx?.dayKey === day.key) {
-                      e.preventDefault()
-                      moveExercise(day.key, dragEx.idx, i)
-                      setDragEx(null)
-                    }
-                  }}
-                  className={`rounded-md border bg-muted/20 p-2 ${
-                    dragEx?.dayKey === day.key && dragEx.idx !== i ? 'border-dashed border-primary/60' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      draggable
-                      onDragStart={() => setDragEx({ dayKey: day.key, idx: i })}
-                      onDragEnd={() => setDragEx(null)}
-                      className="cursor-grab text-muted-foreground"
-                      title="Arraste para reordenar"
-                    >
-                      <GripVertical className="size-4" />
-                    </span>
-                    <span className="flex flex-1 items-center gap-1.5 text-sm font-medium">
-                      {i + 1}. {nameOf(ex.exerciseId)}
-                      {cautionsFor(ex.exerciseId).length > 0 ? (
-                        <span
-                          className="text-amber-500"
-                          title={`Revisar: ${cautionsFor(ex.exerciseId).join(' · ')}`}
-                        >
-                          <AlertTriangle className="size-3.5" />
-                        </span>
-                      ) : null}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => moveExercise(day.key, i, i - 1)}
-                      disabled={i === 0}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      title="Subir"
-                    >
-                      <ChevronUp className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveExercise(day.key, i, i + 1)}
-                      disabled={i === day.exercises.length - 1}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      title="Descer"
-                    >
-                      <ChevronDown className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeExercise(day.key, ex.key)}
-                      className="text-destructive"
-                      title="Remover exercício"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-4 gap-2">
-                    <Field id={`exercise-${ex.key}-sets`} label="Séries">
-                      <Input
-                        id={`exercise-${ex.key}-sets`}
-                        aria-label={`Séries de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={ex.sets}
-                        onChange={(e) =>
-                          patchExercise(day.key, ex.key, { sets: Math.max(1, Number(e.target.value) || 1) })
-                        }
-                      />
-                    </Field>
-                    <Field id={`exercise-${ex.key}-reps`} label="Reps">
-                      <Input
-                        id={`exercise-${ex.key}-reps`}
-                        aria-label={`Repetições de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
-                        value={ex.reps}
-                        onChange={(e) => patchExercise(day.key, ex.key, { reps: e.target.value })}
-                      />
-                    </Field>
-                    <Field id={`exercise-${ex.key}-rir`} label="RIR">
-                      <Input
-                        id={`exercise-${ex.key}-rir`}
-                        aria-label={`RIR de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={ex.rir ?? ''}
-                        onChange={(e) =>
-                          patchExercise(day.key, ex.key, {
-                            rir: e.target.value === '' ? null : Number(e.target.value),
-                          })
-                        }
-                      />
-                    </Field>
-                    <Field id={`exercise-${ex.key}-rest`} label="Descanso (s)">
-                      <Input
-                        id={`exercise-${ex.key}-rest`}
-                        aria-label={`Descanso de ${nameOf(ex.exerciseId)} na divisão ${day.label}`}
-                        type="number"
-                        min={0}
-                        max={600}
-                        value={ex.restSeconds ?? ''}
-                        onChange={(e) =>
-                          patchExercise(day.key, ex.key, {
-                            restSeconds: e.target.value === '' ? null : Number(e.target.value),
-                          })
-                        }
-                      />
-                    </Field>
-                  </div>
-                </div>
-              ))}
+              {toBlocks(day.exercises).map((block) => renderBlock(day, block))}
               <ExercisePicker
                 exercises={exercises}
                 orgId={orgId}

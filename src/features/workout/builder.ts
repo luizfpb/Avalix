@@ -10,6 +10,13 @@ import type {
   WorkoutPlanDetail,
 } from './api'
 import {
+  isGroupKind,
+  isTechnique,
+  normalizeGroups,
+  type GroupKind,
+  type Technique,
+} from './groups'
+import {
   buildVolumeSnapshot,
   type MovementPattern,
   type MuscleGroup,
@@ -24,11 +31,18 @@ export type EditorExercise = {
   key: string // chave estavel (uuid no create, id do banco no edit)
   exerciseId: string
   sets: number
-  reps: string
+  // reps e rir sao os dois campos que o dominio permite deixar em branco:
+  // aquecimento, mobilidade e trabalho ate a falha nao tem faixa definida.
+  reps: string | null
   rir: number | null
   restSeconds: number | null
   tempo: string | null
   notes: string | null
+  // agrupamento contiguo (super-serie/circuito) e tecnica de intensidade.
+  // As regras de contiguidade vivem em groups.ts, nunca aqui.
+  groupKey: string | null
+  groupKind: GroupKind | null
+  technique: Technique | null
 }
 
 export type EditorDay = {
@@ -171,15 +185,23 @@ export function editorToSaveInput(
   const days: PlanDayInput[] = plan.days.map((d) => ({
     label: d.label,
     name: d.name,
-    exercises: d.exercises.map((ex) => ({
+    // ultima normalizacao antes de gravar: a RPC recusa grupo furado ou de um
+    // membro so (0030), e a mensagem de la e de integridade, nao de formulario.
+    // Aqui nao ha o que perguntar ao usuario - um grupo de um membro so e
+    // sempre um exercicio solto.
+    exercises: normalizeGroups(d.exercises).map((ex) => ({
       clientKey: ex.key,
       exerciseId: ex.exerciseId,
       sets: ex.sets,
-      reps: ex.reps,
+      // string vazia nao e "sem faixa": e o campo que o CHECK do banco recusa
+      reps: ex.reps?.trim() ? ex.reps.trim() : null,
       rir: ex.rir,
       restSeconds: ex.restSeconds,
       tempo: ex.tempo,
       notes: ex.notes,
+      groupKey: ex.groupKey,
+      groupKind: ex.groupKind,
+      technique: ex.technique,
     })),
   }))
   const overrides: PlanWeekOverrideInput[] = plan.overrides.map((o) => ({
@@ -263,19 +285,27 @@ export function planDetailToEditor(detail: WorkoutPlanDetail): EditorPlan {
       key: d.id,
       label: d.label,
       name: d.name,
-      exercises: (exByDay.get(d.id) ?? [])
-        .slice()
-        .sort((a, b) => a.position - b.position)
-        .map((ex) => ({
-          key: ex.id,
-          exerciseId: ex.exercise_id,
-          sets: ex.sets,
-          reps: ex.reps,
-          rir: ex.rir,
-          restSeconds: ex.rest_seconds,
-          tempo: ex.tempo,
-          notes: ex.notes,
-        })),
+      // normaliza na leitura tambem: plano gravado antes da 0030 nao tem
+      // agrupamento nenhum, e um plano de outra origem nao pode entrar no
+      // editor num estado que o editor considera impossivel.
+      exercises: normalizeGroups(
+        (exByDay.get(d.id) ?? [])
+          .slice()
+          .sort((a, b) => a.position - b.position)
+          .map((ex) => ({
+            key: ex.id,
+            exerciseId: ex.exercise_id,
+            sets: ex.sets,
+            reps: ex.reps,
+            rir: ex.rir,
+            restSeconds: ex.rest_seconds,
+            tempo: ex.tempo,
+            notes: ex.notes,
+            groupKey: ex.group_key,
+            groupKind: isGroupKind(ex.group_kind) ? ex.group_kind : null,
+            technique: isTechnique(ex.technique) ? ex.technique : null,
+          }))
+      ),
     })),
     overrides: overrides.map((o) => ({
       week: o.week_number,

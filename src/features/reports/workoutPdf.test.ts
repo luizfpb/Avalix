@@ -185,6 +185,34 @@ describe('generateWorkoutPdf', () => {
     expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
   })
 
+  // A faixa de bloco e o travessão de "sem faixa de reps" só existem no
+  // caminho de render: um estilo inválido ou um `undefined` numa célula derruba
+  // a geração inteira, e nenhum teste de função pura pegaria isso.
+  it('gera bytes com super-série, circuito e exercício sem faixa de reps', async () => {
+    const blob = await generateWorkoutPdf({
+      orgName: 'Estúdio Teste',
+      subjectName: 'Fulano de Tal',
+      plan,
+      days: DIAS,
+      exercises: [
+        exercicio('e1', 'dA', 'x1', { position: 0, group_key: 'g1', group_kind: 'superset' }),
+        exercicio('e2', 'dA', 'x2', {
+          position: 1,
+          group_key: 'g1',
+          group_kind: 'superset',
+          technique: 'drop_set',
+        }),
+        exercicio('e3', 'dB', 'x3', { position: 0, group_key: 'g2', group_kind: 'circuit' }),
+        exercicio('e4', 'dB', 'x4', { position: 1, group_key: 'g2', group_kind: 'circuit' }),
+        exercicio('e5', 'dB', 'x5', { position: 2, reps: null, rir: null, rest_seconds: null }),
+      ],
+      weeks: [semana(1)],
+      overrides: [],
+      exerciseNames: { ...NOMES, x4: 'Afundo', x5: 'Prancha' },
+    })
+    expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
+  })
+
   it('gera bytes com observação longa (bloco que volta a quebrar)', async () => {
     const blob = await generateWorkoutPdf({
       orgName: 'Estúdio Teste',

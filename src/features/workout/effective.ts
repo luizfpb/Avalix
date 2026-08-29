@@ -17,7 +17,9 @@ import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from './api'
 
 export type EffectivePrescription = {
   sets: number
-  reps: string
+  // nulo = prescrição sem faixa de repetição (aquecimento, mobilidade,
+  // trabalho até a falha). Ver migration 0030.
+  reps: string | null
   rir: number | null
   restSeconds: number | null
   notes: string | null
@@ -75,7 +77,7 @@ export function effectiveDiff(
 
   const parts: string[] = []
   if (e.sets !== base.sets) parts.push(`${fmtNumero(e.sets)} séries`)
-  if (e.reps !== base.reps) parts.push(`${e.reps} reps`)
+  if (e.reps !== base.reps) parts.push(e.reps == null ? 'sem faixa de reps' : `${e.reps} reps`)
   if (e.rir !== base.rir) parts.push(e.rir == null ? 'sem RIR' : `RIR ${fmtNumero(e.rir)}`)
   if (e.restSeconds !== base.rest_seconds) {
     parts.push(e.restSeconds == null ? 'sem descanso definido' : `${e.restSeconds}s de descanso`)
@@ -87,4 +89,13 @@ export function effectiveDiff(
 // inteiro sem casas; fracionado com 1 casa (séries fracionadas: 2.5, 13)
 function fmtNumero(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
+}
+
+// `4×8-12`, ou `4 séries` quando não há faixa de repetição prescrita. Fica aqui
+// e não em cada tela porque `3×` sem nada depois — o que sairia de um template
+// literal com reps nulo — é justamente o defeito que a 0030 veio corrigir.
+export function formatSetsReps(sets: number, reps: string | null): string {
+  const s = fmtNumero(sets)
+  if (!reps) return `${s} ${sets === 1 ? 'série' : 'séries'}`
+  return `${s}×${reps}`
 }

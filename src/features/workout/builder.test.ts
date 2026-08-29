@@ -28,7 +28,7 @@ function plan(): EditorPlan {
         label: 'A',
         name: 'Peito',
         exercises: [
-          { key: 'k-sup', exerciseId: 'ex-sup', sets: 4, reps: '8-12', rir: 2, restSeconds: 90, tempo: null, notes: null },
+          { key: 'k-sup', exerciseId: 'ex-sup', sets: 4, reps: '8-12', rir: 2, restSeconds: 90, tempo: null, notes: null, groupKey: null, groupKind: null, technique: null },
         ],
       },
       {
@@ -36,7 +36,7 @@ function plan(): EditorPlan {
         label: 'B',
         name: 'Pernas',
         exercises: [
-          { key: 'k-agacho', exerciseId: 'ex-agacho', sets: 5, reps: '6-10', rir: 1, restSeconds: 120, tempo: null, notes: null },
+          { key: 'k-agacho', exerciseId: 'ex-agacho', sets: 5, reps: '6-10', rir: 1, restSeconds: 120, tempo: null, notes: null, groupKey: null, groupKind: null, technique: null },
         ],
       },
     ],
@@ -117,8 +117,8 @@ describe('planDetailToEditor', () => {
         { id: 'day-a', org_id: 'o1', plan_id: 'p1', label: 'A', name: 'Peito', position: 0, created_at: 'x' },
       ],
       exercises: [
-        { id: 'we-2', org_id: 'o1', day_id: 'day-a', exercise_id: 'ex-sup', position: 1, sets: 3, reps: '10', rir: null, rest_seconds: 60, tempo: null, notes: null, created_at: 'x' },
-        { id: 'we-1', org_id: 'o1', day_id: 'day-a', exercise_id: 'ex-agacho', position: 0, sets: 4, reps: '8', rir: 2, rest_seconds: 90, tempo: null, notes: null, created_at: 'x' },
+        { id: 'we-2', org_id: 'o1', day_id: 'day-a', exercise_id: 'ex-sup', position: 1, sets: 3, reps: '10', rir: null, rest_seconds: 60, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
+        { id: 'we-1', org_id: 'o1', day_id: 'day-a', exercise_id: 'ex-agacho', position: 0, sets: 4, reps: '8', rir: 2, rest_seconds: 90, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
       ],
       overrides: [
         { id: 'ov1', org_id: 'o1', plan_id: 'p1', workout_exercise_id: 'we-1', week_number: 6, sets: 2, reps: null, rir: null, rest_seconds: null, is_skipped: false, notes: null, created_at: 'x' },
@@ -138,6 +138,90 @@ describe('planDetailToEditor', () => {
   })
 })
 
+describe('reps opcional e agrupamento no payload', () => {
+  const base = plan()
+
+  it('reps em branco vai como null, e não como string vazia', () => {
+    // string vazia é o que o CHECK do banco recusa; ausência de faixa é null
+    const p: EditorPlan = {
+      ...base,
+      days: [{ ...base.days[0], exercises: [{ ...base.days[0].exercises[0], reps: '  ' }] }],
+    }
+    const save = editorToSaveInput(p, { orgId: 'o1', subjectId: 's1' }, snapshotFromEditor(p, meta))
+    expect(save.days[0].exercises[0].reps).toBeNull()
+  })
+
+  it('grava o bloco quando ele é válido', () => {
+    const [ex] = base.days[0].exercises
+    const p: EditorPlan = {
+      ...base,
+      days: [
+        {
+          ...base.days[0],
+          exercises: [
+            { ...ex, key: 'k1', groupKey: 'g1', groupKind: 'superset' },
+            { ...ex, key: 'k2', exerciseId: 'ex-agacho', groupKey: 'g1', groupKind: 'superset' },
+          ],
+        },
+      ],
+    }
+    const save = editorToSaveInput(p, { orgId: 'o1', subjectId: 's1' }, snapshotFromEditor(p, meta))
+    expect(save.days[0].exercises.map((e) => e.groupKey)).toEqual(['g1', 'g1'])
+    expect(save.days[0].exercises[0].groupKind).toBe('superset')
+  })
+
+  it('dissolve bloco de um membro só antes de gravar', () => {
+    // o banco recusaria (RPC de gravação da 0030) com mensagem de integridade;
+    // um grupo de um membro só é sempre um exercício solto
+    const p: EditorPlan = {
+      ...base,
+      days: [
+        {
+          ...base.days[0],
+          exercises: [
+            { ...base.days[0].exercises[0], groupKey: 'g1', groupKind: 'superset' },
+          ],
+        },
+      ],
+    }
+    const save = editorToSaveInput(p, { orgId: 'o1', subjectId: 's1' }, snapshotFromEditor(p, meta))
+    expect(save.days[0].exercises[0].groupKey).toBeNull()
+    expect(save.days[0].exercises[0].groupKind).toBeNull()
+  })
+
+  it('agrupar não mexe no volume: o motor continua somando séries', () => {
+    const [ex] = base.days[0].exercises
+    const solto: EditorPlan = {
+      ...base,
+      days: [
+        {
+          ...base.days[0],
+          exercises: [
+            { ...ex, key: 'k1' },
+            { ...ex, key: 'k2', exerciseId: 'ex-agacho' },
+          ],
+        },
+      ],
+    }
+    const agrupado: EditorPlan = {
+      ...solto,
+      days: [
+        {
+          ...solto.days[0],
+          exercises: solto.days[0].exercises.map((e) => ({
+            ...e,
+            groupKey: 'g1',
+            groupKind: 'superset' as const,
+          })),
+        },
+      ],
+    }
+    expect(snapshotFromEditor(agrupado, meta).typicalByMuscle).toEqual(
+      snapshotFromEditor(solto, meta).typicalByMuscle
+    )
+  })
+})
+
 describe('duplicatePlanEditor', () => {
   const detail: WorkoutPlanDetail = {
     plan: {
@@ -149,7 +233,7 @@ describe('duplicatePlanEditor', () => {
     },
     days: [{ id: 'd1', org_id: 'o1', plan_id: 'p1', label: 'A', name: 'Peito', position: 0, created_at: 'x' }],
     exercises: [
-      { id: 'we-1', org_id: 'o1', day_id: 'd1', exercise_id: 'ex-sup', position: 0, sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null, created_at: 'x' },
+      { id: 'we-1', org_id: 'o1', day_id: 'd1', exercise_id: 'ex-sup', position: 0, sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
     ],
     overrides: [],
     weeks: [],

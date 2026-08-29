@@ -26,6 +26,9 @@ import {
   type ProgressionKind,
 } from '../features/workout/progression'
 import { roundToIncrement } from '../features/workout/oneRm'
+import { formatSetsReps } from '../features/workout/effective'
+import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
+import { GroupBlock } from '../features/workout/GroupBlock'
 import { linePath } from '../features/reports/charts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -529,12 +532,22 @@ function LogForm({
         </div>
 
         <div className="space-y-3">
-          {dayExercises.map((ex) => (
+          {/* Super-série e circuito mudam o que se faz ENTRE uma série e outra:
+              a tela que conduz a sessão não pode listar os exercícios soltos. */}
+          {toRowBlocks(dayExercises).map((block) => {
+            const cartoes = block.items.map((ex) => (
             <div key={ex.id} className="rounded-md border bg-muted/20 p-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{names[ex.exercise_id] ?? 'Exercício'}</span>
-                <span className="text-xs text-muted-foreground">
-                  plano: {ex.sets}×{ex.reps}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">
+                  {names[ex.exercise_id] ?? 'Exercício'}
+                  {techniqueLabel(ex.technique) ? (
+                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      {techniqueLabel(ex.technique)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  plano: {formatSetsReps(ex.sets, ex.reps)}
                 </span>
               </div>
               {(() => {
@@ -581,7 +594,7 @@ function LogForm({
                       className="h-8 w-16"
                       type="number"
                       inputMode="numeric"
-                      placeholder={ex.reps}
+                      placeholder={ex.reps ?? '—'}
                       value={row.reps}
                       onChange={(e) => setCell(ex.id, i, 'reps', e.target.value)}
                     />
@@ -605,7 +618,15 @@ function LogForm({
                 </button>
               </div>
             </div>
-          ))}
+            ))
+            return block.kind == null ? (
+              cartoes
+            ) : (
+              <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
+                {cartoes}
+              </GroupBlock>
+            )
+          })}
         </div>
 
         <div className="space-y-1.5">

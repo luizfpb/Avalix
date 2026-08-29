@@ -14,9 +14,9 @@ const days: WorkoutDayRow[] = [
   { id: 'dB', org_id: 'o1', plan_id: 'p1', label: 'B', name: null, position: 1, created_at: 'x' },
 ]
 const exercises: WorkoutExerciseRow[] = [
-  { id: 'x2', org_id: 'o1', day_id: 'dA', exercise_id: 'e-sup', position: 1, sets: 3, reps: '10', rir: null, rest_seconds: 60, tempo: null, notes: null, created_at: 'x' },
-  { id: 'x1', org_id: 'o1', day_id: 'dA', exercise_id: 'e-cru', position: 0, sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null, created_at: 'x' },
-  { id: 'x3', org_id: 'o1', day_id: 'dB', exercise_id: 'e-agacho', position: 0, sets: 5, reps: '5', rir: 1, rest_seconds: 120, tempo: null, notes: null, created_at: 'x' },
+  { id: 'x2', org_id: 'o1', day_id: 'dA', exercise_id: 'e-sup', position: 1, sets: 3, reps: '10', rir: null, rest_seconds: 60, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
+  { id: 'x1', org_id: 'o1', day_id: 'dA', exercise_id: 'e-cru', position: 0, sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
+  { id: 'x3', org_id: 'o1', day_id: 'dB', exercise_id: 'e-agacho', position: 0, sets: 5, reps: '5', rir: 1, rest_seconds: 120, tempo: null, notes: null, group_key: null, group_kind: null, technique: null, created_at: 'x' },
 ]
 const names = { 'e-sup': 'Supino', 'e-cru': 'Crucifixo', 'e-agacho': 'Agachamento' }
 
@@ -96,6 +96,38 @@ describe('planShareText não pode contradizer o PDF', () => {
       orgName: 'Studio X', plan, days, exercises, exerciseNames: names,
     })
     expect(semOverrides).not.toContain('Ajustes por semana')
+  })
+})
+
+// O WhatsApp é o canal que mais gente usa para receber o treino. Se ele listar
+// os exercícios de uma super-série soltos, o aluno faz todas as séries de um e
+// depois todas do outro — que é outro treino, com outro estímulo.
+describe('planShareText com bloco e sem faixa de reps', () => {
+  const comBloco: WorkoutExerciseRow[] = [
+    { ...exercises[1], group_key: 'g1', group_kind: 'superset' },
+    { ...exercises[0], group_key: 'g1', group_kind: 'superset', technique: 'drop_set' },
+    { ...exercises[2], reps: null },
+  ]
+  const texto = planShareText({
+    orgName: 'Studio X',
+    plan,
+    days,
+    exercises: comBloco,
+    exerciseNames: names,
+  })
+
+  it('anuncia o bloco e como executá-lo', () => {
+    expect(texto).toContain('_Super-série: 2 exercícios em sequência, sem descanso entre eles_')
+  })
+
+  it('recua os membros do bloco e mantém a numeração contínua', () => {
+    expect(texto).toContain('   1. Crucifixo — 4×8-12 (RIR 2) · 90s')
+    expect(texto).toContain('   2. Supino — 3×10 · 60s · Drop-set')
+  })
+
+  it('sem faixa de reps sai como séries, e não como "5×" pendurado', () => {
+    expect(texto).toContain('1. Agachamento — 5 séries (RIR 1) · 120s')
+    expect(texto).not.toContain('Agachamento — 5×')
   })
 })
 

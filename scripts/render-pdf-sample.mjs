@@ -41,6 +41,17 @@ const dias = ['A', 'B', 'C'].map((label, di) => ({
   created_at: '2026-06-01',
 }))
 
+// Agrupamentos e reps em branco entram na amostra de proposito: a faixa do
+// bloco, o fundo dos membros e o travessao da celula sem faixa so existem no
+// caminho de render, e a regra da casa e nunca iterar PDF as cegas.
+// Divisao A: super-serie nos exercicios 1 e 2, com drop-set no segundo.
+// Divisao B: circuito de tres. Divisao C: um exercicio sem faixa de reps.
+function agrupamento(di, i) {
+  if (di === 0 && (i === 1 || i === 2)) return { group_key: 'gA', group_kind: 'superset' }
+  if (di === 1 && i < 3) return { group_key: 'gB', group_kind: 'circuit' }
+  return { group_key: null, group_kind: null }
+}
+
 const exercises = dias.flatMap((d, di) =>
   EXERCICIOS.slice(0, 6).map((nome, i) => ({
     id: `e${di}-${i}`,
@@ -49,12 +60,14 @@ const exercises = dias.flatMap((d, di) =>
     exercise_id: `x${di}-${i}`,
     position: i,
     sets: 4,
-    reps: '8-12',
+    reps: di === 2 && i === 5 ? null : '8-12',
     rir: 2,
     rest_seconds: 90,
     tempo: '2-0-2',
     // Caractere fora do WinAnsi de proposito: antes virava outro glifo.
     notes: i === 0 ? 'Manter RIR ≤ 2 e amplitude completa' : null,
+    technique: di === 0 && i === 2 ? 'drop_set' : null,
+    ...agrupamento(di, i),
     created_at: '2026-06-01',
   }))
 )

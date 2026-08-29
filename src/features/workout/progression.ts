@@ -10,7 +10,11 @@ export const PROGRESSION_ENGINE_VERSION = 'progression-engine@1'
 export type RepRange = { min: number; max: number }
 
 // "8-12" -> {8,12}; "10" -> {10,10}; "30s"/vazio/invalido -> null.
-export function parseRepRange(reps: string): RepRange | null {
+// Aceita nulo porque a faixa de repetição é opcional desde a 0030: prescrição
+// sem faixa simplesmente não tem alvo de progressão, e é o mesmo caso de um
+// texto que não parseia ("até a falha") — que esta função já tratava.
+export function parseRepRange(reps: string | null): RepRange | null {
+  if (reps == null) return null
   const t = reps.trim()
   const range = /^(\d+)\s*[-–a]\s*(\d+)$/.exec(t)
   if (range) {

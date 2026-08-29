@@ -45,7 +45,14 @@ import {
   type QueuedSession,
 } from '../features/workout/studentStore'
 import { applyStudentManifest } from '../features/workout/studentPwa'
-import { effectivePrescription, overrideFor, overrideIndex } from '../features/workout/effective'
+import {
+  effectivePrescription,
+  formatSetsReps,
+  overrideFor,
+  overrideIndex,
+} from '../features/workout/effective'
+import { GroupBlock } from '../features/workout/GroupBlock'
+import { groupLabel, techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { SessionSets } from '../features/workout/SessionSets'
 import { currentWeek } from '../features/workout/progress'
 import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from '../features/workout/api'
@@ -939,16 +946,27 @@ function TreinoDoDia({
       </div>
 
       <div className="space-y-3">
-        {exerciciosDoDia.map((ex) => {
+        {/* Quem executa o treino é esta tela: se ela listar os exercícios de uma
+            super-série soltos, a super-série não acontece. */}
+        {toRowBlocks(exerciciosDoDia).map((block) => {
+          const cartoes = block.items.map((ex) => {
           const override = overrideFor(indice, semana, ex.id)
           const efetiva = effectivePrescription(ex as unknown as WorkoutExerciseRow, override)
           const ultima = ultimaPorExercicio.get(ex.exercise_id)
+          const tecnica = techniqueLabel(ex.technique)
           return (
             <div key={ex.id} className="rounded-md border bg-muted/20 p-2.5">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-medium">{ex.name}</span>
+                <span className="text-sm font-medium">
+                  {ex.name}
+                  {tecnica ? (
+                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      {tecnica}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {efetiva.sets}×{efetiva.reps}
+                  {formatSetsReps(efetiva.sets, efetiva.reps)}
                   {efetiva.rir != null ? ` · RIR ${efetiva.rir}` : ''}
                 </span>
               </div>
@@ -1003,7 +1021,7 @@ function TreinoDoDia({
                           className="h-9 w-16"
                           type="number"
                           inputMode="numeric"
-                          placeholder={efetiva.reps}
+                          placeholder={efetiva.reps ?? '—'}
                           value={row.reps}
                           onChange={(e) => setCelula(ex.id, i, 'reps', e.target.value)}
                         />
@@ -1029,6 +1047,14 @@ function TreinoDoDia({
                 </>
               )}
             </div>
+          )
+          })
+          return block.kind == null ? (
+            cartoes
+          ) : (
+            <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
+              {cartoes}
+            </GroupBlock>
           )
         })}
       </div>
@@ -1342,25 +1368,42 @@ function PlanoResumo({ detalhe }: { detalhe: StudentPlanDetail }) {
   const dias = detalhe.days.slice().sort((a, b) => a.position - b.position)
   return (
     <div className="space-y-2.5">
-      {dias.map((d) => (
-        <div key={d.id}>
-          <p className="text-xs font-medium">
-            Treino {d.label}
-            {d.name ? ` — ${d.name}` : ''}
-          </p>
-          <ul className="mt-0.5 space-y-0.5">
-            {detalhe.exercises
-              .filter((e) => e.day_id === d.id)
-              .sort((a, b) => a.position - b.position)
-              .map((e) => (
-                <li key={e.id} className="text-xs text-muted-foreground">
-                  {e.name} — {e.sets}×{e.reps}
-                  {e.rir != null ? ` · RIR ${e.rir}` : ''}
+      {dias.map((d) => {
+        const blocos = toRowBlocks(
+          detalhe.exercises
+            .filter((e) => e.day_id === d.id)
+            .sort((a, b) => a.position - b.position)
+        )
+        return (
+          <div key={d.id}>
+            <p className="text-xs font-medium">
+              Treino {d.label}
+              {d.name ? ` — ${d.name}` : ''}
+            </p>
+            <ul className="mt-0.5 space-y-0.5">
+              {blocos.map((bloco) => (
+                <li key={bloco.items[0].id} className="text-xs text-muted-foreground">
+                  {/* Resumo de plano antigo: o rótulo do bloco entra uma vez, na
+                      frente dos membros, em vez de repetir por linha. */}
+                  {bloco.kind ? (
+                    <span className="font-medium text-primary">
+                      {groupLabel(bloco.kind, bloco.items.length)}:{' '}
+                    </span>
+                  ) : null}
+                  {bloco.items
+                    .map(
+                      (e) =>
+                        `${e.name} — ${formatSetsReps(e.sets, e.reps)}${
+                          e.rir != null ? ` · RIR ${e.rir}` : ''
+                        }`
+                    )
+                    .join(' + ')}
                 </li>
               ))}
-          </ul>
-        </div>
-      ))}
+            </ul>
+          </div>
+        )
+      })}
     </div>
   )
 }
