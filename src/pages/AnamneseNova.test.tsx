@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { RouterProvider, createMemoryRouter } from 'react-router'
 import AnamneseNova from './AnamneseNova'
 import { emptyAnamnesis, PARQ_ITEMS } from '../features/anamnesis/spec'
 
@@ -69,14 +69,19 @@ function anamneseFixture(over: Record<string, unknown> = {}) {
 }
 
 function renderPage(path: string) {
+  // data router (createMemoryRouter), e não MemoryRouter: é o que o app usa em
+  // produção e o que a guarda de saída não salva exige (useBlocker).
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/avaliados/:id/anamnese/nova" element={<AnamneseNova />} />
-        <Route path="/avaliados/:id/anamnese/:anamneseId/editar" element={<AnamneseNova />} />
-        <Route path="/avaliados/:id/anamnese/:anamneseId" element={<div>detalhe da anamnese</div>} />
-      </Routes>
-    </MemoryRouter>
+    <RouterProvider
+      router={createMemoryRouter(
+        [
+          { path: '/avaliados/:id/anamnese/nova', element: <AnamneseNova /> },
+          { path: '/avaliados/:id/anamnese/:anamneseId/editar', element: <AnamneseNova /> },
+          { path: '/avaliados/:id/anamnese/:anamneseId', element: <div>detalhe da anamnese</div> },
+        ],
+        { initialEntries: [path] }
+      )}
+    />
   )
 }
 

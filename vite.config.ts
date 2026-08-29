@@ -88,6 +88,8 @@ export default defineConfig({
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
     },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Shim de ambiente (jsdom x Request do Node). Ver src/testSetup.ts.
+    setupFiles: ["./src/testSetup.ts"],
     // A suite completa roda arquivos jsdom pesados em paralelo. Em runners
     // Windows/CI mais lentos, testes que levam <2 s isoladamente podem passar
     // de 5 s sob contencao; 15 s ainda detecta travamentos sem gerar falsos

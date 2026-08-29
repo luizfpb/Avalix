@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeDbError } from '../lib/errors'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useUnsavedChanges } from '../lib/unsavedChanges'
+import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
 
 function todayLocal(): string {
   const d = new Date()
@@ -98,17 +100,27 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // rascunho local (P4): anamnese é formulário longo; refresh não pode perder.
-  // Só no modo criar — editando, o servidor é a fonte de verdade.
-  const draftKey = isEdit ? null : `anamnese:${subject.id}`
+  // Rascunho local: anamnese é formulário longo; refresh não pode perder. Vale
+  // também na edição — a chave carrega a versão que esta tela carregou, então
+  // um rascunho feito contra outra versão do registro nem é encontrado (era o
+  // risco que mantinha a edição sem rascunho).
+  const draftKey = existing
+    ? `anamnese:${subject.id}:${existing.id}:${existing.updated_at}`
+    : `anamnese:${subject.id}`
+  const valorAtual = useMemo(() => ({ assessedAt, a }), [assessedAt, a])
   const draft = useFormDraft<{ assessedAt: string; a: AnamnesisAnswers }>(
     draftKey,
-    { assessedAt, a },
+    valorAtual,
     (d) => {
       setAssessedAt(d.assessedAt)
       setA({ ...emptyAnamnesis(), ...d.a })
     }
   )
+
+  // alterações pendentes, comparadas com o estado em que a tela abriu
+  const baseline = useRef(JSON.stringify(valorAtual))
+  const dirty = useMemo(() => JSON.stringify(valorAtual) !== baseline.current, [valorAtual])
+  const guard = useUnsavedChanges(dirty)
 
   function set(patch: Partial<AnamnesisAnswers>) {
     setA((prev) => ({ ...prev, ...patch }))
@@ -137,6 +149,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
             answers: a,
           })
       if (draftKey) clearDraft(draftKey)
+      guard.allowNext()
       navigate(`/avaliados/${subject.id}/anamnese/${row.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -231,14 +244,17 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
 
       {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleSave} disabled={!canSave || mut.isPending}>
           {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar anamnese'}
         </Button>
         <Button variant="outline" asChild>
           <Link to={backTo}>Cancelar</Link>
         </Button>
+        {dirty ? <UnsavedBadge /> : null}
       </div>
+
+      <UnsavedChangesPrompt guard={guard} what="nesta anamnese" />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { cloneElement, useId, useState, type ReactElement } from 'react'
+import { cloneElement, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Pill, Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -34,6 +34,8 @@ import type {
 } from '../features/assessment/api'
 import { ageFromBirthDate } from '../lib/age'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useUnsavedChanges } from '../lib/unsavedChanges'
+import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -301,9 +303,12 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // rascunho local (P4): só no modo criar — editar tem o servidor como fonte
-  // de verdade. Restaura ao montar, salva com debounce, limpa no save.
-  const draftKey = isEdit ? null : `avaliacao:${subject.id}`
+  // Rascunho local: restaura ao montar, salva com debounce, limpa no save. Vale
+  // também na edição — a chave carrega a versão que esta tela carregou, então
+  // um rascunho feito contra outra versão da avaliação nem é encontrado (era o
+  // risco que mantinha a edição sem rascunho). Mesma versão que a concorrência
+  // otimista já usava logo acima.
+  const draftKey = ea ? `avaliacao:${subject.id}:${ea.id}:${ea.updated_at}` : `avaliacao:${subject.id}`
   type AvaliacaoDraft = {
     assessedAt: string
     protocolId: string
@@ -315,9 +320,13 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
     circumferences: Record<string, string>
     customCircs: { site: string; value: string }[]
   }
+  const valorAtual = useMemo<AvaliacaoDraft>(
+    () => ({ assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs }),
+    [assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs]
+  )
   const draft = useFormDraft<AvaliacaoDraft>(
     draftKey,
-    { assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs },
+    valorAtual,
     (d) => {
       setAssessedAt(d.assessedAt)
       setProtocolId(d.protocolId)
@@ -330,6 +339,11 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       setCustomCircs(d.customCircs ?? [])
     }
   )
+
+  // alterações pendentes, comparadas com o estado em que a tela abriu
+  const baseline = useRef(JSON.stringify(valorAtual))
+  const dirty = useMemo(() => JSON.stringify(valorAtual) !== baseline.current, [valorAtual])
+  const guard = useUnsavedChanges(dirty)
 
   const protocol = protocols.find((p) => p.id === protocolId) ?? protocols[0]
   const neededCircs: CircumferenceSite[] = (protocol?.circumferenceSites ?? []).filter(
@@ -455,6 +469,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         circumferences: circRows,
       })
       if (draftKey) clearDraft(draftKey)
+      guard.allowNext()
       navigate(`/avaliados/${subject.id}/avaliacoes/${assessment.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -645,14 +660,17 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
 
       {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleSave} disabled={mut.isPending || !result}>
           {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar avaliação'}
         </Button>
         <Button variant="outline" asChild>
           <Link to={`/avaliados/${subject.id}`}>Cancelar</Link>
         </Button>
+        {dirty ? <UnsavedBadge /> : null}
       </div>
+
+      <UnsavedChangesPrompt guard={guard} what="nesta avaliação" />
     </div>
   )
 }

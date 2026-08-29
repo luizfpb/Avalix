@@ -1,16 +1,21 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { RouterProvider, createMemoryRouter } from 'react-router'
 import TreinoNovo from './TreinoNovo'
-import type { SaveWorkoutPlanInput } from '../features/workout/api'
+import { setPrivateDraftScope } from '../lib/draft'
+import type { SaveWorkoutPlanInput, WorkoutPlanDetail } from '../features/workout/api'
 
 // O builder é a tela mais longa do app e não tinha teste. Estes fixam as duas
 // regras novas onde elas de fato acontecem — na interação, não no módulo puro:
 // reps/RIR podem ficar em branco e chegam ao payload como null, e agrupar dois
 // exercícios produz um bloco válido para o banco.
 
-const { criarMock } = vi.hoisted(() => ({ criarMock: vi.fn() }))
+const { criarMock, atualizarMock, planoMock } = vi.hoisted(() => ({
+  criarMock: vi.fn(),
+  atualizarMock: vi.fn(),
+  planoMock: vi.fn(),
+}))
 
 vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org-1' } }),
@@ -47,10 +52,10 @@ vi.mock('../features/workout/hooks', () => ({
     isPending: false,
     isError: false,
   }),
-  useWorkoutPlan: () => ({ data: null, isPending: false, isError: false }),
+  useWorkoutPlan: () => planoMock(),
   useWorkoutPlans: () => ({ data: [] }),
   useCreateWorkoutPlan: () => ({ mutateAsync: criarMock, isPending: false }),
-  useUpdateWorkoutPlan: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkoutPlan: () => ({ mutateAsync: atualizarMock, isPending: false }),
   useCreateCustomExercise: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateCustomExercise: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
@@ -71,21 +76,73 @@ vi.mock('../features/auth/context', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }))
 
+// Sem escopo (usuario + organizacao) o modulo de rascunho se recusa a gravar,
+// de proposito - no app quem o define e o bootstrap de privacidade da sessao.
 beforeEach(() => {
   localStorage.clear()
-  criarMock.mockReset()
-  criarMock.mockResolvedValue({ id: 'plan-1' })
+  setPrivateDraftScope('user-1', 'org-1')
+  criarMock.mockReset().mockResolvedValue({ id: 'plan-1' })
+  atualizarMock.mockReset().mockResolvedValue({ id: 'plan-1' })
+  planoMock.mockReset().mockReturnValue({ data: null, isPending: false, isError: false })
 })
 afterEach(cleanup)
 
-function abrir() {
+// data router (createMemoryRouter), e não MemoryRouter: é o que o app usa em
+// produção e o que a guarda de saída não salva exige (useBlocker).
+function abrir(rota = '/avaliados/subject-1/treinos/nova') {
   render(
-    <MemoryRouter initialEntries={['/avaliados/subject-1/treinos/nova']}>
-      <Routes>
-        <Route path="/avaliados/:id/treinos/nova" element={<TreinoNovo />} />
-      </Routes>
-    </MemoryRouter>
+    <RouterProvider
+      router={createMemoryRouter(
+        [
+          { path: '/avaliados/:id/treinos/nova', element: <TreinoNovo /> },
+          { path: '/avaliados/:id/treinos/:planId/editar', element: <TreinoNovo /> },
+          { path: '/avaliados/:id', element: <div>perfil do avaliado</div> },
+          { path: '/avaliados/:id/treinos/:planId', element: <div>detalhe do plano</div> },
+        ],
+        { initialEntries: [rota] }
+      )}
+    />
   )
+}
+
+// Plano salvo com uma divisao e um exercicio, para exercitar o modo edicao.
+function planoSalvo(): WorkoutPlanDetail {
+  return {
+    plan: {
+      id: 'plan-1',
+      org_id: 'org-1',
+      subject_id: 'subject-1',
+      evaluator_id: 'user-1',
+      name: 'Mesociclo A',
+      goal: 'hypertrophy',
+      weeks: 4,
+      starts_on: null,
+      notes: null,
+      status: 'active',
+      source_assessment_id: null,
+      source_posture_session_id: null,
+      weekly_schedule: [],
+      volume: null,
+      volume_engine_version: null,
+      created_at: '2026-08-01T10:00:00Z',
+      updated_at: '2026-08-01T10:00:00Z',
+    },
+    days: [
+      {
+        id: 'day-1', org_id: 'org-1', plan_id: 'plan-1', label: 'A', name: 'Peito',
+        position: 0, created_at: 'x',
+      },
+    ],
+    exercises: [
+      {
+        id: 'we-1', org_id: 'org-1', day_id: 'day-1', exercise_id: 'ex-1', position: 0,
+        sets: 4, reps: '8-12', rir: 2, rest_seconds: 90, tempo: null, notes: null,
+        group_key: null, group_kind: null, technique: null, created_at: 'x',
+      },
+    ],
+    overrides: [],
+    weeks: [],
+  } as unknown as WorkoutPlanDetail
 }
 
 // Divisão A com os dois exercícios do catálogo, na ordem.
@@ -190,5 +247,75 @@ describe('TreinoNovo — agrupamentos', () => {
     const enviado = criarMock.mock.calls[0][0] as SaveWorkoutPlanInput
     expect(enviado.days[0].exercises[0].technique).toBe('drop_set')
     expect(enviado.days[0].exercises[1].technique).toBeNull()
+  })
+})
+
+// O pedido foi "salvar automaticamente". O que o app faz e guardar o rascunho no
+// aparelho e nunca deixar sair em silencio: publicar edicao pela metade num
+// plano que o aluno le pelo link seria pior do que perder o trabalho.
+describe('TreinoNovo - nao perder o que foi editado', () => {
+  it('pergunta antes de sair com alteracao pendente e deixa continuar editando', async () => {
+    abrir()
+    montarDivisaoComDoisExercicios()
+
+    fireEvent.click(screen.getByRole('link', { name: 'Cancelar' }))
+
+    expect(await screen.findByText('Sair sem salvar?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    await vi.waitFor(() => expect(screen.queryByText('Sair sem salvar?')).toBeNull())
+    expect(screen.getByLabelText('Nome do plano')).toBeTruthy()
+  })
+
+  it('nao pergunta nada depois de salvar', async () => {
+    abrir()
+    montarDivisaoComDoisExercicios()
+    salvar()
+
+    await vi.waitFor(() => expect(criarMock).toHaveBeenCalled())
+    expect(await screen.findByText('detalhe do plano')).toBeTruthy()
+    expect(screen.queryByText('Sair sem salvar?')).toBeNull()
+  })
+
+  it('recupera o rascunho da EDICAO ao reabrir o plano', async () => {
+    planoMock.mockReturnValue({ data: planoSalvo(), isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+
+    fireEvent.change(screen.getByLabelText('Nome do plano'), {
+      target: { value: 'Mesociclo A bloco 2' },
+    })
+    expect(screen.getByText(/Alteracoes|Alterações/)).toBeTruthy()
+    // o rascunho grava com debounce
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    cleanup()
+
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+    const nome = await screen.findByLabelText('Nome do plano')
+    expect((nome as HTMLInputElement).value).toBe('Mesociclo A bloco 2')
+    expect(screen.getByText(/Rascunho não salvo recuperado/)).toBeTruthy()
+  })
+
+  it('descarta rascunho feito contra outra versao do plano', async () => {
+    planoMock.mockReturnValue({ data: planoSalvo(), isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+    fireEvent.change(screen.getByLabelText('Nome do plano'), {
+      target: { value: 'Rascunho velho' },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    cleanup()
+
+    // o plano mudou no servidor (outro dispositivo): o rascunho anterior nao
+    // pode voltar por cima do que foi salvo la
+    const maisNovo = planoSalvo()
+    maisNovo.plan = {
+      ...maisNovo.plan!,
+      updated_at: '2026-08-02T10:00:00Z',
+      name: 'Mesociclo A v2',
+    }
+    planoMock.mockReturnValue({ data: maisNovo, isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+
+    const nome = await screen.findByLabelText('Nome do plano')
+    expect((nome as HTMLInputElement).value).toBe('Mesociclo A v2')
+    expect(screen.queryByText(/Rascunho não salvo recuperado/)).toBeNull()
   })
 })

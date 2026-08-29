@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { RouterProvider, createMemoryRouter } from 'react-router'
 import AvaliacaoNova from './AvaliacaoNova'
 
 vi.mock('../features/organization/context', () => ({
@@ -37,15 +37,15 @@ afterEach(cleanup)
 
 describe('AvaliacaoNova — nomes acessíveis', () => {
   it('associa labels aos campos, às dobras e aos medicamentos', () => {
+    // data router (createMemoryRouter), e não MemoryRouter: é o que o app usa em
+    // produção e o que a guarda de saída não salva exige (useBlocker).
     render(
-      <MemoryRouter initialEntries={['/avaliados/subject-1/avaliacoes/nova']}>
-        <Routes>
-          <Route
-            path="/avaliados/:id/avaliacoes/nova"
-            element={<AvaliacaoNova />}
-          />
-        </Routes>
-      </MemoryRouter>
+      <RouterProvider
+        router={createMemoryRouter(
+          [{ path: '/avaliados/:id/avaliacoes/nova', element: <AvaliacaoNova /> }],
+          { initialEntries: ['/avaliados/subject-1/avaliacoes/nova'] }
+        )}
+      />
     )
 
     expect(screen.getByLabelText('Data')).toBeTruthy()

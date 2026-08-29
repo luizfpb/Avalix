@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
   Plus,
@@ -52,6 +52,8 @@ import {
 } from '../features/workout/groups'
 import { GOAL_OPTIONS } from '../features/workout/schema'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useUnsavedChanges } from '../lib/unsavedChanges'
+import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
 import {
   snapshotVolumeItems,
   type MovementPattern,
@@ -211,10 +213,25 @@ function Builder({
   // sequência semanal e overrides por semana) é o trabalho mais longo do app e
   // vivia só em memória: um toque em Voltar, um F5 ou o Android descartando a
   // aba jogava tudo fora. Mesmo escopo/TTL dos outros formulários longos.
-  // Só no modo criação: na edição o servidor já é a fonte de verdade e um
-  // rascunho velho poderia ressuscitar dados por cima do plano salvo.
-  const draftKey = isEdit ? null : `treino:${subjectId}`
+  //
+  // O rascunho passa a valer TAMBÉM na edição. Ele ficava de fora porque um
+  // rascunho velho poderia ressuscitar dados por cima do plano salvo — risco
+  // real, e resolvido pela chave, não abrindo mão do rascunho: ela carrega a
+  // versão do plano que esta tela carregou. Se o plano mudou no servidor desde
+  // então (outro dispositivo, outra aba), a chave não bate e o rascunho antigo
+  // simplesmente não é encontrado. Editar um plano é o caso em que perder o
+  // trabalho dói mais, porque o ponto de partida já era um plano inteiro.
+  const draftKey = isEdit
+    ? `treino:${subjectId}:${planId}:${planUpdatedAt ?? '-'}`
+    : `treino:${subjectId}`
   const draft = useFormDraft<EditorPlan>(draftKey, plan, (d) => setPlan(d))
+
+  // "Tem alteração pendente?" comparado contra o estado com que a tela abriu.
+  // Um sinalizador ligado em cada setPlan esqueceria de um caminho novo mais
+  // cedo ou mais tarde, e desfazer tudo na mão voltaria a acusar sujeira.
+  const baseline = useRef(JSON.stringify(initial))
+  const dirty = useMemo(() => JSON.stringify(plan) !== baseline.current, [plan])
+  const guard = useUnsavedChanges(dirty)
   const [dragDay, setDragDay] = useState<number | null>(null)
   const [dragEx, setDragEx] = useState<{ dayKey: string; idx: number } | null>(null)
 
@@ -712,6 +729,8 @@ function Builder({
       const save = editorToSaveInput(plan, { orgId, subjectId }, snapshot)
       const saved = await mut.mutateAsync(save)
       if (draftKey) clearDraft(draftKey)
+      // salvou: a navegação seguinte não pode perguntar "descartar alterações?"
+      guard.allowNext()
       navigate(`/avaliados/${subjectId}/treinos/${saved.id}`)
     } catch (e) {
       setSubmitError(normalizeDbError(e))
@@ -1055,14 +1074,17 @@ function Builder({
 
       {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleSave} disabled={mut.isPending}>
           {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar plano'}
         </Button>
         <Button variant="outline" asChild>
           <Link to={`/avaliados/${subjectId}`}>Cancelar</Link>
         </Button>
+        {dirty ? <UnsavedBadge /> : null}
       </div>
+
+      <UnsavedChangesPrompt guard={guard} what="neste plano de treino" />
     </div>
   )
 }
