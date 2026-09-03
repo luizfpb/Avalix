@@ -10,7 +10,7 @@ import {
   submitIntake,
 } from '../features/anamnesis/intake'
 import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
-import { computeGate } from '../features/anamnesis/gate'
+import { computeGate, medicamentosRespondidos } from '../features/anamnesis/gate'
 import { AnamneseCamadaA, AnamneseCamadaB } from '../features/anamnesis/AnamneseForm'
 import { subjectFormSchema, emptySubjectForm, type SubjectFormValues } from '../features/subjects/schema'
 import { ageFromBirthDate } from '../lib/age'
@@ -172,7 +172,8 @@ function Form({
   }
 
   const gateComplete = computeGate(a).status !== 'incompleto'
-  const canSubmit = gateComplete && signerName.trim().length >= 3 && accepted
+  const medicamentosOk = medicamentosRespondidos(a)
+  const canSubmit = gateComplete && medicamentosOk && signerName.trim().length >= 3 && accepted
 
   const submit = useMutation({
     mutationFn: (registration: SubjectFormValues | undefined) =>
@@ -219,6 +220,11 @@ function Form({
     }
     if (!gateComplete) {
       return setError('Responda todos os itens das seções de saúde e confirme “Nenhuma” quando aplicável.')
+    }
+    if (!medicamentosOk) {
+      return setError(
+        'Liste os medicamentos que você toma ou marque “Não tomo nenhum medicamento”.'
+      )
     }
     if (signerName.trim().length < 3) return setError('Preencha o nome de quem está aceitando o termo.')
     if (!accepted) return setError('É preciso aceitar o termo de consentimento para enviar.')

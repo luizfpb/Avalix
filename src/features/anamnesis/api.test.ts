@@ -31,6 +31,7 @@ function completeAnswers(patch: Partial<AnamnesisAnswers> = {}): AnamnesisAnswer
     ativo_regular: false,
     doenca_cmr_confirmada: true,
     sinais_sintomas_confirmados: true,
+    medicamentos_confirmados: true,
     ...patch,
   }
 }

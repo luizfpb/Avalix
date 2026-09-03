@@ -9,6 +9,11 @@
 // 1.3: + confirmação explícita das duas listas da camada A2; array vazio sem
 // confirmação volta a significar pergunta não respondida, nunca ausência.
 //
+// medicamentos_confirmados entrou depois da 1.3 e também não bumpa a versão,
+// pelo mesmo motivo do A3 abaixo: '1.3' é contrato de banco e bumpar
+// invalidaria todo link já enviado a aluno. Payload sem o campo lê como
+// pergunta não respondida — quem editar aquela anamnese responde na hora.
+//
 // A3 (liberacao_declarada) entrou DEPOIS da 1.3 sem bumpar a versão, e isso é
 // deliberado: o campo é opcional, não é lido pelo gate, e '1.3' é contrato de
 // banco em três pontos da migration 0028 (o trigger carimba, o submit e o
@@ -275,7 +280,14 @@ export type AnamnesisAnswers = {
   // B2
   doencas_cronicas: string[]
   cirurgias: Cirurgia[]
+  // Medicamentos em uso é resposta OBRIGATÓRIA: o que a pessoa toma muda a
+  // leitura do treino e da composição corporal (betabloqueador atenua a FC,
+  // diurético desidrata, corticoide e anticoncepcional mexem no peso). Como
+  // "nenhum" é resposta legítima, ela precisa ser explícita — mesmo desenho de
+  // doenca_cmr_confirmada: lista vazia sem confirmação é pergunta não
+  // respondida, nunca ausência de medicamento.
   medicamentos: Medicamento[]
+  medicamentos_confirmados: boolean
   // '' | 'sim' | 'nao' | 'nao_sei' (na spec 1.0 era boolean | null;
   // parseAnswers converte na leitura)
   historia_familiar_dcv: string
@@ -355,6 +367,7 @@ export function emptyAnamnesis(): AnamnesisAnswers {
     doencas_cronicas: [],
     cirurgias: [],
     medicamentos: [],
+    medicamentos_confirmados: false,
     historia_familiar_dcv: '',
     tabagismo: '',
     tabagismo_macos_ano: '',

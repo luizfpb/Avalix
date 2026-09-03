@@ -45,6 +45,7 @@ function answersFixture() {
     ativo_regular: false,
     doenca_cmr_confirmada: true,
     sinais_sintomas_confirmados: true,
+    medicamentos_confirmados: true,
     ocupacao: 'Professora',
     declaracao_veracidade: true,
     consentimento_lgpd: true,
@@ -171,6 +172,26 @@ describe('AnamneseNova — edição', () => {
 
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1))
     expect(updateMock.mock.calls[0][0].answers.liberacao_declarada).toBe(true)
+  })
+
+  // O campo saiu da avaliação física e virou obrigatório aqui; anamnese
+  // gravada antes de ele existir abre com a pergunta em branco e precisa ser
+  // respondida para salvar a correção.
+  it('sem resposta sobre medicamentos, o salvamento fica bloqueado', () => {
+    const { medicamentos_confirmados: _omitido, ...semMedicamentos } = answersFixture()
+    useAnamneseMock.mockReturnValue({
+      data: anamneseFixture({ payload: semMedicamentos }),
+      isPending: false,
+      isError: false,
+    })
+    renderPage('/avaliados/s1/anamnese/an1/editar')
+
+    const salvar = screen.getByRole('button', { name: 'Salvar alterações' }) as HTMLButtonElement
+    expect(salvar.disabled).toBe(true)
+    expect(screen.getByText(/liste os medicamentos ou confirme que não usa nenhum/i)).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('Não usa nenhum medicamento'))
+    expect(salvar.disabled).toBe(false)
   })
 
   it('anamnese de outro avaliado na URL não abre para edição', () => {

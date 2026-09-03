@@ -21,6 +21,7 @@ export function anamneseBase(): AnamnesisAnswers {
   a.ativo_regular = false
   a.doenca_cmr_confirmada = true
   a.sinais_sintomas_confirmados = true
+  a.medicamentos_confirmados = true
   return a
 }
 

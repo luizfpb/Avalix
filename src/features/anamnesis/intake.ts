@@ -4,7 +4,7 @@ import { isIntakePath } from '../../lib/routing'
 import { clearIntakeLinkLocal, purgeExpiredIntakeLinks, saveIntakeLinkLocal } from './linkStore'
 import type { Database, Json } from '../../lib/database.types'
 import { SPEC_VERSION, type AnamnesisAnswers } from './spec'
-import { assertGateComplete } from './gate'
+import { assertGateComplete, assertMedicamentosRespondidos } from './gate'
 import { consentText, CONSENT_VERSION } from '../consent/text'
 import type { SignerKind } from '../consent/api'
 import type { SubjectInsert } from '../subjects/api'
@@ -259,6 +259,7 @@ export type SubmitIntakeInput = {
 // fluxo de consentimento do personal. Prova depois qual texto o aluno leu.
 export async function submitIntake(input: SubmitIntakeInput): Promise<void> {
   assertGateComplete(input.answers)
+  assertMedicamentosRespondidos(input.answers)
   const consentHash = await sha256Hex(consentText(input.orgName))
   const { error } = await supabase.rpc('submit_anamnese_intake', {
     p_token: input.token,

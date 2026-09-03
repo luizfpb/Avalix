@@ -200,7 +200,17 @@ function clinicaBlock(a: AnamnesisAnswers): string {
   return block('B2. HISTÓRIA CLÍNICA', [
     multiLine('Doenças crônicas', DOENCAS_CRONICAS, a.doencas_cronicas),
     line('Cirurgias (priorizando ortopédicas)', cirurgias.length > 0 ? cirurgias.join(' | ') : null),
-    line('Medicamentos em uso', medicamentos.length > 0 ? medicamentos.join(' | ') : null),
+    // Pergunta obrigatória desde ago/2026: "nenhum" confirmado é resposta, e
+    // dizer só "não informado" faria a IA tratar ausência confirmada de
+    // medicamento como lacuna de coleta.
+    line(
+      'Medicamentos em uso',
+      medicamentos.length > 0
+        ? medicamentos.join(' | ')
+        : a.medicamentos_confirmados
+          ? 'Nenhum (ausência confirmada)'
+          : null
+    ),
     line(
       'Morte por doença cardíaca ou súbita em familiar de 1º grau (homem < 55a, mulher < 65a)?',
       optionLabel(HISTORIA_FAMILIAR, a.historia_familiar_dcv)

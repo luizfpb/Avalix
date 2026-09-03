@@ -57,6 +57,7 @@ const answersSchema = z.object({
   doencas_cronicas: zarr,
   cirurgias: z.array(cirurgiaSchema).catch([]),
   medicamentos: z.array(medicamentoSchema).catch([]),
+  medicamentos_confirmados: z.boolean().catch(false),
   historia_familiar_dcv: zs,
   tabagismo: zs,
   tabagismo_macos_ano: zs,

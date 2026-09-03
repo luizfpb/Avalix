@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import type { Database, Json } from '../../lib/database.types'
 import type { AnamnesisAnswers } from './spec'
-import { assertGateComplete } from './gate'
+import { assertGateComplete, assertMedicamentosRespondidos } from './gate'
 import { validarLiberacao, type LiberacaoInput } from './clearance'
 import { SPEC_VERSION } from './spec'
 
@@ -18,6 +18,7 @@ export type CreateAnamneseInput = {
 // guarda as respostas cruas. org_id é recopiado do subject pelo trigger.
 export async function createAnamnese(input: CreateAnamneseInput): Promise<AnamneseRow> {
   const gate = assertGateComplete(input.answers)
+  assertMedicamentosRespondidos(input.answers)
   const { data, error } = await supabase
     .from('anamneses')
     .insert({
@@ -52,6 +53,7 @@ export async function updateAnamnese(
   input: UpdateAnamneseInput
 ): Promise<AnamneseRow> {
   const gate = assertGateComplete(input.answers)
+  assertMedicamentosRespondidos(input.answers)
   const { data, error } = await supabase
     .from('anamneses')
     .update({

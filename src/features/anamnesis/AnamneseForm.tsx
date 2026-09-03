@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useId, type ReactNode } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pill, Plus, Trash2 } from 'lucide-react'
 import {
   PARQ_ITEMS,
   DOENCA_CMR,
@@ -26,7 +26,7 @@ import {
   type AnamnesisAnswers,
   type Option,
 } from './spec'
-import { NIVEL_LABEL, type computeGate } from './gate'
+import { NIVEL_LABEL, medicamentosRespondidos, type computeGate } from './gate'
 import {
   anamneseAlerta,
   ALERTA_CLASSES,
@@ -272,23 +272,27 @@ function RepeatList<T>({
   onAdd,
   onRemove,
   render,
+  emptyText = 'Nenhum item.',
 }: {
-  label: string
+  label: ReactNode
   items: T[]
   onAdd: () => void
   onRemove: (i: number) => void
   render: (item: T, i: number) => ReactNode
+  // null esconde a linha de lista vazia — em medicamentos, "Nenhum item" ao
+  // lado de uma pergunta obrigatória pareceria a resposta "não usa nenhum".
+  emptyText?: ReactNode
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">{label}</span>
         <Button type="button" size="xs" variant="outline" onClick={onAdd}>
           <Plus /> Adicionar
         </Button>
       </div>
       {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Nenhum item.</p>
+        emptyText ? <p className="text-xs text-muted-foreground">{emptyText}</p> : null
       ) : (
         <div className="space-y-3">
           {items.map((item, i) => (
@@ -316,6 +320,75 @@ function updateItem<K extends 'cirurgias' | 'medicamentos' | 'dor_queixas'>(
   const list = a[key] as AnamnesisAnswers[K]
   const next = list.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
   set({ [key]: next } as unknown as Partial<AnamnesisAnswers>)
+}
+
+// Medicamentos em uso: pergunta OBRIGATÓRIA e destacada. Era um campo livre da
+// avaliação física — de quando a anamnese ainda não existia —, e ficava longe
+// do resto da história clínica, sem nada que garantisse que alguém tivesse
+// respondido. Aqui ela mora junto das outras perguntas de saúde, com o mesmo
+// destaque em âmbar que tinha na avaliação, e "não usa nenhum" é uma
+// confirmação explícita: lista vazia por si só é pergunta em branco
+// (medicamentosRespondidos, em gate.ts).
+function Medicamentos({
+  a,
+  set,
+  isAluno,
+}: {
+  a: AnamnesisAnswers
+  set: SetAnswers
+  isAluno: boolean
+}) {
+  const nenhum = a.medicamentos_confirmados && a.medicamentos.length === 0
+  return (
+    <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+      <RepeatList
+        label={
+          <span className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
+            <Pill className="size-4 shrink-0" />
+            {isAluno ? 'Medicamentos que você toma *' : 'Medicamentos em uso *'}
+          </span>
+        }
+        items={a.medicamentos}
+        emptyText={nenhum ? null : 'Nenhum medicamento listado ainda.'}
+        onAdd={() =>
+          set({
+            medicamentos: [...a.medicamentos, { nome: '', dose: '' }],
+            medicamentos_confirmados: true,
+          })
+        }
+        onRemove={(i) => {
+          // Tirar o último da lista NÃO equivale a declarar que não usa nada:
+          // a confirmação volta a ficar pendente, como nas listas da camada A.
+          const next = a.medicamentos.filter((_, idx) => idx !== i)
+          set({ medicamentos: next, medicamentos_confirmados: next.length > 0 })
+        }}
+        render={(m, i) => (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Input aria-label={`Medicamento ${i + 1}: nome`} placeholder="Nome" value={m.nome} onChange={(e) => updateItem('medicamentos', i, { nome: e.target.value }, a, set)} />
+            <Input aria-label={`Medicamento ${i + 1}: dose`} placeholder="Dose" value={m.dose} onChange={(e) => updateItem('medicamentos', i, { dose: e.target.value }, a, set)} />
+          </div>
+        )}
+      />
+      <p className="text-xs text-amber-800/80 dark:text-amber-200/70">
+        {isAluno
+          ? 'Vale remédio de uso contínuo e o que você está tomando agora, com a dose se souber. Nenhuma resposta aqui atrapalha seu treino — ela ajuda a montar um treino seguro.'
+          : 'Uso contínuo e uso atual, com a dose. Muda a leitura do treino e da composição corporal (ex.: betabloqueador atenua a FC; diurético e corticoide mexem em peso e retenção).'}
+      </p>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={nenhum}
+          onChange={(e) => set({ medicamentos: [], medicamentos_confirmados: e.target.checked })}
+        />
+        {isAluno ? 'Não tomo nenhum medicamento' : 'Não usa nenhum medicamento'}
+      </label>
+      {!medicamentosRespondidos(a) ? (
+        <p className="text-xs text-warning" role="status">
+          Obrigatório: liste os medicamentos ou confirme que não usa nenhum.
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 // ---- Camada A (triagem PAR-Q+ / ACSM) ---------------------------------
@@ -554,18 +627,7 @@ export function AnamneseCamadaB({
           )}
         />
 
-        <RepeatList
-          label="Medicamentos em uso"
-          items={a.medicamentos}
-          onAdd={() => set({ medicamentos: [...a.medicamentos, { nome: '', dose: '' }] })}
-          onRemove={(i) => set({ medicamentos: a.medicamentos.filter((_, idx) => idx !== i) })}
-          render={(m, i) => (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Input aria-label={`Medicamento ${i + 1}: nome`} placeholder="Nome" value={m.nome} onChange={(e) => updateItem('medicamentos', i, { nome: e.target.value }, a, set)} />
-              <Input aria-label={`Medicamento ${i + 1}: dose`} placeholder="Dose" value={m.dose} onChange={(e) => updateItem('medicamentos', i, { dose: e.target.value }, a, set)} />
-            </div>
-          )}
-        />
+        <Medicamentos a={a} set={set} isAluno={isAluno} />
 
         <Row label="Morte por doença cardíaca/súbita em familiar de 1º grau (homem <55a, mulher <65a)?">
           <Choice

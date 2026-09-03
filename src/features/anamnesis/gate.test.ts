@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeGate } from './gate'
+import { computeGate, medicamentosRespondidos } from './gate'
 import { emptyAnamnesis, type AnamnesisAnswers } from './spec'
 
 // base "saudável": PAR-Q todo Não, sem doença/sintomas
@@ -87,5 +87,37 @@ describe('computeGate — red flags e gestação levantam flag', () => {
     const a = base()
     a.gestante = true
     expect(computeGate(a).flagEncaminhamento).toBe(true)
+  })
+})
+
+describe('medicamentos em uso — obrigatório, mas fora da triagem', () => {
+  it('lista vazia sem confirmação é pergunta não respondida', () => {
+    expect(medicamentosRespondidos(base())).toBe(false)
+  })
+
+  it('“não usa nenhum” confirmado responde a pergunta', () => {
+    const a = base()
+    a.medicamentos_confirmados = true
+    expect(medicamentosRespondidos(a)).toBe(true)
+  })
+
+  it('linha em branco na lista não conta como resposta', () => {
+    const a = base()
+    a.medicamentos = [{ nome: '  ', dose: '' }]
+    a.medicamentos_confirmados = true
+    expect(medicamentosRespondidos(a)).toBe(false)
+    a.medicamentos = [{ nome: 'levotiroxina', dose: '75 mcg' }]
+    expect(medicamentosRespondidos(a)).toBe(true)
+  })
+
+  // Se entrasse no gate, anamnese antiga (gravada antes de o campo existir)
+  // apareceria como encaminhamento por falta de preenchimento, e o nível ACSM
+  // de quem não respondeu mudaria sem nenhum sinal clínico novo.
+  it('não altera o resultado da triagem', () => {
+    const semResposta = computeGate(base())
+    const a = base()
+    a.medicamentos_confirmados = true
+    a.medicamentos = [{ nome: 'metformina', dose: '850 mg' }]
+    expect(computeGate(a)).toEqual(semResposta)
   })
 })

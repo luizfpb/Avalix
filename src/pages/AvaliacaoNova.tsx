@@ -1,6 +1,6 @@
 import { cloneElement, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { Pill, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
@@ -187,7 +187,13 @@ function CircumferencesCard({
         {CIRCUMFERENCE_CATALOG.map((group) => (
           <div key={group.group} className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">{group.group}</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {/* Duas colunas em qualquer largura, e não três no desktop: o
+                catálogo lista os pontos bilaterais em pares (D, E) seguidos, e
+                com duas colunas cada linha é um par — "Coxa proximal (D)" ao
+                lado de "Coxa proximal (E)". Com três colunas o par quebrava
+                entre linhas e a grade virava uma lista de rótulos parecidos.
+                Nos grupos sem lado (Tronco) o efeito é só uma coluna a menos. */}
+            <div className="grid grid-cols-2 gap-3">
               {group.items.map((item) => (
                 <Field key={item.key} label={needed.has(item.key) ? `${item.label} *` : item.label}>
                   <Input
@@ -276,7 +282,13 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const [height, setHeight] = useState(() =>
     ea ? String(ea.height_cm) : subject.height_cm != null ? String(subject.height_cm) : ''
   )
-  const [medications, setMedications] = useState(() => ea?.medications ?? '')
+  // Medicamentos em uso saíram DESTE formulário e passaram a ser resposta
+  // obrigatória da anamnese. O valor gravado antes disso continua sendo
+  // reenviado na edição de propósito: `save_assessment` trata argumento
+  // omitido como "limpar o campo", então não repassar apagaria o que foi
+  // registrado quando o campo ainda existia aqui. Ele segue visível no detalhe
+  // e no laudo — só não é mais editável nesta tela.
+  const legacyMedications = ea?.medications ?? null
   const [notes, setNotes] = useState(() => ea?.notes ?? '')
   const [skinfolds, setSkinfolds] = useState<Record<string, [string, string, string]>>(() => {
     const m: Record<string, [string, string, string]> = {}
@@ -314,15 +326,14 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
     protocolId: string
     weight: string
     height: string
-    medications: string
     notes: string
     skinfolds: Record<string, [string, string, string]>
     circumferences: Record<string, string>
     customCircs: { site: string; value: string }[]
   }
   const valorAtual = useMemo<AvaliacaoDraft>(
-    () => ({ assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs }),
-    [assessedAt, protocolId, weight, height, medications, notes, skinfolds, circumferences, customCircs]
+    () => ({ assessedAt, protocolId, weight, height, notes, skinfolds, circumferences, customCircs }),
+    [assessedAt, protocolId, weight, height, notes, skinfolds, circumferences, customCircs]
   )
   const draft = useFormDraft<AvaliacaoDraft>(
     draftKey,
@@ -332,7 +343,6 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       setProtocolId(d.protocolId)
       setWeight(d.weight)
       setHeight(d.height)
-      setMedications(d.medications)
       setNotes(d.notes)
       setSkinfolds(d.skinfolds ?? {})
       setCircumferences(d.circumferences ?? {})
@@ -462,7 +472,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         protocolId: protocol.id,
         weightKg,
         heightCm,
-        medications: medications.trim() || null,
+        medications: legacyMedications,
         notes: notes.trim() || null,
         result: snapshot,
         skinfolds: skinfoldRows,
@@ -631,23 +641,6 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
           Preencha peso, altura e as medidas do protocolo para ver o resultado.
         </p>
       )}
-
-      <div className="space-y-1.5 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
-        <Label htmlFor="assessment-medications" className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
-          <Pill className="size-4" /> Medicamentos em uso
-        </Label>
-        <textarea
-          id="assessment-medications"
-          rows={2}
-          className={controlClass}
-          value={medications}
-          onChange={(e) => setMedications(e.target.value)}
-          placeholder="Liste os medicamentos que o avaliado usa atualmente. Deixe em branco se não usa."
-        />
-        <p className="text-xs text-amber-700/80 dark:text-amber-300/70">
-          Importante para interpretar os resultados (ex.: medicação que afeta peso ou retenção).
-        </p>
-      </div>
 
       <Field label="Observações (opcional)">
         <textarea

@@ -36,7 +36,7 @@ beforeEach(() => localStorage.clear())
 afterEach(cleanup)
 
 describe('AvaliacaoNova — nomes acessíveis', () => {
-  it('associa labels aos campos, às dobras e aos medicamentos', () => {
+  it('associa labels aos campos e às dobras', () => {
     // data router (createMemoryRouter), e não MemoryRouter: é o que o app usa em
     // produção e o que a guarda de saída não salva exige (useBlocker).
     render(
@@ -53,7 +53,6 @@ describe('AvaliacaoNova — nomes acessíveis', () => {
     expect(screen.getByLabelText('Peso (kg)')).toBeTruthy()
     expect(screen.getByLabelText('Altura (cm)')).toBeTruthy()
     expect(screen.getAllByLabelText(/aferição 1$/).length).toBeGreaterThan(0)
-    expect(screen.getByLabelText('Medicamentos em uso')).toBeTruthy()
     expect(screen.getByLabelText('Observações (opcional)')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
@@ -61,5 +60,22 @@ describe('AvaliacaoNova — nomes acessíveis', () => {
     expect(
       screen.getByLabelText('Medida da circunferência personalizada 1 em centímetros')
     ).toBeTruthy()
+  })
+
+  // O campo existia aqui desde a v1.6, antes de a anamnese existir. Perguntar
+  // duas vezes a mesma coisa, em telas diferentes, produz duas respostas
+  // divergentes sobre saúde — agora a pergunta é obrigatória na anamnese.
+  it('não pergunta mais medicamentos em uso', () => {
+    render(
+      <RouterProvider
+        router={createMemoryRouter(
+          [{ path: '/avaliados/:id/avaliacoes/nova', element: <AvaliacaoNova /> }],
+          { initialEntries: ['/avaliados/subject-1/avaliacoes/nova'] }
+        )}
+      />
+    )
+
+    expect(screen.queryByLabelText('Medicamentos em uso')).toBeNull()
+    expect(screen.queryByText(/Medicamentos/)).toBeNull()
   })
 })

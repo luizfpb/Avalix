@@ -157,9 +157,19 @@ export function AnamneseResumo({
         {(a.cirurgias ?? []).map((c, i) => (
           <Item key={`c${i}`} label="Cirurgia" value={[c.descricao, c.ano].filter(Boolean).join(' · ')} />
         ))}
-        {(a.medicamentos ?? []).map((m, i) => (
-          <Item key={`m${i}`} label="Medicamento" value={[m.nome, m.dose].filter(Boolean).join(' · ')} />
-        ))}
+        {/* Pergunta obrigatória: lista vazia sem confirmação é "não respondido",
+            e não "não usa nada" — anamnese gravada antes do campo existir cai
+            neste caso. */}
+        {(a.medicamentos ?? []).length > 0 ? (
+          (a.medicamentos ?? []).map((m, i) => (
+            <Item key={`m${i}`} label="Medicamento" value={[m.nome, m.dose].filter(Boolean).join(' · ')} />
+          ))
+        ) : (
+          <Item
+            label="Medicamentos em uso"
+            value={a.medicamentos_confirmados ? 'Nenhum' : 'Não respondido'}
+          />
+        )}
         <Item label="História familiar DCV" value={a.historia_familiar_dcv ? labelOf(HISTORIA_FAMILIAR, a.historia_familiar_dcv) : ''} />
         <Item label="Tabagismo" value={a.tabagismo ? labelOf(TABAGISMO, a.tabagismo) : ''} />
         <Item label="Álcool" value={a.alcool ? labelOf(ALCOOL, a.alcool) : ''} />

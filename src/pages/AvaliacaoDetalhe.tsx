@@ -342,6 +342,10 @@ export default function AvaliacaoDetalhe() {
         </Card>
       ) : null}
 
+      {/* Só aparece em avaliação registrada antes de agosto/2026: o campo saiu
+          deste formulário e virou pergunta obrigatória da anamnese. O que já
+          foi coletado continua visível aqui e no laudo — apagar da tela dado de
+          saúde que está gravado seria pior do que a duplicidade que existiu. */}
       {assessment.medications ? (
         <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
           <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
@@ -349,6 +353,9 @@ export default function AvaliacaoDetalhe() {
           </p>
           <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
             {assessment.medications}
+          </p>
+          <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-300/70">
+            Registrado nesta avaliação antes de os medicamentos passarem para a anamnese.
           </p>
         </div>
       ) : null}

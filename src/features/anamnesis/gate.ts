@@ -130,6 +130,36 @@ export function gateFromRow(row: {
   }
 }
 
+// ---- obrigatoriedade fora da triagem ----------------------------------
+// Medicamentos em uso eram um campo livre da AVALIAÇÃO FÍSICA, de quando a
+// anamnese ainda não existia; agora são resposta obrigatória daqui, onde o
+// resto da história clínica mora. Fica FORA de computeGate de propósito: é
+// completude de preenchimento, não sinal clínico — deixá-lo entrar no gate
+// mudaria `nivelEncaminhamento` de quem não respondeu e faria uma anamnese
+// antiga, gravada antes do campo existir, aparecer como encaminhamento.
+//
+// Respondida = ao menos um medicamento nomeado, ou a confirmação explícita de
+// que não usa nenhum. Linha em branco na lista não conta: quem clicou em
+// "Adicionar" e não digitou nada não respondeu a pergunta.
+export function medicamentosRespondidos(a: AnamnesisAnswers): boolean {
+  if (a.medicamentos_confirmados !== true) return false
+  const itens = a.medicamentos ?? []
+  return itens.length === 0 || itens.some((m) => (m.nome ?? '').trim() !== '')
+}
+
+// Rede de segurança das escritas, como assertGateComplete: os formulários já
+// barram antes, e a mensagem que o usuário lê sai de lá. NÃO entra no aceite de
+// uma resposta pendente (acceptIntake): o aluno já enviou, o payload dele é
+// imutável, e uma resposta enviada antes da pergunta existir ficaria impossível
+// de aceitar — o caminho ali é aceitar e completar na edição.
+export function assertMedicamentosRespondidos(a: AnamnesisAnswers): void {
+  if (!medicamentosRespondidos(a)) {
+    throw new Error(
+      'Responda os medicamentos em uso: liste os medicamentos ou confirme que não usa nenhum.'
+    )
+  }
+}
+
 export function assertGateComplete(a: AnamnesisAnswers): GateResult {
   const gate = computeGate(a)
   if (gate.status === 'incompleto') {

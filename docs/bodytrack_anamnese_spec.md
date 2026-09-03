@@ -95,7 +95,8 @@ adesão (preferências e vetos).
 
 - `doencas_cronicas` — `multi` — HAS / DM1 / DM2 / dislipidemia / cardiopatia / doença renal / pulmonar (asma, DPOC) / tireoidiana / câncer (atual ou prévio) / reumática-artrite / osteoporose-osteopenia / neurológica / psiquiátrica relevante ao engajamento
 - `cirurgias` — repetível: `{descricao: text, ano: int, regiao: enum}` — priorize ortopédicas
-- `medicamentos` — repetível: `{nome: text, dose: text}` — sinalize classes que alteram resposta ao exercício (betabloqueador → atenua FC; diurético → desidratação/cãibra; insulina → hipoglicemia de esforço)
+- `medicamentos` — repetível: `{nome: text, dose: text}` — **obrigatório**, com destaque próprio no formulário — sinalize classes que alteram resposta ao exercício (betabloqueador → atenua FC; diurético → desidratação/cãibra; insulina → hipoglicemia de esforço)
+- `medicamentos_confirmados` — `bool` — confirmação explícita de que a pergunta foi respondida; lista vazia sem ela é "não respondido", nunca "não usa nenhum" (mesmo desenho de `doenca_cmr_confirmada`). Não entra no gate: é completude de preenchimento, não sinal clínico. *(entrou depois da spec 1.3, sem bumpar a versão — payload antigo lê como não respondido)*
 - `historia_familiar_dcv` — `enum` sim / não / não sei — Morte por doença cardíaca ou morte súbita em familiar de 1º grau (homem <55a, mulher <65a)? *(era `bool` na spec 1.0; "não sei" é resposta comum e distinta de "não" — `parseAnswers` converte payloads antigos)*
 - `tabagismo` — `enum` — nunca / ex / atual  (+ `int` maços-ano se atual/ex)
 - `alcool` — `enum` — não / social / frequente

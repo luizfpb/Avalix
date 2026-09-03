@@ -4,7 +4,7 @@ import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
 import { useAnamnese, useCreateAnamnese, useUpdateAnamnese } from '../features/anamnesis/hooks'
-import { computeGate } from '../features/anamnesis/gate'
+import { computeGate, medicamentosRespondidos } from '../features/anamnesis/gate'
 import { declaracaoFromAnswers } from '../features/anamnesis/clearance'
 import { AnamneseCamadaA, AnamneseCamadaB, GateBox } from '../features/anamnesis/AnamneseForm'
 import { parseAnswers } from '../features/anamnesis/parse'
@@ -128,13 +128,20 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
 
   const gate = computeGate(a)
   const gateComplete = gate.status !== 'incompleto'
-  const canSave = gateComplete && a.declaracao_veracidade && a.consentimento_lgpd && !!organization
+  const medicamentosOk = medicamentosRespondidos(a)
+  const canSave =
+    gateComplete && medicamentosOk && a.declaracao_veracidade && a.consentimento_lgpd && !!organization
 
   async function handleSave() {
     setSubmitError(null)
     if (!organization) return
     if (!gateComplete) {
       return setSubmitError('Responda todos os itens da triagem, incluindo as confirmações da seção A2.')
+    }
+    if (!medicamentosOk) {
+      return setSubmitError(
+        'Responda os medicamentos em uso: liste os medicamentos ou marque que o avaliado não usa nenhum.'
+      )
     }
     if (!a.declaracao_veracidade || !a.consentimento_lgpd) {
       return setSubmitError('Confirme a declaração de veracidade e o consentimento.')
