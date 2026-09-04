@@ -674,3 +674,93 @@ describe('TreinoAluno', () => {
     expect(screen.getByText(/visível para o profissional/i)).toBeTruthy()
   })
 })
+
+// Aparelho ocupado, dor no dia, fila na academia: a troca acontece e precisa
+// caber no registro. Sem link para o catálogo, o aluno escolhe entre os
+// exercícios das OUTRAS divisões do próprio plano — o pacote já os traz, então
+// funciona offline como o resto da tela.
+describe('TreinoAluno — troca de exercício', () => {
+  function pacoteDoisDias() {
+    const base = pacote()
+    return pacote({
+      days: [
+        { id: 'd1', label: 'A', name: 'Superiores', position: 0 },
+        { id: 'd2', label: 'B', name: 'Inferiores', position: 1 },
+      ],
+      exercises: [
+        ...base.exercises,
+        {
+          id: 'we2',
+          day_id: 'd2',
+          exercise_id: 'x2',
+          name: 'Leg press',
+          position: 0,
+          sets: 3,
+          reps: '10-12',
+          rir: 2,
+          rest_seconds: 90,
+          tempo: null,
+          notes: null,
+        },
+      ],
+    })
+  }
+
+  async function trocar() {
+    fireEvent.change(screen.getByLabelText('Trocou algum exercício?'), {
+      target: { value: 'we2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    return screen.findByLabelText(/Carga da série 1 de Leg press/)
+  }
+
+  it('envia o exercício trocado junto com o do dia, numerado por exercício', async () => {
+    getWorkoutMock.mockResolvedValue(pacoteDoisDias())
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+
+    const carga = await trocar()
+    fireEvent.change(carga, { target: { value: '100' } })
+    fireEvent.change(screen.getByLabelText(/Repetições da série 1 de Leg press/), {
+      target: { value: '12' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets).toEqual([
+      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: null, rir: null },
+      { exercise_id: 'x2', set_number: 1, weight_kg: 100, reps: 12, rir: null },
+    ])
+  })
+
+  it('a troca entra no rascunho, para não sumir se a aba fechar no meio', async () => {
+    getWorkoutMock.mockResolvedValue(pacoteDoisDias())
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    await trocar()
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+
+    await waitFor(() => expect(reserveDraftRevisionMock).toHaveBeenCalled())
+    expect(reserveDraftRevisionMock.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ extras: ['we2'] })
+    )
+  })
+
+  it('o exercício escolhido sai da lista e volta ao ser removido', async () => {
+    getWorkoutMock.mockResolvedValue(pacoteDoisDias())
+    await abrir()
+    await trocar()
+
+    expect(screen.queryByRole('option', { name: /Leg press/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Leg press deste treino' }))
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /Leg press/ })).toBeTruthy()
+    )
+    expect(screen.queryByLabelText(/Carga da série 1 de Leg press/)).toBeNull()
+  })
+
+  it('plano de uma divisão só não mostra a troca', async () => {
+    await abrir()
+    expect(screen.queryByLabelText('Trocou algum exercício?')).toBeNull()
+  })
+})

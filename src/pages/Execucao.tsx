@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Trash2, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
   useCreateWorkoutLog,
@@ -11,7 +11,7 @@ import {
   useWorkoutLogSets,
   useWorkoutPlan,
 } from '../features/workout/hooks'
-import type { NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
+import type { ExerciseRow, NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
 import {
   adherencePct,
   exerciseProgression,
@@ -29,6 +29,7 @@ import { roundToIncrement } from '../features/workout/oneRm'
 import { formatSetsReps } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { GroupBlock } from '../features/workout/GroupBlock'
+import { ExercisePicker } from '../features/workout/ExercisePicker'
 import { linePath } from '../features/reports/charts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -198,6 +199,7 @@ export default function Execucao() {
         orgId={organization?.id ?? ''}
         subjectId={plan.subject_id}
         names={names}
+        exercises={exercisesQuery.data ?? []}
         history={historyQuery.data ?? []}
       />
 
@@ -392,17 +394,96 @@ const KIND_LABEL: Record<ProgressionKind, string> = {
   insufficient: '',
 }
 
+// A grade de séries de um exercício. Vale para o que estava prescrito e para o
+// exercício avulso — as duas coisas são a mesma tabela de carga/reps/RIR, e
+// mantê-las em componentes separados era garantia de divergirem.
+function SetGrid({
+  name,
+  rows,
+  repsPlaceholder,
+  rirPlaceholder,
+  onCell,
+  onAddRow,
+}: {
+  name: string
+  rows: LogRow[]
+  repsPlaceholder: string
+  rirPlaceholder: string
+  onCell: (i: number, field: keyof LogRow, value: string) => void
+  onAddRow: () => void
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+        <span className="w-6" />
+        <span className="w-20 text-center">carga (kg)</span>
+        <span className="w-16 text-center">reps</span>
+        <span className="w-14 text-center">RIR</span>
+      </div>
+      {rows.map((row, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
+          <Input
+            aria-label={`Carga da série ${i + 1} de ${name}`}
+            className="h-8 w-20"
+            type="number"
+            inputMode="decimal"
+            placeholder="kg"
+            value={row.weight}
+            onChange={(e) => onCell(i, 'weight', e.target.value)}
+          />
+          <Input
+            aria-label={`Repetições da série ${i + 1} de ${name}`}
+            className="h-8 w-16"
+            type="number"
+            inputMode="numeric"
+            placeholder={repsPlaceholder}
+            value={row.reps}
+            onChange={(e) => onCell(i, 'reps', e.target.value)}
+          />
+          <Input
+            aria-label={`RIR da série ${i + 1} de ${name}`}
+            className="h-8 w-14"
+            type="number"
+            inputMode="numeric"
+            placeholder={rirPlaceholder}
+            value={row.rir}
+            onChange={(e) => onCell(i, 'rir', e.target.value)}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={onAddRow}
+        className="flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Plus className="size-3" /> série
+      </button>
+    </div>
+  )
+}
+
+// Exercício feito fora da prescrição: equipamento ocupado, dor no dia, troca
+// combinada na hora. O banco sempre permitiu (workout_log_sets aponta para o
+// CATÁLOGO, não para o exercício do plano — 0009), o que faltava era a tela.
+// Registrar o que foi feito de verdade vale mais do que uma sessão que só
+// aceita o que estava no papel: é esse histórico que sustenta a progressão de
+// carga do exercício, aqui e em qualquer plano futuro.
+type ExtraExercise = { rowId: string; exerciseId: string }
+
 function LogForm({
   detail,
   orgId,
   subjectId,
   names,
+  exercises,
   history,
 }: {
   detail: WorkoutPlanDetail
   orgId: string
   subjectId: string
   names: Record<string, string>
+  exercises: ExerciseRow[]
   history: SetHistoryPoint[]
 }) {
   const planId = detail.plan?.id ?? ''
@@ -417,6 +498,7 @@ function LogForm({
   const [week, setWeek] = useState('')
   const [notes, setNotes] = useState('')
   const [sets, setSets] = useState<Record<string, LogRow[]>>({})
+  const [extras, setExtras] = useState<ExtraExercise[]>([])
   const [error, setError] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState(false)
 
@@ -440,6 +522,34 @@ function LogForm({
     setSets((prev) => ({ ...prev, [exRowId]: [...(prev[exRowId] ?? []), { weight: '', reps: '', rir: '' }] }))
   }
 
+  // A chave das linhas é o rowId, e não o exercício: o mesmo exercício pode ser
+  // adicionado de novo numa sessão futura sem herdar as linhas da anterior.
+  function addExtra(exerciseId: string) {
+    const rowId = `extra:${crypto.randomUUID()}`
+    setExtras((prev) => [...prev, { rowId, exerciseId }])
+    setSets((prev) => ({
+      ...prev,
+      [rowId]: Array.from({ length: 3 }, () => ({ weight: '', reps: '', rir: '' })),
+    }))
+  }
+
+  function removeExtra(rowId: string) {
+    setExtras((prev) => prev.filter((x) => x.rowId !== rowId))
+    setSets((prev) => {
+      const next = { ...prev }
+      delete next[rowId]
+      return next
+    })
+  }
+
+  // Fora da lista o mesmo exercício duas vezes na sessão: o planejado e o
+  // avulso disputariam a numeração das séries e o educador veria dois cartões
+  // do mesmo movimento.
+  const usedExerciseIds = useMemo(
+    () => new Set([...dayExercises.map((e) => e.exercise_id), ...extras.map((x) => x.exerciseId)]),
+    [dayExercises, extras]
+  )
+
   const day = days.find((d) => d.id === dayKey)
 
   async function save() {
@@ -448,13 +558,17 @@ function LogForm({
     if (!orgId) return setError('Organização não carregada.')
 
     const flat: { exerciseId: string; weightKg: number | null; reps: number | null; rir: number | null }[] = []
-    for (const ex of dayExercises) {
-      for (const row of sets[ex.id] ?? []) {
+    const fontes = [
+      ...dayExercises.map((ex) => ({ rowId: ex.id, exerciseId: ex.exercise_id })),
+      ...extras,
+    ]
+    for (const ex of fontes) {
+      for (const row of sets[ex.rowId] ?? []) {
         const w = row.weight.trim() === '' ? null : Number(row.weight)
         const r = row.reps.trim() === '' ? null : Number(row.reps)
         const rir = row.rir.trim() === '' ? null : Number(row.rir)
         if (w == null && r == null) continue
-        flat.push({ exerciseId: ex.exercise_id, weightKg: w, reps: r, rir })
+        flat.push({ exerciseId: ex.exerciseId, weightKg: w, reps: r, rir })
       }
     }
     if (flat.length === 0) return setError('Registre ao menos uma série com carga ou repetições.')
@@ -483,7 +597,14 @@ function LogForm({
       for (const ex of dayExercises) {
         init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '' }))
       }
-      setSets((previous) => ({ ...previous, ...init }))
+      // Os avulsos pertencem à sessão que acabou de ser gravada: a próxima
+      // começa de novo com o que está prescrito.
+      setSets((previous) => {
+        const next = { ...previous, ...init }
+        for (const x of extras) delete next[x.rowId]
+        return next
+      })
+      setExtras([])
       setNotes('')
       setOkMsg(true)
     } catch (e) {
@@ -570,53 +691,14 @@ function LogForm({
                   </p>
                 )
               })()}
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                  <span className="w-6" />
-                  <span className="w-20 text-center">carga (kg)</span>
-                  <span className="w-16 text-center">reps</span>
-                  <span className="w-14 text-center">RIR</span>
-                </div>
-                {(sets[ex.id] ?? []).map((row, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
-                    <Input
-                      aria-label={`Carga da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
-                      className="h-8 w-20"
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="kg"
-                      value={row.weight}
-                      onChange={(e) => setCell(ex.id, i, 'weight', e.target.value)}
-                    />
-                    <Input
-                      aria-label={`Repetições da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
-                      className="h-8 w-16"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder={ex.reps ?? '—'}
-                      value={row.reps}
-                      onChange={(e) => setCell(ex.id, i, 'reps', e.target.value)}
-                    />
-                    <Input
-                      aria-label={`RIR da série ${i + 1} de ${names[ex.exercise_id] ?? 'exercício'}`}
-                      className="h-8 w-14"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder={ex.rir != null ? String(ex.rir) : '—'}
-                      value={row.rir}
-                      onChange={(e) => setCell(ex.id, i, 'rir', e.target.value)}
-                    />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => addRow(ex.id)}
-                  className="flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="size-3" /> série
-                </button>
-              </div>
+              <SetGrid
+                name={names[ex.exercise_id] ?? 'exercício'}
+                rows={sets[ex.id] ?? []}
+                repsPlaceholder={ex.reps ?? '—'}
+                rirPlaceholder={ex.rir != null ? String(ex.rir) : '—'}
+                onCell={(i, field, value) => setCell(ex.id, i, field, value)}
+                onAddRow={() => addRow(ex.id)}
+              />
             </div>
             ))
             return block.kind == null ? (
@@ -627,6 +709,60 @@ function LogForm({
               </GroupBlock>
             )
           })}
+
+          {extras.map((extra) => {
+            const nome = names[extra.exerciseId] ?? 'Exercício'
+            const last = lastByExercise.get(extra.exerciseId)
+            return (
+              <div key={extra.rowId} className="rounded-md border border-dashed bg-muted/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {nome}
+                    <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      fora do plano
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeExtra(extra.rowId)}
+                    className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Remover ${nome} da sessão`}
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+                {last ? (
+                  <p className="mt-1 text-xs text-primary">
+                    última {last.weightKg}×{last.reps}
+                    {last.rir != null ? ` (RIR ${last.rir})` : ''}
+                  </p>
+                ) : null}
+                <SetGrid
+                  name={nome}
+                  rows={sets[extra.rowId] ?? []}
+                  repsPlaceholder="—"
+                  rirPlaceholder="—"
+                  onCell={(i, field, value) => setCell(extra.rowId, i, field, value)}
+                  onAddRow={() => addRow(extra.rowId)}
+                />
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Substituição de última hora (equipamento ocupado, dor no dia) deixa
+            de virar série perdida ou linha digitada no exercício errado. */}
+        <div className="space-y-1.5 rounded-md border border-dashed p-2">
+          <p className="text-xs text-muted-foreground">
+            Fez algo diferente do prescrito? Registre o exercício que foi feito de verdade — ele
+            entra no histórico de carga do aluno.
+          </p>
+          <ExercisePicker
+            exercises={exercises}
+            orgId={orgId}
+            excludedExerciseIds={usedExerciseIds}
+            onPick={addExtra}
+          />
         </div>
 
         <div className="space-y-1.5">

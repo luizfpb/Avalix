@@ -214,4 +214,21 @@ describe('buildSets', () => {
   it('exercício sem linha nenhuma não gera série', () => {
     expect(buildSets({}, exercicios)).toEqual([])
   })
+
+  // Acontece quando o plano é editado no meio da sessão: o exercício trocado,
+  // vindo de outra divisão, passa a existir também no dia. Numerado por linha
+  // do plano, o envio inteiro seria recusado por série repetida.
+  it('o mesmo exercício em duas grades continua a numeração, e não recomeça', () => {
+    const sets = buildSets(
+      {
+        we1: [{ weight: '40', reps: '10', rir: '' }],
+        we3: [{ weight: '42.5', reps: '8', rir: '' }],
+      },
+      [...exercicios, { id: 'we3', exercise_id: 'x1' }]
+    )
+    expect(sets.map((s) => [s.exercise_id, s.set_number])).toEqual([
+      ['x1', 1],
+      ['x1', 2],
+    ])
+  })
 })

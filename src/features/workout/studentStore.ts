@@ -370,6 +370,10 @@ export type DraftSession = {
   performedAt: string
   notes: string
   rows: Record<string, { weight: string; reps: string; rir: string }[]>
+  // Exercícios de OUTRA divisão do plano feitos nesta sessão (substituição de
+  // última hora). Guardados como id do exercício do plano, que é a mesma chave
+  // de `rows`. Opcional: rascunho gravado antes desta versão não tem o campo.
+  extras?: string[]
 }
 
 type StoredDraftSession = DraftSession & { updatedAt: string }

@@ -5,6 +5,7 @@ import {
   getPlanForLink,
   getWorkoutForLink,
   submitSession,
+  type StudentExercise,
   type StudentHistoryCursor,
   type StudentHistorySession,
   type StudentPlanDetail,
@@ -601,6 +602,12 @@ function TreinoDoDia({
   const [data, setData] = useState(hoje())
   const [notas, setNotas] = useState('')
   const [linhas, setLinhas] = useState<Record<string, Linha[]>>({})
+  // Exercícios de outra divisão do plano feitos nesta sessão: equipamento
+  // ocupado, dor no dia, troca combinada na hora. Guardamos o id do exercício
+  // DO PLANO — é a mesma chave de `linhas` e o buildSets já sabe traduzir para
+  // o exercício do catálogo.
+  const [extras, setExtras] = useState<string[]>([])
+  const [escolhaExtra, setEscolhaExtra] = useState('')
   const [clientRef, setClientRef] = useState<string>(() => crypto.randomUUID())
   const [revision, setRevision] = useState(0)
   const [erro, setErro] = useState<string | null>(null)
@@ -622,6 +629,30 @@ function TreinoDoDia({
         .sort((a, b) => a.position - b.position),
     [pacote.exercises, dayId]
   )
+
+  // Um plano editado pode ter perdido o exercício que estava no rascunho; o
+  // filter é o que impede a tela de quebrar nesse caso.
+  const exerciciosExtras = useMemo(
+    () =>
+      extras
+        .map((id) => pacote.exercises.find((e) => e.id === id))
+        .filter((e): e is StudentExercise => e != null),
+    [extras, pacote.exercises]
+  )
+
+  // Só exercícios de OUTRAS divisões, e nenhum movimento repetido na sessão: o
+  // mesmo exercício duas vezes faria as duas grades numerarem a série 1 e o
+  // servidor recusaria o envio inteiro por série repetida.
+  const opcoesExtras = useMemo(() => {
+    const usados = new Set([
+      ...exerciciosDoDia.map((e) => e.exercise_id),
+      ...exerciciosExtras.map((e) => e.exercise_id),
+    ])
+    return pacote.exercises
+      .filter((e) => e.day_id !== dayId && !usados.has(e.exercise_id))
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [pacote.exercises, dayId, exerciciosDoDia, exerciciosExtras])
 
   const indice = useMemo(
     () => overrideIndex(pacote.overrides as unknown as WorkoutWeekOverrideRow[]),
@@ -654,6 +685,7 @@ function TreinoDoDia({
         setData(rascunho.performedAt)
         setNotas(rascunho.notes)
         setLinhas(rascunho.rows)
+        setExtras(rascunho.extras ?? [])
         setClientRef(rascunho.clientRef)
         setRevision(rascunho.revision ?? 0)
         setDirty(true)
@@ -677,9 +709,15 @@ function TreinoDoDia({
         )
         proximo[ex.id] = reconcileSetRows(proximo[ex.id] ?? [], efetiva.sets)
       }
+      // O avulso usa as séries prescritas na divisão de origem como ponto de
+      // partida; override de semana não se aplica, porque ele não está sendo
+      // feito no dia para o qual foi prescrito.
+      for (const ex of exerciciosExtras) {
+        proximo[ex.id] = reconcileSetRows(proximo[ex.id] ?? [], ex.sets)
+      }
       return proximo
     })
-  }, [exerciciosDoDia, indice, semana, rascunhoLido, resetEpoch])
+  }, [exerciciosDoDia, exerciciosExtras, indice, semana, rascunhoLido, resetEpoch])
 
   // Autosave do rascunho.
   useEffect(() => {
@@ -697,7 +735,7 @@ function TreinoDoDia({
       })
     }, 500)
     return () => clearTimeout(id)
-  }, [scope, clientRef, revision, plano.id, dayId, semana, data, notas, linhas, rascunhoLido, dirty])
+  }, [scope, clientRef, revision, plano.id, dayId, semana, data, notas, linhas, extras, rascunhoLido, dirty])
 
   function setCelula(exId: string, i: number, campo: keyof Linha, valor: string) {
     setDirty(true)
@@ -716,6 +754,23 @@ function TreinoDoDia({
     }))
   }
 
+  function adicionarExtra(exId: string) {
+    if (!exId) return
+    setDirty(true)
+    setExtras((anterior) => (anterior.includes(exId) ? anterior : [...anterior, exId]))
+    setEscolhaExtra('')
+  }
+
+  function removerExtra(exId: string) {
+    setDirty(true)
+    setExtras((anterior) => anterior.filter((id) => id !== exId))
+    setLinhas((anterior) => {
+      const proximo = { ...anterior }
+      delete proximo[exId]
+      return proximo
+    })
+  }
+
   const dia = dias.find((d) => d.id === dayId)
 
   function draftAtual(nextRevision = revision) {
@@ -728,6 +783,7 @@ function TreinoDoDia({
       performedAt: data,
       notes: notas,
       rows: linhas,
+      extras,
     }
   }
 
@@ -744,6 +800,8 @@ function TreinoDoDia({
       setSemana(target?.weekNumber ?? semanaSugerida)
       setNotas(target?.notes ?? '')
       setLinhas(target?.rows ?? {})
+      setExtras(target?.extras ?? [])
+      setEscolhaExtra('')
       setClientRef(target?.clientRef ?? crypto.randomUUID())
       setRevision(target?.revision ?? 0)
       setDirty(Boolean(target))
@@ -759,7 +817,7 @@ function TreinoDoDia({
     if (switchingSession) return
     setErro(null)
     setOk(null)
-    const sets = buildSets(linhas, exerciciosDoDia)
+    const sets = buildSets(linhas, [...exerciciosDoDia, ...exerciciosExtras])
     if (sets.length === 0) {
       setErro('Marque ao menos uma série com carga ou repetições.')
       return
@@ -868,6 +926,8 @@ function TreinoDoDia({
     setRevision(0)
     setNotas('')
     setLinhas({})
+    setExtras([])
+    setEscolhaExtra('')
     setDirty(false)
     setResetEpoch((value) => value + 1)
   }
@@ -1057,7 +1117,127 @@ function TreinoDoDia({
             </GroupBlock>
           )
         })}
+
+        {exerciciosExtras.map((ex) => {
+          const ultima = ultimaPorExercicio.get(ex.exercise_id)
+          const origem = dias.find((d) => d.id === ex.day_id)
+          return (
+            <div key={ex.id} className="rounded-md border border-dashed bg-muted/20 p-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm font-medium">
+                  {ex.name}
+                  <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    trocado{origem ? ` · do treino ${origem.label}` : ''}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removerExtra(ex.id)}
+                  className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Tirar ${ex.name} deste treino`}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              {ultima ? (
+                <p className="mt-1 text-[11px] text-primary">
+                  última vez: {ultima.weight_kg ?? '—'} kg × {ultima.reps ?? '—'}
+                  {ultima.rir != null ? ` (RIR ${ultima.rir})` : ''} em {dataBr(ultima.performed_at)}
+                </p>
+              ) : null}
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+                  <span className="w-6" />
+                  <span className="w-20 text-center">carga (kg)</span>
+                  <span className="w-16 text-center">reps</span>
+                  <span className="w-14 text-center">RIR</span>
+                </div>
+                {(linhas[ex.id] ?? []).map((row, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
+                    <Input
+                      aria-label={`Carga da série ${i + 1} de ${ex.name}`}
+                      className="h-9 w-20"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="kg"
+                      value={row.weight}
+                      onChange={(e) => setCelula(ex.id, i, 'weight', e.target.value)}
+                    />
+                    <Input
+                      aria-label={`Repetições da série ${i + 1} de ${ex.name}`}
+                      className="h-9 w-16"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder={ex.reps ?? '—'}
+                      value={row.reps}
+                      onChange={(e) => setCelula(ex.id, i, 'reps', e.target.value)}
+                    />
+                    <Input
+                      aria-label={`RIR da série ${i + 1} de ${ex.name}`}
+                      className="h-9 w-14"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder={ex.rir != null ? String(ex.rir) : '—'}
+                      value={row.rir}
+                      onChange={(e) => setCelula(ex.id, i, 'rir', e.target.value)}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="px-1 text-xs text-muted-foreground underline"
+                  onClick={() => addLinha(ex.id)}
+                >
+                  + série
+                </button>
+              </div>
+            </div>
+          )
+        })}
       </div>
+
+      {/* Trocar de exercício na hora é rotina de academia: aparelho ocupado,
+          dor no dia, fila. Sem esta saída, o que foi feito de verdade ficava
+          fora do registro — ou pior, digitado na linha do exercício errado. */}
+      {opcoesExtras.length > 0 ? (
+        <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
+          <Label htmlFor="aluno-extra" className="text-xs">
+            Trocou algum exercício?
+          </Label>
+          <p className="text-[11px] text-muted-foreground">
+            Escolha o que você fez no lugar. A lista traz os exercícios das outras divisões do seu
+            treino.
+          </p>
+          <div className="flex gap-2">
+            <select
+              id="aluno-extra"
+              className={controlClass}
+              value={escolhaExtra}
+              disabled={switchingSession || salvando !== null}
+              onChange={(e) => setEscolhaExtra(e.target.value)}
+            >
+              <option value="">Escolher exercício...</option>
+              {opcoesExtras.map((e) => {
+                const origem = dias.find((d) => d.id === e.day_id)
+                return (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                    {origem ? ` — treino ${origem.label}` : ''}
+                  </option>
+                )
+              })}
+            </select>
+            <Button
+              variant="outline"
+              disabled={!escolhaExtra || switchingSession || salvando !== null}
+              onClick={() => adicionarExtra(escolhaExtra)}
+            >
+              Adicionar
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-1.5">
         <Label htmlFor="aluno-notas" className="text-xs">

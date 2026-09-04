@@ -183,20 +183,27 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
 // Achata a grade da tela (linhas por exercício) no formato da RPC, numerando as
 // séries por exercício — a unique do banco é (log, exercício, nº da série).
 // Linha sem carga E sem repetição é linha não feita: não vira série.
+//
+// A contagem é por exercício do CATÁLOGO, e não por linha do plano: a sessão
+// pode ter o mesmo movimento em duas grades (o prescrito e um trocado de outra
+// divisão, se o plano mudar no meio do treino). Numerando por linha do plano,
+// as duas começariam na série 1 e o servidor recusaria o envio INTEIRO por
+// série repetida — perdendo o treino que a pessoa já tinha feito.
 export function buildSets(
   rows: Record<string, { weight: string; reps: string; rir: string }[]>,
   exercises: { id: string; exercise_id: string }[]
 ): SubmitSet[] {
   const sets: SubmitSet[] = []
+  const contador = new Map<string, number>()
   for (const exercise of exercises) {
-    let n = 0
     for (const row of rows[exercise.id] ?? []) {
       const weight = row.weight.trim() === '' ? null : Number(row.weight)
       const reps = row.reps.trim() === '' ? null : Number(row.reps)
       const rir = row.rir.trim() === '' ? null : Number(row.rir)
       if (weight == null && reps == null) continue
       if (Number.isNaN(weight) || Number.isNaN(reps) || Number.isNaN(rir)) continue
-      n += 1
+      const n = (contador.get(exercise.exercise_id) ?? 0) + 1
+      contador.set(exercise.exercise_id, n)
       sets.push({
         exercise_id: exercise.exercise_id,
         set_number: n,
