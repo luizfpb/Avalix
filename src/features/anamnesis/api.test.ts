@@ -8,11 +8,14 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   single: vi.fn(),
   eq: vi.fn(),
+  // leitura usada só no caminho de erro, para distinguir "sumiu" de "mudou"
+  maybeSingle: vi.fn(),
+  select: vi.fn(),
 }))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({ update: mocks.update })),
+    from: vi.fn(() => ({ update: mocks.update, select: mocks.select })),
   },
 }))
 
@@ -38,8 +41,16 @@ function completeAnswers(patch: Partial<AnamnesisAnswers> = {}): AnamnesisAnswer
 
 beforeEach(() => {
   mocks.single.mockReset().mockResolvedValue({ data: { id: 'an-1' }, error: null })
-  mocks.eq.mockReset().mockReturnValue({ select: vi.fn(() => ({ single: mocks.single })) })
+  // `.eq()` encadeia: id e, quando há versão-base, updated_at
+  mocks.eq.mockReset().mockImplementation(() => ({
+    eq: mocks.eq,
+    select: vi.fn(() => ({ single: mocks.single })),
+  }))
   mocks.update.mockReset().mockReturnValue({ eq: mocks.eq })
+  mocks.maybeSingle.mockReset().mockResolvedValue({ data: null, error: null })
+  mocks.select
+    .mockReset()
+    .mockReturnValue({ eq: vi.fn(() => ({ maybeSingle: mocks.maybeSingle })) })
 })
 
 function updatedRow(): Record<string, unknown> {
@@ -92,6 +103,43 @@ describe('updateAnamnese', () => {
         answers: completeAnswers(),
       })
     ).rejects.toThrow(/não está mais disponível para edição/)
+  })
+
+  it('filtra pela versão que a tela carregou quando ela é informada', async () => {
+    await updateAnamnese('an-1', {
+      assessedAt: '2026-08-01',
+      answers: completeAnswers(),
+      expectedUpdatedAt: '2026-08-26T09:00:00.000Z',
+    })
+
+    expect(mocks.eq).toHaveBeenCalledWith('id', 'an-1')
+    expect(mocks.eq).toHaveBeenCalledWith('updated_at', '2026-08-26T09:00:00.000Z')
+  })
+
+  it('sem versão-base, o update continua filtrando só por id', async () => {
+    await updateAnamnese('an-1', { assessedAt: '2026-08-01', answers: completeAnswers() })
+
+    expect(mocks.eq).toHaveBeenCalledTimes(1)
+    expect(mocks.eq).toHaveBeenCalledWith('id', 'an-1')
+  })
+
+  it('linha que ainda existe com outra versão vira aviso de conflito, não de sumiço', async () => {
+    mocks.single.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' },
+    })
+    mocks.maybeSingle.mockResolvedValue({
+      data: { updated_at: '2026-08-27T10:00:00.000Z' },
+      error: null,
+    })
+
+    await expect(
+      updateAnamnese('an-1', {
+        assessedAt: '2026-08-01',
+        answers: completeAnswers(),
+        expectedUpdatedAt: '2026-08-26T09:00:00.000Z',
+      })
+    ).rejects.toThrow(/alterada em outro dispositivo/)
   })
 
   it('não tenta escrever as colunas congeladas por trigger', async () => {

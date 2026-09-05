@@ -40,6 +40,14 @@ export async function createAnamnese(input: CreateAnamneseInput): Promise<Anamne
 export type UpdateAnamneseInput = {
   assessedAt: string
   answers: AnamnesisAnswers
+  /**
+   * Versão (`updated_at`) que a tela carregou. Quando informada, o update só
+   * pega a linha se ela ainda estiver nessa versão — mesma concorrência
+   * otimista que a 0023 deu à avaliação e ao treino, aqui pelo predicado do
+   * próprio UPDATE (a anamnese não passa por RPC). Omitir mantém o
+   * comportamento antigo de "último a salvar vence".
+   */
+  expectedUpdatedAt?: string | null
 }
 
 // Correção de uma anamnese já registrada (mesmo registro, não versão nova: pra
@@ -54,7 +62,7 @@ export async function updateAnamnese(
 ): Promise<AnamneseRow> {
   const gate = assertGateComplete(input.answers)
   assertMedicamentosRespondidos(input.answers)
-  const { data, error } = await supabase
+  let q = supabase
     .from('anamneses')
     .update({
       assessed_at: input.assessedAt,
@@ -65,16 +73,27 @@ export async function updateAnamnese(
       flag_encaminhamento: gate.flagEncaminhamento,
     })
     .eq('id', id)
-    .select('*')
-    .single()
-  // update que não pega linha nenhuma (registro excluído noutra aba, acesso
-  // perdido) volta como PGRST116 em inglês; normalizeDbError repassa a
-  // mensagem, então a tradução tem que sair daqui
+  if (input.expectedUpdatedAt) q = q.eq('updated_at', input.expectedUpdatedAt)
+  const { data, error } = await q.select('*').single()
+  // update que não pega linha nenhuma volta como PGRST116 em inglês;
+  // normalizeDbError repassa a mensagem, então a tradução tem que sair daqui.
+  // Com o predicado de versão são DOIS motivos possíveis, e eles pedem ações
+  // opostas — recarregar e reeditar, ou desistir. A pergunta extra só é feita
+  // no caminho de erro.
   if (error?.code === 'PGRST116') {
-    throw new Error('Esta anamnese não está mais disponível para edição. Recarregue a página.')
+    throw new Error(await motivoDaRecusa(id, input.expectedUpdatedAt))
   }
   if (error) throw error
   return data
+}
+
+async function motivoDaRecusa(id: string, expectedUpdatedAt?: string | null): Promise<string> {
+  if (!expectedUpdatedAt) {
+    return 'Esta anamnese não está mais disponível para edição. Recarregue a página.'
+  }
+  const { data } = await supabase.from('anamneses').select('updated_at').eq('id', id).maybeSingle()
+  if (!data) return 'Esta anamnese não está mais disponível para edição. Recarregue a página.'
+  return 'Esta anamnese foi alterada em outro dispositivo depois que você abriu esta tela. Recarregue para ver a versão atual antes de salvar.'
 }
 
 // As mensagens dos triggers vêm em ASCII (convenção das migrations, para o

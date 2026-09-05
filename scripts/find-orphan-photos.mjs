@@ -5,6 +5,21 @@
 //
 // SO LISTA por padrao; passe --delete para remover os orfaos encontrados.
 //
+// POR QUE A PAGINACAO AQUI E QUESTAO DE SEGURANCA, E NAO DE DESEMPENHO.
+// A versao anterior lia posture_photos com um select sem paginacao e percorria
+// o Storage INTEIRO. O PostgREST corta a resposta no max-rows do projeto (mil
+// linhas por padrao) e nao devolve erro nenhum: o script simplesmente passava a
+// desconhecer as fotos alem do corte e a classificar TODAS elas como orfas. Em
+// modo --delete, com service role, isso apaga foto clinica legitima - o pior
+// desfecho possivel para um utilitario de limpeza. Agora:
+//
+//   1. a leitura pagina ate o fim e CONFERE o total com o count exato;
+//   2. divergencia entre os dois aborta antes de qualquer exclusao;
+//   3. cada candidato e revalidado no banco imediatamente antes de apagar.
+//
+// Nenhuma das tres sozinha basta: (1) e (2) fecham o corte silencioso, e (3)
+// cobre a foto que foi registrada entre a leitura e a exclusao.
+//
 // Rodar (cmd, service role NUNCA vai pro .env.local nem pro repo):
 //   set SUPABASE_SERVICE_ROLE_KEY=eyJ...
 //   node scripts/find-orphan-photos.mjs
@@ -12,6 +27,11 @@
 
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
+
+const PAGE = 1000
+// A API de Storage tem limite por chamada; remover em blocos tambem evita que
+// um erro no fim da lista deixe estado ambiguo sobre o que ja saiu.
+const DELETE_CHUNK = 100
 
 function readEnvLocal() {
   const out = {}
@@ -33,16 +53,71 @@ if (!url || !serviceKey) {
 const supabase = createClient(url, serviceKey)
 const doDelete = process.argv.includes('--delete')
 
-// paths registrados no banco
-const { data: rows, error: rowsErr } = await supabase
-  .from('posture_photos')
-  .select('storage_path, thumb_path')
-if (rowsErr) {
-  console.error('ERRO ao ler posture_photos:', rowsErr.message)
+function abortar(motivo) {
+  console.error(`ERRO: ${motivo}`)
+  console.error('Nada foi removido.')
   process.exit(1)
 }
-const known = new Set(rows.flatMap((r) => [r.storage_path, r.thumb_path]))
 
+// ---------------------------------------------------------------- banco
+// Paginacao por range, avancando pelo TAMANHO RECEBIDO e nao pelo pedido: se o
+// max-rows do projeto for menor que PAGE, o laco continua correto em vez de
+// parar cedo achando que acabou.
+async function readAllPhotoPaths() {
+  const { count, error: countErr } = await supabase
+    .from('posture_photos')
+    .select('id', { count: 'exact', head: true })
+  if (countErr) abortar(`ao contar posture_photos: ${countErr.message}`)
+
+  const paths = new Set()
+  let lidas = 0
+  for (let offset = 0; ; ) {
+    const { data, error } = await supabase
+      .from('posture_photos')
+      // ordem estavel: sem ela, duas paginas podem repetir ou pular linhas
+      .select('id, storage_path, thumb_path')
+      .order('id', { ascending: true })
+      .range(offset, offset + PAGE - 1)
+    if (error) abortar(`ao ler posture_photos: ${error.message}`)
+    if (!data || data.length === 0) break
+    for (const row of data) {
+      if (row.storage_path) paths.add(row.storage_path)
+      if (row.thumb_path) paths.add(row.thumb_path)
+    }
+    lidas += data.length
+    offset += data.length
+  }
+
+  if (count == null) abortar('o banco nao devolveu o total de posture_photos')
+  if (lidas !== count) {
+    abortar(
+      `leitura incompleta de posture_photos: ${lidas} linha(s) lidas de ${count}. ` +
+        'Rodar a limpeza com a lista incompleta classificaria foto legitima como orfa.'
+    )
+  }
+  return { paths, linhas: lidas }
+}
+
+// Revalidacao imediatamente antes de apagar: confirma que NENHUM candidato tem
+// linha no banco agora. Consulta os dois campos, em blocos, para caber no
+// tamanho de URL do PostgREST.
+async function candidatosAindaOrfaos(candidatos) {
+  const conhecidos = []
+  for (let i = 0; i < candidatos.length; i += DELETE_CHUNK) {
+    const bloco = candidatos.slice(i, i + DELETE_CHUNK)
+    for (const coluna of ['storage_path', 'thumb_path']) {
+      const { data, error } = await supabase
+        .from('posture_photos')
+        .select(coluna)
+        .in(coluna, bloco)
+      if (error) abortar(`ao revalidar candidatos (${coluna}): ${error.message}`)
+      for (const row of data ?? []) if (row[coluna]) conhecidos.push(row[coluna])
+    }
+  }
+  return conhecidos
+}
+
+// ---------------------------------------------------------------- storage
 // anda a arvore org/subject/session do bucket
 async function listDir(prefix) {
   const out = []
@@ -50,13 +125,16 @@ async function listDir(prefix) {
   for (;;) {
     const { data, error } = await supabase.storage
       .from('photos')
-      .list(prefix, { limit: 1000, offset: page * 1000 })
+      .list(prefix, { limit: PAGE, offset: page * PAGE })
     if (error) throw new Error(`list ${prefix || '(raiz)'}: ${error.message}`)
     out.push(...(data ?? []))
-    if (!data || data.length < 1000) return out
+    if (!data || data.length < PAGE) return out
     page++
   }
 }
+
+const { paths: known, linhas } = await readAllPhotoPaths()
+console.log(`${linhas} linha(s) em posture_photos, ${known.size} caminho(s) conhecido(s).`)
 
 const orphans = []
 for (const org of await listDir('')) {
@@ -83,13 +161,26 @@ if (orphans.length === 0) {
 console.log(`${orphans.length} objeto(s) orfao(s):`)
 for (const p of orphans) console.log('  ' + p)
 
-if (doDelete) {
-  const { error } = await supabase.storage.from('photos').remove(orphans)
+if (!doDelete) {
+  console.log('\n(nada removido — rode com --delete para apagar)')
+  process.exit(0)
+}
+
+const conhecidos = await candidatosAindaOrfaos(orphans)
+if (conhecidos.length > 0) {
+  abortar(
+    `${conhecidos.length} candidato(s) TEM linha em posture_photos na revalidacao ` +
+      `(ex.: ${conhecidos[0]}). A lista nao e confiavel; investigue antes de apagar.`
+  )
+}
+
+for (let i = 0; i < orphans.length; i += DELETE_CHUNK) {
+  const bloco = orphans.slice(i, i + DELETE_CHUNK)
+  const { error } = await supabase.storage.from('photos').remove(bloco)
   if (error) {
     console.error('ERRO ao remover:', error.message)
+    console.error(`Removidos ${i} de ${orphans.length} antes da falha.`)
     process.exit(1)
   }
-  console.log('Removidos.')
-} else {
-  console.log('\n(nada removido — rode com --delete para apagar)')
 }
+console.log(`Removidos ${orphans.length} objeto(s).`)

@@ -34,8 +34,10 @@ import type {
 } from '../features/assessment/api'
 import { ageFromBirthDate } from '../lib/age'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useBaseVersion } from '../lib/baseVersion'
 import { useUnsavedChanges } from '../lib/unsavedChanges'
 import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
+import { VersionConflictBanner } from '../components/VersionConflict'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -268,10 +270,16 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const isEdit = !!existing
   const ea = existing?.assessment
   const createMut = useCreateAssessment(subject.id)
-  // ea.updated_at e a versao que ESTA tela carregou. Se o educador editar a
-  // mesma avaliacao pelo celular e depois salvar numa aba antiga do PC, o banco
-  // recusa em vez de sobrescrever em silencio (migration 0023).
-  const updateMut = useUpdateAssessment(subject.id, ea?.id, ea?.updated_at)
+  // A versao que ESTA tela carregou, CONGELADA (useBaseVersion). Se o educador
+  // editar a mesma avaliacao pelo celular e depois salvar numa aba antiga do PC,
+  // o banco recusa em vez de sobrescrever em silencio (migration 0023).
+  //
+  // Congelada, e nao lida do resultado da query: a revalidacao por foco/reconexao
+  // do React Query trocava o carimbo sem trocar os valores do formulario, e a
+  // aba antiga passava a mandar a versao nova com os dados velhos — desarmando
+  // exatamente o guard que existe para esse caso.
+  const versao = useBaseVersion(ea?.updated_at)
+  const updateMut = useUpdateAssessment(subject.id, ea?.id, versao.base)
   const mut = isEdit ? updateMut : createMut
   const sex = asSex(subject.sex)
   const protocols = listProtocols(sex)
@@ -320,7 +328,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   // um rascunho feito contra outra versão da avaliação nem é encontrado (era o
   // risco que mantinha a edição sem rascunho). Mesma versão que a concorrência
   // otimista já usava logo acima.
-  const draftKey = ea ? `avaliacao:${subject.id}:${ea.id}:${ea.updated_at}` : `avaliacao:${subject.id}`
+  const draftKey = ea ? `avaliacao:${subject.id}:${ea.id}:${versao.base}` : `avaliacao:${subject.id}`
   type AvaliacaoDraft = {
     assessedAt: string
     protocolId: string
@@ -478,6 +486,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         skinfolds: skinfoldRows,
         circumferences: circRows,
       })
+      versao.adopt(assessment.updated_at)
       if (draftKey) clearDraft(draftKey)
       guard.allowNext()
       navigate(`/avaliados/${subject.id}/avaliacoes/${assessment.id}`)
@@ -499,6 +508,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
           {isEdit ? 'Editar avaliação' : 'Nova avaliação'}
         </h1>
       </div>
+
+      {versao.conflict ? <VersionConflictBanner what="Esta avaliação" /> : null}
 
       {draft.restored ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">

@@ -248,6 +248,48 @@ export function anamneseAlerta(input: {
     }
   }
 
+  // Restrição registrada muda a PRESCRIÇÃO, então precede triagem limpa e
+  // triagem incompleta. Sem esta precedência, corrigir as respostas da anamnese
+  // depois do parecer (a 0029 preserva o registro nessa edição) deixava a
+  // triagem limpa e o aviso voltava a 'Liberado', sem a restrição: o registro
+  // continuava no banco e sumia justamente de quem prescreve.
+  if (l.status === 'liberado_com_restricoes' && !l.vencida) {
+    return {
+      ...base,
+      nivel: 'info',
+      titulo: 'Liberado pelo médico, com restrições',
+      // a restrição vem primeiro: é ela que muda a prescrição
+      linhas: [
+        ...(l.obs ? [l.obs] : []),
+        linhaParecer(l),
+        ...(gate.status === 'incompleto'
+          ? ['A triagem desta anamnese está incompleta — a liberação não foi calculada.']
+          : []),
+        ...(nivelLinha ? [nivelLinha] : []),
+      ],
+      badge: { label: 'Liberado com restrições', variant: 'default' },
+      destacarMotivos: false,
+    }
+  }
+
+  // Parecer vencido: o documento caducou, a limitação clínica que ele descrevia
+  // não. Com restrições isso vale mesmo se a triagem estiver limpa — é o mesmo
+  // motivo do bloco acima, com o documento fora da validade.
+  if (l.vencida && (pedeLiberacao || l.status === 'liberado_com_restricoes')) {
+    return {
+      ...base,
+      nivel: 'atencao',
+      titulo: 'Liberação médica vencida',
+      linhas: [
+        `${linhaParecer(l)} — peça um documento atualizado.`,
+        ...(l.status === 'liberado_com_restricoes' && l.obs ? [l.obs] : []),
+        ...(nivelLinha ? [nivelLinha] : []),
+      ],
+      badge: { label: 'Liberação vencida', variant: 'warn' },
+      destacarMotivos: true,
+    }
+  }
+
   if (gate.status === 'incompleto') {
     return {
       ...base,
@@ -270,20 +312,6 @@ export function anamneseAlerta(input: {
     }
   }
 
-  if (l.vencida) {
-    return {
-      ...base,
-      nivel: 'atencao',
-      titulo: 'Liberação médica vencida',
-      linhas: [
-        `${linhaParecer(l)} — peça um documento atualizado.`,
-        ...(nivelLinha ? [nivelLinha] : []),
-      ],
-      badge: { label: 'Liberação vencida', variant: 'warn' },
-      destacarMotivos: true,
-    }
-  }
-
   if (l.status === 'liberado') {
     return {
       ...base,
@@ -291,18 +319,6 @@ export function anamneseAlerta(input: {
       titulo: 'Liberado pelo médico',
       linhas: [linhaParecer(l), ...(l.obs ? [l.obs] : [])],
       badge: { label: 'Liberado pelo médico', variant: 'success' },
-      destacarMotivos: false,
-    }
-  }
-
-  if (l.status === 'liberado_com_restricoes') {
-    return {
-      ...base,
-      nivel: 'info',
-      titulo: 'Liberado pelo médico, com restrições',
-      // a restrição vem primeiro: é ela que muda a prescrição
-      linhas: [...(l.obs ? [l.obs] : []), linhaParecer(l)],
-      badge: { label: 'Liberado com restrições', variant: 'default' },
       destacarMotivos: false,
     }
   }

@@ -139,10 +139,13 @@ const assessmentBlob = await generateAssessmentPdf({
   evaluatorName: 'Prof. Joao Carlos de Almeida (CREF 000000-G/SP)',
   assessment,
   skinfolds: [], circumferences: [],
+  // A serie mistura protocolos DE PROPOSITO: e o caminho que imprime o aviso de
+  // comparabilidade, e a variacao de %gordura (22 -> 18) e o caso que tem de
+  // sair em pontos percentuais, nao em '%'.
   history: [
-    { date: '01/01', weightKg: 84, bmi: 26.5, bodyFatPct: 22, leanMassKg: 65.5, fatMassKg: 18.5 },
-    { date: '01/03', weightKg: 82, bmi: 25.9, bodyFatPct: 20, leanMassKg: 65.6, fatMassKg: 16.4 },
-    { date: '01/06', weightKg: 80, bmi: 25.3, bodyFatPct: 18, leanMassKg: 65.6, fatMassKg: 14.4 },
+    { date: '01/01', protocolId: 'jp7', weightKg: 84, bmi: 26.5, bodyFatPct: 22, leanMassKg: 65.5, fatMassKg: 18.5 },
+    { date: '01/03', protocolId: 'jp7', weightKg: 82, bmi: 25.9, bodyFatPct: 20, leanMassKg: 65.6, fatMassKg: 16.4 },
+    { date: '01/06', protocolId: 'jp3', weightKg: 80, bmi: 25.3, bodyFatPct: 18, leanMassKg: 65.6, fatMassKg: 14.4 },
   ],
   circumferenceHistory: [
     { assessedAt: '2026-01-01', site: 'waist', valueCm: 92 },

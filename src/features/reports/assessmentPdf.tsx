@@ -23,6 +23,7 @@ import type {
 } from '../assessment/api'
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { protocolLabel } from '../assessment/protocols'
+import { comparabilidadeDeProtocolos } from '../assessment/comparability'
 import { registerReportFonts } from './pdfFonts'
 import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
@@ -50,6 +51,8 @@ const FAT = palette.magenta
 // existem sempre; %gordura/massas só quando houve protocolo de composição.
 export type AssessmentHistoryPoint = {
   date: string
+  /** protocolo da avaliação; a série mistura métodos quando ele varia */
+  protocolId?: string | null
   weightKg: number | null
   bmi: number | null
   bodyFatPct: number | null
@@ -187,15 +190,22 @@ export function buildCircSeries(
 // que o gráfico não desenhe ruído com cara de resultado: dobra cutânea carrega
 // erro padrão de alguns pontos percentuais, peso corporal oscila 1-2 kg no
 // mesmo dia, e fita métrica tem cerca de 1 cm de repetibilidade.
+//
+// deltaUnit: a unidade da DIFERENÇA nem sempre é a unidade do valor. De 22% para
+// 18% de gordura a variação é de quatro PONTOS PERCENTUAIS; escrito "−4%" o
+// número lê como redução relativa de 4% (que daria 21,1%), e o laudo passa a
+// afirmar outra coisa. Onde a unidade da diferença é a mesma do valor (kg, cm)
+// o campo é omitido.
 type TrendKey = 'bodyFatPct' | 'weightKg' | 'bmi' | 'leanMassKg' | 'fatMassKg'
 const TREND_METRICS: {
   key: TrendKey
   title: string
   unit: string
+  deltaUnit?: string
   color: string
   minSpan: number
 }[] = [
-  { key: 'bodyFatPct', title: '% de gordura', unit: '%', color: FAT, minSpan: 2 },
+  { key: 'bodyFatPct', title: '% de gordura', unit: '%', deltaUnit: ' p.p.', color: FAT, minSpan: 2 },
   { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.plum, minSpan: 2 },
   { key: 'bmi', title: 'IMC', unit: '', color: palette.violet, minSpan: 1 },
   { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN, minSpan: 2 },
@@ -272,12 +282,15 @@ function Legend({ color, text }: { color: string; text: string }) {
 function TrendChart({
   title,
   unit,
+  deltaUnit,
   color,
   points,
   minSpan,
 }: {
   title: string
   unit: string
+  /** unidade da DIFERENÇA, quando não é a mesma do valor (ver TREND_METRICS) */
+  deltaUnit?: string
   color: string
   points: TrendPoint[]
   // menor janela do eixo Y, na unidade da métrica: impede que uma variação
@@ -301,7 +314,7 @@ function TrendChart({
   const first = coords[0]
   const last = coords[coords.length - 1]
   const delta = last.value - first.value
-  const deltaTxt = `${delta > 0 ? '+' : ''}${fmtNum(delta)}${unit}`
+  const deltaTxt = `${delta > 0 ? '+' : ''}${fmtNum(delta)}${deltaUnit ?? unit}`
   // 3 referências: máximo (topo), meio e mínimo (base), com a escala à esquerda
   const grid = [
     { v: max, y: PY0 },
@@ -387,6 +400,10 @@ function EvolutionSection({
     .filter((c) => c.points.filter((p) => p.value != null).length >= 2)
     .slice(0, maxCharts)
   if (charts.length === 0) return null
+  // Mesma regra da tela de comparação e do prompt de parecer: com protocolos
+  // diferentes na série, parte da variação de %gordura e das massas é troca de
+  // método. O laudo tem de dizer isso onde desenha a curva.
+  const comparabilidade = comparabilidadeDeProtocolos(recent.map((p) => p.protocolId))
   return (
     <View style={styles.section}>
       <SectionTitle>Evolução ao longo das avaliações</SectionTitle>
@@ -396,6 +413,7 @@ function EvolutionSection({
             key={m.key}
             title={m.title}
             unit={m.unit}
+            deltaUnit={m.deltaUnit}
             color={m.color}
             points={points}
             minSpan={m.minSpan}
@@ -406,6 +424,9 @@ function EvolutionSection({
         de {recent[0].date} a {recent[recent.length - 1].date} · {recent.length} avaliações
         {history.length > recent.length ? ` (de ${history.length} no total)` : ''}
       </Text>
+      {comparabilidade.aviso ? (
+        <Text style={styles.reproNote}>{comparabilidade.aviso}</Text>
+      ) : null}
     </View>
   )
 }
@@ -622,7 +643,7 @@ export type EvolutionPdfData = {
   circumferenceHistory: SubjectCircumference[]
 }
 
-type SummaryRow = { label: string; unit: string; from: number; to: number }
+type SummaryRow = { label: string; unit: string; deltaUnit: string; from: number; to: number }
 
 // primeiro e último valor válido de cada métrica no período (puro/testável)
 export function evolutionSummaryRows(history: AssessmentHistoryPoint[]): SummaryRow[] {
@@ -630,7 +651,13 @@ export function evolutionSummaryRows(history: AssessmentHistoryPoint[]): Summary
   for (const m of TREND_METRICS) {
     const valid = history.map((p) => p[m.key]).filter((v): v is number => v != null)
     if (valid.length < 2) continue
-    out.push({ label: m.title, unit: m.unit, from: valid[0], to: valid[valid.length - 1] })
+    out.push({
+      label: m.title,
+      unit: m.unit,
+      deltaUnit: m.deltaUnit ?? m.unit,
+      from: valid[0],
+      to: valid[valid.length - 1],
+    })
   }
   return out
 }
@@ -675,7 +702,7 @@ function EvolutionSummary({ history }: { history: AssessmentHistoryPoint[] }) {
             <Text style={summaryStyles.colNum}>{fmtNum(r.from)}{r.unit}</Text>
             <Text style={summaryStyles.colNum}>{fmtNum(r.to)}{r.unit}</Text>
             <Text style={[summaryStyles.colNum, summaryStyles.delta]}>
-              {delta > 0 ? '+' : ''}{fmtNum(delta)}{r.unit}
+              {delta > 0 ? '+' : ''}{fmtNum(delta)}{r.deltaUnit}
             </Text>
           </View>
         )

@@ -48,9 +48,21 @@ import { controlClass } from '@/lib/ui'
 export type SetAnswers = (patch: Partial<AnamnesisAnswers>) => void
 
 // ---- primitivas de campo (internas) -----------------------------------
-function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
+function Section({
+  id,
+  title,
+  desc,
+  children,
+}: {
+  // âncora de rolagem: as seções com resposta OBRIGATÓRIA recebem o id que o
+  // indicador de pendências usa para levar quem responde até elas
+  id?: string
+  title: string
+  desc?: string
+  children: ReactNode
+}) {
   return (
-    <Card>
+    <Card id={id} className="scroll-mt-20">
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
         {desc ? <CardDescription>{desc}</CardDescription> : null}
@@ -340,7 +352,10 @@ function Medicamentos({
 }) {
   const nenhum = a.medicamentos_confirmados && a.medicamentos.length === 0
   return (
-    <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+    <div
+      id="sec-medicamentos"
+      className="scroll-mt-20 space-y-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10"
+    >
       <RepeatList
         label={
           <span className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
@@ -407,6 +422,7 @@ export function AnamneseCamadaA({
   return (
     <>
       <Section
+        id="sec-parq"
         title={isAluno ? 'Sobre sua saúde' : 'A1. Triagem de prontidão (PAR-Q+)'}
         desc={
           isAluno
@@ -443,6 +459,7 @@ export function AnamneseCamadaA({
       </Section>
 
       <Section
+        id="sec-acsm"
         title={isAluno ? 'Atividade física e sintomas' : 'A2. Refinamento (ACSM)'}
         desc={isAluno ? 'Considere como você está hoje.' : 'Define o nível de encaminhamento.'}
       >

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import {
   ArrowRight,
@@ -70,6 +70,10 @@ export default function Dashboard() {
     [subjects, lastAssessQ.data, plansQ.data, logsQ.data, now]
   )
   const attentionRows = rows.filter((row) => row.attention > 0)
+  // O painel mostra os primeiros e dizia quantos faltavam, sem caminho nenhum
+  // para eles: quem precisava agir tinha de voltar à lista geral e procurar de
+  // novo quem já estava sinalizado aqui. A lista já está toda em memória.
+  const [verTodasPendencias, setVerTodasPendencias] = useState(false)
   const reassessCount = rows.filter((row) => row.reassessDue).length
   const quietCount = rows.filter((row) => row.quiet).length
   const attentionPending =
@@ -229,7 +233,7 @@ export default function Dashboard() {
                 />
               ) : (
                 <ul className="divide-y divide-border/60">
-                  {attentionRows.slice(0, 5).map((row) => {
+                  {(verTodasPendencias ? attentionRows : attentionRows.slice(0, 5)).map((row) => {
                     const lowAdherence =
                       row.adherencePct != null && row.adherencePct < LOW_ADHERENCE_RATIO
                     return (
@@ -273,10 +277,18 @@ export default function Dashboard() {
                 </ul>
               )}
               {!attentionPending && attentionRows.length > 5 ? (
-                <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-                  Mais {attentionRows.length - 5}{' '}
-                  {attentionRows.length - 5 === 1 ? 'acompanhamento precisa' : 'acompanhamentos precisam'} de atenção.
-                </p>
+                <div className="border-t border-border/60 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setVerTodasPendencias((v) => !v)}
+                    aria-expanded={verTodasPendencias}
+                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {verTodasPendencias
+                      ? 'Mostrar só os primeiros'
+                      : `Ver os ${attentionRows.length} acompanhamentos que precisam de atenção`}
+                  </button>
+                </div>
               ) : null}
             </CardContent>
           </Card>

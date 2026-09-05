@@ -1,5 +1,80 @@
 # Avalix — DECISIONS.md
-Cole este arquivo no início de chats novos sobre o projeto. Última atualização: v2.11 (set/2026). App, repositório e pacote = Avalix; somente o `project_id` legado do Supabase permanece `bodytrack`. Migrations 0001–0028 aplicadas em produção; a 0029 (liberação médica) e a 0030 (agrupamentos de treino) estão entregues e PENDENTES de aplicação, nesta ordem — o gate `check:remote-schema` já exige `0030` e bloqueia o deploy do frontend antes disso. Nunca usar `db reset`, `migration down`, `db push --include-all` ou seed em produção. A migration 0020 foi aplicada em 13/07/2026 somente depois de backup criptografado, verificação de hashes e restore drill. Consentimento LGPD canônico em 1.1; aceites históricos mantêm a versão e a evidência originais. 2FA TOTP foi validado ponta a ponta em produção; continua opcional por conta e usuários sem fator verificado permanecem em AAL1. Perder o autenticador não tem autoatendimento: remover o fator exige operação administrativa autorizada; manter o backup multi-dispositivo do autenticador ativo.
+Cole este arquivo no início de chats novos sobre o projeto. Última atualização: v2.12 (set/2026). App, repositório e pacote = Avalix; somente o `project_id` legado do Supabase permanece `bodytrack`. **Estado do schema:** migrations 0001–0030 aplicadas em produção (a RPC `app_schema_version` remota respondeu `0030` em 04/09/2026); a 0031 (publicação atômica do treino + gate de 2FA no catálogo) está entregue e PENDENTE de aplicação — o gate `check:remote-schema` já exige `0031` e bloqueia o deploy do frontend antes disso. Nunca usar `db reset`, `migration down`, `db push --include-all` ou seed em produção. A migration 0020 foi aplicada em 13/07/2026 somente depois de backup criptografado, verificação de hashes e restore drill. Consentimento LGPD canônico em 1.1; aceites históricos mantêm a versão e a evidência originais. 2FA TOTP foi validado ponta a ponta em produção; continua opcional por conta e usuários sem fator verificado permanecem em AAL1. Perder o autenticador não tem autoatendimento: remover o fator exige operação administrativa autorizada; manter o backup multi-dispositivo do autenticador ativo.
+
+## v2.12 — confiabilidade das transições (edição, atualização e retomada)
+
+Rodada de correções a partir de uma revisão externa do app (o relatório está em [`ANALISE_APP_2026-09-04.md`](ANALISE_APP_2026-09-04.md)). O tema é um só: **proteções bem desenhadas que se desarmavam quando alguém editava, atualizava ou retomava um trabalho em andamento.** Nenhuma delas aparece com a tela parada — todas exigem duas superfícies interagindo, que é exatamente o que a suíte não cobria.
+
+### Restrição médica não some mais do aviso de quem prescreve
+
+- `anamneseAlerta` (`clearance.ts`) devolvia para triagem limpa ANTES de tratar `liberado_com_restricoes`. Sequência real: o médico registra um parecer com restrição; depois alguém corrige as respostas da anamnese e a triagem fica limpa. A 0029 preserva o parecer nessa edição — mas o aviso voltava a "Liberado", com apenas a data. A restrição continuava gravada e sumia justamente do builder de treino, que é onde ela muda a conduta.
+- **A precedência passou a ser a da consequência clínica, não a da ordem em que os casos foram escritos:** recusa médica → restrição vigente → parecer vencido → triagem incompleta → triagem limpa. Restrição vale sobre triagem limpa E sobre triagem incompleta (nesse caso o aviso diz as duas coisas). Parecer vencido que trazia restrição continua mostrando a restrição: o documento caducou, a limitação clínica não.
+
+### A versão-base dos editores parou de acompanhar o refetch
+
+- A concorrência otimista da 0023 recusa a gravação quando o `updated_at` enviado não é mais o da linha. As telas liam esse carimbo do resultado da query — e o React Query revalida por foco/reconexão. Os VALORES do formulário ficam no estado inicial e não acompanham o refetch; o CARIMBO acompanhava. Resultado: a aba antiga passava a mandar a versão nova com os dados velhos, e o guard deixava de reconhecer a edição defasada. **A proteção se autodesarmava no cenário exato para o qual foi escrita.**
+- `src/lib/baseVersion.ts` congela a versão com que a tela abriu e expõe `conflict`. As três telas longas (treino, avaliação, anamnese) usam a base congelada no guard E na chave do rascunho — que tinha o mesmo defeito: a chave mudava no meio da edição e orfanava o rascunho já gravado.
+- Alteração externa deixou de ser recusa-surpresa no clique em Salvar: vira banner (`components/VersionConflict.tsx`) no momento em que chega. Ele não descarta nada e não recarrega sozinho — diz o que aconteceu e que salvar por cima será recusado.
+- A anamnese não tinha guard nenhum (o update filtrava só por `id`). Ganhou o mesmo controle pelo predicado do próprio UPDATE, sem migration: `.eq('updated_at', base)`. Como agora existem dois motivos para o update não pegar linha, a mensagem de erro pergunta ao banco qual foi — "sumiu" e "mudou" pedem ações opostas.
+
+### O treino em andamento sobrevive à edição do plano
+
+- `replace_workout_plan_children` apaga e recria divisões e exercícios: **todos os ids filhos mudam a cada gravação, mesmo com o exercício do catálogo igual.** O rascunho da sessão do aluno aponta para esses ids, então bastava o treinador salvar um ajuste enquanto o aluno treinava para o aparelho reconectar, receber ids novos e descartar o rascunho inteiro. As cargas já marcadas sumiam da tela.
+- **A correção é no cliente, por identidade estável, e não preservando ids no banco.** Preservar id exigiria casar linhas por posição ou por catálogo dentro de `replace_workout_plan_children`, com três uniques não adiáveis no caminho (`(plan_id, position)`, `(plan_id, label)`, `(day_id, position)`) e um reordenamento em duas fases. O modo de falha desse conserto é atribuir o registro do aluno ao exercício ERRADO — pior do que o defeito que ele corrige.
+- O rascunho passa a guardar, junto dos ids, o que não muda: o rótulo da divisão e, por linha, o exercício do CATÁLOGO. É a mesma chave que a 0009 escolheu para `workout_log_sets.exercise_id`, pelo mesmo motivo. `features/workout/studentDraft.ts` (puro e testado) remapeia; linha cujo exercício mudou de divisão vira avulso em vez de sumir; exercício que saiu do plano é DESCARTADO e contado, nunca aproximado por outro parecido. O aluno vê "seu treinador atualizou este treino", com o número de séries perdidas quando houve.
+- O campo `identity` é opcional: rascunho gravado antes desta versão continua sendo aceito pelo caminho antigo (id exato).
+
+### Dois furos do rascunho do aluno, no mesmo lugar
+
+- **O autosave montava o payload à mão e esquecia os `extras`.** Quem adicionava um exercício avulso e fechava a aba antes de tocar em "Salvar progresso" perdia a escolha na retomada — o caminho explícito usava `draftAtual()`, que inclui o campo, e por isso o teste existente de troca de exercício não pegava. Agora os dois caminhos gravam o MESMO objeto.
+- **Descarga ao desmontar.** A `key` do `TreinoDoDia` acompanha os ids das divisões, então o pacote novo remonta a tela — e o debounce de 500 ms podia ser cancelado antes de gravar. Sem isso a reconciliação não teria o que reconciliar. `dirty` é o guarda: sessão concluída zera o sinalizador, então nada é ressuscitado.
+
+### Publicar treino novo virou uma transação só (migration 0031)
+
+- `createWorkoutPlan` fazia INSERT do cabeçalho e SÓ DEPOIS chamava a RPC das filhas. **O insert já é o ato que troca o treino vigente:** o trigger da 0027 arquiva o plano ativo anterior no mesmo comando. Falhar na segunda chamada deixava o anterior arquivado e o novo vazio; se a limpeza do cliente também falhasse, sobrava um plano ativo sem divisão nenhuma. Nos dois casos o aluno abre o link e não encontra treino.
+- É o mesmo defeito que a 0023 corrigiu na EDIÇÃO e que não tinha sido replicado na criação — que é o caminho mais usado (publicar mesociclo novo). A RPC `create_workout_plan` é `security invoker` como a irmã: RLS, trigger `check_evaluator` e `evaluator_id` saindo do default `auth.uid()` continuam valendo exatamente como no insert direto.
+- O cliente não chama mais `replace_workout_plan_children` direto; ela continua no banco porque as duas RPCs de gravação a chamam por dentro.
+
+### Escrita no catálogo de exercícios exige o segundo fator (migration 0031)
+
+- As policies de INSERT/UPDATE/DELETE de `exercises` conferiam organização e papel por `is_member`/`role_in`, que não checam AAL — e não checam por decisão explícita da 0003, para o shell conseguir rotear até `/mfa`. A 0022 fechou esse mesmo contorno em `org_members` e `organizations`; o catálogo ficou de fora.
+- Consequência: uma sessão AAL1, obtida só com a senha de uma conta que usa 2FA, não vê dado clínico nenhum (`can_view_subject` barra), mas alterava por REST os exercícios personalizados da organização. O nome do exercício é lido pelos planos publicados, então a alteração chega à ficha impressa e ao app do aluno. A UI parava no desafio; o endpoint do PostgREST não.
+- Mesmo tratamento da 0022: `app.mfa_satisfied()` nas três policies de escrita, SELECT intocado. Conta sem fator verificado continua passando — nada muda para quem não usa 2FA.
+
+### O script de fotos órfãs deixou de poder apagar foto legítima
+
+- `find-orphan-photos.mjs` lia `posture_photos` com um select sem paginação e percorria o Storage inteiro. O PostgREST corta a resposta no `max-rows` do projeto **e não devolve erro**: acima do limite, o script passava a desconhecer as fotos além do corte e a classificá-las como órfãs. Em `--delete`, com service role, isso apaga foto clínica.
+- Três defesas, e nenhuma sozinha bastaria: a leitura pagina até o fim avançando pelo tamanho RECEBIDO (correto mesmo se o `max-rows` for menor que a página pedida); o total lido é conferido contra o `count` exato e qualquer divergência ABORTA antes de qualquer exclusão; e cada candidato é revalidado no banco imediatamente antes de apagar, para cobrir a foto registrada entre a leitura e a exclusão.
+
+### Diferença de percentual é ponto percentual
+
+- De 22% para 18% de gordura a variação é de quatro PONTOS PERCENTUAIS. Impresso "−4%", o laudo afirma uma redução relativa de 4%, que daria 21,1% — outra conta. Os cartões de tendência do PDF, o resumo do período, a tela de evolução e a comparação passaram a separar a unidade do VALOR da unidade da DIFERENÇA (`deltaUnit`). Onde as duas coincidem (kg, cm) o campo é omitido.
+
+### A regra de protocolos saiu do prompt e chegou às telas
+
+- O prompt de parecer já avisava a IA de que "percentual de gordura obtido por protocolos diferentes não é diretamente comparável: parte da diferença observada é troca de método". A tela de comparação, a evolução e os PDFs calculavam e COLORIAM a mesma diferença sem dizer isso a ninguém — e quem assina o parecer é o profissional, não a IA.
+- `features/assessment/comparability.ts` centraliza a regra. Com protocolos distintos na série: aviso específico, e as métricas derivadas da densidade corporal (% de gordura, massa magra, massa gorda) perdem a cor de melhora/piora — o valor continua à vista, só deixa de ser pintado como resultado. **Peso, IMC e circunferências continuam comparáveis e coloridos:** um aviso geral ensinaria a ignorar tudo.
+
+### Orientação de preenchimento na anamnese e no treino do aluno
+
+- **A anamnese passa de oito mil pixels num celular de 360 px** e não dava pista nenhuma de quanto faltava: a pendência aparecia só ao tocar em Enviar, e a pessoa voltava a rolar procurando qual pergunta ficou em branco. Entrou uma barra fixa (`PendenciasBar`) que conta, nomeia e leva até cada pendência, nas duas telas — a pública e a do profissional.
+- **Ela conta SÓ o obrigatório** (`pendencias.ts`, puro e testado): PAR-Q item a item, os três itens de A2 e os medicamentos. A camada B é contexto opcional de propósito; medir "progresso" nela transformaria pergunta facultativa em cobrança e a barra nunca chegaria a zero. "Nenhum" continua sendo resposta que precisa ser dita — lista vazia sem confirmação segue pendente.
+- **RIR e cadência ganharam explicação curta no app do aluno**, recolhida e mostrada só quando a prescrição do dia realmente usa o termo. Glossário que aparece sem ter o que explicar vira ruído e ensina a fechar sem ler.
+
+### O que foi deixado como está, e por quê
+
+- **Paginação dos PDFs.** A amostra tem uma página que termina cedo porque o bloco de evolução desce inteiro. Tentei quebrar a grade de cartões em linhas para a quebra cair entre elas; **renderizado e conferido na imagem, o resultado ficou idêntico** — o empurrão vem de outro ponto do fluxo. Mudança que não se demonstra não entra: o trecho foi revertido. Vale notar que a amostra exagera o vazio (ela não tem dobras nem circunferências, que na prática preenchem a primeira página).
+- **Filtro de "precisa de atenção" em `/avaliados`** e **paginação no servidor da lista de alunos**: o primeiro duplicaria a regra de atenção em duas telas; a segunda não tem problema demonstrado na carteira atual e merece medição antes de mexer.
+- **Preservação de ids na gravação do plano** (ver acima): o modo de falha do conserto é pior que o defeito.
+
+### Painel de atenção com caminho para a lista inteira
+
+- O início mostrava os cinco primeiros e informava quantos faltavam, sem caminho nenhum para eles: quem precisava agir voltava à lista geral e procurava de novo quem já estava sinalizado ali. Agora a contagem é um botão que expande — a lista já estava toda em memória. Não virou filtro em `/avaliados` de propósito: seria duplicar a regra de atenção em duas telas.
+
+### Um teste que falhava por fuso, não por defeito
+
+- O teste de sessão por data calculava "ontem" com `Date.now()`/`toISOString` (UTC) enquanto o app usa o calendário local. Depois das 21h em Brasília o valor batia com o "hoje" do app, o dia não trocava e a suíte acusava colisão de sessões que não existe. Passou a derivar a data do próprio campo da tela. Não era caso de aumentar timeout: o teste estava perguntando outra coisa.
+
 
 ## v2.11 — agrupamentos de treino, prescrição sem número, trabalho não perdido, medicamentos na anamnese e registro fora do prescrito
 

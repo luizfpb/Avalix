@@ -45,6 +45,7 @@ import {
   STUDENT_TOKEN_KEY,
   type QueuedSession,
 } from '../features/workout/studentStore'
+import { identidadeDaSessao, reconciliarRascunho } from '../features/workout/studentDraft'
 import { applyStudentManifest } from '../features/workout/studentPwa'
 import {
   effectivePrescription,
@@ -481,6 +482,53 @@ export default function TreinoAluno() {
   )
 }
 
+// RIR e cadência são abreviações de quem prescreve, não de quem treina. Elas
+// aparecem na ficha do aluno desde sempre; quem está começando lia "RIR 2" sem
+// nenhuma pista do que fazer com aquilo. A explicação é curta, fica recolhida e
+// SÓ aparece quando a prescrição do dia realmente usa o termo — glossário que
+// aparece sem ter o que explicar vira ruído e ensina a fechar sem ler.
+function GlossarioDoDia({
+  exercicios,
+  indice,
+  semana,
+}: {
+  exercicios: StudentExercise[]
+  indice: ReturnType<typeof overrideIndex>
+  semana: number | null
+}) {
+  const temRir = exercicios.some(
+    (ex) =>
+      effectivePrescription(ex as unknown as WorkoutExerciseRow, overrideFor(indice, semana, ex.id))
+        .rir != null
+  )
+  const temCadencia = exercicios.some((ex) => !!ex.tempo)
+  if (!temRir && !temCadencia) return null
+
+  return (
+    <details className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
+      <summary className="cursor-pointer">
+        O que significa {temRir ? 'RIR' : ''}
+        {temRir && temCadencia ? ' e cadência' : temCadencia ? 'cadência' : ''}?
+      </summary>
+      <div className="mt-2 space-y-1.5">
+        {temRir ? (
+          <p>
+            <strong>RIR</strong> é quantas repetições você ainda conseguiria fazer ao parar a
+            série. RIR 2 significa terminar sentindo que daria para fazer mais duas — não é para
+            ir até não conseguir mais. RIR 0 é o limite.
+          </p>
+        ) : null}
+        {temCadencia ? (
+          <p>
+            <strong>Cadência</strong> é o ritmo do movimento em segundos, na ordem descida ·
+            pausa · subida · pausa. Em "3010": desce em 3 segundos, sobe em 1, sem pausas.
+          </p>
+        ) : null}
+      </div>
+    </details>
+  )
+}
+
 function StatusBar({
   semRede,
   sincronizadoEm,
@@ -614,6 +662,8 @@ function TreinoDoDia({
   const [ok, setOk] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<'progresso' | 'concluir' | null>(null)
   const [rascunhoLido, setRascunhoLido] = useState(false)
+  // aviso de "o plano foi regravado e o rascunho foi remapeado"
+  const [planoMudou, setPlanoMudou] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [switchingSession, setSwitchingSession] = useState(false)
   const [resetEpoch, setResetEpoch] = useState(0)
@@ -665,7 +715,9 @@ function TreinoDoDia({
   )
 
   // Rascunho: fechar a aba no meio do treino não pode custar o que já foi
-  // marcado. Lido uma vez, e só se for do mesmo dia.
+  // marcado. Lido uma vez, e reconciliado com a prescrição vigente — o
+  // treinador pode ter regravado o plano (o que troca TODOS os ids filhos)
+  // enquanto o aluno treinava. Ver features/workout/studentDraft.ts.
   useEffect(() => {
     const planDraftKey = `${scope}:${plano.id}`
     if (draftReadKey.current === planDraftKey) return
@@ -674,28 +726,40 @@ function TreinoDoDia({
     void (async () => {
       const rascunho = await readDraft(scope, plano.id)
       if (!vivo) return
-      const diaAindaExiste =
-        !rascunho?.dayId || dias.some((day) => day.id === rascunho.dayId)
       const ageInDays = rascunho
         ? Math.floor((Date.parse(`${hoje()}T00:00:00`) - Date.parse(`${rascunho.performedAt}T00:00:00`)) / 86_400_000)
         : -1
-      if (rascunho && ageInDays >= 0 && ageInDays <= 7 && diaAindaExiste) {
-        if (rascunho.dayId) setDayId(rascunho.dayId)
-        setSemana(rascunho.weekNumber)
-        setData(rascunho.performedAt)
-        setNotas(rascunho.notes)
-        setLinhas(rascunho.rows)
-        setExtras(rascunho.extras ?? [])
-        setClientRef(rascunho.clientRef)
-        setRevision(rascunho.revision ?? 0)
+      const conciliado =
+        rascunho && ageInDays >= 0 && ageInDays <= 7
+          ? reconciliarRascunho(rascunho, { days: dias, exercises: pacote.exercises })
+          : null
+      if (conciliado) {
+        const d = conciliado.draft
+        if (d.dayId) setDayId(d.dayId)
+        setSemana(d.weekNumber)
+        setData(d.performedAt)
+        setNotas(d.notes)
+        setLinhas(d.rows)
+        setExtras(d.extras ?? [])
+        setClientRef(d.clientRef)
+        setRevision(d.revision ?? 0)
         setDirty(true)
+        // O aviso só aparece quando houve remapeamento de verdade: dizer "o
+        // treino mudou" a cada abertura ensinaria a ignorar o recado.
+        if (conciliado.remapeado || conciliado.perdidas > 0) {
+          setPlanoMudou(
+            conciliado.perdidas > 0
+              ? `Seu treinador atualizou este treino. O que você já tinha marcado foi mantido, menos ${conciliado.perdidas === 1 ? '1 série de um exercício que saiu' : `${conciliado.perdidas} séries de exercícios que saíram`} do plano.`
+              : 'Seu treinador atualizou este treino. O que você já tinha marcado foi mantido.'
+          )
+        }
       }
       setRascunhoLido(true)
     })()
     return () => {
       vivo = false
     }
-  }, [dias, plano.id, scope])
+  }, [dias, pacote.exercises, plano.id, scope])
 
   // Garante uma linha por série prescrita ao trocar de divisão/semana.
   useEffect(() => {
@@ -719,23 +783,32 @@ function TreinoDoDia({
     })
   }, [exerciciosDoDia, exerciciosExtras, indice, semana, rascunhoLido, resetEpoch])
 
-  // Autosave do rascunho.
+  // Autosave do rascunho. Grava exatamente o mesmo objeto do caminho explícito
+  // (`draftAtual`): montar o payload à mão aqui já custou os `extras` — quem
+  // adicionava um exercício avulso e fechava a aba antes de "Salvar progresso"
+  // perdia a escolha na retomada, porque o campo simplesmente não era gravado.
+  const draftRef = useRef(draftAtual)
+  draftRef.current = draftAtual
   useEffect(() => {
     if (!rascunhoLido || !dirty) return
     const id = setTimeout(() => {
-      void writeDraft(scope, {
-        clientRef,
-        revision,
-        planId: plano.id,
-        dayId,
-        weekNumber: semana,
-        performedAt: data,
-        notes: notas,
-        rows: linhas,
-      })
+      void writeDraft(scope, draftRef.current())
     }, 500)
     return () => clearTimeout(id)
   }, [scope, clientRef, revision, plano.id, dayId, semana, data, notas, linhas, extras, rascunhoLido, dirty])
+
+  // Descarga ao desmontar: o pacote novo que chega do servidor remonta esta
+  // tela (a `key` acompanha os ids das divisões), e o debounce de 500 ms acima
+  // podia ser cancelado antes de gravar. Sem isto, a reconciliação do rascunho
+  // não teria o que reconciliar. `dirty` é o guarda: sessão concluída zera o
+  // sinalizador em `reiniciar()`, então nada é ressuscitado.
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current) void writeDraft(scope, draftRef.current())
+    }
+  }, [scope])
 
   function setCelula(exId: string, i: number, campo: keyof Linha, valor: string) {
     setDirty(true)
@@ -784,6 +857,9 @@ function TreinoDoDia({
       notes: notas,
       rows: linhas,
       extras,
+      // rótulo da divisão + exercício do catálogo de cada linha: é o que
+      // permite reencontrar esta sessão depois de o plano ser regravado
+      identity: identidadeDaSessao(dias, dayId, linhas, pacote.exercises),
     }
   }
 
@@ -807,6 +883,7 @@ function TreinoDoDia({
       setDirty(Boolean(target))
       setErro(null)
       setOk(null)
+      setPlanoMudou(null)
       setResetEpoch((value) => value + 1)
     } finally {
       if (generation === switchGeneration.current) setSwitchingSession(false)
@@ -929,6 +1006,7 @@ function TreinoDoDia({
     setExtras([])
     setEscolhaExtra('')
     setDirty(false)
+    setPlanoMudou(null)
     setResetEpoch((value) => value + 1)
   }
 
@@ -944,6 +1022,24 @@ function TreinoDoDia({
 
   return (
     <div className="space-y-4">
+      {planoMudou ? (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-2.5 text-xs"
+        >
+          <RefreshCw className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <p className="flex-1">{planoMudou}</p>
+          <button
+            type="button"
+            onClick={() => setPlanoMudou(null)}
+            className="text-muted-foreground"
+            aria-label="Fechar aviso de treino atualizado"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+
       <div>
         <p className="mb-1 text-sm font-medium">{plano.name}</p>
         <div className="flex flex-wrap gap-1.5">
@@ -1008,6 +1104,8 @@ function TreinoDoDia({
       <div className="space-y-3">
         {/* Quem executa o treino é esta tela: se ela listar os exercícios de uma
             super-série soltos, a super-série não acontece. */}
+        <GlossarioDoDia exercicios={exerciciosDoDia} indice={indice} semana={semana} />
+
         {toRowBlocks(exerciciosDoDia).map((block) => {
           const cartoes = block.items.map((ex) => {
           const override = overrideFor(indice, semana, ex.id)

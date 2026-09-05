@@ -7,6 +7,7 @@ import { useAnamnese, useCreateAnamnese, useUpdateAnamnese } from '../features/a
 import { computeGate, medicamentosRespondidos } from '../features/anamnesis/gate'
 import { declaracaoFromAnswers } from '../features/anamnesis/clearance'
 import { AnamneseCamadaA, AnamneseCamadaB, GateBox } from '../features/anamnesis/AnamneseForm'
+import { PendenciasBar } from '../features/anamnesis/PendenciasBar'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
 import type { AnamneseRow } from '../features/anamnesis/api'
@@ -16,8 +17,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeDbError } from '../lib/errors'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useBaseVersion } from '../lib/baseVersion'
 import { useUnsavedChanges } from '../lib/unsavedChanges'
 import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
+import { VersionConflictBanner } from '../components/VersionConflict'
 
 function todayLocal(): string {
   const d = new Date()
@@ -90,6 +93,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   const isEdit = !!existing
   const createMut = useCreateAnamnese(subject.id)
   const updateMut = useUpdateAnamnese(subject.id, existing?.id)
+  // Versão que ESTA tela carregou, congelada — ver src/lib/baseVersion.ts. Vale
+  // para o predicado de concorrência do update e para a chave do rascunho.
+  const versao = useBaseVersion(existing?.updated_at)
   const mut = isEdit ? updateMut : createMut
   const isFemale = subject.sex === 'F'
 
@@ -105,7 +111,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   // um rascunho feito contra outra versão do registro nem é encontrado (era o
   // risco que mantinha a edição sem rascunho).
   const draftKey = existing
-    ? `anamnese:${subject.id}:${existing.id}:${existing.updated_at}`
+    ? `anamnese:${subject.id}:${existing.id}:${versao.base}`
     : `anamnese:${subject.id}`
   const valorAtual = useMemo(() => ({ assessedAt, a }), [assessedAt, a])
   const draft = useFormDraft<{ assessedAt: string; a: AnamnesisAnswers }>(
@@ -148,13 +154,18 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
     }
     try {
       const row = existing
-        ? await updateMut.mutateAsync({ assessedAt, answers: a })
+        ? await updateMut.mutateAsync({
+            assessedAt,
+            answers: a,
+            expectedUpdatedAt: versao.base,
+          })
         : await createMut.mutateAsync({
             orgId: organization.id,
             subjectId: subject.id,
             assessedAt,
             answers: a,
           })
+      versao.adopt(row.updated_at)
       if (draftKey) clearDraft(draftKey)
       guard.allowNext()
       navigate(`/avaliados/${subject.id}/anamnese/${row.id}`)
@@ -187,6 +198,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
           </p>
         ) : null}
       </div>
+
+      {versao.conflict ? <VersionConflictBanner what="Esta anamnese" /> : null}
 
       {draft.restored ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
@@ -262,6 +275,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
       </div>
 
       <UnsavedChangesPrompt guard={guard} what="nesta anamnese" />
+
+      <PendenciasBar answers={a} />
     </div>
   )
 }

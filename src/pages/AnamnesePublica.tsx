@@ -12,6 +12,7 @@ import {
 import { emptyAnamnesis, type AnamnesisAnswers } from '../features/anamnesis/spec'
 import { computeGate, medicamentosRespondidos } from '../features/anamnesis/gate'
 import { AnamneseCamadaA, AnamneseCamadaB } from '../features/anamnesis/AnamneseForm'
+import { PendenciasBar } from '../features/anamnesis/PendenciasBar'
 import { subjectFormSchema, emptySubjectForm, type SubjectFormValues } from '../features/subjects/schema'
 import { ageFromBirthDate } from '../lib/age'
 import { consentText } from '../features/consent/text'
@@ -437,9 +438,11 @@ function Form({
         <Button className="w-full" onClick={handleSubmit} disabled={!canSubmit || submit.isPending}>
           {submit.isPending ? 'Enviando...' : isCadastro ? 'Enviar cadastro e respostas' : 'Enviar respostas'}
         </Button>
-        <p className="pb-8 text-center text-xs text-muted-foreground">
+        <p className="pb-2 text-center text-xs text-muted-foreground">
           Ao enviar, guardamos a versão do termo, quem aceitou e quando.
         </p>
+
+        <PendenciasBar answers={a} />
       </div>
     </Shell>
   )

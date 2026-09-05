@@ -361,6 +361,8 @@ export async function clearQueue(scope: string): Promise<void> {
 
 // A sessão em andamento, antes de ser salva. Sobrevive a fechar a aba no meio
 // do treino, que numa academia acontece o tempo todo.
+export type DraftRow = { weight: string; reps: string; rir: string }
+
 export type DraftSession = {
   clientRef: string
   revision: number
@@ -369,11 +371,20 @@ export type DraftSession = {
   weekNumber: number | null
   performedAt: string
   notes: string
-  rows: Record<string, { weight: string; reps: string; rir: string }[]>
+  rows: Record<string, DraftRow[]>
   // Exercícios de OUTRA divisão do plano feitos nesta sessão (substituição de
   // última hora). Guardados como id do exercício do plano, que é a mesma chave
   // de `rows`. Opcional: rascunho gravado antes desta versão não tem o campo.
   extras?: string[]
+  // IDENTIDADE ESTÁVEL do que este rascunho descreve, para ele sobreviver a uma
+  // regravação do plano (que troca todos os ids filhos). Ver studentDraft.ts.
+  // Opcional: rascunho gravado antes desta versão não tem o campo.
+  identity?: {
+    /** rótulo da divisão (A, B, C...) */
+    dayLabel: string | null
+    /** chave de `rows` -> exercício do CATÁLOGO */
+    rowExercises: Record<string, string>
+  }
 }
 
 type StoredDraftSession = DraftSession & { updatedAt: string }

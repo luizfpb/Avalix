@@ -299,56 +299,52 @@ function planChildrenPayload(input: SaveWorkoutPlanInput) {
   }
 }
 
-async function replacePlanChildren(planId: string, input: SaveWorkoutPlanInput): Promise<void> {
+// replace_workout_plan_children continua no banco (as duas RPCs de gravação a
+// chamam por dentro), mas o cliente não a chama mais direto: a criação e a
+// edição passam por create_workout_plan e save_workout_plan, que fecham
+// cabeçalho e filhas na mesma transação.
+
+// Cria cabeçalho E estrutura filha numa transação só (RPC create_workout_plan,
+// migration 0031).
+//
+// Antes eram duas gravações independentes, e a primeira delas já trocava o
+// treino vigente: o trigger da 0027 arquiva o plano ativo anterior no próprio
+// insert do cabeçalho. Falhar na segunda deixava o aluno SEM treino — o
+// anterior arquivado e o novo vazio (ou apagado pela limpeza do cliente, que
+// também podia falhar). É o mesmo defeito que a 0023 corrigiu na edição e que
+// não tinha sido replicado na criação, que é o caminho mais usado.
+//
+// evaluator_id continua omitido de propósito: a RPC é security invoker, então o
+// default do banco (auth.uid()) assume e o trigger check_evaluator valida.
+export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<WorkoutPlanRow> {
   const { days, overrides, weeks } = planChildrenPayload(input)
-  const { error } = await supabase.rpc('replace_workout_plan_children', {
-    p_plan: planId,
+  const { data, error } = await supabase.rpc('create_workout_plan', {
+    p_org: input.orgId,
+    p_subject: input.subjectId,
+    p_name: input.name,
+    p_weeks: input.weeks,
+    p_status: input.status,
+    p_weekly_schedule: input.weeklySchedule as unknown as Json,
+    p_volume: input.volume as unknown as Json,
+    p_volume_engine_version: input.volume.engineVersion,
     p_days: days,
     p_overrides: overrides,
-    p_weeks: weeks,
+    p_weeks_meta: weeks,
+    // args com default null na RPC: omitir = deixar o campo nulo. Mesmo padrão
+    // do updateWorkoutPlan (o gerador de tipos só marca o parâmetro como
+    // opcional quando ele tem DEFAULT no SQL).
+    ...(input.goal != null ? { p_goal: input.goal } : {}),
+    ...(input.startsOn != null ? { p_starts_on: input.startsOn } : {}),
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+    ...(input.sourceAssessmentId != null
+      ? { p_source_assessment_id: input.sourceAssessmentId }
+      : {}),
+    ...(input.sourcePostureSessionId != null
+      ? { p_source_posture_session_id: input.sourcePostureSessionId }
+      : {}),
   })
   if (error) throw error
-}
-
-function planColumns(input: SaveWorkoutPlanInput) {
-  return {
-    name: input.name,
-    goal: input.goal,
-    weeks: input.weeks,
-    starts_on: input.startsOn,
-    notes: input.notes,
-    status: input.status,
-    source_assessment_id: input.sourceAssessmentId,
-    source_posture_session_id: input.sourcePostureSessionId,
-    weekly_schedule: input.weeklySchedule,
-    volume: input.volume as unknown as Json,
-    volume_engine_version: input.volume.engineVersion,
-  }
-}
-
-// evaluator_id e omitido de proposito: o default do banco (auth.uid()) assume e o
-// trigger check_evaluator valida. org_id/subject_id chegam no insert e sao
-// congelados depois.
-export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<WorkoutPlanRow> {
-  const { data: plan, error } = await supabase
-    .from('workout_plans')
-    .insert({
-      org_id: input.orgId,
-      subject_id: input.subjectId,
-      ...planColumns(input),
-    })
-    .select('*')
-    .single()
-  if (error) throw error
-
-  try {
-    await replacePlanChildren(plan.id, input)
-  } catch (e) {
-    // não deixa um plano vazio pra trás se a estrutura falhar; best-effort
-    await supabase.from('workout_plans').delete().eq('id', plan.id)
-    throw e
-  }
-  return plan
+  return data as unknown as WorkoutPlanRow
 }
 
 // Atualiza cabeçalho E estrutura filha numa transação só (RPC save_workout_plan,

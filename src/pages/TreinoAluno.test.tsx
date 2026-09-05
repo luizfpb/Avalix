@@ -185,11 +185,42 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+function hojeLocal(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+// Dia anterior no calendário LOCAL, a partir de uma data 'aaaa-mm-dd'. Passar
+// por Date.now()/toISOString deslocaria o dia pelo fuso.
+function diaAnteriorLocal(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const anterior = new Date(y, m - 1, d - 1)
+  const mm = String(anterior.getMonth() + 1).padStart(2, '0')
+  const dd = String(anterior.getDate()).padStart(2, '0')
+  return `${anterior.getFullYear()}-${mm}-${dd}`
+}
+
 describe('TreinoAluno', () => {
   it('mostra o treino vigente com a prescrição do exercício', async () => {
     await abrir()
     expect(screen.getByText('Supino reto')).toBeTruthy()
     expect(screen.getByText(/3×8-12/)).toBeTruthy()
+  })
+
+  it('explica RIR quando a prescrição do dia usa RIR', async () => {
+    await abrir()
+    expect(screen.getByText(/O que significa RIR/)).toBeTruthy()
+  })
+
+  it('não mostra glossário quando não há RIR nem cadência prescritos', async () => {
+    const base = pacote()
+    getWorkoutMock.mockResolvedValue(
+      pacote({ exercises: [{ ...base.exercises[0], rir: null, tempo: null }] })
+    )
+    await abrir()
+    expect(screen.queryByText(/O que significa/)).toBeNull()
   })
 
   it('link sem treino publicado explica em vez de mostrar tela vazia', async () => {
@@ -501,8 +532,11 @@ describe('TreinoAluno', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2))
 
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    // "Ontem" tem de sair do calendário LOCAL — é o que a tela usa (`hoje()`).
+    // Calculado por UTC, o valor virava o MESMO dia do app depois das 21h em
+    // Brasília, e o teste falhava por fuso, não por defeito da regra de sessão.
     const dateInput = screen.getByLabelText('Data') as HTMLInputElement
+    const yesterday = diaAnteriorLocal(dateInput.value)
     fireEvent.change(dateInput, { target: { value: yesterday } })
     await waitFor(() => expect(dateInput.value).toBe(yesterday))
     const cargaOutroDia = await screen.findByLabelText(/Carga da série 1 de Agachamento/)
@@ -514,6 +548,101 @@ describe('TreinoAluno', () => {
     expect(new Set([a.clientRef, b.clientRef, otherDate.clientRef]).size).toBe(3)
     expect([a.dayLabel, b.dayLabel]).toEqual(['A', 'B'])
     expect(otherDate.performedAt).toBe(yesterday)
+  })
+
+  it('mantém a sessão em andamento quando o treinador regrava o MESMO plano', async () => {
+    // A gravação do plano apaga e recria divisões e exercícios: os ids filhos
+    // mudam mesmo com o exercício do catálogo igual. Antes, o pacote novo
+    // remontava o formulário e a carga já marcada sumia da tela.
+    const antigo = pacote()
+    const regravado = pacote({
+      days: [{ id: 'd1-novo', label: 'A', name: 'Superiores', position: 0 }],
+      exercises: [{ ...antigo.exercises[0], id: 'we1-novo', day_id: 'd1-novo' }],
+    })
+    const rede = deferred<StudentWorkout>()
+    readCachedWorkoutMock.mockResolvedValue({ at: '2026-09-04T10:00:00.000Z', data: antigo })
+    readDraftMock.mockResolvedValue({
+      clientRef: 'ref-1',
+      revision: 1,
+      planId: 'p1',
+      dayId: 'd1',
+      weekNumber: 1,
+      performedAt: hojeLocal(),
+      notes: '',
+      rows: { we1: [{ weight: '40', reps: '10', rir: '2' }] },
+      extras: [],
+      identity: { dayLabel: 'A', rowExercises: { we1: 'x1' } },
+    })
+    getWorkoutMock.mockReturnValue(rede.promise)
+
+    render(<TreinoAluno />)
+    expect(((await campoCarga()) as HTMLInputElement).value).toBe('40')
+    rede.resolve(regravado)
+
+    // depois do pacote novo, a carga continua na tela — agora na linha nova
+    await waitFor(async () =>
+      expect(((await campoCarga()) as HTMLInputElement).value).toBe('40')
+    )
+    expect(await screen.findByText(/atualizou este treino/)).toBeTruthy()
+  })
+
+  it('avisa quantas séries se perderam quando o exercício sai do plano', async () => {
+    const antigo = pacote()
+    const semSupino = pacote({
+      days: [{ id: 'd1-novo', label: 'A', name: 'Superiores', position: 0 }],
+      exercises: [
+        { ...antigo.exercises[0], id: 'we2', day_id: 'd1-novo', exercise_id: 'x2', name: 'Remada' },
+      ],
+    })
+    readCachedWorkoutMock.mockResolvedValue({ at: '2026-09-04T10:00:00.000Z', data: antigo })
+    readDraftMock.mockResolvedValue({
+      clientRef: 'ref-1',
+      revision: 1,
+      planId: 'p1',
+      dayId: 'd1',
+      weekNumber: 1,
+      performedAt: hojeLocal(),
+      notes: '',
+      rows: { we1: [{ weight: '40', reps: '10', rir: '2' }] },
+      extras: [],
+      identity: { dayLabel: 'A', rowExercises: { we1: 'x1' } },
+    })
+    getWorkoutMock.mockResolvedValue(semSupino)
+
+    render(<TreinoAluno />)
+
+    expect(await screen.findByText(/1 série de um exercício que saiu/)).toBeTruthy()
+  })
+
+  it('o autosave grava os exercícios avulsos, não só as séries', async () => {
+    const base = pacote()
+    getWorkoutMock.mockResolvedValue(
+      pacote({
+        plan: { ...base.plan!, weekly_schedule: ['A', 'B'] },
+        days: [...base.days, { id: 'd2', label: 'B', name: 'Inferiores', position: 1 }],
+        exercises: [
+          ...base.exercises,
+          { ...base.exercises[0], id: 'we2', day_id: 'd2', exercise_id: 'x2', name: 'Agachamento' },
+        ],
+      })
+    )
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      await abrir()
+      fireEvent.change(screen.getByLabelText('Trocou algum exercício?'), {
+        target: { value: 'we2' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+      await screen.findByLabelText(/Carga da série 1 de Agachamento/)
+
+      // só o debounce do autosave, sem passar por "Salvar progresso"
+      await vi.advanceTimersByTimeAsync(700)
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const gravados = writeDraftMock.mock.calls.map(([, draft]) => draft as { extras?: string[] })
+    expect(gravados.at(-1)?.extras).toEqual(['we2'])
   })
 
   it('isola o estado quando a rede substitui o plano cacheado', async () => {
@@ -538,7 +667,8 @@ describe('TreinoAluno', () => {
       planId: 'p1',
       dayId: 'd1',
       weekNumber: 1,
-      performedAt: new Date().toISOString().slice(0, 10),
+      // mesma razão: o app compara com a data local, não com a UTC
+      performedAt: hojeLocal(),
       notes: 'rascunho antigo',
       rows: { we1: [{ weight: '99', reps: '1', rir: '0' }] },
     })

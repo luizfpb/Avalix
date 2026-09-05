@@ -17,6 +17,7 @@ import {
 } from 'recharts'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessments, useSubjectCircumferences } from '../features/assessment/hooks'
+import { comparabilidadeDeProtocolos } from '../features/assessment/comparability'
 import type { AssessmentRow, SubjectCircumference } from '../features/assessment/api'
 import {
   buildCircumferenceTimeline,
@@ -100,6 +101,7 @@ export default function Evolucao() {
         const rr = x.results as AssessmentResultSnapshot | null
         return {
           date: dateShort(x.assessed_at),
+          protocolId: x.protocol_id,
           weightKg: x.weight_kg ?? null,
           bmi: x.weight_kg && x.height_cm ? round1(computeBmi(x.weight_kg, x.height_cm)) : null,
           bodyFatPct: rr?.bodyFatPct ?? null,
@@ -182,6 +184,11 @@ export default function Evolucao() {
   const weight = series((a) => a.weight_kg)
   const leanMass = series((a) => (a.results as AssessmentResultSnapshot | null)?.leanMassKg ?? null)
   const fatMass = series((a) => (a.results as AssessmentResultSnapshot | null)?.fatMassKg ?? null)
+
+  // Percentual de gordura e massas saem da densidade corporal: com protocolos
+  // diferentes na série, parte da variação desenhada é troca de método. A regra
+  // vivia só no prompt de parecer; agora a tela diz o mesmo a quem assina.
+  const comparabilidade = comparabilidadeDeProtocolos(assessments.map((a) => a.protocol_id))
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -279,12 +286,39 @@ export default function Evolucao() {
       {assessments.length >= 2 ? (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Evolução da composição</h2>
+          {comparabilidade.aviso ? (
+            <p
+              role="status"
+              className="rounded-md border border-amber-300/70 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              {comparabilidade.aviso}
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <MetricChart title="% de gordura" unit="%" color={FAT} series={fatPct} betterDown />
+            <MetricChart
+              title="% de gordura"
+              unit="%"
+              deltaUnit="p.p."
+              color={FAT}
+              series={fatPct}
+              betterDown={!comparabilidade.protocoloMudou}
+            />
             <MetricChart title="Peso" unit="kg" color="var(--color-chart-5)" series={weight} />
             <MetricChart title="IMC" unit="" color="var(--color-chart-3)" series={bmiSeries} />
-            <MetricChart title="Massa magra" unit="kg" color={LEAN} series={leanMass} betterUp />
-            <MetricChart title="Massa gorda" unit="kg" color={FAT} series={fatMass} betterDown />
+            <MetricChart
+              title="Massa magra"
+              unit="kg"
+              color={LEAN}
+              series={leanMass}
+              betterUp={!comparabilidade.protocoloMudou}
+            />
+            <MetricChart
+              title="Massa gorda"
+              unit="kg"
+              color={FAT}
+              series={fatMass}
+              betterDown={!comparabilidade.protocoloMudou}
+            />
           </div>
         </section>
       ) : (
@@ -314,6 +348,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 function MetricChart({
   title,
   unit,
+  deltaUnit,
   color,
   series,
   betterUp,
@@ -321,6 +356,8 @@ function MetricChart({
 }: {
   title: string
   unit: string
+  /** unidade da DIFERENÇA, quando não é a do valor: 22% -> 18% são 4 p.p. */
+  deltaUnit?: string
   color: string
   series: SeriesPoint[]
   betterUp?: boolean
@@ -350,6 +387,7 @@ function MetricChart({
     deltaClass = improved ? 'text-success' : 'text-warning'
   }
   const u = unit ? ` ${unit}` : ''
+  const ud = deltaUnit ? ` ${deltaUnit}` : u
 
   return (
     <div className="rounded-xl border bg-card p-3">
@@ -357,7 +395,7 @@ function MetricChart({
         <span className="text-sm font-medium">{title}</span>
         <span className={`text-xs font-semibold ${deltaClass}`}>
           {arrow} {Math.abs(delta).toFixed(1)}
-          {u}
+          {ud}
         </span>
       </div>
       <p className="mb-1 text-xs text-muted-foreground">

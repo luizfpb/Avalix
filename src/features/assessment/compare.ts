@@ -1,4 +1,9 @@
 import { computeBmi } from './bmi'
+import {
+  comparabilidadeDeProtocolos,
+  METRICAS_DEPENDENTES_DO_PROTOCOLO,
+  type Comparabilidade,
+} from './comparability'
 import { CIRCUMFERENCE_CATALOG, circumferenceLabel } from './sites'
 import type { AssessmentResultSnapshot } from './result'
 
@@ -12,6 +17,7 @@ export type ComparePoint = {
   assessedAt: string
   weightKg: number
   heightCm: number
+  protocolId?: string | null
   results: AssessmentResultSnapshot | null
   circumferences: { site: string; valueCm: number }[]
 }
@@ -20,17 +26,27 @@ export type CompareRow = {
   key: string
   label: string
   unit: string
+  /**
+   * Unidade da DIFERENÇA, quando não é a do valor. De 22% para 18% a variação é
+   * de quatro PONTOS PERCENTUAIS; escrito "4%" o número lê como redução
+   * relativa de 4%, que seria outra conta.
+   */
+  deltaUnit: string
   from: number | null
   to: number | null
   // delta = to - from; null quando falta um dos lados
   delta: number | null
   betterWhen: 'up' | 'down' | null
   decimals: number
+  /** o valor depende do protocolo (sai da densidade corporal) */
+  dependeDoProtocolo: boolean
 }
 
 export type Comparison = {
   metrics: CompareRow[]
   circumferences: CompareRow[]
+  /** protocolos das duas pontas e o aviso quando eles diferem */
+  comparabilidade: Comparabilidade
 }
 
 const round = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d
@@ -42,10 +58,22 @@ function row(
   from: number | null,
   to: number | null,
   betterWhen: 'up' | 'down' | null,
-  decimals = 1
+  decimals = 1,
+  deltaUnit = unit
 ): CompareRow {
   const delta = from != null && to != null ? round(to - from, decimals) : null
-  return { key, label, unit, from, to, delta, betterWhen, decimals }
+  return {
+    key,
+    label,
+    unit,
+    deltaUnit,
+    from,
+    to,
+    delta,
+    betterWhen,
+    decimals,
+    dependeDoProtocolo: METRICAS_DEPENDENTES_DO_PROTOCOLO.has(key),
+  }
 }
 
 // ordem canônica dos perímetros = ordem do catálogo; customizados no fim, por nome
@@ -57,6 +85,8 @@ export function buildComparison(from: ComparePoint, to: ComparePoint): Compariso
   const rf = from.results
   const rt = to.results
 
+  const comparabilidade = comparabilidadeDeProtocolos([from.protocolId, to.protocolId])
+
   const metrics: CompareRow[] = [
     row('weight', 'Peso', 'kg', from.weightKg, to.weightKg, null),
     row(
@@ -67,10 +97,17 @@ export function buildComparison(from: ComparePoint, to: ComparePoint): Compariso
       round(computeBmi(to.weightKg, to.heightCm), 1),
       null
     ),
-    row('bodyFatPct', '% de gordura', '%', rf?.bodyFatPct ?? null, rt?.bodyFatPct ?? null, 'down'),
+    row('bodyFatPct', '% de gordura', '%', rf?.bodyFatPct ?? null, rt?.bodyFatPct ?? null, 'down', 1, 'p.p.'),
     row('leanMassKg', 'Massa magra', 'kg', rf?.leanMassKg ?? null, rt?.leanMassKg ?? null, 'up'),
     row('fatMassKg', 'Massa gorda', 'kg', rf?.fatMassKg ?? null, rt?.fatMassKg ?? null, 'down'),
-  ].filter((m) => m.from != null || m.to != null)
+  ]
+    .filter((m) => m.from != null || m.to != null)
+    // Protocolo diferente entre as pontas: a diferença das métricas derivadas
+    // deixa de ser pintada de melhora/piora. Continuar colorindo afirmaria
+    // progresso onde parte do número é troca de método.
+    .map((m) =>
+      comparabilidade.protocoloMudou && m.dependeDoProtocolo ? { ...m, betterWhen: null } : m
+    )
 
   const fromBySite = new Map(from.circumferences.map((c) => [c.site, c.valueCm]))
   const toBySite = new Map(to.circumferences.map((c) => [c.site, c.valueCm]))
@@ -87,5 +124,5 @@ export function buildComparison(from: ComparePoint, to: ComparePoint): Compariso
     row(site, circumferenceLabel(site), 'cm', fromBySite.get(site) ?? null, toBySite.get(site) ?? null, null)
   )
 
-  return { metrics, circumferences }
+  return { metrics, circumferences, comparabilidade }
 }

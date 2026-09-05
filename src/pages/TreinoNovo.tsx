@@ -52,8 +52,10 @@ import {
 } from '../features/workout/groups'
 import { GOAL_OPTIONS } from '../features/workout/schema'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { useBaseVersion } from '../lib/baseVersion'
 import { useUnsavedChanges } from '../lib/unsavedChanges'
 import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
+import { VersionConflictBanner } from '../components/VersionConflict'
 import {
   snapshotVolumeItems,
   type MovementPattern,
@@ -193,7 +195,13 @@ function Builder({
   const navigate = useNavigate()
   const isEdit = !!planId
   const createMut = useCreateWorkoutPlan(subjectId)
-  const updateMut = useUpdateWorkoutPlan(subjectId, planId, planUpdatedAt)
+  // Versão-base CONGELADA: a revalidação por foco/reconexão do React Query
+  // trocava `planUpdatedAt` sem trocar o `plan` em edição (que vem de
+  // useState(initial)), e a aba antiga passava a enviar a versão nova com a
+  // estrutura velha — desarmando o guard da 0023 no cenário exato para o qual
+  // ele foi escrito. Ver src/lib/baseVersion.ts.
+  const versao = useBaseVersion(planUpdatedAt)
+  const updateMut = useUpdateWorkoutPlan(subjectId, planId, versao.base)
   const mut = isEdit ? updateMut : createMut
   const anamneseQ = useAnamneses(subjectId)
 
@@ -222,7 +230,7 @@ function Builder({
   // simplesmente não é encontrado. Editar um plano é o caso em que perder o
   // trabalho dói mais, porque o ponto de partida já era um plano inteiro.
   const draftKey = isEdit
-    ? `treino:${subjectId}:${planId}:${planUpdatedAt ?? '-'}`
+    ? `treino:${subjectId}:${planId}:${versao.base ?? '-'}`
     : `treino:${subjectId}`
   const draft = useFormDraft<EditorPlan>(draftKey, plan, (d) => setPlan(d))
 
@@ -728,6 +736,7 @@ function Builder({
     try {
       const save = editorToSaveInput(plan, { orgId, subjectId }, snapshot)
       const saved = await mut.mutateAsync(save)
+      versao.adopt(saved.updated_at)
       if (draftKey) clearDraft(draftKey)
       // salvou: a navegação seguinte não pode perguntar "descartar alterações?"
       guard.allowNext()
@@ -762,6 +771,8 @@ function Builder({
         </Link>
         <h1 className="mt-2 text-xl font-semibold">{isEdit ? 'Editar plano' : 'Novo plano de treino'}</h1>
       </div>
+
+      {versao.conflict ? <VersionConflictBanner what="Este plano" /> : null}
 
       {draft.restored ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">

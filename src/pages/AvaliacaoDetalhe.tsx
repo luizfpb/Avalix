@@ -97,6 +97,7 @@ export default function AvaliacaoDetalhe() {
           const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.assessed_at)
           return {
             date: m ? `${m[3]}/${m[2]}` : x.assessed_at,
+            protocolId: x.protocol_id,
             weightKg: x.weight_kg ?? null,
             bmi: x.weight_kg && x.height_cm ? computeBmi(x.weight_kg, x.height_cm) : null,
             bodyFatPct: rr?.bodyFatPct ?? null,

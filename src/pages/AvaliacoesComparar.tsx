@@ -117,7 +117,13 @@ export default function AvaliacoesComparar() {
 }
 
 function toPoint(data: {
-  assessment: { assessed_at: string; weight_kg: number; height_cm: number; results: unknown } | null
+  assessment: {
+    assessed_at: string
+    weight_kg: number
+    height_cm: number
+    protocol_id: string | null
+    results: unknown
+  } | null
   circumferences: { site: string; value_cm: number }[]
 }): ComparePoint | null {
   if (!data.assessment) return null
@@ -125,6 +131,7 @@ function toPoint(data: {
     assessedAt: data.assessment.assessed_at,
     weightKg: data.assessment.weight_kg,
     heightCm: data.assessment.height_cm,
+    protocolId: data.assessment.protocol_id,
     results: data.assessment.results as AssessmentResultSnapshot | null,
     circumferences: data.circumferences.map((c) => ({ site: c.site, valueCm: c.value_cm })),
   }
@@ -153,6 +160,15 @@ function ComparisonBody({ fromId, toId }: { fromId: string; toId: string }) {
 
   return (
     <div className="space-y-4">
+      {cmp.comparabilidade.aviso ? (
+        <p
+          role="status"
+          className="rounded-md border border-amber-300/70 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          {cmp.comparabilidade.aviso}
+        </p>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Composição e medidas gerais</CardTitle>
@@ -162,7 +178,12 @@ function ComparisonBody({ fromId, toId }: { fromId: string; toId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CompareTable rows={cmp.metrics} fromDate={from.assessedAt} toDate={to.assessedAt} />
+          <CompareTable
+            rows={cmp.metrics}
+            fromDate={from.assessedAt}
+            toDate={to.assessedAt}
+            marcarDependentes={cmp.comparabilidade.protocoloMudou}
+          />
         </CardContent>
       </Card>
 
@@ -182,8 +203,12 @@ function ComparisonBody({ fromId, toId }: { fromId: string; toId: string }) {
       ) : null}
 
       <p className="text-xs text-muted-foreground">
-        Δ positivo = aumento entre as duas datas. A cor indica melhora/piora apenas nas métricas
-        com direção clara (% de gordura, massas); nas demais o objetivo depende do plano.
+        Δ positivo = aumento entre as duas datas; em percentual de gordura ele vem em pontos
+        percentuais (p.p.). A cor indica melhora/piora apenas nas métricas com direção clara (%
+        de gordura, massas); nas demais o objetivo depende do plano.
+        {cmp.comparabilidade.protocoloMudou
+          ? ' Com protocolos diferentes, as métricas marcadas com * ficam sem cor.'
+          : ''}
       </p>
     </div>
   )
@@ -193,10 +218,13 @@ function CompareTable({
   rows,
   fromDate,
   toDate,
+  marcarDependentes = false,
 }: {
   rows: CompareRow[]
   fromDate: string
   toDate: string
+  /** protocolo mudou entre as pontas: as métricas derivadas ganham asterisco */
+  marcarDependentes?: boolean
 }) {
   return (
     <div className="overflow-x-auto">
@@ -220,14 +248,19 @@ function CompareTable({
             const arrow = r.delta == null || r.delta === 0 ? '–' : r.delta > 0 ? '▲' : '▼'
             return (
               <tr key={r.key} className="border-b last:border-0">
-                <td className="py-1.5 pr-2 text-muted-foreground">{r.label}</td>
+                <td className="py-1.5 pr-2 text-muted-foreground">
+                  {r.label}
+                  {marcarDependentes && r.dependeDoProtocolo ? (
+                    <span title="Depende do protocolo — ver aviso acima"> *</span>
+                  ) : null}
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.from)}</td>
                 <td className="px-2 py-1.5 text-right font-medium tabular-nums">{fmt(r.to)}</td>
                 <td className={`py-1.5 pl-2 text-right font-semibold tabular-nums ${deltaClass}`}>
                   {r.delta != null ? (
                     <>
                       {arrow} {Math.abs(r.delta).toFixed(r.decimals)}
-                      {r.unit ? ` ${r.unit}` : ''}
+                      {r.deltaUnit ? ` ${r.deltaUnit}` : ''}
                     </>
                   ) : (
                     '—'

@@ -88,3 +88,51 @@ describe('buildComparison', () => {
     expect(neck?.delta).toBeNull()
   })
 })
+
+// Protocolos diferentes: a regra já existia no prompt de parecer e não tinha
+// chegado às telas, que calculavam e coloriam a diferença sem dizer nada.
+describe('buildComparison — protocolos diferentes', () => {
+  it('avisa e tira a cor das métricas que dependem do protocolo', () => {
+    const cmp = buildComparison(
+      point({ protocolId: 'jp7', results: snapshot({ bodyFatPct: 22 }) }),
+      point({ protocolId: 'jp3', results: snapshot({ bodyFatPct: 18 }) })
+    )
+    const byKey = Object.fromEntries(cmp.metrics.map((m) => [m.key, m]))
+
+    expect(cmp.comparabilidade.protocoloMudou).toBe(true)
+    expect(cmp.comparabilidade.aviso).toMatch(/troca\s+de\s+método/)
+    // derivadas do protocolo: sem direção de melhora/piora
+    expect(byKey.bodyFatPct.betterWhen).toBeNull()
+    expect(byKey.leanMassKg.betterWhen).toBeNull()
+    expect(byKey.fatMassKg.betterWhen).toBeNull()
+    // medida direta continua comparável
+    expect(byKey.weight.dependeDoProtocolo).toBe(false)
+    // e o valor da diferença não some: só deixa de ser pintado
+    expect(byKey.bodyFatPct.delta).toBe(-4)
+  })
+
+  it('mesmo protocolo não gera aviso nem tira a cor', () => {
+    const cmp = buildComparison(
+      point({ protocolId: 'jp7', results: snapshot({ bodyFatPct: 22 }) }),
+      point({ protocolId: 'jp7', results: snapshot({ bodyFatPct: 18 }) })
+    )
+    const byKey = Object.fromEntries(cmp.metrics.map((m) => [m.key, m]))
+
+    expect(cmp.comparabilidade.protocoloMudou).toBe(false)
+    expect(cmp.comparabilidade.aviso).toBeNull()
+    expect(byKey.bodyFatPct.betterWhen).toBe('down')
+  })
+
+  it('diferença de percentual sai em pontos percentuais, não em %', () => {
+    const cmp = buildComparison(
+      point({ results: snapshot({ bodyFatPct: 22 }) }),
+      point({ results: snapshot({ bodyFatPct: 18 }) })
+    )
+    const byKey = Object.fromEntries(cmp.metrics.map((m) => [m.key, m]))
+
+    // 22% -> 18% é queda de QUATRO PONTOS; "-4%" seria redução relativa de 4%
+    expect(byKey.bodyFatPct.unit).toBe('%')
+    expect(byKey.bodyFatPct.deltaUnit).toBe('p.p.')
+    expect(byKey.weight.deltaUnit).toBe('kg')
+  })
+})

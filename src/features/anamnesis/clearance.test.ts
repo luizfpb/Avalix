@@ -168,6 +168,55 @@ describe('anamneseAlerta', () => {
     expect(a.linhas).toContain('Reavaliar em 90 dias')
   })
 
+  it('restrição registrada sobrevive à correção que limpa a triagem', () => {
+    // O caso real: parecer com restrição, e depois o profissional corrige as
+    // respostas da anamnese; a triagem fica limpa e a 0029 preserva o parecer.
+    // O aviso não pode virar "Liberado" e engolir a restrição.
+    const a = anamneseAlerta({
+      gate: LIMPA,
+      liberacao: liberacao({
+        status: 'liberado_com_restricoes',
+        obs: 'Sem carga axial pesada',
+      }),
+      today: HOJE,
+    })
+    expect(a.nivel).toBe('info')
+    expect(a.badge.label).toBe('Liberado com restrições')
+    expect(a.linhas[0]).toBe('Sem carga axial pesada')
+    expect(a.pedeLiberacao).toBe(false)
+  })
+
+  it('restrição também precede triagem incompleta, dizendo que ela está incompleta', () => {
+    const a = anamneseAlerta({
+      gate: {
+        status: 'incompleto',
+        liberado: false,
+        nivelEncaminhamento: 'antes_iniciar',
+        flagEncaminhamento: false,
+      },
+      liberacao: liberacao({ status: 'liberado_com_restricoes', obs: 'Sem impacto' }),
+      today: HOJE,
+    })
+    expect(a.linhas[0]).toBe('Sem impacto')
+    expect(a.linhas.some((l) => l.includes('incompleta'))).toBe(true)
+    expect(a.badge.label).toBe('Liberado com restrições')
+  })
+
+  it('restrição vencida vira aviso âmbar sem perder a restrição, mesmo com triagem limpa', () => {
+    const a = anamneseAlerta({
+      gate: LIMPA,
+      liberacao: liberacao({
+        status: 'liberado_com_restricoes',
+        obs: 'Sem carga axial pesada',
+        validade: '2026-07-01',
+      }),
+      today: HOJE,
+    })
+    expect(a.nivel).toBe('atencao')
+    expect(a.badge.label).toBe('Liberação vencida')
+    expect(a.linhas).toContain('Sem carga axial pesada')
+  })
+
   it('triagem limpa não inventa pendência de parecer', () => {
     const a = anamneseAlerta({ gate: LIMPA, today: HOJE })
     expect(a.nivel).toBe('ok')

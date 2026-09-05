@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { generateAssessmentPdf, buildCircSeries, type AssessmentPdfData } from './assessmentPdf'
+import {
+  buildCircSeries,
+  evolutionSummaryRows,
+  generateAssessmentPdf,
+  type AssessmentPdfData,
+} from './assessmentPdf'
 import type { AssessmentRow, SubjectCircumference } from '../assessment/api'
 import { registerReportFontsFrom } from './pdfFonts'
 import { join } from 'node:path'
@@ -138,5 +143,26 @@ describe('buildCircSeries', () => {
     const waist = buildCircSeries(sameDay, 1, 10)[0]
     expect(waist.points.map((point) => point.value)).toEqual([90, 88])
     expect(waist.points.map((point) => point.date)).toEqual(['20/08', '20/08'])
+  })
+})
+
+// A DIFERENÇA de um percentual não é um percentual. De 22% para 18% de gordura
+// a variação é de quatro PONTOS PERCENTUAIS; impresso "-4%" o laudo afirma uma
+// redução relativa de 4%, que daria 21,1%.
+describe('evolutionSummaryRows', () => {
+  const serie = [
+    { date: '01/03', weightKg: 82, bmi: 25.9, bodyFatPct: 22, leanMassKg: 64, fatMassKg: 18 },
+    { date: '01/06', weightKg: 80, bmi: 25.3, bodyFatPct: 18, leanMassKg: 65.6, fatMassKg: 14.4 },
+  ]
+
+  it('usa pontos percentuais na variação do percentual de gordura', () => {
+    const linha = evolutionSummaryRows(serie).find((r) => r.label === '% de gordura')!
+    expect(linha.unit).toBe('%')
+    expect(linha.deltaUnit).toBe(' p.p.')
+  })
+
+  it('mantém a unidade do valor onde ela também serve para a diferença', () => {
+    const peso = evolutionSummaryRows(serie).find((r) => r.label === 'Peso')!
+    expect(peso.deltaUnit).toBe(' kg')
   })
 })
