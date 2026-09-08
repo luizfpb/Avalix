@@ -239,7 +239,6 @@ export default function PosturaSessaoDetalhe() {
           <input
             type="file"
             accept="image/*"
-            capture="environment"
             className="hidden"
             disabled={uploading}
             onChange={onFile}
