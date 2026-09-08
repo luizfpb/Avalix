@@ -1,15 +1,22 @@
+import { fileURLToPath } from 'node:url'
+import { loadEnv } from 'vite'
+
 const EXPECTED_SCHEMA_VERSION = '0033'
 const REQUEST_TIMEOUT_MS = 15_000
+const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url))
 
-function requiredEnv(name) {
-  const value = process.env[name]?.trim()
+function requiredEnv(name, env) {
+  const value = env[name]?.trim()
   if (!value) throw new Error(`variável ${name} não configurada`)
   return value
 }
 
 async function checkSchemaVersion() {
-  const rawUrl = requiredEnv('VITE_SUPABASE_URL')
-  const publishableKey = requiredEnv('VITE_SUPABASE_PUBLISHABLE_KEY')
+  // Mesma configuração do build: inclui .env.local, preservando a prioridade
+  // das variáveis já fornecidas pelo terminal ou pelo CI.
+  const env = loadEnv('production', PROJECT_ROOT, 'VITE_SUPABASE_')
+  const rawUrl = requiredEnv('VITE_SUPABASE_URL', env)
+  const publishableKey = requiredEnv('VITE_SUPABASE_PUBLISHABLE_KEY', env)
 
   let baseUrl
   try {
