@@ -17,10 +17,12 @@ import {
   setWorkoutPlanStatus,
   updateCustomExercise,
   updateWorkoutPlan,
+  updateWorkoutLog,
   type CreateExerciseInput,
   type CreateWorkoutLogInput,
   type SaveWorkoutPlanInput,
   type UpdateExerciseInput,
+  type UpdateWorkoutLogInput,
 } from './api'
 import { getWorkoutLink, issueWorkoutLink, revokeWorkoutLink } from './link'
 
@@ -181,6 +183,21 @@ export function useCreateWorkoutLog(planId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
+    },
+  })
+}
+
+export function useUpdateWorkoutLog(planId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateWorkoutLogInput) => updateWorkoutLog(input),
+    onSuccess: async (_log, input) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['workout-logs', planId] }),
+        qc.invalidateQueries({ queryKey: ['workout-log-sets', input.id] }),
+        qc.invalidateQueries({ queryKey: ['workout-set-history', planId] }),
+        qc.invalidateQueries({ queryKey: ['org-log-summary'] }),
+      ])
     },
   })
 }

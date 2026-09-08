@@ -1,5 +1,6 @@
 import { sha256Hex } from '../../lib/hash'
 import { isValidWorkoutToken } from './link'
+import { validateLogRows, type LogRow } from './logRows'
 import { submitSession, type SubmitSet } from './studentApi'
 import {
   dequeueSession,
@@ -133,6 +134,9 @@ export type FlushResult = {
   rejected: { clientRef: string; message: string }[]
 }
 
+export const CORRECTED_SESSION_MESSAGE =
+  'Este treino foi editado no histórico. O envio antigo não substituiu a correção.'
+
 // Sobe a fila inteira. Reenviar é inofensivo por construção (client_ref), então
 // não há estado a proteger contra execução concorrente além de não duplicar
 // esforço — quem chama evita isso com o `flushing` da página.
@@ -142,8 +146,9 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
 
   for (const item of queue) {
     if (item.error) continue
+    let submitted: Awaited<ReturnType<typeof submitSession>>
     try {
-      await submitSession({
+      submitted = await submitSession({
         token,
         clientRef: item.clientRef,
         revision: item.revision ?? 1,
@@ -170,6 +175,15 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
       continue
     }
 
+    if (submitted.corrected) {
+      // A correção feita no histórico prevalece sobre o rascunho anterior.
+      // Mantém o envio local visível, sem repetir nem confirmar uma gravação
+      // que não aconteceu. O rascunho em andamento continua no aparelho.
+      await markSessionRejected(scope, item.clientRef, CORRECTED_SESSION_MESSAGE)
+      result.rejected.push({ clientRef: item.clientRef, message: CORRECTED_SESSION_MESSAGE })
+      continue
+    }
+
     // Se remover do IndexedDB falhar, a exceção sobe. O item permanece e o
     // replay é seguro pelo client_ref; fingir sucesso perderia rastreabilidade.
     await dequeueSession(scope, item.clientRef)
@@ -190,9 +204,13 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
 // as duas começariam na série 1 e o servidor recusaria o envio INTEIRO por
 // série repetida — perdendo o treino que a pessoa já tinha feito.
 export function buildSets(
-  rows: Record<string, { weight: string; reps: string; rir: string }[]>,
+  rows: Record<string, LogRow[]>,
   exercises: { id: string; exercise_id: string }[]
 ): SubmitSet[] {
+  const rowError = validateLogRows(Object.fromEntries(
+    exercises.map((exercise) => [exercise.id, rows[exercise.id] ?? []])
+  ))
+  if (rowError) throw new Error(rowError)
   const sets: SubmitSet[] = []
   const contador = new Map<string, number>()
   for (const exercise of exercises) {
@@ -200,6 +218,7 @@ export function buildSets(
       const weight = row.weight.trim() === '' ? null : Number(row.weight)
       const reps = row.reps.trim() === '' ? null : Number(row.reps)
       const rir = row.rir.trim() === '' ? null : Number(row.rir)
+      const rest = (row.rest ?? '').trim()
       if (weight == null && reps == null) continue
       if (Number.isNaN(weight) || Number.isNaN(reps) || Number.isNaN(rir)) continue
       const n = (contador.get(exercise.exercise_id) ?? 0) + 1
@@ -210,20 +229,23 @@ export function buildSets(
         weight_kg: weight,
         reps,
         rir,
+        rest_seconds: rest === '' ? null : Number(rest),
+        reached_failure: row.failure ?? null,
       })
     }
   }
   return sets
 }
 
-export type StudentSetRow = { weight: string; reps: string; rir: string }
+export type StudentSetRow = LogRow
 
 function emptySetRow(): StudentSetRow {
-  return { weight: '', reps: '', rir: '' }
+  return { weight: '', reps: '', rir: '', rest: '', failure: false }
 }
 
 function rowIsEmpty(row: StudentSetRow): boolean {
   return !row.weight.trim() && !row.reps.trim() && !row.rir.trim()
+    && !(row.rest ?? '').trim() && row.failure !== true
 }
 
 // Ajusta a grade à prescrição sem apagar série preenchida. Linhas vazias que

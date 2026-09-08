@@ -13,6 +13,8 @@ export type SessionSet = {
   weightKg: number | null
   reps: number | null
   rir: number | null
+  restSeconds?: number | null
+  reachedFailure?: boolean | null
 }
 
 // numeric(6,2) pode chegar como 40 ou como "40.00" dependendo da rota (jsonb da
@@ -48,15 +50,23 @@ export function SessionSets({ sets }: { sets: SessionSet[] }) {
             {doExercicio.map((s) => (
               <li key={s.setNumber} className="flex items-baseline gap-2 text-xs tabular-nums">
                 <span className="w-8 shrink-0 text-muted-foreground">{s.setNumber}ª</span>
-                <span className="w-20 shrink-0">
-                  {s.weightKg != null ? `${fmtNumero(s.weightKg)} kg` : '— kg'}
-                </span>
-                <span className="w-20 shrink-0">
-                  {s.reps != null ? `${s.reps} reps` : '— reps'}
-                </span>
-                <span className="text-muted-foreground">
-                  {s.rir != null ? `RIR ${fmtNumero(s.rir)}` : ''}
-                </span>
+                <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-0.5">
+                  <span className="w-16 shrink-0">
+                    {s.weightKg != null ? `${fmtNumero(s.weightKg)} kg` : '— kg'}
+                  </span>
+                  <span className="w-16 shrink-0">
+                    {s.reps != null ? `${s.reps} reps` : '— reps'}
+                  </span>
+                  {s.rir != null && (
+                    <span className="text-muted-foreground">RIR {fmtNumero(s.rir)}</span>
+                  )}
+                  {s.reachedFailure === true && (
+                    <span className="font-medium">Falha</span>
+                  )}
+                  {s.restSeconds != null && (
+                    <span className="text-muted-foreground">Descanso {s.restSeconds} s</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

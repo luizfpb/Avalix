@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import TreinoAluno from './TreinoAluno'
+import { writeCachedHistory } from '../features/workout/studentStore'
 import type {
   StudentHistorySession,
   StudentPlanDetail,
@@ -19,6 +20,7 @@ const {
   getHistoryPageMock,
   getPlanMock,
   submitMock,
+  updateSessionMock,
   enqueueMock,
   dequeueMock,
   flushQueueMock,
@@ -39,6 +41,7 @@ const {
   getHistoryPageMock: vi.fn(),
   getPlanMock: vi.fn(),
   submitMock: vi.fn(),
+  updateSessionMock: vi.fn(),
   enqueueMock: vi.fn(),
   dequeueMock: vi.fn(),
   flushQueueMock: vi.fn(),
@@ -62,6 +65,7 @@ vi.mock('../features/workout/studentApi', async (original) => ({
   getHistoryPageForLink: (t: string, options: unknown) => getHistoryPageMock(t, options),
   getPlanForLink: (t: string, planId: string) => getPlanMock(t, planId),
   submitSession: (input: unknown) => submitMock(input),
+  updateSessionForLink: (input: unknown) => updateSessionMock(input),
 }))
 
 vi.mock('../features/workout/studentStore', async (original) => ({
@@ -95,6 +99,14 @@ vi.mock('../features/workout/studentSession', async (original) => ({
 }))
 
 const TOKEN = 'C'.repeat(43)
+
+function historicalSession(over: Partial<StudentHistorySession> = {}): StudentHistorySession {
+  return { id: 'h1', plan_id: 'p1', updated_at: '2026-09-08T10:00:00.000Z',
+    performed_at: '2026-09-08', day_label: 'A', week_number: 1, plan_name: 'Mesociclo 2',
+    source: 'student', notes: 'Treino registrado',
+    sets: [{ exercise_id: 'x1', exercise_name: 'Supino reto', set_number: 1,
+      weight_kg: 40, reps: 10, rir: 0, rest_seconds: 75, reached_failure: false }], ...over }
+}
 
 function pacote(over: Partial<StudentWorkout> = {}): StudentWorkout {
   return {
@@ -154,6 +166,7 @@ beforeEach(() => {
   getHistoryPageMock.mockResolvedValue({ items: [], next_cursor: null })
   getPlanMock.mockResolvedValue(null)
   submitMock.mockResolvedValue({ logId: 'log1' })
+  updateSessionMock.mockResolvedValue(historicalSession())
   enqueueMock.mockResolvedValue(undefined)
   dequeueMock.mockResolvedValue(undefined)
   flushQueueMock.mockResolvedValue({ sent: 0, pending: 0, rejected: [] })
@@ -203,6 +216,32 @@ function diaAnteriorLocal(iso: string): string {
 }
 
 describe('TreinoAluno', () => {
+  it('diferencia RIR 0 de falha explícita por série', async () => {
+    await abrir()
+    await campoCarga()
+    fireEvent.change(screen.getByLabelText('Repetições da série 1 de Supino reto'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('RIR da série 1 de Supino reto'), { target: { value: '0' } })
+    expect((screen.getByLabelText('Falha na série 1 de Supino reto') as HTMLInputElement).checked).toBe(false)
+    fireEvent.change(screen.getByLabelText('Repetições da série 2 de Supino reto'), { target: { value: '8' } })
+    fireEvent.click(screen.getByLabelText('Falha na série 2 de Supino reto'))
+    expect(screen.getByLabelText('RIR da série 2 de Supino reto')).toMatchObject({ value: '0', disabled: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets.map((s: { rir: number; reached_failure: boolean }) => [s.rir, s.reached_failure]))
+      .toEqual([[0, false], [0, true]])
+    expect(reserveDraftRevisionMock.mock.calls[0][1].rows.we1[1].failure).toBe(true)
+  })
+
+  it('não confirma envio antigo que perdeu para uma correção no histórico', async () => {
+    submitMock.mockResolvedValue({ logId: 'h1', stale: true, corrected: true })
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/editado no histórico/)
+    expect(clearDraftMock).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Treino concluído!/)).toBeNull()
+    expect(await campoCarga()).toHaveProperty('value', '40')
+  })
   it('mostra o treino vigente com a prescrição do exercício', async () => {
     await abrir()
     expect(screen.getByText('Supino reto')).toBeTruthy()
@@ -285,7 +324,7 @@ describe('TreinoAluno', () => {
     await waitFor(() => expect(submitMock).toHaveBeenCalled())
     const enviado = submitMock.mock.calls[0][0]
     expect(enviado.sets).toEqual([
-      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: null },
+      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: null, rest_seconds: null, reached_failure: false },
     ])
     expect(enviado.dayLabel).toBe('A')
     expect(await screen.findByText(/Treino concluído/)).toBeTruthy()
@@ -313,6 +352,56 @@ describe('TreinoAluno', () => {
     )
   })
 
+  it('salva descanso real por série, sem preencher com o tempo prescrito', async () => {
+    await abrir()
+    await campoCarga()
+    const descanso = screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement
+    expect(descanso.value).toBe('')
+    fireEvent.change(screen.getByLabelText('Repetições da série 1 de Supino reto'), { target: { value: '10' } })
+    fireEvent.change(descanso, { target: { value: '75' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 2 de Supino reto'), { target: { value: '8' } })
+    fireEvent.change(screen.getByLabelText('Descanso da série 2 de Supino reto'), { target: { value: '0' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 3 de Supino reto'), { target: { value: '6' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets.map((s: { rest_seconds: number | null }) => s.rest_seconds)).toEqual([75, 0, null])
+    expect(reserveDraftRevisionMock.mock.calls[0][1].rows.we1[0].rest).toBe('75')
+    expect(descanso.value).toBe('75')
+  })
+
+  it.each(['-1', '1.5', '3601'])('bloqueia descanso inválido (%s) e conserva os campos', async (value) => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    const descanso = screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement
+    fireEvent.change(descanso, { target: { value } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/segundos inteiros/)
+    expect(descanso.value).toBe(value)
+    expect(submitMock).not.toHaveBeenCalled()
+  })
+
+  it('avisa quando só o descanso foi preenchido, sem descartar a anotação', async () => {
+    await abrir()
+    await campoCarga()
+    fireEvent.change(screen.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '90' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/carga ou as repetições/)
+    expect(submitMock).not.toHaveBeenCalled()
+  })
+
+  it('mostra o descanso registrado no histórico', async () => {
+    getHistoryPageMock.mockResolvedValue({ items: [{
+      id: 'h1', performed_at: hojeLocal(), day_label: 'A', week_number: 1,
+      plan_name: 'Mesociclo 2', source: 'student', notes: null,
+      sets: [{ exercise_id: 'x1', exercise_name: 'Supino reto', set_number: 1,
+        weight_kg: 40, reps: 10, rir: 2, rest_seconds: 75 }],
+    }], next_cursor: null })
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico' }))
+    expect(await screen.findByText('Descanso 75 s')).toBeTruthy()
+  })
+
   it('sem internet, guarda o treino na fila em vez de perder', async () => {
     submitMock.mockRejectedValue(new TypeError('Failed to fetch'))
     await abrir()
@@ -320,11 +409,13 @@ describe('TreinoAluno', () => {
     fireEvent.change(screen.getByLabelText(/Repetições da série 1 de Supino reto/), {
       target: { value: '10' },
     })
+    fireEvent.change(screen.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '120' } })
     fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
 
     await waitFor(() => expect(enqueueMock).toHaveBeenCalled())
     const [, sessao] = enqueueMock.mock.calls[0]
     expect(sessao.sets).toHaveLength(1)
+    expect(sessao.sets[0].rest_seconds).toBe(120)
     // o client_ref é o que impede a fila de virar sessão duplicada ao subir
     expect(sessao.clientRef).toBeTruthy()
     expect(await screen.findByText(/salvo no aparelho/i)).toBeTruthy()
@@ -569,7 +660,7 @@ describe('TreinoAluno', () => {
       weekNumber: 1,
       performedAt: hojeLocal(),
       notes: '',
-      rows: { we1: [{ weight: '40', reps: '10', rir: '2' }] },
+      rows: { we1: [{ weight: '40', reps: '10', rir: '2', rest: '75' }] },
       extras: [],
       identity: { dayLabel: 'A', rowExercises: { we1: 'x1' } },
     })
@@ -584,6 +675,7 @@ describe('TreinoAluno', () => {
       expect(((await campoCarga()) as HTMLInputElement).value).toBe('40')
     )
     expect(await screen.findByText(/atualizou este treino/)).toBeTruthy()
+    expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('75')
   })
 
   it('avisa quantas séries se perderam quando o exercício sai do plano', async () => {
@@ -805,6 +897,95 @@ describe('TreinoAluno', () => {
   })
 })
 
+describe('TreinoAluno — editar sessão enviada', () => {
+  async function abrirEditor(session = historicalSession()) {
+    getHistoryPageMock.mockResolvedValue({ items: [session], next_cursor: null })
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico' }))
+    const button = await screen.findByRole('button', { name: 'Editar treino' })
+    await waitFor(() => expect(button).toHaveProperty('disabled', false))
+    fireEvent.click(button)
+    return within(await screen.findByRole('dialog', { name: 'Editar treino' }))
+  }
+
+  it('corrige a mesma sessão com a versão carregada e preserva os outros valores', async () => {
+    const editor = await abrirEditor()
+    fireEvent.change(editor.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '42.5' } })
+    fireEvent.click(editor.getByLabelText('Falha na série 1 de Supino reto'))
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(updateSessionMock).toHaveBeenCalled())
+    expect(updateSessionMock.mock.calls[0][0]).toMatchObject({ token: TOKEN, logId: 'h1',
+      expectedUpdatedAt: '2026-09-08T10:00:00.000Z',
+      sets: [{ exercise_id: 'x1', set_number: 1, weight_kg: 42.5, reps: 10,
+        rir: 0, rest_seconds: 75, reached_failure: true }] })
+    expect(await screen.findByText('Correções salvas no treino.')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Editar treino' })).toBeNull()
+    expect(submitMock).not.toHaveBeenCalled()
+    expect(enqueueMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { message: 'registro de treino alterado por outra pessoa; recarregue antes de salvar' },
+    new TypeError('Failed to fetch'),
+  ])('mantém as correções abertas quando salvar falha: %s', async (error) => {
+    updateSessionMock.mockRejectedValue(error)
+    const editor = await abrirEditor()
+    fireEvent.change(editor.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '120' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    expect(await editor.findByRole('alert')).toBeTruthy()
+    expect(editor.getByLabelText('Descanso da série 1 de Supino reto')).toHaveProperty('value', '120')
+    expect(enqueueMock).not.toHaveBeenCalled()
+    expect(screen.queryByText('Correções salvas no treino.')).toBeNull()
+  })
+
+  it('permite completar um envio acidental com exercício faltante do plano original arquivado', async () => {
+    const oldPlan: StudentPlanDetail = { ...pacote(), plan: { ...pacote().plan!, id: 'old', status: 'archived' },
+      exercises: [{ ...pacote().exercises[0], id: 'we-old', exercise_id: 'x2', name: 'Remada do plano anterior' }] }
+    getPlanMock.mockResolvedValue(oldPlan)
+    const editor = await abrirEditor(historicalSession({ plan_id: 'old' }))
+    expect(getPlanMock).toHaveBeenCalledWith(TOKEN, 'old')
+    fireEvent.change(editor.getByLabelText('Adicionar exercício'), { target: { value: 'x2' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Adicionar exercício' }))
+    fireEvent.change(editor.getByLabelText('Repetições da série 1 de Remada do plano anterior'), { target: { value: '12' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(updateSessionMock).toHaveBeenCalled())
+    expect(updateSessionMock.mock.calls[0][0].sets.map((s: { exercise_id: string }) => s.exercise_id)).toEqual(['x1', 'x2'])
+    expect(submitMock).not.toHaveBeenCalled()
+  })
+
+  it('não oferece editar registro do treinador', async () => {
+    getHistoryPageMock.mockResolvedValue({ items: [historicalSession({ source: 'trainer' })], next_cursor: null })
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico' }))
+    expect(await screen.findByText('registrado pelo treinador')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Editar treino' })).toBeNull()
+  })
+
+  it('resposta de correção não repovoa o cache depois de trocar o acesso', async () => {
+    const reply = deferred<StudentHistorySession>()
+    updateSessionMock.mockReturnValue(reply.promise)
+    const editor = await abrirEditor()
+    fireEvent.change(editor.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '90' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(updateSessionMock).toHaveBeenCalled())
+    const writes = vi.mocked(writeCachedHistory).mock.calls.length
+    window.dispatchEvent(new StorageEvent('storage', { key: 'avalix:treino:token', newValue: 'D'.repeat(43) }))
+    expect(await screen.findByText(/Link inválido ou expirado/)).toBeTruthy()
+    await act(async () => {
+      reply.resolve(historicalSession())
+      await reply.promise
+    })
+    expect(vi.mocked(writeCachedHistory).mock.calls).toHaveLength(writes)
+  })
+
+  it('histórico legado sem carimbo não habilita gravação sem controle de versão', async () => {
+    getHistoryPageMock.mockResolvedValue({ items: [historicalSession({ updated_at: undefined })], next_cursor: null })
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico' }))
+    expect(await screen.findByRole('button', { name: 'Editar treino' })).toHaveProperty('disabled', true)
+  })
+})
+
 // Aparelho ocupado, dor no dia, fila na academia: a troca acontece e precisa
 // caber no registro. Sem link para o catálogo, o aluno escolhe entre os
 // exercícios das OUTRAS divisões do próprio plano — o pacote já os traz, então
@@ -854,12 +1035,15 @@ describe('TreinoAluno — troca de exercício', () => {
     fireEvent.change(screen.getByLabelText(/Repetições da série 1 de Leg press/), {
       target: { value: '12' },
     })
+    fireEvent.change(screen.getByLabelText('Descanso da série 1 de Leg press'), {
+      target: { value: '120' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
 
     await waitFor(() => expect(submitMock).toHaveBeenCalled())
     expect(submitMock.mock.calls[0][0].sets).toEqual([
-      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: null, rir: null },
-      { exercise_id: 'x2', set_number: 1, weight_kg: 100, reps: 12, rir: null },
+      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: null, rir: null, rest_seconds: null, reached_failure: false },
+      { exercise_id: 'x2', set_number: 1, weight_kg: 100, reps: 12, rir: null, rest_seconds: 120, reached_failure: false },
     ])
   })
 

@@ -70,6 +70,8 @@ export type StudentLastSet = {
   weight_kg: number | null
   reps: number | null
   rir: number | null
+  rest_seconds?: number | null
+  reached_failure?: boolean | null
 }
 
 export type StudentHistoryPlan = {
@@ -109,10 +111,16 @@ export type StudentHistorySet = {
   weight_kg: number | null
   reps: number | null
   rir: number | null
+  // Ausente no histórico em cache anterior à migration 0032.
+  rest_seconds?: number | null
+  reached_failure?: boolean | null
 }
 
 export type StudentHistorySession = {
   id: string
+  plan_id?: string
+  // O cache legado não permite edição até receber a versão atual do servidor.
+  updated_at?: string
   performed_at: string
   day_label: string | null
   week_number: number | null
@@ -197,6 +205,10 @@ export type SubmitSet = {
   weight_kg: number | null
   reps: number | null
   rir: number | null
+  // A fila offline anterior à migration 0032 não tem este campo.
+  rest_seconds?: number | null
+  // RIR zero sozinho não prova falha; a fila legada mantém esse dado ausente.
+  reached_failure?: boolean | null
 }
 
 export type SubmitSessionInput = {
@@ -219,7 +231,7 @@ export type SubmitSessionInput = {
 
 export async function submitSession(
   input: SubmitSessionInput
-): Promise<{ logId: string; stale: boolean }> {
+): Promise<{ logId: string; stale: boolean; corrected?: boolean }> {
   // Argumento com default na RPC é opcional no tipo gerado (string | undefined,
   // não null): valor ausente se OMITE, e o banco aplica o default. Mandar null
   // explícito não compila — e, se compilasse, sobrescreveria o default.
@@ -235,6 +247,47 @@ export async function submitSession(
     ...(input.planId ? { p_plan: input.planId } : {}),
   })
   if (error) throw error
-  const row = data as unknown as { log_id?: string; stale?: boolean } | null
-  return { logId: row?.log_id ?? '', stale: row?.stale === true }
+  const row = data as unknown as { log_id?: string; stale?: boolean; corrected?: boolean } | null
+  return {
+    logId: row?.log_id ?? '',
+    stale: row?.stale === true,
+    ...(row?.corrected === true ? { corrected: true } : {}),
+  }
+}
+
+export type UpdateSessionForLinkInput = {
+  token: string
+  logId: string
+  expectedUpdatedAt: string
+  performedAt: string
+  notes: string | null
+  sets: SubmitSet[]
+}
+
+export async function updateSessionForLink(
+  input: UpdateSessionForLinkInput
+): Promise<StudentHistorySession> {
+  // Contrato provisório da RPC 0033, até o usuário aplicar a migration e
+  // regenerar database.types. O cliente original conserva sua configuração.
+  const client = supabase as unknown as {
+    rpc(name: 'update_workout_session_for_link', args: {
+      p_token: string
+      p_log: string
+      p_expected_updated_at: string
+      p_sets: SubmitSet[]
+      p_performed_at: string
+      p_notes?: string
+    }): PromiseLike<{ data: unknown; error: unknown }>
+  }
+  const { data, error } = await client.rpc('update_workout_session_for_link', {
+    p_token: input.token,
+    p_log: input.logId,
+    p_expected_updated_at: input.expectedUpdatedAt,
+    p_sets: input.sets,
+    p_performed_at: input.performedAt,
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+  })
+  if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar a edição deste treino.')
+  return data as StudentHistorySession
 }

@@ -361,7 +361,13 @@ export async function clearQueue(scope: string): Promise<void> {
 
 // A sessão em andamento, antes de ser salva. Sobrevive a fechar a aba no meio
 // do treino, que numa academia acontece o tempo todo.
-export type DraftRow = { weight: string; reps: string; rir: string }
+export type DraftRow = {
+  weight: string
+  reps: string
+  rir: string
+  rest?: string
+  failure?: boolean | null
+}
 
 export type DraftSession = {
   clientRef: string

@@ -10,6 +10,7 @@ import {
   useWorkoutLogs,
   useWorkoutLogSets,
   useWorkoutPlan,
+  useUpdateWorkoutLog,
 } from '../features/workout/hooks'
 import type { ExerciseRow, NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
 import {
@@ -26,7 +27,7 @@ import {
   type ProgressionKind,
 } from '../features/workout/progression'
 import { roundToIncrement } from '../features/workout/oneRm'
-import { formatSetsReps } from '../features/workout/effective'
+import { effectivePrescription, formatSetsReps, overrideFor, overrideIndex } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { GroupBlock } from '../features/workout/GroupBlock'
 import { ExercisePicker } from '../features/workout/ExercisePicker'
@@ -40,8 +41,10 @@ import { QueryError } from '../components/QueryError'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
-import { ensureLogRows, type LogRow } from '../features/workout/logRows'
-import { SessionSets, type SessionSet } from '../features/workout/SessionSets'
+import { ensureLogRows, updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
+import { SessionSets } from '../features/workout/SessionSets'
+import { SetRowFields } from '../features/workout/SetRowFields'
+import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
 import type { WorkoutLogRow } from '../features/workout/api'
 
 function todayLocal(): string {
@@ -313,15 +316,48 @@ function LogRowItem({
   onExcluir: () => void
   excluindo: boolean
 }) {
-  const setsQuery = useWorkoutLogSets(aberto ? log.id : undefined)
+  const [editing, setEditing] = useState<{
+    expectedUpdatedAt: string
+    performedAt: string
+    notes: string | null
+    sets: EditableSessionSet[]
+  } | null>(null)
+  const [editOk, setEditOk] = useState(false)
+  const expanded = aberto || editing != null
+  const setsQuery = useWorkoutLogSets(expanded ? log.id : undefined)
+  const updateMut = useUpdateWorkoutLog(log.plan_id)
 
-  const sets: SessionSet[] = (setsQuery.data ?? []).map((s) => ({
+  const sets: EditableSessionSet[] = (setsQuery.data ?? []).map((s) => ({
+    exerciseId: s.exercise_id,
     exerciseName: names[s.exercise_id] ?? 'Exercício',
     setNumber: s.set_number,
     weightKg: s.weight_kg,
+    restSeconds: s.rest_seconds,
     reps: s.reps,
     rir: s.rir,
+    reachedFailure: s.reached_failure,
   }))
+
+  async function saveEdit(value: SessionEditValues) {
+    if (!editing) return
+    await updateMut.mutateAsync({
+      id: log.id,
+      expectedUpdatedAt: editing.expectedUpdatedAt,
+      performedAt: value.performedAt,
+      notes: value.notes,
+      sets: value.sets.map((set) => ({
+        exerciseId: set.exerciseId,
+        setNumber: set.setNumber,
+        weightKg: set.weightKg,
+        reps: set.reps,
+        rir: set.rir,
+        restSeconds: set.restSeconds,
+        reachedFailure: set.reachedFailure,
+      })),
+    })
+    setEditing(null)
+    setEditOk(true)
+  }
 
   return (
     <li className="text-sm">
@@ -329,10 +365,11 @@ function LogRowItem({
         <button
           type="button"
           onClick={onAlternar}
-          aria-expanded={aberto}
+          aria-expanded={expanded}
+          disabled={editing != null}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {aberto ? (
+          {expanded ? (
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           ) : (
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -357,7 +394,7 @@ function LogRowItem({
         </button>
         <button
           onClick={onExcluir}
-          disabled={excluindo}
+          disabled={excluindo || editing != null || updateMut.isPending}
           className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Excluir"
           aria-label={`Excluir sessão de ${formatDate(log.performed_at)}`}
@@ -366,18 +403,48 @@ function LogRowItem({
         </button>
       </div>
 
-      {aberto ? (
+      {expanded ? (
         <div className="border-t bg-muted/20 px-4 py-2.5">
-          {setsQuery.isPending ? (
+          {editing ? (
+            <SessionEditForm
+              sets={editing.sets}
+              performedAt={editing.performedAt}
+              notes={editing.notes}
+              exerciseOptions={Object.entries(names).map(([id, name]) => ({ id, name }))}
+              onSave={saveEdit}
+              onCancel={() => setEditing(null)}
+            />
+          ) : setsQuery.isPending ? (
             <p className="text-xs text-muted-foreground">Carregando séries...</p>
           ) : setsQuery.isError ? (
             <p className="text-xs text-muted-foreground">
               Não foi possível carregar as séries desta sessão.
             </p>
           ) : (
-            <SessionSets sets={sets} />
+            <>
+              <SessionSets sets={sets} />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                disabled={excluindo}
+                onClick={() => {
+                  setEditOk(false)
+                  setEditing({
+                    expectedUpdatedAt: log.updated_at,
+                    performedAt: log.performed_at,
+                    notes: log.notes,
+                    sets,
+                  })
+                }}
+              >
+                Editar treino
+              </Button>
+            </>
           )}
-          {log.notes ? (
+          {editOk ? <p role="status" className="mt-2 text-xs text-primary">Treino atualizado!</p> : null}
+          {!editing && log.notes ? (
             <p className="mt-2 border-t pt-2 text-xs italic text-muted-foreground">{log.notes}</p>
           ) : null}
         </div>
@@ -402,6 +469,7 @@ function SetGrid({
   rows,
   repsPlaceholder,
   rirPlaceholder,
+  restPlaceholder,
   onCell,
   onAddRow,
 }: {
@@ -409,48 +477,30 @@ function SetGrid({
   rows: LogRow[]
   repsPlaceholder: string
   rirPlaceholder: string
-  onCell: (i: number, field: keyof LogRow, value: string) => void
+  restPlaceholder: string
+  onCell: (i: number, field: keyof LogRow, value: string | boolean) => void
   onAddRow: () => void
 }) {
   return (
-    <div className="mt-2 space-y-1">
-      <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-        <span className="w-6" />
-        <span className="w-20 text-center">carga (kg)</span>
-        <span className="w-16 text-center">reps</span>
-        <span className="w-14 text-center">RIR</span>
+    <div className="mt-2 max-w-md space-y-1">
+      <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+        <span />
+        <span>carga (kg)</span>
+        <span>reps</span>
+        <span>RIR</span>
+        <span>desc. (s)</span>
       </div>
       {rows.map((row, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
-          <Input
-            aria-label={`Carga da série ${i + 1} de ${name}`}
-            className="h-8 w-20"
-            type="number"
-            inputMode="decimal"
-            placeholder="kg"
-            value={row.weight}
-            onChange={(e) => onCell(i, 'weight', e.target.value)}
-          />
-          <Input
-            aria-label={`Repetições da série ${i + 1} de ${name}`}
-            className="h-8 w-16"
-            type="number"
-            inputMode="numeric"
-            placeholder={repsPlaceholder}
-            value={row.reps}
-            onChange={(e) => onCell(i, 'reps', e.target.value)}
-          />
-          <Input
-            aria-label={`RIR da série ${i + 1} de ${name}`}
-            className="h-8 w-14"
-            type="number"
-            inputMode="numeric"
-            placeholder={rirPlaceholder}
-            value={row.rir}
-            onChange={(e) => onCell(i, 'rir', e.target.value)}
-          />
-        </div>
+        <SetRowFields
+          key={i}
+          name={name}
+          index={i}
+          row={row}
+          repsPlaceholder={repsPlaceholder}
+          rirPlaceholder={rirPlaceholder}
+          restPlaceholder={restPlaceholder}
+          onChange={(field, value) => onCell(i, field, value)}
+        />
       ))}
       <button
         type="button"
@@ -501,6 +551,8 @@ function LogForm({
   const [extras, setExtras] = useState<ExtraExercise[]>([])
   const [error, setError] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState(false)
+  const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
+  const weekNumber = week.trim() ? Number(week) : null
 
   const dayExercises = useMemo(
     () => detail.exercises.filter((e) => e.day_id === dayKey).sort((a, b) => a.position - b.position),
@@ -511,15 +563,15 @@ function LogForm({
     setSets((previous) => ensureLogRows(previous, dayExercises))
   }, [dayExercises])
 
-  function setCell(exRowId: string, i: number, field: keyof LogRow, val: string) {
+  function setCell(exRowId: string, i: number, field: keyof LogRow, val: string | boolean) {
     setSets((prev) => {
       const rows = (prev[exRowId] ?? []).slice()
-      rows[i] = { ...rows[i], [field]: val }
+      rows[i] = updateLogRow(rows[i], field, val)
       return { ...prev, [exRowId]: rows }
     })
   }
   function addRow(exRowId: string) {
-    setSets((prev) => ({ ...prev, [exRowId]: [...(prev[exRowId] ?? []), { weight: '', reps: '', rir: '' }] }))
+    setSets((prev) => ({ ...prev, [exRowId]: [...(prev[exRowId] ?? []), { weight: '', reps: '', rir: '', rest: '', failure: false }] }))
   }
 
   // A chave das linhas é o rowId, e não o exercício: o mesmo exercício pode ser
@@ -529,7 +581,7 @@ function LogForm({
     setExtras((prev) => [...prev, { rowId, exerciseId }])
     setSets((prev) => ({
       ...prev,
-      [rowId]: Array.from({ length: 3 }, () => ({ weight: '', reps: '', rir: '' })),
+      [rowId]: Array.from({ length: 3 }, () => ({ weight: '', reps: '', rir: '', rest: '', failure: false })),
     }))
   }
 
@@ -557,18 +609,23 @@ function LogForm({
     setOkMsg(false)
     if (!orgId) return setError('Organização não carregada.')
 
-    const flat: { exerciseId: string; weightKg: number | null; reps: number | null; rir: number | null }[] = []
+    const flat: Omit<NewLogSet, 'setNumber'>[] = []
     const fontes = [
       ...dayExercises.map((ex) => ({ rowId: ex.id, exerciseId: ex.exercise_id })),
       ...extras,
     ]
+    const rowError = validateLogRows(Object.fromEntries(
+      fontes.map((ex) => [ex.rowId, sets[ex.rowId] ?? []])
+    ))
+    if (rowError) return setError(rowError)
     for (const ex of fontes) {
       for (const row of sets[ex.rowId] ?? []) {
         const w = row.weight.trim() === '' ? null : Number(row.weight)
         const r = row.reps.trim() === '' ? null : Number(row.reps)
         const rir = row.rir.trim() === '' ? null : Number(row.rir)
+        const restSeconds = row.rest?.trim() ? Number(row.rest) : null
         if (w == null && r == null) continue
-        flat.push({ exerciseId: ex.exerciseId, weightKg: w, reps: r, rir })
+        flat.push({ exerciseId: ex.exerciseId, weightKg: w, reps: r, rir, restSeconds, reachedFailure: row.failure ?? null })
       }
     }
     if (flat.length === 0) return setError('Registre ao menos uma série com carga ou repetições.')
@@ -578,7 +635,7 @@ function LogForm({
     const finalSets: NewLogSet[] = flat.map((s) => {
       const n = (counter.get(s.exerciseId) ?? 0) + 1
       counter.set(s.exerciseId, n)
-      return { exerciseId: s.exerciseId, setNumber: n, weightKg: s.weightKg, reps: s.reps, rir: s.rir }
+      return { ...s, setNumber: n }
     })
 
     try {
@@ -595,7 +652,7 @@ function LogForm({
       // limpa pra registrar a próxima
       const init: Record<string, LogRow[]> = {}
       for (const ex of dayExercises) {
-        init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '' }))
+        init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '', rest: '', failure: false }))
       }
       // Os avulsos pertencem à sessão que acabou de ser gravada: a próxima
       // começa de novo com o que está prescrito.
@@ -652,6 +709,10 @@ function LogForm({
           </div>
         </div>
 
+        <p className="text-xs text-muted-foreground">
+          Descanso: informe quantos segundos descansou após cada série. O preenchimento é opcional.
+          {' '}Marque Falha quando não conseguiu completar outra repetição. RIR 0, sozinho, não marca falha.
+        </p>
         <div className="space-y-3">
           {/* Super-série e circuito mudam o que se faz ENTRE uma série e outra:
               a tela que conduz a sessão não pode listar os exercícios soltos. */}
@@ -696,6 +757,7 @@ function LogForm({
                 rows={sets[ex.id] ?? []}
                 repsPlaceholder={ex.reps ?? '—'}
                 rirPlaceholder={ex.rir != null ? String(ex.rir) : '—'}
+                restPlaceholder={String(effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id)).restSeconds ?? '—')}
                 onCell={(i, field, value) => setCell(ex.id, i, field, value)}
                 onAddRow={() => addRow(ex.id)}
               />
@@ -742,6 +804,7 @@ function LogForm({
                   rows={sets[extra.rowId] ?? []}
                   repsPlaceholder="—"
                   rirPlaceholder="—"
+                  restPlaceholder="—"
                   onCell={(i, field, value) => setCell(extra.rowId, i, field, value)}
                   onAddRow={() => addRow(extra.rowId)}
                 />

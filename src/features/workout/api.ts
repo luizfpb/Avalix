@@ -10,7 +10,12 @@ export type WorkoutExerciseRow = Database['public']['Tables']['workout_exercises
 export type WorkoutWeekOverrideRow = Database['public']['Tables']['workout_week_overrides']['Row']
 export type WorkoutWeekRow = Database['public']['Tables']['workout_weeks']['Row']
 export type WorkoutLogRow = Database['public']['Tables']['workout_logs']['Row']
-export type WorkoutLogSetRow = Database['public']['Tables']['workout_log_sets']['Row']
+// A 0032 acrescenta o descanso e a 0033, a marcação de falha. Os campos
+// opcionais preservam a leitura legada até regenerar os tipos do banco.
+export type WorkoutLogSetRow = Database['public']['Tables']['workout_log_sets']['Row'] & {
+  rest_seconds?: number | null
+  reached_failure?: boolean | null
+}
 
 // =====================================================================
 // BIBLIOTECA DE EXERCICIOS
@@ -413,6 +418,8 @@ export type NewLogSet = {
   weightKg: number | null
   reps: number | null
   rir: number | null
+  restSeconds?: number | null
+  reachedFailure?: boolean | null
 }
 
 export type CreateWorkoutLogInput = {
@@ -426,6 +433,26 @@ export type CreateWorkoutLogInput = {
   sets: NewLogSet[]
 }
 
+export type UpdateWorkoutLogInput = {
+  id: string
+  expectedUpdatedAt: string
+  performedAt: string
+  notes: string | null
+  sets: NewLogSet[]
+}
+
+function logSetsPayload(sets: NewLogSet[]): Json {
+  return sets.map((s) => ({
+    exercise_id: s.exerciseId,
+    set_number: s.setNumber,
+    weight_kg: s.weightKg,
+    reps: s.reps,
+    rir: s.rir,
+    rest_seconds: s.restSeconds ?? null,
+    reached_failure: s.reachedFailure ?? null,
+  }))
+}
+
 // Cria a sessao executada + as series numa transacao so (RPC create_workout_log,
 // 0019). Antes eram duas chamadas: series falhando deixavam sessao vazia que
 // contava na adesao. org_id/subject_id vem do plano pelo trigger b1.
@@ -437,16 +464,36 @@ export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<Wo
     ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
     p_performed_at: input.performedAt,
     ...(input.notes != null ? { p_notes: input.notes } : {}),
-    p_sets: input.sets.map((s) => ({
-      exercise_id: s.exerciseId,
-      set_number: s.setNumber,
-      weight_kg: s.weightKg,
-      reps: s.reps,
-      rir: s.rir,
-    })) as unknown as Json,
+    p_sets: logSetsPayload(input.sets),
   })
   if (error) throw error
   return data as WorkoutLogRow
+}
+
+// A edição substitui as séries na mesma transação do cabeçalho e confere a
+// versão com que o editor abriu. Uma consulta atualizada em segundo plano não
+// pode autorizar a sobreposição de dados que o profissional ainda não viu.
+export async function updateWorkoutLog(input: UpdateWorkoutLogInput): Promise<WorkoutLogRow> {
+  // Contrato restrito da RPC nova até regenerar database.types após a 0033.
+  const client = supabase as unknown as {
+    rpc(name: 'update_workout_log', args: {
+      p_log: string
+      p_expected_updated_at: string
+      p_performed_at: string
+      p_sets: Json
+      p_notes?: string
+    }): PromiseLike<{ data: WorkoutLogRow | null; error: unknown }>
+  }
+  const { data, error } = await client.rpc('update_workout_log', {
+    p_log: input.id,
+    p_expected_updated_at: input.expectedUpdatedAt,
+    p_performed_at: input.performedAt,
+    p_sets: logSetsPayload(input.sets),
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+  })
+  if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar a edição do treino.')
+  return data
 }
 
 export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> {

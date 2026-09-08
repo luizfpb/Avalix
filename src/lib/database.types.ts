@@ -1311,7 +1311,9 @@ export type Database = {
           id: string
           log_id: string
           org_id: string
+          reached_failure: boolean | null
           reps: number | null
+          rest_seconds: number | null
           rir: number | null
           set_number: number
           weight_kg: number | null
@@ -1322,7 +1324,9 @@ export type Database = {
           id?: string
           log_id: string
           org_id: string
+          reached_failure?: boolean | null
           reps?: number | null
+          rest_seconds?: number | null
           rir?: number | null
           set_number: number
           weight_kg?: number | null
@@ -1333,7 +1337,9 @@ export type Database = {
           id?: string
           log_id?: string
           org_id?: string
+          reached_failure?: boolean | null
           reps?: number | null
+          rest_seconds?: number | null
           rir?: number | null
           set_number?: number
           weight_kg?: number | null
@@ -1366,6 +1372,7 @@ export type Database = {
         Row: {
           client_ref: string | null
           client_revision: number
+          corrected_at: string | null
           created_at: string
           day_label: string | null
           id: string
@@ -1381,6 +1388,7 @@ export type Database = {
         Insert: {
           client_ref?: string | null
           client_revision?: number
+          corrected_at?: string | null
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1396,6 +1404,7 @@ export type Database = {
         Update: {
           client_ref?: string | null
           client_revision?: number
+          corrected_at?: string | null
           created_at?: string
           day_label?: string | null
           id?: string
@@ -1785,6 +1794,7 @@ export type Database = {
         Returns: {
           client_ref: string | null
           client_revision: number
+          corrected_at: string | null
           created_at: string
           day_label: string | null
           id: string
@@ -2074,6 +2084,48 @@ export type Database = {
           p_sets: Json
           p_token: string
           p_week_number?: number
+        }
+        Returns: Json
+      }
+      update_workout_log: {
+        Args: {
+          p_expected_updated_at: string
+          p_log: string
+          p_notes?: string
+          p_performed_at: string
+          p_sets: Json
+        }
+        Returns: {
+          client_ref: string | null
+          client_revision: number
+          corrected_at: string | null
+          created_at: string
+          day_label: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          performed_at: string
+          plan_id: string
+          source: string
+          subject_id: string
+          updated_at: string
+          week_number: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workout_logs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_workout_session_for_link: {
+        Args: {
+          p_expected_updated_at: string
+          p_log: string
+          p_notes?: string
+          p_performed_at: string
+          p_sets: Json
+          p_token: string
         }
         Returns: Json
       }

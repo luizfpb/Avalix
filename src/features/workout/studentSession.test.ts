@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   buildSets,
+  CORRECTED_SESSION_MESSAGE,
+  flushQueue,
   isInvalidStudentLinkError,
   isNetworkFailure,
   isStudentLinkExpired,
@@ -9,7 +11,21 @@ import {
   suggestedWorkoutDayId,
   withStudentSyncLock,
 } from './studentSession'
-import { loadStudentToken } from './studentStore'
+import { loadStudentToken, type QueuedSession } from './studentStore'
+
+const queueMocks = vi.hoisted(() => ({
+  readQueue: vi.fn(), dequeueSession: vi.fn(), markSessionRejected: vi.fn(), submitSession: vi.fn(),
+}))
+vi.mock('./studentStore', async (original) => ({
+  ...(await original<typeof import('./studentStore')>()),
+  readQueue: queueMocks.readQueue,
+  dequeueSession: queueMocks.dequeueSession,
+  markSessionRejected: queueMocks.markSessionRejected,
+}))
+vi.mock('./studentApi', async (original) => ({
+  ...(await original<typeof import('./studentApi')>()),
+  submitSession: queueMocks.submitSession,
+}))
 
 const TOKEN = 'A'.repeat(43)
 
@@ -29,6 +45,10 @@ function localStorageFake() {
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', localStorageFake())
+  queueMocks.readQueue.mockReset().mockResolvedValue([])
+  queueMocks.dequeueSession.mockReset().mockResolvedValue(undefined)
+  queueMocks.markSessionRejected.mockReset().mockResolvedValue(undefined)
+  queueMocks.submitSession.mockReset().mockResolvedValue({ logId: 'log-1', stale: false })
 })
 
 describe('resolveStudentToken', () => {
@@ -77,11 +97,24 @@ describe('resolveStudentToken', () => {
 describe('grade e divisão sugerida', () => {
   it('acrescenta séries prescritas e remove apenas excedentes vazios', () => {
     const preenchida = { weight: '40', reps: '10', rir: '2' }
-    const vazia = { weight: '', reps: '', rir: '' }
+    const vazia = { weight: '', reps: '', rir: '', rest: '', failure: false }
 
     expect(reconcileSetRows([preenchida], 3)).toEqual([preenchida, vazia, vazia])
     expect(reconcileSetRows([preenchida, vazia, vazia], 1)).toEqual([preenchida])
     expect(reconcileSetRows([preenchida, { weight: '42', reps: '8', rir: '' }], 1)).toHaveLength(2)
+  })
+
+  it('preserva descanso preenchido ao diminuir a prescrição e aceita rascunho legado', () => {
+    const legado = { weight: '40', reps: '10', rir: '' }
+    const descanso = { weight: '', reps: '', rir: '', rest: '0' }
+    expect(reconcileSetRows([legado, descanso], 1)).toEqual([legado, descanso])
+    expect(reconcileSetRows([legado, { weight: '', reps: '', rir: '' }], 1)).toEqual([legado])
+  })
+
+  it('não apaga uma marcação de falha ao diminuir as séries prescritas', () => {
+    const falha = { weight: '', reps: '', rir: '', failure: true }
+    expect(reconcileSetRows([falha], 0)).toEqual([falha])
+    expect(reconcileSetRows([{ ...falha, failure: false }], 0)).toEqual([])
   })
 
   it('usa a sequência semanal e a quantidade concluída para sugerir a próxima divisão', () => {
@@ -179,9 +212,9 @@ describe('buildSets', () => {
       exercicios
     )
     expect(sets).toEqual([
-      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: 2 },
-      { exercise_id: 'x1', set_number: 2, weight_kg: 42.5, reps: 8, rir: 1 },
-      { exercise_id: 'x2', set_number: 1, weight_kg: 60, reps: 12, rir: 3 },
+      { exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: 2, rest_seconds: null, reached_failure: null },
+      { exercise_id: 'x1', set_number: 2, weight_kg: 42.5, reps: 8, rir: 1, rest_seconds: null, reached_failure: null },
+      { exercise_id: 'x2', set_number: 1, weight_kg: 60, reps: 12, rir: 3, rest_seconds: null, reached_failure: null },
     ])
   })
 
@@ -202,8 +235,56 @@ describe('buildSets', () => {
   it('série só com repetições conta (peso do corpo)', () => {
     const sets = buildSets({ we1: [{ weight: '', reps: '15', rir: '1' }] }, exercicios)
     expect(sets).toEqual([
-      { exercise_id: 'x1', set_number: 1, weight_kg: null, reps: 15, rir: 1 },
+      { exercise_id: 'x1', set_number: 1, weight_kg: null, reps: 15, rir: 1, rest_seconds: null, reached_failure: null },
     ])
+  })
+
+  it('grava o descanso de cada série, preservando zero e branco como valores diferentes', () => {
+    const sets = buildSets({
+      we1: [
+        { weight: '40', reps: '10', rir: '', rest: '90' },
+        { weight: '40', reps: '8', rir: '', rest: '0' },
+        { weight: '40', reps: '6', rir: '', rest: '' },
+      ],
+    }, exercicios)
+    expect(sets.map((set) => set.rest_seconds)).toEqual([90, 0, null])
+  })
+
+  it('RIR zero não vira falha sem marcação explícita, inclusive em rascunho legado', () => {
+    const sets = buildSets({ we1: [
+      { weight: '40', reps: '10', rir: '0', failure: true },
+      { weight: '40', reps: '10', rir: '0', failure: false },
+      { weight: '40', reps: '10', rir: '0' },
+    ] }, exercicios)
+    expect(sets.map((set) => set.reached_failure)).toEqual([true, false, null])
+    expect(sets.map((set) => set.rir)).toEqual([0, 0, 0])
+  })
+
+  it('recusa falha incompatível com RIR maior que zero antes de montar o envio', () => {
+    expect(() => buildSets({ we1: [
+      { weight: '40', reps: '10', rir: '2', failure: true },
+    ] }, exercicios)).toThrow(/falha/i)
+  })
+
+  it.each(['-1', '1.5', '3601', 'abc', 'Infinity'])(
+    'recusa descanso inválido %s sem perder a série silenciosamente', (rest) => {
+      expect(() => buildSets({ we1: [{ weight: '40', reps: '10', rir: '', rest }] }, exercicios))
+        .toThrow(/descanso em segundos inteiros/)
+    }
+  )
+
+  it('descanso isolado não vira série feita nem é descartado silenciosamente', () => {
+    expect(() => buildSets({ we1: [{ weight: '', reps: '', rir: '', rest: '60' }] }, exercicios))
+      .toThrow(/carga ou as repetições/)
+  })
+
+  it('só valida descanso dos exercícios que pertencem à sessão enviada', () => {
+    const sets = buildSets({
+      we1: [{ weight: '40', reps: '10', rir: '', rest: '60' }],
+      outroDia: [{ weight: '', reps: '', rir: '', rest: 'abc' }],
+    }, exercicios)
+    expect(sets).toHaveLength(1)
+    expect(sets[0].rest_seconds).toBe(60)
   })
 
   it('texto inválido não vira NaN no payload', () => {
@@ -230,5 +311,42 @@ describe('buildSets', () => {
       ['x1', 1],
       ['x1', 2],
     ])
+  })
+})
+
+describe('reenvio após edição no histórico', () => {
+  it('mantém o envio antigo visível como recusado sem sobrescrever a correção nem reenviar', async () => {
+    const queued: QueuedSession = {
+      clientRef: 'ref-1', revision: 3, planId: 'plan-1', dayLabel: 'A', weekNumber: 1,
+      performedAt: '2026-09-08', notes: null, queuedAt: '2026-09-08T15:00:00Z',
+      sets: [{ exercise_id: 'ex-1', set_number: 1, weight_kg: 40, reps: 10, rir: 0,
+        reached_failure: true }],
+    }
+    queueMocks.readQueue.mockResolvedValue([queued])
+    queueMocks.submitSession.mockResolvedValue({ logId: 'log-1', stale: true, corrected: true })
+    queueMocks.markSessionRejected.mockImplementation(async (_scope, _ref, message: string) => {
+      queued.error = message
+    })
+    expect(await flushQueue(TOKEN, 'scope-1')).toEqual({
+      sent: 0, pending: 0,
+      rejected: [{ clientRef: 'ref-1', message: CORRECTED_SESSION_MESSAGE }],
+    })
+    expect(queueMocks.markSessionRejected).toHaveBeenCalledWith('scope-1', 'ref-1', CORRECTED_SESSION_MESSAGE)
+    expect(queueMocks.dequeueSession).not.toHaveBeenCalled()
+    expect(await flushQueue(TOKEN, 'scope-1')).toEqual({ sent: 0, pending: 0, rejected: [] })
+    expect(queueMocks.submitSession).toHaveBeenCalledTimes(1)
+    expect(queued.sets[0].reached_failure).toBe(true)
+  })
+
+  it('continua retirando da fila o replay antigo de uma revisão normal já salva', async () => {
+    const queued: QueuedSession = {
+      clientRef: 'ref-1', revision: 2, planId: 'plan-1', dayLabel: 'A', weekNumber: 1,
+      performedAt: '2026-09-08', notes: null, queuedAt: '2026-09-08T15:00:00Z', sets: [],
+    }
+    queueMocks.readQueue.mockResolvedValueOnce([queued]).mockResolvedValue([])
+    queueMocks.submitSession.mockResolvedValue({ logId: 'log-1', stale: true })
+    expect(await flushQueue(TOKEN, 'scope-1')).toEqual({ sent: 1, pending: 0, rejected: [] })
+    expect(queueMocks.dequeueSession).toHaveBeenCalledWith('scope-1', 'ref-1')
+    expect(queueMocks.markSessionRejected).not.toHaveBeenCalled()
   })
 })

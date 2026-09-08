@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
 import { SessionSets, type SessionSet } from './SessionSets'
 
 // O formato antigo era "5×10 · 5×9 · 5×7" e, no celular, ninguém sabia dizer o
@@ -64,5 +64,32 @@ describe('SessionSets', () => {
   it('sessão sem série diz isso, em vez de ficar em branco', () => {
     render(<SessionSets sets={[]} />)
     expect(screen.getByText(/Nenhuma série registrada/)).toBeTruthy()
+  })
+
+  it('mostra o descanso com unidade na série correspondente, inclusive zero', () => {
+    render(<SessionSets sets={[
+      serie({ setNumber: 1, restSeconds: 90 }),
+      serie({ setNumber: 2, restSeconds: 0 }),
+      serie({ setNumber: 3, restSeconds: null }),
+      serie({ setNumber: 4 }),
+    ]} />)
+    const rows = screen.getAllByRole('listitem')
+    expect(within(rows[0]).getByText('Descanso 90 s')).toBeTruthy()
+    expect(within(rows[1]).getByText('Descanso 0 s')).toBeTruthy()
+    expect(within(rows[2]).queryByText(/Descanso/)).toBeNull()
+    expect(within(rows[3]).queryByText(/Descanso/)).toBeNull()
+  })
+
+  it('distingue falha explícita de RIR zero no histórico novo e no legado', () => {
+    render(<SessionSets sets={[
+      serie({ setNumber: 1, rir: 0, reachedFailure: true }),
+      serie({ setNumber: 2, rir: 0, reachedFailure: false }),
+      serie({ setNumber: 3, rir: 0, reachedFailure: null }),
+      serie({ setNumber: 4, rir: 0 }),
+    ]} />)
+    const rows = screen.getAllByRole('listitem')
+    expect(within(rows[0]).getByText('Falha')).toBeTruthy()
+    for (const row of rows) expect(within(row).getByText('RIR 0')).toBeTruthy()
+    for (const row of rows.slice(1)) expect(within(row).queryByText('Falha')).toBeNull()
   })
 })

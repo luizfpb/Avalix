@@ -5,6 +5,7 @@ import {
   getPlanForLink,
   getWorkoutForLink,
   submitSession,
+  updateSessionForLink,
   type StudentExercise,
   type StudentHistoryCursor,
   type StudentHistorySession,
@@ -13,6 +14,7 @@ import {
 } from '../features/workout/studentApi'
 import {
   buildSets,
+  CORRECTED_SESSION_MESSAGE,
   flushQueue,
   isInvalidStudentLinkError,
   isNetworkFailure,
@@ -56,6 +58,9 @@ import {
 import { GroupBlock } from '../features/workout/GroupBlock'
 import { groupLabel, techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { SessionSets } from '../features/workout/SessionSets'
+import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
+import { SetRowFields } from '../features/workout/SetRowFields'
+import { SessionEditForm, type SessionEditValues } from '../features/workout/SessionEditForm'
 import { currentWeek } from '../features/workout/progress'
 import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from '../features/workout/api'
 import { BrandMark } from '../components/BrandLogo'
@@ -452,7 +457,25 @@ export default function TreinoAluno() {
       ) : null}
 
       {aba === 'historico' ? (
-        <Historico token={token} scope={scope} onLinkInvalid={invalidarAcesso} />
+        <Historico token={token} scope={scope} onLinkInvalid={invalidarAcesso}
+          planId={pacote.plan?.id ?? null}
+          exerciseOptions={pacote.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))}
+          onEdited={async () => {
+            const epoch = accessEpoch.current
+            try {
+              const next = await getWorkoutForLink(token)
+              if (epoch !== accessEpoch.current) return
+              if (!next || isStudentLinkExpired(next.link_expires_at)) {
+                await invalidarAcesso()
+                return
+              }
+              setPacote(next)
+              await writeCachedWorkout(scope, next)
+            } catch {
+              // A correção já foi salva; a referência de carga pode ser
+              // atualizada na próxima conexão sem desfazer esse sucesso.
+            }
+          }} />
       ) : null}
 
       {aba === 'anteriores' ? (
@@ -515,7 +538,8 @@ function GlossarioDoDia({
           <p>
             <strong>RIR</strong> é quantas repetições você ainda conseguiria fazer ao parar a
             série. RIR 2 significa terminar sentindo que daria para fazer mais duas — não é para
-            ir até não conseguir mais. RIR 0 é o limite.
+            ir até não conseguir mais. RIR 0 significa que você estimou não conseguir outra repetição.
+            Marque Falha se tentou continuar e não conseguiu completar a repetição.
           </p>
         ) : null}
         {temCadencia ? (
@@ -616,7 +640,7 @@ function StatusBar({
   )
 }
 
-type Linha = { weight: string; reps: string; rir: string }
+type Linha = LogRow
 
 function TreinoDoDia({
   token,
@@ -810,11 +834,11 @@ function TreinoDoDia({
     }
   }, [scope])
 
-  function setCelula(exId: string, i: number, campo: keyof Linha, valor: string) {
+  function setCelula(exId: string, i: number, campo: keyof Linha, valor: string | boolean) {
     setDirty(true)
     setLinhas((anterior) => {
       const rows = (anterior[exId] ?? []).slice()
-      rows[i] = { ...rows[i], [campo]: valor }
+      rows[i] = updateLogRow(rows[i], campo, valor)
       return { ...anterior, [exId]: rows }
     })
   }
@@ -823,7 +847,7 @@ function TreinoDoDia({
     setDirty(true)
     setLinhas((anterior) => ({
       ...anterior,
-      [exId]: [...(anterior[exId] ?? []), { weight: '', reps: '', rir: '' }],
+      [exId]: [...(anterior[exId] ?? []), { weight: '', reps: '', rir: '', rest: '', failure: false }],
     }))
   }
 
@@ -894,6 +918,13 @@ function TreinoDoDia({
     if (switchingSession) return
     setErro(null)
     setOk(null)
+    const erroDescanso = validateLogRows(Object.fromEntries(
+      [...exerciciosDoDia, ...exerciciosExtras].map((ex) => [ex.id, linhas[ex.id] ?? []])
+    ))
+    if (erroDescanso) {
+      setErro(erroDescanso)
+      return
+    }
     const sets = buildSets(linhas, [...exerciciosDoDia, ...exerciciosExtras])
     if (sets.length === 0) {
       setErro('Marque ao menos uma série com carga ou repetições.')
@@ -935,7 +966,7 @@ function TreinoDoDia({
         }
 
         try {
-          await submitSession({
+          const enviado = await submitSession({
             token,
             clientRef: sessao.clientRef,
             revision: sessao.revision,
@@ -946,6 +977,10 @@ function TreinoDoDia({
             notes: sessao.notes,
             sets,
           })
+          if (enviado.stale) {
+            throw new Error(enviado.corrected ? CORRECTED_SESSION_MESSAGE
+              : 'Este treino tem um envio mais recente. Confira o histórico antes de salvar novamente.')
+          }
           if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false)
           return { offline: false }
         } catch (error) {
@@ -1101,6 +1136,11 @@ function TreinoDoDia({
         </div>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Descanso (s): anote o tempo após cada série. É opcional; 0 significa sem descanso.
+        {' '}Marque Falha quando tentou e não conseguiu completar a repetição; RIR 0 sozinho não marca falha.
+      </p>
+
       <div className="space-y-3">
         {/* Quem executa o treino é esta tela: se ela listar os exercícios de uma
             super-série soltos, a super-série não acontece. */}
@@ -1150,50 +1190,25 @@ function TreinoDoDia({
                       última vez: {ultima.weight_kg ?? '—'} kg × {ultima.reps ?? '—'}
                       {ultima.rir != null ? ` (RIR ${ultima.rir})` : ''} em{' '}
                       {dataBr(ultima.performed_at)}
+                      {ultima.reached_failure === true ? ' · Falha' : ''}
                     </p>
                   ) : null}
 
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                      <span className="w-6" />
-                      <span className="w-20 text-center">carga (kg)</span>
-                      <span className="w-16 text-center">reps</span>
-                      <span className="w-14 text-center">RIR</span>
+                  <div className="mt-2 max-w-md space-y-1">
+                    <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                      <span />
+                      <span>carga (kg)</span>
+                      <span>reps</span>
+                      <span>RIR</span>
+                      <span>desc. (s)</span>
                     </div>
                     {(linhas[ex.id] ?? []).map((row, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="w-6 text-center text-xs text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        <Input
-                          aria-label={`Carga da série ${i + 1} de ${ex.name}`}
-                          className="h-9 w-20"
-                          type="number"
-                          inputMode="decimal"
-                          placeholder="kg"
-                          value={row.weight}
-                          onChange={(e) => setCelula(ex.id, i, 'weight', e.target.value)}
-                        />
-                        <Input
-                          aria-label={`Repetições da série ${i + 1} de ${ex.name}`}
-                          className="h-9 w-16"
-                          type="number"
-                          inputMode="numeric"
-                          placeholder={efetiva.reps ?? '—'}
-                          value={row.reps}
-                          onChange={(e) => setCelula(ex.id, i, 'reps', e.target.value)}
-                        />
-                        <Input
-                          aria-label={`RIR da série ${i + 1} de ${ex.name}`}
-                          className="h-9 w-14"
-                          type="number"
-                          inputMode="numeric"
-                          placeholder={efetiva.rir != null ? String(efetiva.rir) : '—'}
-                          value={row.rir}
-                          onChange={(e) => setCelula(ex.id, i, 'rir', e.target.value)}
-                        />
-                      </div>
-                    ))}
+                    <SetRowFields key={i} name={ex.name} index={i} row={row}
+                      repsPlaceholder={efetiva.reps ?? '—'}
+                      rirPlaceholder={efetiva.rir != null ? String(efetiva.rir) : '—'}
+                      disabled={switchingSession || salvando !== null}
+                      onChange={(field, value) => setCelula(ex.id, i, field, value)} />
+                  ))}
                     <button
                       type="button"
                       className="px-1 text-xs text-muted-foreground underline"
@@ -1241,47 +1256,24 @@ function TreinoDoDia({
                 <p className="mt-1 text-[11px] text-primary">
                   última vez: {ultima.weight_kg ?? '—'} kg × {ultima.reps ?? '—'}
                   {ultima.rir != null ? ` (RIR ${ultima.rir})` : ''} em {dataBr(ultima.performed_at)}
+                  {ultima.reached_failure === true ? ' · Falha' : ''}
                 </p>
               ) : null}
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                  <span className="w-6" />
-                  <span className="w-20 text-center">carga (kg)</span>
-                  <span className="w-16 text-center">reps</span>
-                  <span className="w-14 text-center">RIR</span>
+              <div className="mt-2 max-w-md space-y-1">
+                <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                  <span />
+                  <span>carga (kg)</span>
+                  <span>reps</span>
+                  <span>RIR</span>
+                  <span>desc. (s)</span>
                 </div>
                 {(linhas[ex.id] ?? []).map((row, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-muted-foreground">{i + 1}</span>
-                    <Input
-                      aria-label={`Carga da série ${i + 1} de ${ex.name}`}
-                      className="h-9 w-20"
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="kg"
-                      value={row.weight}
-                      onChange={(e) => setCelula(ex.id, i, 'weight', e.target.value)}
-                    />
-                    <Input
-                      aria-label={`Repetições da série ${i + 1} de ${ex.name}`}
-                      className="h-9 w-16"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder={ex.reps ?? '—'}
-                      value={row.reps}
-                      onChange={(e) => setCelula(ex.id, i, 'reps', e.target.value)}
-                    />
-                    <Input
-                      aria-label={`RIR da série ${i + 1} de ${ex.name}`}
-                      className="h-9 w-14"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder={ex.rir != null ? String(ex.rir) : '—'}
-                      value={row.rir}
-                      onChange={(e) => setCelula(ex.id, i, 'rir', e.target.value)}
-                    />
-                  </div>
-                ))}
+                    <SetRowFields key={i} name={ex.name} index={i} row={row}
+                      repsPlaceholder={ex.reps ?? '—'}
+                      rirPlaceholder={ex.rir != null ? String(ex.rir) : '—'}
+                      disabled={switchingSession || salvando !== null}
+                      onChange={(field, value) => setCelula(ex.id, i, field, value)} />
+                  ))}
                 <button
                   type="button"
                   className="px-1 text-xs text-muted-foreground underline"
@@ -1387,10 +1379,16 @@ function Historico({
   token,
   scope,
   onLinkInvalid,
+  onEdited,
+  planId,
+  exerciseOptions,
 }: {
   token: string
   scope: string
   onLinkInvalid: () => Promise<void>
+  onEdited: () => Promise<void>
+  planId: string | null
+  exerciseOptions: { id: string; name: string }[]
 }) {
   const [sessoes, setSessoes] = useState<StudentHistorySession[] | null>(null)
   const [cursor, setCursor] = useState<StudentHistoryCursor | null>(null)
@@ -1399,9 +1397,21 @@ function Historico({
   const [refreshing, setRefreshing] = useState(true)
   const [offline, setOffline] = useState(false)
   const [erroMais, setErroMais] = useState<string | null>(null)
+  const [editing, setEditing] = useState<StudentHistorySession | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const [openingEdit, setOpeningEdit] = useState<string | null>(null)
+  const [editingOptions, setEditingOptions] = useState<{ id: string; name: string }[]>([])
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   useEffect(() => {
     let vivo = true
+    setRefreshing(true)
     void (async () => {
       const cache = await readCachedHistory(scope)
       if (vivo && cache) {
@@ -1434,7 +1444,67 @@ function Historico({
     return () => {
       vivo = false
     }
-  }, [token, scope, onLinkInvalid])
+  }, [token, scope, onLinkInvalid, refreshKey])
+
+  async function abrirEdicao(session: StudentHistorySession) {
+    if (openingEdit || !session.updated_at || session.source !== 'student') return
+    setOpeningEdit(session.id)
+    setErroMais(null)
+    let options = session.plan_id === planId || !session.plan_id ? exerciseOptions : []
+    try {
+      if (session.plan_id && session.plan_id !== planId) {
+        const cached = await readCachedPlan(scope, session.plan_id)
+        options = cached?.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name })) ?? []
+        try {
+          const original = await getPlanForLink(token, session.plan_id)
+          if (original) options = original.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))
+        } catch (error) {
+          if (isInvalidStudentLinkError(error)) throw error
+          // Sem rede ainda é possível corrigir as séries já carregadas.
+        }
+      }
+      if (!mounted.current) return
+      setEditingOptions(options)
+      setEditing(session)
+      setSavedMessage(null)
+    } catch (error) {
+      if (isInvalidStudentLinkError(error)) await onLinkInvalid()
+      else setErroMais(errorMessage(error, 'Não foi possível abrir a edição do treino.'))
+    } finally {
+      setOpeningEdit(null)
+    }
+  }
+
+  async function salvarCorrecao(value: SessionEditValues) {
+    if (!editing?.updated_at) throw new Error('Atualize o histórico antes de editar este treino.')
+    try {
+      const updated = await updateSessionForLink({
+        token,
+        logId: editing.id,
+        expectedUpdatedAt: editing.updated_at,
+        performedAt: value.performedAt,
+        notes: value.notes,
+        sets: value.sets.map((s) => ({ exercise_id: s.exerciseId, set_number: s.setNumber,
+          weight_kg: s.weightKg, reps: s.reps, rir: s.rir,
+          rest_seconds: s.restSeconds ?? null, reached_failure: s.reachedFailure ?? null })),
+      })
+      // Sair do aparelho ou revogar o link pode desmontar o histórico durante
+      // a requisição. Sua resposta não pode repovoar o cache já apagado.
+      if (!mounted.current) return
+      const next = (sessoes ?? []).map((session) => session.id === updated.id ? updated : session)
+      setSessoes(next)
+      setEditing(null)
+      setSavedMessage('Correções salvas no treino.')
+      await writeCachedHistory(scope, next, cursor)
+      // A data participa da paginação: recarregar a primeira página evita
+      // manter um cursor antigo depois de mover uma sessão para outra data.
+      setRefreshKey((key) => key + 1)
+      await onEdited()
+    } catch (error) {
+      if (isInvalidStudentLinkError(error)) await onLinkInvalid()
+      throw error
+    }
+  }
 
   async function carregarMais() {
     if (!cursor || carregandoMais || refreshing || !sessoes) return
@@ -1479,6 +1549,15 @@ function Historico({
 
   return (
     <div className="space-y-3">
+      {savedMessage ? <p role="status" className="text-sm text-primary">{savedMessage}</p> : null}
+      {editing ? (
+        <SessionEditForm performedAt={editing.performed_at} notes={editing.notes}
+          exerciseOptions={editingOptions}
+          sets={editing.sets.map((s) => ({ exerciseId: s.exercise_id, exerciseName: s.exercise_name,
+            setNumber: s.set_number, weightKg: s.weight_kg, reps: s.reps, rir: s.rir,
+            restSeconds: s.rest_seconds, reachedFailure: s.reached_failure }))}
+          onSave={salvarCorrecao} onCancel={() => setEditing(null)} />
+      ) : null}
       {offline ? (
         <p className="text-[11px] text-muted-foreground">
           Sem internet: mostrando o que estava salvo no aparelho.
@@ -1511,10 +1590,21 @@ function Historico({
                 weightKg: x.weight_kg,
                 reps: x.reps,
                 rir: x.rir,
+                restSeconds: x.rest_seconds,
+                reachedFailure: x.reached_failure,
               }))}
             />
           </div>
           {s.notes ? <p className="mt-1 text-[11px] italic text-muted-foreground">{s.notes}</p> : null}
+          {s.source === 'student' ? (
+            <div className="mt-2">
+              <Button type="button" size="sm" variant="outline" disabled={!s.updated_at || refreshing || openingEdit !== null}
+                onClick={() => void abrirEdicao(s)}>
+                {openingEdit === s.id ? 'Abrindo...' : 'Editar treino'}
+              </Button>
+              {!s.updated_at ? <p className="mt-1 text-[11px] text-muted-foreground">Conecte-se à internet para atualizar e editar este registro.</p> : null}
+            </div>
+          ) : null}
         </div>
       ))}
       {cursor && !refreshing ? (

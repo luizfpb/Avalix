@@ -5,6 +5,22 @@
 > estabilização da 0028; em qualquer divergência, `docs/DECISIONS.md`, as
 > migrations e o bloco a seguir prevalecem sobre os exemplos históricos.
 
+## Atualização — falha e edição de sessões (0033, pendente de aplicação)
+
+- **Falha** é uma caixa separada do RIR: marcar define RIR 0; RIR 0 digitado não marca falha. `reached_failure` permanece `NULL` em séries antigas, sem inferência retroativa.
+- **Histórico → Editar treino** permite ao aluno corrigir uma sessão enviada por ele, inclusive antiga ou de plano arquivado. Data, notas e séries podem ser corrigidas; exercícios faltantes podem ser acrescentados a partir do plano original. O profissional também ganha edição da sessão.
+- As RPCs de correção exigem internet, carimbo `updated_at` da abertura e permissão da sessão. Salvamento é atômico; conflito/rede mantém o editor preenchido. Cancelar com mudanças pede confirmação.
+- `corrected_at` impede que a fila antiga de progresso substitua uma correção. O histórico retorna `plan_id` e `updated_at`; depois de corrigir uma data, a primeira página é recarregada.
+- Aplicar a 0033 após as anteriores e regenerar os tipos. O gate de deploy passa a exigir `0033`. A exclusão pelo aluno e o cronômetro continuam fora de escopo.
+
+## Atualização — descanso realizado por série (0032)
+
+- Cada linha de execução tem **Descanso (s)** opcional, para o intervalo após a série. Não é cronômetro nem preenchimento automático a partir da prescrição.
+- `workout_log_sets.rest_seconds` aceita inteiro de 0 a 3600, com `NULL` para não informado e `0` para sem descanso. O campo integra `p_sets`, os históricos e a última série, sem mudar a prescrição do plano.
+- A anotação acompanha o rascunho local e a fila offline, inclusive após remapeamento do plano. Pacotes anteriores sem o campo permanecem compatíveis.
+- O histórico do aluno e o do profissional exibem o descanso com unidade. Entrada inválida ou descanso sem carga/repetições impede salvar, preservando o preenchimento.
+- Aplicar a migration 0032 após a 0031, regenerar os tipos e só então publicar o frontend. O gate `check:remote-schema` passa a exigir `0032`.
+
 ## Atualização de estabilização — 0028
 
 - `/t` e `/t/` são rewrites explícitos do Cloudflare Pages, sempre `no-store`;

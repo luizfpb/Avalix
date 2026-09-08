@@ -564,7 +564,10 @@ select ok(
   'ultima carga prioriza sessao mais recente antes da melhor serie'
 );
 
-select is(public.app_schema_version(), '0028', 'carimbo de schema em 0028');
+select ok(
+  public.app_schema_version() >= '0028',
+  'carimbo confirma a 0028 ou uma versão posterior'
+);
 
 select * from finish();
 rollback;

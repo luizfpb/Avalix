@@ -112,6 +112,37 @@ describe('reconciliarRascunho', () => {
     expect(r.perdidas).toBe(0)
   })
 
+  it('preserva rascunho com apenas descanso quando o exercício muda de divisão', () => {
+    const draft = rascunho({ rows: { we1: [{ weight: '', reps: '', rir: '', rest: '0' }] } })
+    const plano: PlanoVigente = {
+      days: [DIA_A, DIA_B],
+      exercises: [ex({ id: 'we1-novo', day_id: 'd2', exercise_id: 'cat-supino' })],
+    }
+    const r = reconciliarRascunho(draft, plano)!
+    expect(r.draft.extras).toEqual(['we1-novo'])
+    expect(r.draft.rows['we1-novo'][0].rest).toBe('0')
+    expect(r.perdidas).toBe(0)
+  })
+
+  it('conta descanso preenchido no aviso de linhas perdidas ao remover o exercício', () => {
+    const draft = rascunho({ rows: { we1: [{ weight: '', reps: '', rir: '', rest: '60' }] } })
+    const r = reconciliarRascunho(draft, { days: [DIA_A], exercises: [] })!
+    expect(r.perdidas).toBe(1)
+  })
+
+  it('mantém a marcação de falha mesmo antes de preencher carga e repetições', () => {
+    const draft = rascunho({ rows: { we1: [{ weight: '', reps: '', rir: '', failure: true }] } })
+    const plano: PlanoVigente = {
+      days: [DIA_A, DIA_B],
+      exercises: [ex({ id: 'we1-novo', day_id: 'd2', exercise_id: 'cat-supino' })],
+    }
+    const r = reconciliarRascunho(draft, plano)!
+    expect(r.draft.extras).toEqual(['we1-novo'])
+    expect(r.draft.rows['we1-novo'][0].failure).toBe(true)
+    expect(r.perdidas).toBe(0)
+    expect(reconciliarRascunho(draft, { days: [DIA_A], exercises: [] })!.perdidas).toBe(1)
+  })
+
   it('conta as séries perdidas quando o exercício saiu do plano — sem chutar substituto', () => {
     const plano: PlanoVigente = {
       days: [DIA_A],

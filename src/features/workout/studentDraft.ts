@@ -37,11 +37,11 @@ export type RascunhoReconciliado = {
 }
 
 function temConteudo(rows: DraftRow[] | undefined): boolean {
-  return (rows ?? []).some((r) => r.weight.trim() || r.reps.trim() || r.rir.trim())
+  return (rows ?? []).some((r) => r.weight.trim() || r.reps.trim() || r.rir.trim() || r.rest?.trim() || r.failure === true)
 }
 
 function preenchidas(rows: DraftRow[] | undefined): number {
-  return (rows ?? []).filter((r) => r.weight.trim() || r.reps.trim() || r.rir.trim()).length
+  return (rows ?? []).filter((r) => r.weight.trim() || r.reps.trim() || r.rir.trim() || r.rest?.trim() || r.failure === true).length
 }
 
 /**
