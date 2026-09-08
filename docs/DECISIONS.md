@@ -1,6 +1,11 @@
 # Avalix — DECISIONS.md
 Cole este arquivo no início de chats novos sobre o projeto. Última atualização: v2.12 (set/2026). App, repositório e pacote = Avalix; somente o `project_id` legado do Supabase permanece `bodytrack`. **Estado do schema:** schema remoto confirmado em `0033` pela RPC `app_schema_version` em 08/09/2026, após aplicação pelo usuário. O gate de schema exige 0033 antes do deploy do frontend. Nunca usar `db reset`, `migration down`, `db push --include-all` ou seed em produção. A migration 0020 foi aplicada em 13/07/2026 somente depois de backup criptografado, verificação de hashes e restore drill. Consentimento LGPD canônico em 1.1; aceites históricos mantêm a versão e a evidência originais. 2FA TOTP foi validado ponta a ponta em produção; continua opcional por conta e usuários sem fator verificado permanecem em AAL1. Perder o autenticador não tem autoatendimento: remover o fator exige operação administrativa autorizada; manter o backup multi-dispositivo do autenticador ativo.
 
+## Teste da semana do aluno — estabilidade do CI em 08/09/2026
+
+- O teste de alteração de semana esperava o resumo `5×6-10`, que aparece antes das linhas de carga enquanto o rascunho ainda é lido do IndexedDB. A consulta síncrona das cinco linhas podia falhar conforme a ordem de execução no runner. Agora a asserção aguarda a quantidade exata de campos; o mesmo cenário cobre leitura imediata e leitura pendente controlada por Promise. A leitura pendente reproduziu o erro original antes da correção. O ajuste fica no teste, sem alterar a tela ou os PDFs.
+- Validação: `npm run check` aprovado, com lint, 776 testes em 99 arquivos, build e orçamento de build.
+
 ## PDFs Clareza — direção aprovada em 08/09/2026
 
 - **Clareza escolhida pelo usuário entre três estudos visuais.** Avaliação física, evolução e treino passam a compartilhar o sistema aprovado: Manrope, papel branco, lilás suave, títulos à esquerda, identificação sem caixa externa, tabelas finas e rodapé com marca, profissional e paginação. Os tokens próprios dos relatórios ficam em `pdfTheme.tsx`; o tema das telas não muda. Detalhes e reprodução em [`PDFS_CLAREZA.md`](PDFS_CLAREZA.md).

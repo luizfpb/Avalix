@@ -268,7 +268,9 @@ describe('TreinoAluno', () => {
     expect(await screen.findByText(/ainda não publicou um treino/)).toBeTruthy()
   })
 
-  it('aplica a alteração da semana escolhida, e não a prescrição base', async () => {
+  it.each(['imediata', 'pendente'])('aplica a alteração da semana escolhida, e não a prescrição base (leitura de rascunho %s)', async (leitura) => {
+    const rascunho = deferred<null>()
+    if (leitura === 'pendente') readDraftMock.mockReturnValue(rascunho.promise)
     getWorkoutMock.mockResolvedValue(
       pacote({
         overrides: [
@@ -288,7 +290,14 @@ describe('TreinoAluno', () => {
     await abrir()
     fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '2' } })
     await waitFor(() => expect(screen.getByText(/5×6-10/)).toBeTruthy())
-    expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(5)
+    if (leitura === 'pendente') {
+      // O resumo já mudou de semana, mas as linhas esperam o IndexedDB.
+      expect(screen.queryAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(0)
+      rascunho.resolve(null)
+    }
+    await waitFor(() =>
+      expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(5)
+    )
   })
 
   it('exercício pulado na semana aparece como não executar', async () => {
