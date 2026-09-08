@@ -23,7 +23,7 @@ import type {
 } from '../assessment/api'
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { protocolLabel } from '../assessment/protocols'
-import { comparabilidadeDeProtocolos } from '../assessment/comparability'
+import { comparabilidadeDeProtocolos, METRICAS_DEPENDENTES_DO_PROTOCOLO } from '../assessment/comparability'
 import { registerReportFonts } from './pdfFonts'
 import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../assessment/sites'
@@ -37,6 +37,7 @@ import {
   MethodNote,
   ReportFooter,
   ReportHeader,
+  ReportRunningHeader,
   SectionTitle,
   fmtDate,
   palette,
@@ -79,10 +80,12 @@ export type AssessmentPdfData = {
 
 type TrendPoint = { value: number | null; date: string }
 
-// inteiro sem casa decimal; senão 1 casa (80.0 -> "80", 18.23 -> "18.2")
+// Números e unidades seguem a leitura brasileira também nos eixos dos gráficos.
 function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+  return (Number.isInteger(n) ? String(n) : n.toFixed(1)).replace('.', ',')
 }
+
+const fixed = (n: number, digits = 1) => n.toFixed(digits).replace('.', ',')
 
 // ISO (aaaa-mm-dd) -> dd/mm pro eixo do gráfico
 function shortDate(iso: string): string {
@@ -185,11 +188,10 @@ export function buildCircSeries(
 
 // métricas plotadas na evolução, na ordem de exibição. key bate com o ponto.
 //
-// minSpan: a menor janela que o eixo Y pode ter, na unidade da métrica (ver
-// axisDomain em charts.ts). Cada valor é da ordem da incerteza da medida, para
-// que o gráfico não desenhe ruído com cara de resultado: dobra cutânea carrega
-// erro padrão de alguns pontos percentuais, peso corporal oscila 1-2 kg no
-// mesmo dia, e fita métrica tem cerca de 1 cm de repetibilidade.
+// minSpan: janela visual mínima na unidade da métrica (axisDomain em
+// charts.ts), no ritmo do estudo Clareza. Não é limite clínico nem intervalo
+// de confiança. Dá contexto à variação e evita que uma mudança pequena
+// ocupe toda a altura do gráfico; os valores e a escala continuam explícitos.
 //
 // deltaUnit: a unidade da DIFERENÇA nem sempre é a unidade do valor. De 22% para
 // 18% de gordura a variação é de quatro PONTOS PERCENTUAIS; escrito "−4%" o
@@ -205,72 +207,107 @@ const TREND_METRICS: {
   color: string
   minSpan: number
 }[] = [
-  { key: 'bodyFatPct', title: '% de gordura', unit: '%', deltaUnit: ' p.p.', color: FAT, minSpan: 2 },
-  { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.plum, minSpan: 2 },
-  { key: 'bmi', title: 'IMC', unit: '', color: palette.violet, minSpan: 1 },
-  { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN, minSpan: 2 },
-  { key: 'fatMassKg', title: 'Massa gorda', unit: ' kg', color: FAT, minSpan: 2 },
+  { key: 'bodyFatPct', title: '% de gordura', unit: '%', deltaUnit: ' p.p.', color: FAT, minSpan: 12 },
+  { key: 'weightKg', title: 'Peso', unit: ' kg', color: palette.violet, minSpan: 8 },
+  { key: 'bmi', title: 'IMC', unit: '', color: palette.violet, minSpan: 2 },
+  { key: 'leanMassKg', title: 'Massa magra', unit: ' kg', color: LEAN, minSpan: 5 },
+  { key: 'fatMassKg', title: 'Massa gorda', unit: ' kg', color: FAT, minSpan: 5 },
 ]
 
-// circunferência em cm: 3 cm de janela mínima (fita repete dentro de ~1 cm)
-const CIRC_MIN_SPAN = 3
+// A mesma janela mínima em todas as regiões facilita comparar a amplitude.
+const CIRC_MIN_SPAN = 12
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 14 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  stat: { width: '25%', marginBottom: 6 },
-  statLabel: { fontSize: 8, color: palette.muted },
-  statValue: { fontSize: 13, fontFamily: 'Manrope', fontWeight: 700, color: palette.plum },
+  // O espaçamento faz parte da caixa: marginBottom fora da altura dispara
+  // shouldBreak quando só a margem ultrapassa a folha e empurra a seção toda.
+  section: { paddingBottom: 17 },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  stat: { flex: 1, borderWidth: 0.7, borderColor: palette.hairline, borderRadius: 10, padding: 11 },
+  statLabel: { fontSize: 7.5, color: palette.muted, marginBottom: 4 },
+  statValue: { fontSize: 21, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, letterSpacing: -0.6, lineHeight: 1.2 },
+  statUnit: { fontSize: 7.5, color: palette.muted, fontWeight: 400, letterSpacing: 0 },
+  statDetail: { fontSize: 7, color: palette.muted, marginTop: 3 },
+  composition: { flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surface, borderRadius: 12, padding: 18, marginBottom: 10 },
+  donut: { width: 146, height: 124, position: 'relative', marginRight: 20 },
+  donutCenter: { position: 'absolute', top: 37, left: 7, width: 110, alignItems: 'center' },
+  donutValue: { fontSize: 24, fontWeight: 700, letterSpacing: -0.8, lineHeight: 1.2 },
+  donutLabel: { fontSize: 6.8, color: palette.muted },
+  compositionTitle: { fontSize: 12, fontWeight: 700, marginBottom: 11, lineHeight: 1.3 },
+  massRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 9 },
+  massSwatch: { width: 4, height: 25, borderRadius: 2, marginRight: 9 },
+  massLabel: { fontSize: 8 },
+  massShare: { fontSize: 7, color: palette.muted },
+  massValue: { fontSize: 23, fontWeight: 700, letterSpacing: -0.6, lineHeight: 1.2 },
+  compositionNote: { fontSize: 7, color: palette.muted, lineHeight: 1.45 },
+  resultDetails: { fontSize: 7.5, color: palette.muted, lineHeight: 1.45, marginBottom: 12 },
+  measuresColumns: { flexDirection: 'row', gap: 22 },
+  measuresColumn: { flex: 1 },
+  tableHead: { flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: palette.hairline, paddingBottom: 5 },
+  tableHeadText: { fontSize: 7, color: palette.muted },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 2.5,
+    paddingVertical: 3,
     borderBottomWidth: 0.5,
     borderBottomColor: palette.hairline,
+    fontSize: 8,
   },
+  cellLabel: { flex: 1, paddingRight: 9 },
+  cellValue: { textAlign: 'right', fontWeight: 700 },
   muted: { color: palette.muted },
-  legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  legendSwatch: { width: 8, height: 8, borderRadius: 2, marginRight: 5 },
-  reproNote: { fontSize: 8, color: palette.muted, marginTop: 6, lineHeight: 1.4 },
-  evoGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  trendCard: { width: '48%', marginBottom: 10 },
+  reproNote: { fontSize: 7.5, color: palette.muted, marginBottom: 10, lineHeight: 1.5 },
+  evoRow: { flexDirection: 'row', gap: 19, marginBottom: 12 },
+  trendCard: { width: 254 },
   trendHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 1,
+    marginBottom: 3,
   },
-  trendTitle: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: palette.plum },
-  trendDelta: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700 },
+  trendTitle: { fontSize: 10, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink },
+  trendDelta: { fontSize: 8, fontFamily: 'Manrope', fontWeight: 700 },
+  trendUnit: { fontSize: 7, color: palette.muted, marginBottom: 3 },
+  freeText: { borderLeftWidth: 2, borderLeftColor: palette.violet, paddingLeft: 10, marginBottom: 16 },
+  freeTextTitle: { fontSize: 8.5, fontWeight: 700, color: palette.violet, marginBottom: 4 },
+  freeTextBody: { fontSize: 8.5, lineHeight: 1.5 },
 })
 
 // dimensões e margens internas do gráfico (espaço pra escala, rótulos e datas)
-const CHART_W = 250
-const CHART_H = 104
+const CHART_W = 254
+const CHART_H = 82
 const PX0 = 34 // gutter esquerdo (escala y)
 const PX1 = 212 // borda direita do plot (deixa margem à direita pro valor atual)
-const PY0 = 18 // topo (espaço pro rótulo de valor sobre o ponto)
-const PY1 = 84 // base do plot (acima da linha de datas)
-const AXIS_COLOR = '#66717E' // escala/datas: legível sem disputar com os dados
-const GRID_COLOR = '#DCE2E8' // linhas de referência
+const PY0 = 13 // topo (espaço pro rótulo de valor sobre o ponto)
+const PY1 = 62 // base do plot (acima da linha de datas)
+const AXIS_COLOR = palette.muted
+const GRID_COLOR = palette.hairline
 
-function Donut({ lean, fat }: { lean: number; fat: number }) {
-  const slices = donutSlices([lean, fat], 50, 50, 46, 28)
+function Donut({ lean, fat, bodyFatPct }: { lean: number; fat: number; bodyFatPct: number }) {
+  const slices = donutSlices([lean, fat], 62, 62, 56, 44)
   const colors = [LEAN, FAT]
   return (
-    <Svg width={100} height={100} viewBox="0 0 100 100">
-      {slices.map((s, i) => (
-        <Path key={i} d={s.d} fill={colors[i] ?? LEAN} />
-      ))}
-    </Svg>
+    <View style={styles.donut}>
+      <Svg width={124} height={124} viewBox="0 0 124 124">
+        {slices.map((s, i) => (
+          <Path key={i} d={s.d} fill={colors[i] ?? LEAN} />
+        ))}
+      </Svg>
+      <View style={styles.donutCenter}>
+        <Text style={styles.donutValue}>{fixed(bodyFatPct)}%</Text>
+        <Text style={styles.donutLabel}>gordura corporal</Text>
+      </View>
+    </View>
   )
 }
 
-function Legend({ color, text }: { color: string; text: string }) {
+function MassValue({ color, label, mass, share }: { color: string; label: string; mass: number; share: number }) {
   return (
-    <View style={styles.legendRow}>
-      <View style={[styles.legendSwatch, { backgroundColor: color }]} />
-      <Text>{text}</Text>
+    <View style={styles.massRow}>
+      <View style={[styles.massSwatch, { backgroundColor: color }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.massLabel, { color }]}>{label}</Text>
+        <Text style={styles.massShare}>{fixed(share)}%</Text>
+      </View>
+      <Text style={styles.massValue}>{fixed(mass)}<Text style={styles.statUnit}> kg</Text></Text>
     </View>
   )
 }
@@ -325,9 +362,10 @@ function TrendChart({
   return (
     <View style={styles.trendCard} wrap={false}>
       <View style={styles.trendHeader}>
-        <Text style={styles.trendTitle}>{title}</Text>
+        <Text style={styles.trendTitle}>{title === '% de gordura' ? 'Gordura corporal' : title === 'Peso' ? 'Peso corporal' : title}</Text>
         <Text style={[styles.trendDelta, { color }]}>{deltaTxt}</Text>
       </View>
+      <Text style={styles.trendUnit}>{unit.trim() || 'kg/m²'}</Text>
       <Svg width={CHART_W} height={CHART_H}>
         {/* linhas de referência + escala (máx / meio / mín) */}
         {grid.map((g, i) => (
@@ -346,7 +384,7 @@ function TrendChart({
         {/* linha + pontos */}
         <Polyline points={polyPoints} fill="none" stroke={color} strokeWidth={1.8} />
         {coords.map((c, i) => (
-          <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.2 : 2.2} fill={color} />
+          <Circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.4 : 2.8} fill={color} stroke={palette.paper} strokeWidth={1} />
         ))}
         {/* Valor inicial, pequeno, acima do 1º ponto. Só aparece quando o eixo
             ainda não escreveu esse mesmo número: quando o ponto inicial é o
@@ -371,13 +409,12 @@ function TrendChart({
         >
           {fmtNum(last.value)}
         </Text>
-        {/* datas das pontas */}
-        <Text x={PX0} y={CHART_H - 4} style={{ fontSize: 6.5, fill: AXIS_COLOR, textAnchor: 'start' }}>
-          {first.date}
-        </Text>
-        <Text x={PX1} y={CHART_H - 4} style={{ fontSize: 6.5, fill: AXIS_COLOR, textAnchor: 'end' }}>
-          {last.date}
-        </Text>
+        {/* Até cinco datas cabem; séries densas mantêm as pontas e o meio. */}
+        {coords.filter((_, i) => coords.length <= 5 || i === 0 || i === Math.floor((coords.length - 1) / 2) || i === coords.length - 1).map((c, i) => (
+          <Text key={`date-${i}`} x={c.x} y={CHART_H - 4} style={{ fontSize: 6.5, fill: AXIS_COLOR, textAnchor: 'middle' }}>
+            {shortDate(c.date).slice(0, 5)}
+          </Text>
+        ))}
       </Svg>
     </View>
   )
@@ -385,7 +422,7 @@ function TrendChart({
 
 function EvolutionSection({
   history,
-  maxCharts = 4,
+  maxCharts = 5,
 }: {
   history: AssessmentHistoryPoint[]
   maxCharts?: number
@@ -404,29 +441,33 @@ function EvolutionSection({
   // diferentes na série, parte da variação de %gordura e das massas é troca de
   // método. O laudo tem de dizer isso onde desenha a curva.
   const comparabilidade = comparabilidadeDeProtocolos(recent.map((p) => p.protocolId))
+  const chartRows = Array.from({ length: Math.ceil(charts.length / 2) }, (_, i) => (
+    <View key={i} style={styles.evoRow} wrap={false}>
+      {charts.slice(i * 2, i * 2 + 2).map(({ m, points }) => (
+        <TrendChart
+          key={m.key}
+          title={m.title}
+          unit={m.unit}
+          deltaUnit={m.deltaUnit}
+          color={comparabilidade.protocoloMudou && METRICAS_DEPENDENTES_DO_PROTOCOLO.has(m.key) ? palette.muted : m.color}
+          points={points}
+          minSpan={m.minSpan}
+        />
+      ))}
+    </View>
+  ))
   return (
     <View style={styles.section}>
-      <SectionTitle>Evolução ao longo das avaliações</SectionTitle>
-      <View style={styles.evoGrid}>
-        {charts.map(({ m, points }) => (
-          <TrendChart
-            key={m.key}
-            title={m.title}
-            unit={m.unit}
-            deltaUnit={m.deltaUnit}
-            color={m.color}
-            points={points}
-            minSpan={m.minSpan}
-          />
-        ))}
+      <View wrap={false}>
+        <SectionTitle minPresenceAhead={0}>Evolução ao longo das avaliações</SectionTitle>
+        <Text style={styles.reproNote}>
+          De {recent[0].date} a {recent[recent.length - 1].date} · {recent.length} avaliações
+          {history.length > recent.length ? ` (de ${history.length} no total)` : ''}
+        </Text>
+        {comparabilidade.aviso ? <Text style={styles.reproNote}>{comparabilidade.aviso}</Text> : null}
+        {chartRows[0]}
       </View>
-      <Text style={[styles.muted, { fontSize: 8 }]}>
-        de {recent[0].date} a {recent[recent.length - 1].date} · {recent.length} avaliações
-        {history.length > recent.length ? ` (de ${history.length} no total)` : ''}
-      </Text>
-      {comparabilidade.aviso ? (
-        <Text style={styles.reproNote}>{comparabilidade.aviso}</Text>
-      ) : null}
+      {chartRows.slice(1)}
     </View>
   )
 }
@@ -434,37 +475,38 @@ function EvolutionSection({
 function CircumferenceEvolution({ rows }: { rows: SubjectCircumference[] }) {
   const series = buildCircSeries(rows, 12, 10)
   if (series.length === 0) return null
+  const chartRows = Array.from({ length: Math.ceil(series.length / 2) }, (_, i) => (
+    <View key={i} style={styles.evoRow} wrap={false}>
+      {series.slice(i * 2, i * 2 + 2).map((s) => (
+        <TrendChart key={s.label} title={s.label} unit=" cm" color={palette.violet} points={s.points} minSpan={CIRC_MIN_SPAN} />
+      ))}
+    </View>
+  ))
   return (
-    <View style={styles.section} wrap={series.length > 2}>
-      <SectionTitle>Evolução das circunferências (cm)</SectionTitle>
-      <View style={styles.evoGrid}>
-        {series.map((s) => (
-          <TrendChart
-            key={s.label}
-            title={s.label}
-            unit=" cm"
-            color={palette.plum}
-            points={s.points}
-            minSpan={CIRC_MIN_SPAN}
-          />
-        ))}
+    <View style={styles.section}>
+      <View wrap={false}>
+        <SectionTitle minPresenceAhead={0}>Evolução das circunferências (cm)</SectionTitle>
+        <Text style={styles.reproNote}>Regiões bilaterais: média dos lados medidos em cada avaliação. Últimos dez registros; até doze regiões.</Text>
+        {chartRows[0]}
       </View>
+      {chartRows.slice(1)}
     </View>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, unit, detail }: { label: string; value: string; unit: string; detail?: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statValue}>{value}<Text style={styles.statUnit}> {unit}</Text></Text>
+      {detail ? <Text style={styles.statDetail}>{detail}</Text> : null}
     </View>
   )
 }
 
 // Largura útil do texto solto: a folha A4 (595) menos as margens da página
-// (36 de cada lado). Sem caixa, ao contrário do PDF de treino.
-const TEXTO_LIVRE_LARGURA = 595 - 36 * 2
+// (34 de cada lado), menos o recuo da nota.
+const TEXTO_LIVRE_LARGURA = 595 - 34 * 2 - 12
 
 // Texto livre digitado pelo profissional — medicamentos e observações. Recebe o
 // mesmo tratamento do PDF de treino: enquanto couber numa folha, o bloco
@@ -475,130 +517,168 @@ const TEXTO_LIVRE_LARGURA = 595 - 36 * 2
 // minPresenceAhead não serve aqui: o shouldBreak do @react-pdf/layout só o
 // consulta quando o bloco CABE inteiro na sobra da página.
 //
-// A altura de linha usada na conta é a natural da Manrope (ascent - descent +
-// lineGap = 1,366 do corpo), porque estes dois blocos não declaram lineHeight;
-// 1,4 arredonda por cima, que é o lado seguro do erro.
 function FreeTextSection({ title, text }: { title: string; text: string }) {
-  const TITULO = 21 // faixa da SectionTitle + margem inferior
+  const TITULO = 21
   const altura =
     TITULO +
-    estimateTextHeight({ text, fontSize: 10, lineHeight: 1.4, width: TEXTO_LIVRE_LARGURA })
+    estimateTextHeight({ text, fontSize: 8.5, lineHeight: 1.5, width: TEXTO_LIVRE_LARGURA })
   const parte = altura > LIMITE_BLOCO_ATOMICO
 
   return (
-    <View style={styles.section} wrap={parte} break={parte}>
-      <SectionTitle>{title}</SectionTitle>
-      <Text>{text}</Text>
+    <View style={styles.freeText} wrap={parte} break={parte}>
+      <Text style={styles.freeTextTitle} minPresenceAhead={26}>{title}</Text>
+      <Text style={styles.freeTextBody} orphans={3} widows={3}>{text}</Text>
     </View>
+  )
+}
+
+function SkinfoldTable({ rows }: { rows: SkinfoldReadingRow[] }) {
+  return (
+    <View style={styles.section}>
+      <SectionTitle>Dobras cutâneas (mm)</SectionTitle>
+      <View style={styles.tableHead} wrap={false} minPresenceAhead={24}>
+        <Text style={[styles.tableHeadText, { width: '48%' }]}>Ponto de coleta</Text>
+        <Text style={[styles.tableHeadText, { width: '35%', textAlign: 'right' }]}>Leituras</Text>
+        <Text style={[styles.tableHeadText, { width: '17%', textAlign: 'right' }]}>Média</Text>
+      </View>
+      {rows.map((s) => {
+        const values = [s.reading_1, s.reading_2, s.reading_3].filter((v): v is number => v != null)
+        const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
+        return (
+          <View key={s.id} style={styles.row} wrap={false}>
+            <Text style={{ width: '48%', paddingRight: 7 }}>{SKINFOLD_LABELS[s.site as SkinfoldSite] ?? s.site}</Text>
+            <Text style={{ width: '35%', textAlign: 'right', color: palette.muted, fontSize: 7.5 }}>{values.map(fmtNum).join(' / ') || '—'}</Text>
+            <Text style={[styles.cellValue, { width: '17%' }]}>{mean == null ? '—' : fixed(mean)}</Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+function CircumferenceCells({ row }: { row: CircumferenceReadingRow }) {
+  return (
+    <View style={styles.row} wrap={false}>
+      <Text style={styles.cellLabel}>{circumferenceLabel(row.site)}</Text>
+      <Text style={styles.cellValue}>{fmtNum(row.value_cm)}</Text>
+    </View>
+  )
+}
+
+function CircumferenceTableHead() {
+  return (
+    <View style={styles.tableHead} wrap={false} minPresenceAhead={24}>
+      <Text style={[styles.tableHeadText, { flex: 1 }]}>Região</Text>
+      <Text style={styles.tableHeadText}>Atual</Text>
+    </View>
+  )
+}
+
+function CircumferenceTable({ rows }: { rows: CircumferenceReadingRow[] }) {
+  const twoColumns = rows.length > 12 && rows.every((row) => circumferenceLabel(row.site).length <= 60)
+  const half = Math.ceil(rows.length / 2)
+  return (
+    <View style={styles.section}>
+      <SectionTitle>Circunferências (cm)</SectionTitle>
+      {twoColumns ? (
+        <>
+          <View style={styles.measuresColumns} wrap={false} minPresenceAhead={24}>
+            <View style={styles.measuresColumn}><CircumferenceTableHead /></View>
+            <View style={styles.measuresColumn}><CircumferenceTableHead /></View>
+          </View>
+          {rows.slice(0, half).map((row, i) => (
+            <View key={row.id} style={styles.measuresColumns} wrap={false}>
+              <View style={styles.measuresColumn}><CircumferenceCells row={row} /></View>
+              <View style={styles.measuresColumn}>{rows[i + half] ? <CircumferenceCells row={rows[i + half]} /> : null}</View>
+            </View>
+          ))}
+        </>
+      ) : (
+        <>
+          <CircumferenceTableHead />
+          {rows.map((row) => <CircumferenceCells key={row.id} row={row} />)}
+        </>
+      )}
+    </View>
+  )
+}
+
+function AssessmentMeasures({ skinfolds, circumferences }: Pick<AssessmentPdfData, 'skinfolds' | 'circumferences'>) {
+  // As duas tabelas curtas compartilham uma faixa, como na proposta aprovada.
+  // Conteúdo extenso volta ao fluxo vertical para quebrar entre registros,
+  // sem transformar duas colunas inteiras em um bloco maior que a folha.
+  const compact = skinfolds.length > 0 && skinfolds.length <= 10 && circumferences.length > 0 && circumferences.length <= 12
+    && circumferences.every((c) => circumferenceLabel(c.site).length <= 42)
+  if (compact) {
+    return (
+      <View style={styles.measuresColumns} wrap={false}>
+        <View style={styles.measuresColumn}><CircumferenceTable rows={circumferences} /></View>
+        <View style={styles.measuresColumn}><SkinfoldTable rows={skinfolds} /></View>
+      </View>
+    )
+  }
+  return (
+    <>
+      {circumferences.length ? <CircumferenceTable rows={circumferences} /> : null}
+      {skinfolds.length ? <SkinfoldTable rows={skinfolds} /> : null}
+    </>
   )
 }
 
 function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   const { assessment, skinfolds, circumferences } = data
   const r = assessment.results as AssessmentResultSnapshot | null
+  const bmi = computeBmi(assessment.weight_kg, assessment.height_cm)
 
   const info: InfoItem[] = [
     { label: 'Avaliado', value: data.subjectName, wide: true },
     { label: 'Data', value: fmtDate(assessment.assessed_at) ?? '—' },
-    { label: 'Protocolo', value: protocolLabel(assessment.protocol_id) },
-    { label: 'Peso', value: `${assessment.weight_kg} kg` },
-    { label: 'Altura', value: `${assessment.height_cm} cm` },
+    ...(r?.inputs.ageYears != null ? [{ label: 'Idade na avaliação', value: `${r.inputs.ageYears} anos` }] : []),
   ]
 
   return (
-    <Document>
+    <Document title={`Avaliação física · ${data.subjectName}`} author={data.orgName} language="pt-BR">
       <Page size="A4" style={pdfTheme.page}>
+        <ReportRunningHeader title="Avaliação física" subject={data.subjectName} />
         <ReportHeader
           logoUrl={data.logoUrl}
           orgName={data.orgName}
-          title="Relatório de Avaliação Física"
-          subtitle={fmtDate(assessment.assessed_at)}
+          kicker="Avaliação física"
+          title="Seu corpo, em perspectiva."
+          subtitle={`${protocolLabel(assessment.protocol_id)}${r?.conversions ? ' · Conversão de Siri' : ''}`}
         />
 
         <InfoCard items={info} />
 
         {r ? (
-          <View style={styles.section}>
-            <SectionTitle>Resultado</SectionTitle>
-            <View style={styles.statsRow}>
-              <Stat label="% Gordura" value={`${r.bodyFatPct.toFixed(1)}%`} />
-              {r.bodyDensity != null ? (
-                <Stat label="Densidade" value={r.bodyDensity.toFixed(4)} />
-              ) : null}
-              <Stat label="Massa gorda" value={`${r.fatMassKg.toFixed(1)} kg`} />
-              <Stat label="Massa magra" value={`${r.leanMassKg.toFixed(1)} kg`} />
-            </View>
-            {r.conversions ? (
-              <Text style={styles.muted}>
-                Siri {r.conversions.siri.toFixed(1)}% · Brozek {r.conversions.brozek.toFixed(1)}%
-                (principal: Siri)
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {r ? (
-          <View style={styles.section}>
-            <SectionTitle>Composição corporal</SectionTitle>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ marginRight: 16 }}>
-                <Donut lean={r.leanMassKg} fat={r.fatMassKg} />
-              </View>
-              <View>
-                <Legend color={LEAN} text={`Massa magra: ${r.leanMassKg.toFixed(1)} kg`} />
-                <Legend color={FAT} text={`Massa gorda: ${r.fatMassKg.toFixed(1)} kg`} />
-                <Text style={{ marginTop: 5 }}>
-                  Gordura: {r.bodyFatPct.toFixed(1)}% (
-                  {classifyBodyFat(r.inputs.sex, r.bodyFatPct).label})
-                </Text>
-                <Text>
-                  IMC: {computeBmi(assessment.weight_kg, assessment.height_cm).toFixed(1)} (
-                  {bmiCategory(computeBmi(assessment.weight_kg, assessment.height_cm)).label})
-                </Text>
-              </View>
+          <View style={styles.composition} wrap={false}>
+            <Donut lean={r.leanMassKg} fat={r.fatMassKg} bodyFatPct={r.bodyFatPct} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.compositionTitle}>Sua composição corporal</Text>
+              <MassValue color={LEAN} label="Massa magra" mass={r.leanMassKg} share={100 - r.bodyFatPct} />
+              <MassValue color={FAT} label="Massa gorda" mass={r.fatMassKg} share={r.bodyFatPct} />
+              <Text style={styles.compositionNote}>Gordura corporal: {classifyBodyFat(r.inputs.sex, r.bodyFatPct).label}.</Text>
+              <Text style={styles.compositionNote}>Estimativa pelo protocolo registrado.</Text>
             </View>
           </View>
         ) : null}
 
-        {data.history ? <EvolutionSection history={data.history} /> : null}
-
-        {data.circumferenceHistory ? (
-          <CircumferenceEvolution rows={data.circumferenceHistory} />
+        {r && (r.bodyDensity != null || r.conversions) ? (
+          <Text style={styles.resultDetails}>
+            {r.bodyDensity != null ? `Densidade corporal: ${fixed(r.bodyDensity, 4)}. ` : ''}
+            {r.conversions ? `Siri ${fixed(r.conversions.siri)}% · Brozek ${fixed(r.conversions.brozek)}% (principal: Siri).` : ''}
+          </Text>
         ) : null}
 
-        {skinfolds.length > 0 ? (
-          <View style={styles.section}>
-            <SectionTitle>Dobras cutâneas (mm)</SectionTitle>
-            {skinfolds.map((s) => {
-              const vals = [s.reading_1, s.reading_2, s.reading_3].filter(
-                (v): v is number => v != null
-              )
-              const mean = vals.reduce((a, b) => a + b, 0) / vals.length
-              return (
-                <View key={s.id} style={styles.row}>
-                  <Text style={styles.muted}>
-                    {SKINFOLD_LABELS[s.site as SkinfoldSite] ?? s.site}
-                  </Text>
-                  <Text>
-                    {vals.join(' / ')} (méd {mean.toFixed(1)})
-                  </Text>
-                </View>
-              )
-            })}
-          </View>
-        ) : null}
+        <View style={styles.statsRow} wrap={false}>
+          <Stat label="Peso corporal" value={fmtNum(assessment.weight_kg)} unit="kg" />
+          <Stat label="IMC" value={fixed(bmi)} unit="kg/m²" detail={bmiCategory(bmi).label} />
+          <Stat label="Altura" value={fmtNum(assessment.height_cm)} unit="cm" />
+        </View>
 
-        {circumferences.length > 0 ? (
-          <View style={styles.section}>
-            <SectionTitle>Circunferências (cm)</SectionTitle>
-            {circumferences.map((c) => (
-              <View key={c.id} style={styles.row}>
-                <Text style={styles.muted}>{circumferenceLabel(c.site)}</Text>
-                <Text>{c.value_cm}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        {!r ? <Text style={styles.reproNote}>Esta avaliação registra peso, altura e IMC, sem estimativa de composição corporal.</Text> : null}
+
+        <AssessmentMeasures skinfolds={skinfolds} circumferences={circumferences} />
 
         {assessment.medications ? (
           <FreeTextSection title="Medicamentos em uso" text={assessment.medications} />
@@ -608,13 +688,20 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
           <FreeTextSection title="Observações" text={assessment.notes} />
         ) : null}
 
+        {data.history ? <EvolutionSection history={data.history} /> : null}
+
+        {data.circumferenceHistory ? (
+          <CircumferenceEvolution rows={data.circumferenceHistory} />
+        ) : null}
+
         <MethodNote warnings={r?.warnings}>
-          Resultado reproduzível a partir das medidas registradas (protocolo{' '}
-          {protocolLabel(assessment.protocol_id)}, motor {assessment.engine_version ?? '—'}).
-          Antropometria estima a composição corporal por equação de regressão e carrega erro
-          padrão inerente ao método; os valores servem para acompanhamento da evolução, não
-          substituem exame de imagem nem constituem diagnóstico ou orientação médica. Em caso de
-          sintoma, dor ou condição de saúde, procure um profissional de saúde habilitado.
+          {r ? (
+            `Resultado reproduzível a partir das medidas registradas (protocolo ${protocolLabel(assessment.protocol_id)}, motor ${assessment.engine_version ?? '—'}). ` +
+            'Antropometria estima a composição corporal por equação de regressão e carrega erro padrão inerente ao método; os valores servem para acompanhamento da evolução, não substituem exame de imagem nem constituem diagnóstico ou orientação médica. '
+          ) : (
+            'Peso, altura e IMC correspondem aos dados desta avaliação. Não foi calculada uma estimativa de composição corporal. Esses indicadores servem para acompanhamento e não constituem diagnóstico ou orientação médica. '
+          )}
+          Em caso de sintoma, dor ou condição de saúde, procure um profissional de saúde habilitado.
         </MethodNote>
 
         <ReportFooter note="Calculado pelo motor Avalix" evaluator={data.evaluatorName} />
@@ -663,47 +750,30 @@ export function evolutionSummaryRows(history: AssessmentHistoryPoint[]): Summary
 }
 
 const summaryStyles = StyleSheet.create({
-  head: {
-    flexDirection: 'row',
-    borderBottomWidth: 0.8,
-    borderBottomColor: palette.hairline,
-    paddingBottom: 3,
-    marginBottom: 2,
-  },
-  row: {
-    flexDirection: 'row',
-    paddingVertical: 2.5,
-    borderBottomWidth: 0.5,
-    borderBottomColor: palette.hairline,
-  },
-  colLabel: { width: '40%', color: palette.muted },
-  colNum: { width: '20%', textAlign: 'right' },
-  colHead: { fontSize: 8, color: palette.muted },
-  delta: { fontFamily: 'Manrope', fontWeight: 700 },
+  grid: { flexDirection: 'row', gap: 8, marginBottom: 19 },
+  card: { flex: 1, borderRadius: 11, backgroundColor: palette.surface, padding: 10 },
+  label: { fontSize: 7, color: palette.muted, marginBottom: 5 },
+  delta: { fontSize: 17, fontWeight: 700, letterSpacing: -0.5, color: palette.violet, lineHeight: 1.2 },
+  detail: { fontSize: 7, color: palette.muted, marginTop: 5, lineHeight: 1.4 },
 })
 
 function EvolutionSummary({ history }: { history: AssessmentHistoryPoint[] }) {
   const rows = evolutionSummaryRows(history)
   if (rows.length === 0) return null
+  const comparabilidade = comparabilidadeDeProtocolos(history.map((p) => p.protocolId))
   return (
-    <View style={styles.section}>
-      <SectionTitle>Resumo do período</SectionTitle>
-      <View style={summaryStyles.head}>
-        <Text style={[summaryStyles.colLabel, summaryStyles.colHead]}>Métrica</Text>
-        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Início</Text>
-        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Atual</Text>
-        <Text style={[summaryStyles.colNum, summaryStyles.colHead]}>Variação</Text>
-      </View>
+    <View style={summaryStyles.grid} wrap={false}>
       {rows.map((r) => {
         const delta = r.to - r.from
+        const metric = TREND_METRICS.find((m) => m.title === r.label)!
+        const neutral = comparabilidade.protocoloMudou && METRICAS_DEPENDENTES_DO_PROTOCOLO.has(metric.key)
         return (
-          <View key={r.label} style={summaryStyles.row}>
-            <Text style={summaryStyles.colLabel}>{r.label}</Text>
-            <Text style={summaryStyles.colNum}>{fmtNum(r.from)}{r.unit}</Text>
-            <Text style={summaryStyles.colNum}>{fmtNum(r.to)}{r.unit}</Text>
-            <Text style={[summaryStyles.colNum, summaryStyles.delta]}>
+          <View key={r.label} style={summaryStyles.card}>
+            <Text style={summaryStyles.label}>{r.label === '% de gordura' ? 'Gordura corporal' : r.label === 'Peso' ? 'Peso corporal' : r.label}</Text>
+            <Text style={[summaryStyles.delta, { color: neutral ? palette.muted : palette.violet }]}>
               {delta > 0 ? '+' : ''}{fmtNum(delta)}{r.deltaUnit}
             </Text>
+            <Text style={summaryStyles.detail}>{fmtNum(r.from)} a {fmtNum(r.to)}{r.unit}</Text>
           </View>
         )
       })}
@@ -719,25 +789,31 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
     { label: 'Período', value: first && last ? `${first.date} a ${last.date}` : '—' },
     { label: 'Avaliações', value: String(data.history.length) },
   ]
+  const comparabilidade = comparabilidadeDeProtocolos(data.history.map((p) => p.protocolId))
   return (
-    <Document>
+    <Document title={`Evolução · ${data.subjectName}`} author={data.orgName} language="pt-BR">
       <Page size="A4" style={pdfTheme.page}>
+        <ReportRunningHeader title="Relatório de evolução" subject={data.subjectName} />
         <ReportHeader
           logoUrl={data.logoUrl}
           orgName={data.orgName}
-          title="Relatório de Evolução"
-          subtitle={first && last ? `${first.date} a ${last.date}` : undefined}
+          kicker="Relatório de evolução"
+          title="Cada medida conta."
+          subtitle="As mudanças do período, medida por medida."
         />
         <InfoCard items={info} />
         <EvolutionSummary history={data.history} />
+        {comparabilidade.aviso ? <FreeTextSection title="Comparabilidade do período" text={comparabilidade.aviso} /> : null}
         <EvolutionSection history={data.history} maxCharts={5} />
         <CircumferenceEvolution rows={data.circumferenceHistory} />
         <MethodNote>
           Valores calculados a partir das avaliações registradas no período. Antropometria estima
           a composição corporal por equação de regressão e carrega erro padrão inerente ao método;
           serve para acompanhamento da evolução e não constitui diagnóstico ou orientação médica.
+          Variações pequenas podem refletir a variabilidade da medida. Diferenças de percentual
+          são expressas em pontos percentuais (p.p.).
         </MethodNote>
-        <ReportFooter note="Calculado pelo motor Avalix" evaluator={data.evaluatorName} />
+        <ReportFooter note="Calculado pelo motor Avalix" evaluator={data.evaluatorName} evaluatorLabel="Emitido por" />
       </Page>
     </Document>
   )

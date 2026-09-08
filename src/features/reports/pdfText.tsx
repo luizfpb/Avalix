@@ -1,19 +1,10 @@
 import { Text as RawText } from '@react-pdf/renderer'
 import type { ComponentProps, ReactNode } from 'react'
 
-// Os PDFs usam as fontes padrão do @react-pdf (Helvetica e família), que são
-// codificadas em WinAnsi (CP1252). Nenhum Font.register acontece no projeto.
-//
-// Consequência que passava despercebida: qualquer caractere fora do CP1252
-// digitado pelo profissional não some nem dá erro — ele vira OUTRO caractere
-// no PDF entregue ao aluno. "RIR <= 2" escrito com o sinal de menor-ou-igual
-// era impresso como "RIR d 2". Um documento de prescrição não pode trocar
-// símbolo em silêncio.
-//
-// Registrar uma fonte Unicode resolveria, mas acrescentaria centenas de KB ao
-// chunk de PDF (que já é o mais pesado do bundle e fica fora do precache de
-// propósito). Transliterar é mais barato e preserva o SENTIDO: em vez de um
-// glifo errado, imprime-se o equivalente ASCII correto.
+// Os arquivos Manrope locais têm repertório latino, não Unicode completo.
+// Mantemos o subconjunto conservador do saneamento original (WinAnsi): ele
+// evita símbolos sem glifo e preserva o sentido da prescrição, inclusive em
+// rótulos SVG. Por exemplo, menor-ou-igual é impresso como "<=".
 //
 // Acentuação do português está toda em Latin-1 (á é í ó ú â ê ô ã õ ç à),
 // assim como °, ², ³, aspas curvas, travessões, • e …: nada disso é tocado.

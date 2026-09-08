@@ -8,7 +8,7 @@
 // ilegível. Por isso a conta estima por cima em todos os arredondamentos.
 //
 // Grosseira de propósito: quem usa deixa folga larga entre o limite de bloco
-// atômico e a altura útil da folha (760 pt no A4 com as margens de pdfTheme).
+// atômico e a altura útil da folha (738 pt no A4 com as margens de pdfTheme).
 
 // Largura média de caractere em Manrope 400, como fração do corpo. Medida na
 // renderização real: 111 caracteres de texto corrido em português couberam nos
@@ -68,10 +68,10 @@ export function estimateTextHeight({
   return countWrappedLines(text, charsPerLine(fontSize, width)) * fontSize * lineHeight
 }
 
-// Altura útil da folha A4 com as margens de pdfTheme.page: 842 - 34 - 48.
-export const ALTURA_UTIL_A4 = 760
+// Altura útil da folha A4 com as margens Clareza: 842 - 34 - 70.
+export const ALTURA_UTIL_A4 = 738
 
-// Acima disto um bloco de texto deixa de ser atômico. A folga de 200 pt até a
+// Acima disto um bloco de texto deixa de ser atômico. A folga de 178 pt até a
 // altura útil é a margem de erro da estimativa: mesmo num texto todo em
 // maiúsculas (~0,62em por caractere, o pior caso plausível) a altura real fica
 // em ~700 pt e ainda cabe na folha.

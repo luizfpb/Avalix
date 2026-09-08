@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
-import { estimateNotesHeight, generateWorkoutPdf, weekChangeGroups } from './workoutPdf'
+import { estimateNotesHeight, estimateWorkoutExerciseHeight, generateWorkoutPdf, weekChangeGroups, weekPrescriptionRanges } from './workoutPdf'
 import { registerReportFontsFrom } from './pdfFonts'
 import type {
   WorkoutDayRow,
@@ -140,7 +140,7 @@ describe('weekChangeGroups', () => {
 // de voltar a quebrar, porque wrap={false} em bloco maior que a folha
 // transborda sobreposto em vez de não partir.
 const LONGA = Array.from(
-  { length: 40 },
+  { length: 60 },
   (_, i) => `Linha ${i + 1}: aquecer bem antes de cada série pesada e registrar a carga usada.`
 ).join('\n')
 
@@ -226,6 +226,30 @@ describe('generateWorkoutPdf', () => {
     })
     expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
   })
+
+  it('pagina grupos extensos e uma nota de várias folhas após as semanas', async () => {
+    // O break forçado nas notas depois de tabelas longas produzia dimensões
+    // negativas no PDFKit; os testes com uma divisão curta não reproduziam.
+    const exercises = Array.from({ length: 30 }, (_, i) => exercicio(`long${i}`, 'dA', `x${i}`, {
+      position: i,
+      group_key: i < 16 ? 'long-group' : null,
+      group_kind: i < 16 ? 'circuit' : null,
+      notes: 'Manter a execução estável e registrar a carga. '.repeat(i === 20 ? 40 : 4),
+    }))
+    const blob = await generateWorkoutPdf({
+      orgName: 'Estúdio Teste', subjectName: 'Fulano de Tal',
+      plan: { ...plan, notes: 'Conferir os ajustes da semana e comunicar dúvidas ao profissional. '.repeat(190) },
+      days: [DIAS[0]], exercises,
+      weeks: [semana(1), semana(2)],
+      overrides: exercises.slice(0, 16).map((e, i) => override(`ol${i}`, e.id, {
+        week_number: 2, notes: `Ajuste ${i}: conferir a execução antes de progredir a carga.`,
+      })),
+      exerciseNames: Object.fromEntries(exercises.map((e, i) => [e.exercise_id, `Exercício ${i + 1} com ajuste de amplitude e posicionamento`])),
+    })
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    const pageCount = new TextDecoder().decode(bytes).match(/\/Type \/Page\b/g)?.length ?? 0
+    expect(pageCount).toBeGreaterThan(3)
+  })
 })
 
 describe('estimateNotesHeight', () => {
@@ -248,5 +272,83 @@ describe('estimateNotesHeight', () => {
     // abaixo do limite, logo continua atômica
     const trinta = Array.from({ length: 30 }, () => 'Série pesada com carga registrada.').join('\n')
     expect(estimateNotesHeight(trinta)).toBeLessThan(560)
+  })
+})
+
+describe('paginação de exercícios', () => {
+  it('inclui o texto completo de nomes e observações na estimativa', () => {
+    const base = exercicio('e1', 'dA', 'x1')
+    const short = estimateWorkoutExerciseHeight(base, 'Supino')
+    expect(estimateWorkoutExerciseHeight(base, 'Supino com ajuste de amplitude '.repeat(30))).toBeGreaterThan(short)
+    expect(estimateWorkoutExerciseHeight({ ...base, notes: LONGA }, 'Supino')).toBeGreaterThan(440)
+  })
+})
+
+describe('weekPrescriptionRanges', () => {
+  const week = (n: number, extra: Partial<WorkoutWeekRow> = {}) => ({
+    id: `w${n}`, week_number: n, label: 'Acumulação', notes: null, is_deload: false, ...extra,
+  }) as WorkoutWeekRow
+  const data = (weeks: WorkoutWeekRow[], overrides: WorkoutWeekOverrideRow[] = []) => ({
+    weeks, overrides, days: DIAS, exercises: EXERCICIOS, exerciseNames: NOMES,
+  })
+
+  it('resume semanas consecutivas com a mesma prescrição', () => {
+    const result = weekPrescriptionRanges(data([week(1), week(2), week(3)], [
+      override('o1', 'e1', { week_number: 1, sets: 6 }),
+      override('o2', 'e1', { week_number: 2, sets: 6 }),
+    ]))
+    expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 2], [3, 3]])
+    expect(result[0].groups[0].desc).toBe('6 séries')
+    expect(result[1].groups).toEqual([])
+  })
+
+  it('preserva notas, rótulos e deload como mudanças independentes', () => {
+    const result = weekPrescriptionRanges(data([
+      week(1), week(2, { notes: 'Reduzir amplitude.' }),
+      week(3, { notes: 'Reduzir amplitude.', is_deload: true }),
+      week(4, { label: 'Recuperação', notes: 'Reduzir amplitude.', is_deload: true }),
+    ]))
+    expect(result).toHaveLength(4)
+    expect(result[1].notes).toBe('Reduzir amplitude.')
+    expect(result[2].isDeload).toBe(true)
+    expect(result[3].label).toBe('Recuperação')
+  })
+
+  it('não preenche lacunas nem perde semanas que só têm override', () => {
+    const result = weekPrescriptionRanges(data([week(1), week(3)], [override('o5', 'e1', { week_number: 5, is_skipped: true })]))
+    expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 1], [3, 3], [5, 5]])
+    expect(result[2].groups[0].desc).toBe('não executar')
+  })
+
+  it('não une alterações em linhas distintas que têm o mesmo nome', () => {
+    const fixture = data([week(1), week(2)], [
+      override('o1', 'e1', { week_number: 1, sets: 6 }),
+      override('o2', 'e2', { week_number: 2, sets: 6 }),
+    ])
+    fixture.exercises = [EXERCICIOS[0], { ...EXERCICIOS[1], exercise_id: 'x1' }, EXERCICIOS[2]]
+    const result = weekPrescriptionRanges(fixture)
+    expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 1], [2, 2]])
+    // A referência numérica aponta para a ocorrência correta na tabela.
+    expect(result[0].groups[0].label).toBe('A · 01 · Supino reto')
+    expect(result[1].groups[0].label).toBe('A · 02 · Supino reto')
+  })
+
+  it('normaliza a ordem dos overrides e ignora campos que repetem a base', () => {
+    const result = weekPrescriptionRanges(data([week(1), week(2)], [
+      override('o1', 'e1', { week_number: 1, sets: 6 }),
+      override('o2', 'e2', { week_number: 1, rir: 0 }),
+      override('o3', 'e2', { week_number: 2, rir: 0, rest_seconds: 90 }),
+      override('o4', 'e1', { week_number: 2, sets: 6, reps: '8-12' }),
+    ]))
+    expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 2]])
+  })
+
+  it('distingue alteração numérica de uma nota com o mesmo texto impresso', () => {
+    const result = weekPrescriptionRanges(data([week(1), week(2)], [
+      override('o1', 'e1', { week_number: 1, sets: 6 }),
+      override('o2', 'e1', { week_number: 2, notes: '6 séries' }),
+    ]))
+    expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 1], [2, 2]])
+    expect(result[0].groups[0].desc).toBe(result[1].groups[0].desc)
   })
 })

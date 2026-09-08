@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Avalix · Três direções para os PDFs</title>
+  <style>
+    @font-face{font-family:Manrope;src:url('../../public/fonts/manrope-400.ttf')}@font-face{font-family:Manrope;src:url('../../public/fonts/manrope-700.ttf');font-weight:700}
+    :root{color-scheme:light;--ink:#232332;--muted:#686577;--line:#dedbe6;--purple:#6250a1}
+    *{box-sizing:border-box}body{margin:0;background:#f4f3f7;color:var(--ink);font-family:Manrope,Arial,sans-serif}button,a{-webkit-tap-highlight-color:transparent}button{font:inherit}a{color:inherit}button:focus-visible,a:focus-visible{outline:3px solid #8a64c3;outline-offset:5px}
+    .wrap{max-width:1500px;margin:auto;padding:0 52px}.masthead{height:83px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.brand{display:flex;gap:19px;align-items:center}.brand img{width:85px;filter:brightness(0);opacity:.85}.brand span{border-left:1px solid var(--line);padding-left:19px;color:var(--muted);font-size:12px}.edition{font-size:11px;letter-spacing:.09em;color:var(--muted)}
+    .intro{padding:38px 0 30px;display:flex;align-items:flex-end;justify-content:space-between;gap:40px}h1{font-size:43px;line-height:1.13;letter-spacing:-1.8px;margin:0;font-weight:700}.intro p{max-width:350px;margin:0;color:var(--muted);font-size:13px;line-height:1.8}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:24px;margin:0 0 30px}.tabs{padding:5px;background:#e8e5ee;display:flex;gap:4px;border-radius:11px}.tabs button{border:0;background:none;color:var(--muted);border-radius:7px;padding:11px 21px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap}.tabs button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 2px 5px #3422440c}.hint{font-size:11px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:29px;padding-bottom:38px}.concept-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.name{display:flex;align-items:baseline;gap:11px}.number{font-size:11px;color:var(--muted)}h2{font-size:24px;letter-spacing:-.8px;margin:0}.swatches{display:flex;gap:4px}.swatches i{width:13px;height:13px;border-radius:50%;border:1px solid #0000000c}.description{font-size:12px;color:var(--muted);margin:0 0 18px;line-height:1.7;min-height:42px}.paper-button{display:block;padding:0;border:0;width:100%;background:#fff;cursor:zoom-in;box-shadow:0 8px 30px #2820390d,0 0 0 1px #28203909;transition:transform .18s ease,box-shadow .18s ease}.paper-button:hover{transform:translateY(-4px);box-shadow:0 15px 32px #2820391a}.paper-button img{width:100%;height:auto;aspect-ratio:595.28 / 841.89;display:block;object-fit:contain;background:white}.actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:17px}.actions a{font-size:11px;font-weight:700;text-underline-offset:4px}.zoom{font-size:11px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}.signature{margin-top:18px;font-size:10px;color:var(--muted);line-height:1.7;border-top:1px solid var(--line);padding-top:12px}.signature strong{color:var(--ink);font-weight:700}
+    .endnote{padding:23px 0 32px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:25px;font-size:10px;line-height:1.8;color:var(--muted)}.endnote p{margin:0;max-width:560px}
+    dialog{padding:0;border:0;border-radius:12px;background:#efedf3;width:min(960px,96vw);max-height:95vh;box-shadow:0 20px 100px #0005}dialog::backdrop{background:#171021aa;backdrop-filter:blur(5px)}.dialog-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:13px 20px;background:#fff;border-bottom:1px solid var(--line);z-index:1}.dialog-head span{font-size:12px;font-weight:700}.dialog-head button{border:1px solid var(--line);padding:8px 13px;background:white;border-radius:6px;cursor:pointer;font-size:12px}.dialog-paper{display:block;width:calc(100% - 44px);margin:22px;box-shadow:0 4px 20px #0001}
+    @media(min-width:1650px){.intro{padding-top:46px;padding-bottom:36px}h1{font-size:48px}.grid{gap:38px}}
+    @media(max-width:1000px){.wrap{padding:0 27px}.intro{gap:24px}h1{font-size:35px}.intro p{max-width:280px}.grid{gap:19px}.description{min-height:62px}.actions{align-items:flex-start;flex-direction:column}.hint{display:none}}
+    @media(max-width:700px){.wrap{padding:0 20px}.masthead{height:69px}.brand{gap:12px}.brand img{width:68px}.brand span{font-size:10px;padding-left:12px}.edition{display:none}.intro{display:block;padding-top:29px}h1{font-size:34px;letter-spacing:-1.2px}.intro p{margin-top:19px;max-width:100%;font-size:12px}.toolbar{margin-bottom:28px}.tabs{width:100%;overflow-x:auto;gap:0}.tabs button{padding:11px 10px;flex:1;font-size:11px}.grid{grid-template-columns:1fr;gap:42px}.description{min-height:0}.actions{flex-direction:row}.endnote{flex-direction:column;gap:12px}.dialog-paper{width:calc(100% - 20px);margin:10px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="masthead"><div class="brand"><img src="../../src/brand/logo-avalix.svg" alt="Avalix"><span>Estudos para os relatórios</span></div><span class="edition">SETEMBRO 2026 · DIREÇÃO VISUAL</span></header>
+    <main>
+      <div class="intro"><h1>Uma nova assinatura<br>para os seus relatórios.</h1><p>Três identidades completas. Os mesmos dados, três formas de apresentar avaliação, evolução e treino. Explore cada documento e escolha a sua direção.</p></div>
+      <div class="toolbar"><div class="tabs" role="group" aria-label="Documento exibido"><button type="button" data-page="1" aria-pressed="true">Avaliação física</button><button type="button" data-page="2" aria-pressed="false">Evolução</button><button type="button" data-page="3" aria-pressed="false">Plano de treino</button></div><span class="hint">Clique na folha para ampliar · PDFs A4 com texto selecionável</span></div>
+      <div class="grid" aria-live="polite">
+        <article data-file="01-clareza" data-name="Clareza">
+          <div class="concept-head"><div class="name"><span class="number">01</span><h2>Clareza</h2></div><div class="swatches" aria-hidden="true"><i style="background:#6250a1"></i><i style="background:#ac577b"></i><i style="background:#f4f2fa"></i></div></div>
+          <p class="description">Leve, precisa e intuitiva.<br>Dados fáceis de ler, com espaço para respirar.</p>
+          <button class="paper-button" type="button" aria-label="Ampliar avaliação física da opção Clareza"><img src="01-clareza-1.png" alt="Avaliação física — opção Clareza" width="910" height="1287"></button>
+          <div class="actions"><a href="01-clareza.pdf" target="_blank" rel="noopener">Abrir PDF · 3 páginas ↗</a><button type="button" class="zoom">Ampliar página</button></div>
+          <div class="signature"><strong>A assinatura:</strong> superfícies suaves, composição circular e hierarquia silenciosa. A direção mais próxima de um produto digital.</div>
+        </article>
+        <article data-file="02-pulso" data-name="Pulso">
+          <div class="concept-head"><div class="name"><span class="number">02</span><h2>Pulso</h2></div><div class="swatches" aria-hidden="true"><i style="background:#2a0e52"></i><i style="background:#8b5cf6"></i><i style="background:#e8dff4"></i></div></div>
+          <p class="description">Esportiva, forte e contemporânea.<br>Contraste e números que assumem o protagonismo.</p>
+          <button class="paper-button" type="button" aria-label="Ampliar avaliação física da opção Pulso"><img src="02-pulso-1.png" alt="Avaliação física — opção Pulso" width="910" height="1287"></button>
+          <div class="actions"><a href="02-pulso.pdf" target="_blank" rel="noopener">Abrir PDF · 3 páginas ↗</a><button type="button" class="zoom">Ampliar página</button></div>
+          <div class="signature"><strong>A assinatura:</strong> placa plum, tipografia de impacto e trilhos de dados. A direção com mais presença esportiva.</div>
+        </article>
+        <article data-file="03-atelier" data-name="Atelier">
+          <div class="concept-head"><div class="name"><span class="number">03</span><h2>Atelier</h2></div><div class="swatches" aria-hidden="true"><i style="background:#3f284b"></i><i style="background:#9c4779"></i><i style="background:#f1edf6"></i></div></div>
+          <p class="description">Editorial, elegante e autoral.<br>O cuidado de uma publicação feita para cada pessoa.</p>
+          <button class="paper-button" type="button" aria-label="Ampliar avaliação física da opção Atelier"><img src="03-atelier-1.png" alt="Avaliação física — opção Atelier" width="910" height="1287"></button>
+          <div class="actions"><a href="03-atelier.pdf" target="_blank" rel="noopener">Abrir PDF · 3 páginas ↗</a><button type="button" class="zoom">Ampliar página</button></div>
+          <div class="signature"><strong>A assinatura:</strong> títulos serifados, anotações na margem e composição editorial. A direção mais sofisticada e pessoal.</div>
+        </article>
+      </div>
+    </main>
+    <footer class="endnote"><p>Os três PDFs contêm amostras de avaliação física, evolução e uma divisão de treino. Dados fictícios, compartilhados entre as propostas, para comparar o design.</p><p>Estudos para escolha de direção.<br>A implementação no aplicativo será feita após a seleção.</p></footer>
+  </div>
+  <dialog aria-labelledby="dialog-title"><div class="dialog-head"><span id="dialog-title"></span><button type="button" id="close-dialog">Fechar ×</button></div><img class="dialog-paper" alt=""></dialog>
+  <script>
+    const labels = { 1: 'Avaliação física', 2: 'Evolução', 3: 'Plano de treino' };
+    const modal = document.querySelector('dialog');
+    let currentPage = 1;
+    document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => {
+      currentPage = Number(button.dataset.page);
+      document.querySelectorAll('[data-page]').forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+      document.querySelectorAll('article').forEach(article => {
+        const img = article.querySelector('.paper-button img');
+        img.src = `${article.dataset.file}-${currentPage}.png`;
+        img.alt = `${labels[currentPage]} — opção ${article.dataset.name}`;
+        article.querySelector('.paper-button').setAttribute('aria-label', `Ampliar ${labels[currentPage]} da opção ${article.dataset.name}`);
+      });
+    }));
+    document.querySelectorAll('article').forEach(article => {
+      const open = () => {
+        const title = `${article.dataset.name} · ${labels[currentPage]}`;
+        document.querySelector('#dialog-title').textContent = title;
+        const img = modal.querySelector('img');
+        img.src = `${article.dataset.file}-${currentPage}.png`;
+        img.alt = title;
+        modal.showModal();
+        modal.scrollTop = 0;
+      };
+      article.querySelector('.paper-button').addEventListener('click', open);
+      article.querySelector('.zoom').addEventListener('click', open);
+    });
+    document.querySelector('#close-dialog').addEventListener('click', () => modal.close());
+    modal.addEventListener('click', event => { if (event.target === modal) { const rect = modal.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) modal.close(); } });
+  </script>
+</body>
+</html>

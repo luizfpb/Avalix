@@ -19,14 +19,13 @@ import {
   MethodNote,
   ReportFooter,
   ReportHeader,
+  ReportRunningHeader,
   SectionTitle,
   fmtDate,
   palette,
   pdfTheme,
   type InfoItem,
 } from './pdfTheme'
-
-const PLUM = palette.plum
 
 export type WorkoutPdfData = {
   orgName: string
@@ -51,72 +50,72 @@ export type WorkoutPdfData = {
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 16 },
-  intro: { fontSize: 8.5, color: palette.muted, marginBottom: 9, lineHeight: 1.45 },
+  section: { marginBottom: 18 },
+  intro: { fontSize: 7.5, color: palette.muted, marginBottom: 9, lineHeight: 1.45 },
+  schedule: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  scheduleCopy: { flexGrow: 1, flexBasis: 165, paddingRight: 12 },
+  scheduleTitle: { fontSize: 10, fontWeight: 700 },
+  scheduleDetail: { fontSize: 7.5, color: palette.muted, marginTop: 3 },
+  sessions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 340, gap: 7 },
+  session: { alignItems: 'center', width: 35 },
+  sessionLabel: { fontSize: 6, color: palette.muted, marginBottom: 4 },
+  sessionBadge: { width: 35, minHeight: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, padding: 4 },
+  sessionFirst: { backgroundColor: palette.violet },
+  sessionLetter: { fontSize: 14, fontWeight: 700, color: palette.violet },
+  sessionLetterFirst: { color: palette.paper },
 
   // ---- Divisão: cartão com cabeçalho (letra + nome) e tabela de exercícios ----
   dayCard: {
-    marginBottom: 11,
-    borderWidth: 0.8,
-    borderColor: palette.hairline,
-    borderRadius: 7,
+    marginBottom: 20,
   },
   dayHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.surface,
-    paddingVertical: 7,
-    paddingHorizontal: 11,
-    borderTopLeftRadius: 7,
-    borderTopRightRadius: 7,
-    borderBottomWidth: 0.8,
-    borderBottomColor: palette.hairline,
+    marginBottom: 10,
   },
   dayBadge: {
-    width: 23,
-    height: 23,
-    borderRadius: 6,
+    minWidth: 37,
+    minHeight: 37,
+    padding: 5,
+    borderRadius: 9,
     backgroundColor: palette.violet,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
-  dayBadgeText: { fontSize: 12.5, fontFamily: 'Manrope', fontWeight: 700, color: '#ffffff' },
-  dayName: { fontSize: 11, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
+  dayBadgeText: { fontSize: 21, fontFamily: 'Manrope', fontWeight: 700, color: palette.paper },
+  dayName: { fontSize: 14, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, lineHeight: 1.25 },
   daySub: { fontSize: 7.5, color: palette.muted, marginTop: 1 },
 
   // cabeçalho da tabela
   thead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2F4',
-    paddingVertical: 4,
-    paddingHorizontal: 11,
-    borderBottomWidth: 0.6,
-    borderBottomColor: palette.hairline,
+    backgroundColor: palette.surface,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
+    borderRadius: 5,
   },
   th: {
-    fontSize: 6.5,
-    fontFamily: 'Manrope', fontWeight: 700,
+    fontSize: 6,
     color: palette.muted,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   tr: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 11,
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 9,
     borderBottomWidth: 0.5,
     borderBottomColor: palette.hairline,
   },
-  trAlt: { backgroundColor: '#F7F9FA' },
   trLast: { borderBottomWidth: 0 },
-  tdNum: { fontSize: 8.5, color: palette.muted },
-  tdName: { fontSize: 9.5, color: palette.ink },
-  tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 1.5, lineHeight: 1.35 },
-  tdStrong: { fontSize: 10, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
-  tdCell: { fontSize: 8.5, color: '#46515D' },
+  tdNum: { fontSize: 7.8, color: palette.muted, paddingTop: 1 },
+  tdName: { fontSize: 9, fontWeight: 700, color: palette.ink, lineHeight: 1.35 },
+  tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 2, lineHeight: 1.45 },
+  tdStrong: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, paddingTop: 1 },
+  tdCell: { fontSize: 8.5, color: palette.ink, paddingTop: 1 },
 
   // ---- Bloco (super-série / circuito) ----
   // Faixa acima dos membros, com a instrução de execução junto: a ficha
@@ -127,61 +126,55 @@ const styles = StyleSheet.create({
   // exercícios entram na super-série" é justamente o que a ficha precisa dizer.
   // O padding esquerdo desconta a barra para as colunas não saírem do prumo.
   groupBand: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: '#EDE7F7',
-    paddingVertical: 3,
-    paddingRight: 11,
-    paddingLeft: 8.5,
-    borderLeftWidth: 2.5,
+    backgroundColor: palette.surface,
+    paddingVertical: 5,
+    paddingRight: 9,
+    paddingLeft: 7,
+    borderLeftWidth: 2,
     borderLeftColor: palette.violet,
-    borderBottomWidth: 0.5,
-    borderBottomColor: palette.hairline,
   },
   groupBandName: {
-    fontSize: 6.5,
+    fontSize: 7,
     fontFamily: 'Manrope', fontWeight: 700,
     color: palette.violet,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    lineHeight: 1.4,
   },
-  groupBandHint: { fontSize: 6.5, color: palette.muted, marginLeft: 6 },
-  // membro do bloco não entra na zebra: fundo próprio e a mesma barra lateral
-  // da faixa é o que delimita o bloco de ponta a ponta
+  // Fundo e barra lateral delimitam os membros do bloco de ponta a ponta.
   trGroup: {
-    backgroundColor: '#F7F4FC',
-    paddingLeft: 8.5,
-    borderLeftWidth: 2.5,
+    backgroundColor: palette.surface,
+    paddingLeft: 7,
+    borderLeftWidth: 2,
     borderLeftColor: palette.violet,
   },
 
   // colunas da tabela de exercícios
-  colNum: { width: 20, textAlign: 'center' },
+  colNum: { width: 24 },
   colName: { flex: 1, paddingRight: 8 },
-  colSets: { width: 40, textAlign: 'center' },
-  colReps: { width: 58, textAlign: 'center' },
-  colRir: { width: 38, textAlign: 'center' },
-  colRest: { width: 62, textAlign: 'center' },
+  colSets: { width: 35, textAlign: 'center' },
+  colReps: { width: 50, textAlign: 'center' },
+  colRir: { width: 29, textAlign: 'center' },
+  colRest: { width: 46, textAlign: 'center' },
 
   // ---- Organização por semana ----
-  weekWrap: { borderWidth: 0.8, borderColor: palette.hairline, borderRadius: 7 },
   weekRow: {
-    paddingVertical: 6,
-    paddingHorizontal: 11,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
     borderBottomWidth: 0.5,
     borderBottomColor: palette.hairline,
   },
-  weekHead: { flexDirection: 'row', alignItems: 'center' },
-  weekNum: { fontSize: 9.5, fontFamily: 'Manrope', fontWeight: 700, color: PLUM },
-  weekLabel: { fontSize: 9, color: palette.muted, marginLeft: 5 },
+  weekNum: { width: 44, paddingRight: 6, fontSize: 9, fontWeight: 700, color: palette.violet },
+  weekHead: { width: 116, paddingRight: 14 },
+  weekLabel: { fontSize: 8, fontWeight: 700, color: palette.ink, lineHeight: 1.4 },
+  weekContinuation: { fontSize: 6.5, color: palette.muted, marginTop: 3 },
+  weekBody: { flex: 1 },
   deloadPill: {
-    marginLeft: 7,
-    backgroundColor: '#EEEAF6',
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: palette.surface,
     color: palette.violet,
     fontSize: 6.5,
     fontFamily: 'Manrope', fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     paddingVertical: 1.5,
     paddingHorizontal: 6,
     borderRadius: 8,
@@ -191,25 +184,19 @@ const styles = StyleSheet.create({
   // Sem fontStyle italic: só Manrope 400/700 normal são registradas em
   // pdfFonts, e pedir um itálico inexistente derruba a geração inteira
   // ("Could not resolve font for Manrope, fontStyle italic").
-  weekSame: { fontSize: 8, color: '#8A939D', marginLeft: 7 },
-  // Uma alteração: quem muda (plum, com peso) e o que muda (cinza). Separar os
-  // dois em linhas próprias é o que faz a coluna ser varrível de cima a baixo.
-  weekChange: { marginTop: 4, marginLeft: 3, borderLeftWidth: 1.6, borderLeftColor: '#D9D1EA', paddingLeft: 7 },
-  weekChangeLabel: { fontSize: 8, fontFamily: 'Manrope', fontWeight: 700, color: PLUM, lineHeight: 1.35 },
-  weekChangeDesc: { fontSize: 8, color: palette.muted, lineHeight: 1.4 },
+  weekSame: { fontSize: 7.5, lineHeight: 1.45, color: palette.muted },
+  // Uma alteração: quem muda em negrito, seguido pelo ajuste prescrito.
+  weekChange: { marginBottom: 5 },
+  weekChangeLabel: { fontSize: 7.5, fontWeight: 700, color: palette.ink, lineHeight: 1.4 },
+  weekChangeDesc: { fontSize: 7.5, color: palette.muted, lineHeight: 1.45 },
 
   // ---- Observações (callout) ----
   notesBox: {
-    backgroundColor: palette.surface,
-    borderLeftWidth: 3,
+    borderLeftWidth: 2,
     borderLeftColor: palette.violet,
-    borderRadius: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingLeft: 10,
   },
-  notesText: { fontSize: 9.5, lineHeight: 1.5, color: palette.ink },
-
-  reproNote: { fontSize: 8, color: palette.muted, marginTop: 10, lineHeight: 1.4 },
+  notesText: { fontSize: 8, lineHeight: 1.5, color: palette.muted },
 })
 
 // inteiro sem casas; fracionado com 1 casa (séries fracionadas: 2.5, 13)
@@ -239,46 +226,27 @@ function exerciseSub(ex: WorkoutExerciseRow, hoisted: string | null): string {
   return parts.join(' · ')
 }
 
-// Acima disto o cartão deixa de ser atômico. A folha A4 com as margens de
-// pdfTheme.page tem 760 pt úteis (842 - 34 - 48); 440 é pouco mais da metade —
-// o maior buraco que se aceita no pé de uma página para manter uma divisão
-// inteira, e com folga larga para o erro da estimativa não estourar a folha.
+// A estimativa deixa folga para a fonte e o cabeçalho de continuação. Nenhum
+// contêiner cujo conteúdo pode superar uma folha recebe wrap={false} à força.
 const LIMITE_CARTAO_ATOMICO = 440
+const LARGURA_NOME_EXERCICIO = 595 - 34 * 2 - 9 * 2 - 24 - 35 - 50 - 29 - 46 - 8
 
-// Altura estimada do cartão da divisão, em pontos. Grosseira de propósito —
-// serve só para decidir se a divisão cabe inteira numa folha, e o limite acima
-// tem folga de sobra para o erro da estimativa.
-function estimateDayCardHeight(rows: WorkoutExerciseRow[], tempo: string | null): number {
-  const CABECALHO = 42
-  const THEAD = 16
-  const LINHA = 22
-  const SUBLINHA = 11
-  const FAIXA_BLOCO = 14
-  const bordas = 12
-  const blocos = toRowBlocks(rows).filter((b) => b.kind != null).length
-  return (
-    CABECALHO +
-    THEAD +
-    bordas +
-    blocos * FAIXA_BLOCO +
-    rows.reduce((h, ex) => h + LINHA + (exerciseSub(ex, tempo) ? SUBLINHA : 0), 0)
-  )
+export function estimateWorkoutExerciseHeight(
+  ex: WorkoutExerciseRow,
+  name: string,
+  tempo: string | null = null
+): number {
+  const sub = exerciseSub(ex, tempo)
+  const nameHeight = estimateTextHeight({ text: name, fontSize: 9, lineHeight: 1.35, width: LARGURA_NOME_EXERCICIO })
+  const detailHeight = sub
+    ? 2 + estimateTextHeight({ text: sub, fontSize: 7, lineHeight: 1.45, width: LARGURA_NOME_EXERCICIO })
+    : 0
+  const repsHeight = estimateTextHeight({ text: ex.reps ?? '—', fontSize: 8.5, lineHeight: 1.4, width: 50 })
+  return 18 + Math.max(nameHeight + detailHeight, repsHeight)
 }
 
-// Uma divisão (Treino A/B/C) como cartão: cabeçalho com a letra num selo e o
-// nome, seguido da tabela de exercícios (nº, exercício, séries, reps, RIR,
-// descanso) com zebra pra leitura.
-//
-// A altura depende do número de exercícios, e é ela que decide se o cartão
-// quebra ou não — ver o comentário dentro da função. Fica registrado o que NÃO
-// funciona no @react-pdf, para ninguém tentar de novo:
-//
-// - wrap={false} em cartão maior que a folha não impede a quebra: transborda
-//   sobreposto e ilegível, sem aviso nenhum.
-// - minPresenceAhead num container que quebra exige espaço para o elemento
-//   INTEIRO mais a margem, não para o começo dele. Posto no cartão, empurrava
-//   uma divisão de seis exercícios para a página seguinte com meia folha vazia.
-// - minPresenceAhead é ignorado em elemento `fixed`.
+// O mesmo cálculo governa linha, grupo e divisão. Contar só exercícios
+// subestimava nomes compridos e observações com muitas linhas.
 function DayCard({
   day,
   exercises,
@@ -293,36 +261,24 @@ function DayCard({
     .slice()
     .sort((a, b) => a.position - b.position)
   const tempo = commonTempo(rows)
-  // Uma divisão que cabe numa folha é indivisível: quem leva a ficha para a
-  // academia quer o treino do dia inteiro numa página, e um cartão atômico não
-  // pode nem partir a tabela nem deixar cabeçalho órfão. O preço é um espaço em
-  // branco no pé da página anterior, limitado à altura do cartão — por isso o
-  // teto de LIMITE_CARTAO_ATOMICO.
-  //
-  // Acima desse limite (divisão muito longa) o cartão volta a quebrar. Aí o
-  // cabeçalho de coluna precisa ser `fixed` para reaparecer na continuação:
-  // sem ele as linhas que sobravam caíam na folha seguinte como quatro números
-  // sem rótulo nenhum. E `fixed` só entra NESSE caso porque ele desenha na
-  // origem do cartão em toda página que o cartão ocupa — inclusive numa em que
-  // o cartão começa e não cabe nenhuma linha, o que imprimia uma faixa de
-  // cabeçalho vazia no pé da página.
-  //
-  // wrap={false} nunca em cartão maior que a folha: aí ele não "não parte", ele
-  // TRANSBORDA sobreposto, que é o jeito mais fácil de gerar um PDF ilegível.
-  const parte = estimateDayCardHeight(rows, tempo) > LIMITE_CARTAO_ATOMICO
+  const name = day.name || `Treino ${day.label}`
+  const blocks = toRowBlocks(rows)
+  const rowHeight = (ex: WorkoutExerciseRow) => estimateWorkoutExerciseHeight(ex, names[ex.exercise_id] ?? 'Exercício', tempo)
+  const headerHeight = 26 + estimateTextHeight({ text: name, fontSize: 14, lineHeight: 1.25, width: 470 })
+  const parte = headerHeight + 35 + rows.reduce((h, ex) => h + rowHeight(ex), 0) + blocks.filter((b) => b.kind).length * 28 > LIMITE_CARTAO_ATOMICO
 
   return (
     <View style={styles.dayCard} wrap={parte}>
-      <View style={styles.dayHeader} wrap={false}>
+      <View style={styles.dayHeader} wrap={headerHeight > LIMITE_CARTAO_ATOMICO} minPresenceAhead={48}>
         <View style={styles.dayBadge}>
           <Text style={styles.dayBadgeText}>{day.label}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.dayName}>{day.name ? day.name : `Treino ${day.label}`}</Text>
+          <Text style={styles.dayName}>{name}</Text>
           {/* "Treino A" saiu daqui: o selo à esquerda e o nome logo acima já
               dizem isso duas vezes. Sobra a contagem e a cadência da divisão. */}
           <Text style={styles.daySub}>
-            {rows.length} {rows.length === 1 ? 'exercício' : 'exercícios'}
+            Prescrição-base · {rows.length} {rows.length === 1 ? 'exercício' : 'exercícios'}
             {tempo ? ` · cadência ${tempo} em todos` : ''}
           </Text>
         </View>
@@ -331,33 +287,30 @@ function DayCard({
       {/* O rótulo da divisão vai junto na coluna do exercício: na continuação
           de um cartão que partiu, o selo "A" ficou na página anterior. */}
       <View style={styles.thead} fixed={parte}>
-        <Text style={[styles.th, styles.colNum]}>#</Text>
+        <Text style={[styles.th, styles.colNum]} />
         <Text style={[styles.th, styles.colName]}>Exercício · Treino {day.label}</Text>
         <Text style={[styles.th, styles.colSets]}>Séries</Text>
         <Text style={[styles.th, styles.colReps]}>Reps</Text>
         <Text style={[styles.th, styles.colRir]}>RIR</Text>
-        <Text style={[styles.th, styles.colRest]}>Descanso</Text>
+        <Text style={[styles.th, styles.colRest]}>Pausa</Text>
       </View>
 
-      {toRowBlocks(rows).map((block) => {
+      {blocks.map((block) => {
         const linhas = block.items.map((ex, j) => {
           const i = block.start + j
           const sub = exerciseSub(ex, tempo)
-          const last = i === rows.length - 1
           return (
-            // A linha em si nunca parte: com o cartão podendo quebrar entre
-            // páginas, sem isto um exercício ficava com o nome numa folha e as
-            // séries/reps na outra.
+            // Linhas usuais ficam juntas; texto livre maior que uma folha
+            // precisa poder continuar, preservando o conteúdo completo.
             <View
               key={ex.id}
-              wrap={false}
+              wrap={rowHeight(ex) > LIMITE_CARTAO_ATOMICO}
               style={[
                 styles.tr,
-                ...(block.kind != null ? [styles.trGroup] : i % 2 === 1 ? [styles.trAlt] : []),
-                ...(last ? [styles.trLast] : []),
+                ...(block.kind != null ? [styles.trGroup] : []),
               ]}
             >
-              <Text style={[styles.tdNum, styles.colNum]}>{i + 1}</Text>
+              <Text style={[styles.tdNum, styles.colNum]}>{String(i + 1).padStart(2, '0')}</Text>
               <View style={styles.colName}>
                 <Text style={styles.tdName}>{names[ex.exercise_id] ?? 'Exercício'}</Text>
                 {sub ? <Text style={styles.tdNameSub}>{sub}</Text> : null}
@@ -370,24 +323,39 @@ function DayCard({
                 {ex.rir != null ? fmtSets(ex.rir) : '—'}
               </Text>
               <Text style={[styles.tdCell, styles.colRest]}>
-                {ex.rest_seconds != null ? `${ex.rest_seconds}s` : '—'}
+                {ex.rest_seconds != null ? `${ex.rest_seconds} s` : '—'}
               </Text>
             </View>
           )
         })
         if (block.kind == null) return linhas
-        // O bloco não parte entre páginas: uma super-série com a faixa numa
-        // folha e o segundo exercício na outra não é executável a partir da
-        // ficha. São dois a quatro exercícios, então nunca estoura a folha.
-        return (
-          <View key={block.key} wrap={false}>
-            <View style={styles.groupBand}>
-              <Text style={styles.groupBandName}>{groupLabel(block.kind, block.items.length)}</Text>
-              <Text style={styles.groupBandHint}>{groupHint(block.kind, block.items.length)}</Text>
+        // Faixas fixed aninhadas em tabelas fixed corrompem a paginação do
+        // renderer. Grupos extensos são segmentados entre exercícios, com a
+        // mesma instrução e a indicação de continuação em cada segmento.
+        const starts = [0]
+        let height = 28
+        block.items.forEach((ex, i) => {
+          const nextHeight = rowHeight(ex)
+          if (i > starts[starts.length - 1] && height + nextHeight > 340) {
+            starts.push(i)
+            height = 28
+          }
+          height += nextHeight
+        })
+        return starts.map((start, segment) => {
+          const end = starts[segment + 1] ?? block.items.length
+          const segmentHeight = 28 + block.items.slice(start, end).reduce((h, ex) => h + rowHeight(ex), 0)
+          return (
+            <View key={`${block.key}-${start}`} wrap={segmentHeight > LIMITE_CARTAO_ATOMICO}>
+              <View style={styles.groupBand} minPresenceAhead={32}>
+                <Text style={styles.groupBandName}>
+                  {groupLabel(block.kind!, block.items.length)}{segment > 0 ? ' · continuação' : ''} · {groupHint(block.kind!, block.items.length)}
+                </Text>
+              </View>
+              {linhas.slice(start, end)}
             </View>
-            {linhas}
-          </View>
-        )
+          )
+        })
       })}
     </View>
   )
@@ -396,16 +364,30 @@ function DayCard({
 // O que este override muda EM RELAÇÃO À PRESCRIÇÃO BASE do exercício — só os
 // campos diferentes. Antes imprimia-se o override inteiro, incluindo os campos
 // que repetiam a tabela acima; string vazia = override que não altera nada.
-function overrideDiff(o: WorkoutWeekOverrideRow, base: WorkoutExerciseRow | undefined): string {
-  if (o.is_skipped) return 'não executar'
-  const parts: string[] = []
-  if (o.sets != null && o.sets !== base?.sets) parts.push(`${fmtSets(o.sets)} séries`)
-  if (o.reps != null && o.reps !== base?.reps) parts.push(`${o.reps} reps`)
-  if (o.rir != null && o.rir !== base?.rir) parts.push(`RIR ${fmtSets(o.rir)}`)
+type OverrideChanges = { skipped?: true; sets?: number; reps?: string; rir?: number; rest?: number; notes?: string }
+
+function effectiveOverrideChanges(o: WorkoutWeekOverrideRow, base: WorkoutExerciseRow | undefined): OverrideChanges {
+  if (o.is_skipped) return { skipped: true }
+  const changes: OverrideChanges = {}
+  if (o.sets != null && o.sets !== base?.sets) changes.sets = o.sets
+  if (o.reps != null && o.reps !== base?.reps) changes.reps = o.reps
+  if (o.rir != null && o.rir !== base?.rir) changes.rir = o.rir
   if (o.rest_seconds != null && o.rest_seconds !== base?.rest_seconds) {
-    parts.push(`${o.rest_seconds}s de descanso`)
+    changes.rest = o.rest_seconds
   }
-  if (o.notes && o.notes !== base?.notes) parts.push(o.notes)
+  if (o.notes && o.notes !== base?.notes) changes.notes = o.notes
+  return changes
+}
+
+function overrideDiff(o: WorkoutWeekOverrideRow, base: WorkoutExerciseRow | undefined): string {
+  const changes = effectiveOverrideChanges(o, base)
+  if (changes.skipped) return 'não executar'
+  const parts: string[] = []
+  if (changes.sets != null) parts.push(`${fmtSets(changes.sets)} séries`)
+  if (changes.reps != null) parts.push(`${changes.reps} reps`)
+  if (changes.rir != null) parts.push(`RIR ${fmtSets(changes.rir)}`)
+  if (changes.rest != null) parts.push(`${changes.rest}s de descanso`)
+  if (changes.notes) parts.push(changes.notes)
   return parts.join(' · ')
 }
 
@@ -434,6 +416,15 @@ export function weekChangeGroups(
   for (const e of exercises) perDay.set(e.day_id, (perDay.get(e.day_id) ?? 0) + 1)
   const dayLabel = new Map(days.map((d) => [d.id, d.label]))
   const multiDay = days.length > 1
+  const nameCounts = new Map<string, number>()
+  const rowNumbers = new Map<string, string>()
+  for (const dayId of perDay.keys()) {
+    exercises.filter((ex) => ex.day_id === dayId).sort((a, b) => a.position - b.position).forEach((ex, index) => {
+      const nameKey = JSON.stringify([dayId, exerciseNames[ex.exercise_id] ?? 'Exercício'])
+      nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
+      rowNumbers.set(ex.id, String(index + 1).padStart(2, '0'))
+    })
+  }
 
   // desc -> exercícios que sofreram exatamente essa alteração
   const byDesc = new Map<string, WorkoutExerciseRow[]>()
@@ -467,7 +458,9 @@ export function weekChangeGroups(
       label = group
         .map((e) => {
           const nome = exerciseNames[e.exercise_id] ?? 'Exercício'
-          return multiDay ? `${dayLabel.get(e.day_id) ?? '?'} · ${nome}` : nome
+          const repeated = (nameCounts.get(JSON.stringify([e.day_id, nome])) ?? 0) > 1
+          const identified = repeated ? `${rowNumbers.get(e.id)} · ${nome}` : nome
+          return multiDay ? `${dayLabel.get(e.day_id) ?? '?'} · ${identified}` : identified
         })
         .join(', ')
     }
@@ -475,80 +468,143 @@ export function weekChangeGroups(
   })
 }
 
-function WeeksSection({ data }: { data: WorkoutPdfData }) {
-  const { weeks, overrides, exercises, days, exerciseNames } = data
-  if (weeks.length === 0 && overrides.length === 0) return null
+export type WeekPrescriptionRange = {
+  first: number
+  last: number
+  label: string | null
+  isDeload: boolean
+  notes: string | null
+  groups: WeekChangeGroup[]
+}
 
+// Só semanas consecutivas com a mesma prescrição E o mesmo contexto podem
+// compartilhar uma linha. A nota da semana faz parte desse contexto.
+export function weekPrescriptionRanges(
+  data: Pick<WorkoutPdfData, 'weeks' | 'overrides' | 'exercises' | 'days' | 'exerciseNames'>
+): WeekPrescriptionRange[] {
+  const { weeks, overrides, exercises, days, exerciseNames } = data
   const weekMeta = new Map(weeks.map((w) => [w.week_number, w]))
-  const weeksWithOverrides = [...new Set(overrides.map((o) => o.week_number))].sort((a, b) => a - b)
-  const allWeeks = [...new Set([...weeks.map((w) => w.week_number), ...weeksWithOverrides])].sort(
+  const baseById = new Map(exercises.map((ex) => [ex.id, ex]))
+  const allWeeks = [...new Set([...weeks.map((w) => w.week_number), ...overrides.map((o) => o.week_number)])].sort(
     (a, b) => a - b
   )
+  const ranges: WeekPrescriptionRange[] = []
+  let previousChangesKey = ''
+  for (const n of allWeeks) {
+    const meta = weekMeta.get(n)
+    const weekOverrides = overrides.filter((o) => o.week_number === n)
+    // Nomes são apresentação, não identidade: duas linhas do plano podem
+    // apontar para o mesmo exercício do catálogo e ter o mesmo nome impresso.
+    const changesKey = JSON.stringify(weekOverrides.flatMap((override) => {
+      const changes = effectiveOverrideChanges(override, baseById.get(override.workout_exercise_id))
+      return Object.keys(changes).length ? [[override.workout_exercise_id, JSON.stringify(changes)]] : []
+    }).sort(([leftId, leftChange], [rightId, rightChange]) => leftId.localeCompare(rightId) || leftChange.localeCompare(rightChange)))
+    const next = {
+      first: n,
+      last: n,
+      label: meta?.label || null,
+      isDeload: meta?.is_deload ?? false,
+      notes: meta?.notes || null,
+      groups: weekChangeGroups(weekOverrides, exercises, days, exerciseNames),
+    }
+    const previous = ranges[ranges.length - 1]
+    if (previous && previous.last + 1 === n && previous.label === next.label && previous.isDeload === next.isDeload && previous.notes === next.notes && previousChangesKey === changesKey) {
+      previous.last = n
+    } else {
+      ranges.push(next)
+    }
+    previousChangesKey = changesKey
+  }
+  return ranges
+}
 
-  const rows = allWeeks.map((n) => ({
-    n,
-    meta: weekMeta.get(n),
-    groups: weekChangeGroups(
-      overrides.filter((o) => o.week_number === n),
-      exercises,
-      days,
-      exerciseNames
-    ),
-  }))
+function estimateWeekChangeHeight(group: WeekChangeGroup): number {
+  return 5 + estimateTextHeight({ text: group.label, fontSize: 7.5, lineHeight: 1.4, width: 367 })
+    + estimateTextHeight({ text: group.desc, fontSize: 7.5, lineHeight: 1.45, width: 367 })
+}
 
-  // Altura proporcional a semanas x alterações: o bloco pode passar de uma
-  // página. Antes, wrap={false} fazia ele transbordar sobreposto — o caso mais
-  // fácil de reproduzir de PDF corrompido. Cada semana continua inteira.
+function weekSegments(groups: WeekChangeGroup[], notes: string | null) {
+  const notesHeight = notes ? estimateTextHeight({ text: notes, fontSize: 7.5, lineHeight: 1.45, width: 367 }) : 0
+  const total = groups.reduce((height, group) => height + estimateWeekChangeHeight(group), notesHeight)
+  if (total <= 500) return [{ groups, notes }]
+
+  // Segmentos delimitados entre alterações mantêm a referência da semana em
+  // cada continuação. Não usamos fixed dentro da linha flexível: a repetição
+  // de elementos aninhados interfere no cálculo de altura do renderer.
+  const segments: { groups: WeekChangeGroup[]; notes: string | null }[] = []
+  let current: WeekChangeGroup[] = []
+  let height = 0
+  for (const group of groups) {
+    const next = estimateWeekChangeHeight(group)
+    if (current.length && height + next > 500) {
+      segments.push({ groups: current, notes: null })
+      current = []
+      height = 0
+    }
+    current.push(group)
+    height += next
+  }
+  if (current.length && notesHeight + height > 500) {
+    segments.push({ groups: current, notes: null })
+    current = []
+  }
+  segments.push({ groups: current, notes })
+  return segments
+}
+
+function WeeksSection({ data }: { data: WorkoutPdfData }) {
+  const ranges = weekPrescriptionRanges(data)
+  if (!ranges.length) return null
   return (
     <View style={styles.section}>
-      <SectionTitle>Organização por semana</SectionTitle>
+      <SectionTitle detail={`${data.plan.weeks} ${data.plan.weeks === 1 ? 'semana' : 'semanas'}`}>O que muda a cada semana</SectionTitle>
       <Text style={styles.intro}>
-        Só o que muda em relação à prescrição das divisões acima. Semana sem alteração segue a
-        tabela do treino como está.
+        Ajustes em relação à prescrição-base. Nas demais situações, siga a tabela da divisão.
       </Text>
-      <View style={styles.weekWrap}>
-        {rows.map(({ n, meta, groups }, idx) => (
-          <View
-            key={n}
-            wrap={false}
-            style={[styles.weekRow, ...(idx === rows.length - 1 ? [styles.trLast] : [])]}
-          >
+      {ranges.flatMap(({ first, last, label, isDeload, notes: weekNotes, groups: weekGroups }) => weekSegments(weekGroups, weekNotes).map(({ notes, groups }, segment) => {
+        const bodyHeight = groups.reduce((h, g) => h + estimateWeekChangeHeight(g), 0)
+          + (notes ? estimateTextHeight({ text: notes, fontSize: 7.5, lineHeight: 1.45, width: 367 }) : 0)
+        const labelHeight = estimateTextHeight({ text: label ?? '', fontSize: 8, lineHeight: 1.4, width: 102 })
+        const split = 30 + Math.max(bodyHeight, labelHeight) > LIMITE_BLOCO_ATOMICO
+        return (
+          <View key={`${first}-${segment}`} wrap={split} style={styles.weekRow}>
+            <Text style={styles.weekNum}>{first === last ? first : `${first}–${last}`}</Text>
             <View style={styles.weekHead}>
-              <Text style={styles.weekNum}>Semana {n}</Text>
-              {meta?.label ? <Text style={styles.weekLabel}>{meta.label}</Text> : null}
-              {meta?.is_deload ? <Text style={styles.deloadPill}>Deload</Text> : null}
-              {groups.length === 0 ? (
-                <Text style={styles.weekSame}>sem alteração</Text>
-              ) : null}
+              <Text style={styles.weekLabel}>{label || (first === last ? 'Semana' : 'Semanas')}</Text>
+              {segment > 0 ? <Text style={styles.weekContinuation}>continuação</Text> : null}
+              {isDeload ? <Text style={styles.deloadPill}>Deload</Text> : null}
             </View>
-            {groups.map((g, i) => (
-              <View key={i} style={styles.weekChange}>
-                <Text style={styles.weekChangeLabel}>{g.label}</Text>
-                <Text style={styles.weekChangeDesc}>{g.desc}</Text>
-              </View>
-            ))}
+            <View style={styles.weekBody}>
+              {weekGroups.length === 0 ? <Text style={styles.weekSame}>Seguir a prescrição-base.</Text> : null}
+              {groups.map((g, i) => (
+                <View key={i} style={styles.weekChange} wrap={estimateWeekChangeHeight(g) > LIMITE_CARTAO_ATOMICO}>
+                  <Text style={styles.weekChangeLabel}>{g.label}</Text>
+                  <Text style={styles.weekChangeDesc}>{g.desc}</Text>
+                </View>
+              ))}
+              {notes ? <Text style={styles.weekSame}>{notes}</Text> : null}
+            </View>
           </View>
-        ))}
-      </View>
+        )
+      }))}
     </View>
   )
 }
 
 // Largura útil do texto dentro da caixa de observações, em pontos: a folha A4
-// (595) menos as margens da página (36 de cada lado), o padding da caixa (12 de
-// cada lado) e o fio da borda esquerda (3).
-const NOTES_LARGURA = 595 - 36 * 2 - 12 * 2 - 3
+// (595) menos margens de 34, recuo de 10 e a linha violeta de 2.
+const NOTES_LARGURA = 595 - 34 * 2 - 10 - 2
 
 // Altura estimada do bloco "Observações" (título + caixa), em pontos.
 // Grosseira de propósito — serve só para decidir se o bloco cabe inteiro numa
 // folha, e LIMITE_BLOCO_ATOMICO tem folga de sobra para o erro da estimativa.
 export function estimateNotesHeight(notes: string): number {
   const TITULO = 21 // faixa da SectionTitle + margem inferior
-  const CAIXA = 20 // padding vertical da caixa (9 + 9) + folga da borda
+  const CAIXA = 8
   return (
     TITULO +
     CAIXA +
-    estimateTextHeight({ text: notes, fontSize: 9.5, lineHeight: 1.5, width: NOTES_LARGURA })
+    estimateTextHeight({ text: notes, fontSize: 8, lineHeight: 1.5, width: NOTES_LARGURA })
   )
 }
 
@@ -564,16 +620,10 @@ function NotesSection({ notes }: { notes: string }) {
   const parte = estimateNotesHeight(notes) > LIMITE_BLOCO_ATOMICO
 
   return (
-    // A observação que não cabe numa folha começa numa folha limpa (break) e
-    // gasta a página inteira antes de partir — assim ela parte no máximo uma
-    // vez, e no meio do texto, nunca logo abaixo do título.
-    //
-    // minPresenceAhead NÃO resolve esse caso, e a tentativa anterior de usá-lo
-    // aqui era pior que nada: o shouldBreak do @react-pdf/layout só o consulta
-    // quando o bloco CABE inteiro na sobra da página; num bloco que precisa
-    // partir ele é ignorado, e o que saía impresso era o título "Observações"
-    // sozinho no pé da folha com um talo vazio da caixa embaixo.
-    <View style={styles.section} wrap={parte} break={parte}>
+    // Não forçar break no bloco longo: após tabelas com várias continuações,
+    // a combinação de break e borda dividida produzia dimensões negativas no
+    // renderer. O fluxo normal preserva o texto e usa o espaço disponível.
+    <View style={styles.section} wrap={parte}>
       <SectionTitle>Observações</SectionTitle>
       <View style={styles.notesBox}>
         <Text style={styles.notesText}>{notes}</Text>
@@ -593,7 +643,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
     ? [
         data.source.assessmentDate
           ? `avaliação ${fmtDate(data.source.assessmentDate)}${
-              data.source.bodyFatPct != null ? ` · ${data.source.bodyFatPct.toFixed(1)}% gordura` : ''
+              data.source.bodyFatPct != null ? ` · ${data.source.bodyFatPct.toFixed(1).replace('.', ',')}% gordura` : ''
             }`
           : '',
         data.source.postureDate ? `postura ${fmtDate(data.source.postureDate)}` : '',
@@ -604,7 +654,6 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
 
   const info: InfoItem[] = [
     { label: 'Avaliado', value: data.subjectName },
-    { label: 'Plano', value: plan.name },
     { label: 'Objetivo', value: goalLabel(plan.goal) },
     {
       label: 'Mesociclo',
@@ -612,25 +661,38 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
         startsOn ? ` · início ${startsOn}` : ''
       }`,
     },
-    ...(schedule.length > 0
-      ? [{ label: 'Sequência semanal', value: schedule.join(' · '), wide: true }]
-      : []),
     ...(sourceText ? [{ label: 'Base da prescrição', value: sourceText, wide: true }] : []),
   ]
 
   return (
-    <Document>
+    <Document title={`Plano de treino · ${data.subjectName}`} author={data.orgName} subject={plan.name}>
       <Page size="A4" style={pdfTheme.page}>
-        {/* Sem subtítulo: era o nome do plano, que o cartão logo abaixo já
-            traz no campo "Plano". Repetido a três centímetros de distância não
-            ajudava a ler nada. */}
-        <ReportHeader logoUrl={data.logoUrl} orgName={data.orgName} title="Plano de Treino" />
-
+        <ReportRunningHeader title="Plano de treino" subject={data.subjectName} />
+        <ReportHeader logoUrl={data.logoUrl} orgName={data.orgName} kicker="Plano de treino" title="Seu próximo movimento." subtitle={plan.name} />
         <InfoCard items={info} />
 
-        {/* O treino em primeiro lugar — cada divisão num cartão com tabela. */}
+        {schedule.length > 0 ? (
+          <View style={styles.schedule} wrap={false}>
+            <View style={styles.scheduleCopy}>
+              <Text style={styles.scheduleTitle}>Sua sequência semanal</Text>
+              <Text style={styles.scheduleDetail}>
+                {schedule.length} {schedule.length === 1 ? 'sessão' : 'sessões'} · Siga a ordem das divisões
+              </Text>
+            </View>
+            <View style={styles.sessions}>
+              {schedule.map((label, i) => (
+                <View key={`${i}-${label}`} style={styles.session}>
+                  <Text style={styles.sessionLabel}>{i + 1}ª sessão</Text>
+                  <View style={[styles.sessionBadge, ...(i === 0 ? [styles.sessionFirst] : [])]}>
+                    <Text style={[styles.sessionLetter, ...(i === 0 ? [styles.sessionLetterFirst] : [])]}>{label}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
-          <SectionTitle>Divisões do treino</SectionTitle>
           {orderedDays.map((day) => (
             <DayCard key={day.id} day={day} exercises={exercises} names={exerciseNames} />
           ))}
@@ -641,8 +703,8 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
         {plan.notes ? <NotesSection notes={plan.notes} /> : null}
 
         <MethodNote>
-          Plano reproduzível a partir do snapshot registrado. Prescrição de exercício elaborada
-          por profissional de Educação Física para este aluno; não é transferível a terceiros e
+          Prescrição de exercício elaborada por profissional de Educação Física para este aluno;
+          não é transferível a terceiros e
           não constitui diagnóstico ou orientação médica. Interrompa em caso de dor, tontura ou
           mal-estar e comunique o profissional responsável.
         </MethodNote>

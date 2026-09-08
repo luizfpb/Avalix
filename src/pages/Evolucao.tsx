@@ -110,9 +110,16 @@ export default function Evolucao() {
         }
       })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
+      // A série pode reunir avaliações de profissionais diferentes. O rodapé
+      // identifica quem emitiu o relatório, sem atribuir a ele todas as coletas.
+      const { listProfileNames } = await import('../features/reports/audit')
+      const evaluatorName = user
+        ? await listProfileNames([user.id]).then(names => names[user.id] || null).catch(() => null)
+        : null
       const blob = await generateEvolutionPdf({
         orgName: organization?.name ?? '',
         subjectName: subjectQuery.data?.full_name ?? '',
+        evaluatorName,
         logoUrl,
         history,
         circumferenceHistory: circsQuery.data ?? [],

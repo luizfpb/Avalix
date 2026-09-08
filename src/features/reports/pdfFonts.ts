@@ -1,12 +1,12 @@
 import { Font } from '@react-pdf/renderer'
 
-// As fontes do app no PDF: Manrope no corpo e Newsreader nos dois títulos, o
-// mesmo par de src/index.css (body = Manrope, h1-h3 = Newsreader).
+// Clareza usa Manrope 400/700 em títulos, tabelas e gráficos. Newsreader
+// permanece nas telas e nas propostas históricas, sem ser carregada no PDF.
 //
 // Por que TTF e não os woff2 que o app já usa: o fontkit do @react-pdf não
 // decodifica woff2 — registrar passa, mas o render quebra com "Offset is
-// outside the bounds of the DataView". Estes quatro arquivos são as instâncias
-// estáticas em latin (~171 KB somados), servidas de /fonts.
+// outside the bounds of the DataView". Estes dois arquivos são as instâncias
+// estáticas em latin, servidas de /fonts.
 //
 // Eles NÃO entram no precache do service worker, de propósito e pelo mesmo
 // motivo dos chunks de PDF: gerar laudo já exige rede (os dados vêm do
@@ -16,7 +16,6 @@ import { Font } from '@react-pdf/renderer'
 
 const FAMILIES = [
   { family: 'Manrope', arquivos: [['manrope-400.ttf', 400], ['manrope-700.ttf', 700]] },
-  { family: 'Newsreader', arquivos: [['newsreader-400.ttf', 400], ['newsreader-600.ttf', 600]] },
 ] as const
 
 function registrar(base: string): void {
