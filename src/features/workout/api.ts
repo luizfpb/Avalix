@@ -134,6 +134,36 @@ export type WorkoutPlanDetail = {
 // Plano completo (linhas cruas, como getAssessment devolve as leituras). A UI
 // monta a arvore dias->exercicios e casa os overrides por workout_exercise_id.
 export async function getWorkoutPlan(id: string): Promise<WorkoutPlanDetail> {
+  // A escrita substitui todas as filhas. Não devolver um subconjunto limitado
+  // pelo PostgREST nem combinar cabeçalho antigo com filhas de outra revisão.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const detail = await readWorkoutPlan(id)
+    if (!detail.plan) return detail
+    const { data: version, error } = await supabase.from('workout_plans')
+      .select('updated_at').eq('id', id).maybeSingle()
+    if (error) throw error
+    if (version?.updated_at === detail.plan.updated_at) return detail
+  }
+  throw new Error('Este plano foi atualizado durante a leitura. Tente abri-lo novamente.')
+}
+
+async function readAllPlanRows<T>(
+  read: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>
+): Promise<T[]> {
+  const rows: T[] = []
+  // Avança pelo que o servidor entregou, inclusive se seu teto for menor que
+  // 500. Somente uma página vazia prova que a coleção terminou.
+  for (let from = 0; ; ) {
+    const { data, error, count } = await read(from, from + 499)
+    if (error) throw error
+    if (!data?.length) return rows
+    rows.push(...data)
+    from += data.length
+    if (count != null && from >= count) return rows
+  }
+}
+
+async function readWorkoutPlan(id: string): Promise<WorkoutPlanDetail> {
   const { data: plan, error } = await supabase
     .from('workout_plans')
     .select('*')
@@ -142,46 +172,44 @@ export async function getWorkoutPlan(id: string): Promise<WorkoutPlanDetail> {
   if (error) throw error
   if (!plan) return { plan: null, days: [], exercises: [], overrides: [], weeks: [] }
 
-  const daysRes = await supabase
+  const days = await readAllPlanRows<WorkoutDayRow>((from, to) => supabase
     .from('workout_days')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('plan_id', id)
-    .order('position', { ascending: true })
-  if (daysRes.error) throw daysRes.error
-  const days = daysRes.data ?? []
+    .order('position', { ascending: true }).order('id', { ascending: true })
+    .range(from, to))
 
   const dayIds = days.map((d) => d.id)
   let exercises: WorkoutExerciseRow[] = []
   if (dayIds.length > 0) {
-    const exRes = await supabase
+    exercises = await readAllPlanRows<WorkoutExerciseRow>((from, to) => supabase
       .from('workout_exercises')
-      .select('*')
+      .select('*', { count: 'exact' })
       .in('day_id', dayIds)
-      .order('position', { ascending: true })
-    if (exRes.error) throw exRes.error
-    exercises = exRes.data ?? []
+      .order('position', { ascending: true }).order('id', { ascending: true })
+      .range(from, to))
   }
 
-  const ovRes = await supabase
+  const overrides = await readAllPlanRows<WorkoutWeekOverrideRow>((from, to) => supabase
     .from('workout_week_overrides')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('plan_id', id)
-    .order('week_number', { ascending: true })
-  if (ovRes.error) throw ovRes.error
+    .order('week_number', { ascending: true }).order('id', { ascending: true })
+    .range(from, to))
 
-  const wkRes = await supabase
+  const weeks = await readAllPlanRows<WorkoutWeekRow>((from, to) => supabase
     .from('workout_weeks')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('plan_id', id)
-    .order('week_number', { ascending: true })
-  if (wkRes.error) throw wkRes.error
+    .order('week_number', { ascending: true }).order('id', { ascending: true })
+    .range(from, to))
 
   return {
     plan,
     days,
     exercises,
-    overrides: ovRes.data ?? [],
-    weeks: wkRes.data ?? [],
+    overrides,
+    weeks,
   }
 }
 

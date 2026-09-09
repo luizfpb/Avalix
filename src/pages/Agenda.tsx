@@ -26,6 +26,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { QueryError } from '../components/QueryError'
+import { useClock } from '../lib/useClock'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
@@ -57,6 +58,7 @@ function toEvent(a: AppointmentWithSubject): CalendarEvent {
 }
 
 export default function Agenda() {
+  const now = useClock().getTime()
   const { organization } = useOrganization()
   const orgId = organization?.id
   const [params] = useSearchParams()
@@ -77,7 +79,6 @@ export default function Agenda() {
 
   const { upcoming, past } = useMemo(() => {
     const all = apptsQuery.data ?? []
-    const now = Date.now()
     const up: AppointmentWithSubject[] = []
     const pa: AppointmentWithSubject[] = []
     for (const a of all) {
@@ -86,7 +87,7 @@ export default function Agenda() {
     }
     pa.reverse() // passados: mais recente primeiro
     return { upcoming: up, past: pa }
-  }, [apptsQuery.data])
+  }, [apptsQuery.data, now])
 
   if (subjectsQuery.isPending || apptsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando agenda...</p>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Trash2, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -41,7 +41,8 @@ import { QueryError } from '../components/QueryError'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
-import { ensureLogRows, updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
+import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
+import { reconcileSetRows } from '../features/workout/logRows'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
@@ -551,6 +552,8 @@ function LogForm({
   const [extras, setExtras] = useState<ExtraExercise[]>([])
   const [error, setError] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
 
@@ -560,8 +563,15 @@ function LogForm({
   )
 
   useEffect(() => {
-    setSets((previous) => ensureLogRows(previous, dayExercises))
-  }, [dayExercises])
+    setSets((previous) => {
+      const next = { ...previous }
+      for (const ex of dayExercises) {
+        const effective = effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id))
+        next[ex.id] = reconcileSetRows(next[ex.id] ?? [], effective.skipped ? 0 : effective.sets)
+      }
+      return next
+    })
+  }, [dayExercises, overrides, weekNumber])
 
   function setCell(exRowId: string, i: number, field: keyof LogRow, val: string | boolean) {
     setSets((prev) => {
@@ -605,6 +615,7 @@ function LogForm({
   const day = days.find((d) => d.id === dayKey)
 
   async function save() {
+    if (savingRef.current) return
     setError(null)
     setOkMsg(false)
     if (!orgId) return setError('Organização não carregada.')
@@ -638,6 +649,8 @@ function LogForm({
       return { ...s, setNumber: n }
     })
 
+    savingRef.current = true
+    setSaving(true)
     try {
       await createMut.mutateAsync({
         orgId,
@@ -652,7 +665,8 @@ function LogForm({
       // limpa pra registrar a próxima
       const init: Record<string, LogRow[]> = {}
       for (const ex of dayExercises) {
-        init[ex.id] = Array.from({ length: Math.min(ex.sets, 12) }, () => ({ weight: '', reps: '', rir: '', rest: '', failure: false }))
+        const effective = effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id))
+        init[ex.id] = reconcileSetRows([], effective.skipped ? 0 : effective.sets)
       }
       // Os avulsos pertencem à sessão que acabou de ser gravada: a próxima
       // começa de novo com o que está prescrito.
@@ -666,6 +680,9 @@ function LogForm({
       setOkMsg(true)
     } catch (e) {
       setError(normalizeDbError(e))
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
   }
 
@@ -679,6 +696,7 @@ function LogForm({
         <CardTitle className="text-base">Registrar treino</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <fieldset disabled={saving || createMut.isPending} className="min-w-0 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="workout-day" className="text-xs">Divisão</Label>
@@ -717,7 +735,9 @@ function LogForm({
           {/* Super-série e circuito mudam o que se faz ENTRE uma série e outra:
               a tela que conduz a sessão não pode listar os exercícios soltos. */}
           {toRowBlocks(dayExercises).map((block) => {
-            const cartoes = block.items.map((ex) => (
+            const cartoes = block.items.map((ex) => {
+              const effective = effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id))
+              return (
             <div key={ex.id} className="rounded-md border bg-muted/20 p-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">
@@ -729,16 +749,22 @@ function LogForm({
                   ) : null}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  plano: {formatSetsReps(ex.sets, ex.reps)}
+                  plano: {formatSetsReps(effective.sets, effective.reps)}
+                  {effective.rir != null ? ` · RIR ${effective.rir}` : ''}
                 </span>
               </div>
+              {effective.skipped ? (
+                <p className="mt-1 text-xs text-muted-foreground">Nesta semana, não executar. Registre séries somente se o exercício foi realizado.</p>
+              ) : null}
+              {effective.notes ? <p className="mt-1 text-xs text-muted-foreground">{effective.notes}</p> : null}
               {(() => {
+                if (effective.skipped) return null
                 const last = lastByExercise.get(ex.exercise_id)
                 if (!last) return null
                 const s = suggestProgression({
                   last,
-                  repRange: parseRepRange(ex.reps),
-                  targetRir: ex.rir,
+                  repRange: parseRepRange(effective.reps),
+                  targetRir: effective.rir,
                 })
                 if (s.kind === 'insufficient') return null
                 return (
@@ -755,14 +781,15 @@ function LogForm({
               <SetGrid
                 name={names[ex.exercise_id] ?? 'exercício'}
                 rows={sets[ex.id] ?? []}
-                repsPlaceholder={ex.reps ?? '—'}
-                rirPlaceholder={ex.rir != null ? String(ex.rir) : '—'}
-                restPlaceholder={String(effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id)).restSeconds ?? '—')}
+                repsPlaceholder={effective.reps ?? '—'}
+                rirPlaceholder={effective.rir != null ? String(effective.rir) : '—'}
+                restPlaceholder={String(effective.restSeconds ?? '—')}
                 onCell={(i, field, value) => setCell(ex.id, i, field, value)}
                 onAddRow={() => addRow(ex.id)}
               />
             </div>
-            ))
+              )
+            })
             return block.kind == null ? (
               cartoes
             ) : (
@@ -845,6 +872,7 @@ function LogForm({
         <Button size="sm" onClick={save} disabled={createMut.isPending}>
           {createMut.isPending ? 'Salvando...' : 'Registrar treino'}
         </Button>
+        </fieldset>
       </CardContent>
     </Card>
   )

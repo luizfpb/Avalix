@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import TreinoAluno from './TreinoAluno'
+import { reconciliarRascunho, type PlanoVigente } from '../features/workout/studentDraft'
 import { writeCachedHistory } from '../features/workout/studentStore'
+import { captureStudentStorageAccess, STUDENT_TOKEN_KEY } from '../features/workout/studentStore'
 import type {
   StudentHistorySession,
   StudentPlanDetail,
@@ -70,6 +72,7 @@ vi.mock('../features/workout/studentApi', async (original) => ({
 
 vi.mock('../features/workout/studentStore', async (original) => ({
   ...(await original<typeof import('../features/workout/studentStore')>()),
+  captureStudentStorageAccess: vi.fn(async () => ({ generation: '', localGeneration: 0, active: true })),
   readCachedWorkout: () => readCachedWorkoutMock(),
   writeCachedWorkout: (scope: string, data: unknown) => writeCachedWorkoutMock(scope, data),
   readCachedHistory: () => readCachedHistoryMock(),
@@ -81,6 +84,10 @@ vi.mock('../features/workout/studentStore', async (original) => ({
   dequeueSession: (scope: string, clientRef: string) => dequeueMock(scope, clientRef),
   enqueueSession: (scope: string, session: unknown) => enqueueMock(scope, session),
   readDraft: () => readDraftMock(),
+  readReconciledDraft: async (_scope: string, _planId: string, plan: PlanoVigente) => {
+    const draft = await readDraftMock()
+    return draft ? reconciliarRascunho(draft, plan) : null
+  },
   writeDraft: (scope: string, draft: unknown, required?: boolean) => writeDraftMock(scope, draft, required),
   reserveDraftRevision: (scope: string, draft: { revision?: number }, required?: boolean) =>
     reserveDraftRevisionMock(scope, draft, required),
@@ -152,7 +159,7 @@ beforeEach(() => {
   resolveTokenMock.mockReturnValue(TOKEN)
   readQueueMock.mockResolvedValue([])
   readDraftMock.mockResolvedValue(null)
-  writeDraftMock.mockResolvedValue(undefined)
+  writeDraftMock.mockImplementation(async (_scope: string, draft: { revision: number }) => draft.revision + 1)
   reserveDraftRevisionMock.mockImplementation(
     async (_scope: string, draft: { revision?: number }) => (draft.revision ?? 0) + 1
   )
@@ -192,10 +199,12 @@ async function campoCarga() {
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((next) => {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((next, fail) => {
     resolve = next
+    reject = fail
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 function hojeLocal(): string {
@@ -216,6 +225,87 @@ function diaAnteriorLocal(iso: string): string {
 }
 
 describe('TreinoAluno', () => {
+  it('observa saída de outra aba mesmo enquanto a inicialização do IndexedDB aguarda', async () => {
+    const initializing = deferred<Awaited<ReturnType<typeof captureStudentStorageAccess>>>()
+    vi.mocked(captureStudentStorageAccess).mockReturnValueOnce(initializing.promise)
+    render(<TreinoAluno />)
+    fireEvent(window, new StorageEvent('storage', { key: STUDENT_TOKEN_KEY, newValue: null }))
+    expect(await screen.findByText('Link inválido ou expirado')).toBeTruthy()
+    await act(async () => { initializing.resolve({ generation: 'nova', localGeneration: 0, active: true }) })
+    expect(getWorkoutMock).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Olá, Marta/)).toBeNull()
+  })
+
+  it('uma resposta antiga inválida não apaga o novo token aberto em outra aba', async () => {
+    const submission = deferred<unknown>()
+    submitMock.mockReturnValue(submission.promise)
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1))
+    fireEvent(window, new StorageEvent('storage', { key: STUDENT_TOKEN_KEY, newValue: 'B'.repeat(43) }))
+    expect(await screen.findByText('Link inválido ou expirado')).toBeTruthy()
+    // Um erro de request pendente chega depois de o token B estar ativo.
+    await act(async () => { submission.reject(new Error('link invalido ou expirado')) })
+    expect(purgeRevokedMock).not.toHaveBeenCalled()
+  })
+
+  it('termina a leitura do rascunho quando a resposta de rede substitui o cache com os mesmos IDs', async () => {
+    const network = deferred<StudentWorkout>()
+    const draft = deferred<null>()
+    readCachedWorkoutMock.mockResolvedValue({ at: '2026-09-08T12:00:00Z', data: pacote() })
+    getWorkoutMock.mockReturnValue(network.promise)
+    readDraftMock.mockReturnValue(draft.promise)
+    await abrir()
+    await waitFor(() => expect(readDraftMock).toHaveBeenCalledTimes(1))
+    await act(async () => { network.resolve(pacote()) })
+    await waitFor(() => expect(writeCachedWorkoutMock).toHaveBeenCalledTimes(1))
+    await act(async () => { draft.resolve(null) })
+    expect(await campoCarga()).toBeTruthy()
+    expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(3)
+    expect(readDraftMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('aguarda o rascunho antes de habilitar semana, observação e conclusão', async () => {
+    const draft = deferred<unknown>()
+    readDraftMock.mockReturnValue(draft.promise)
+    await abrir()
+    expect(screen.getByLabelText('Semana').matches(':disabled')).toBe(true)
+    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Concluir treino' }).matches(':disabled')).toBe(true)
+    await act(async () => { draft.resolve({ clientRef: 'salvo', revision: 1, planId: 'p1', dayId: 'd1',
+      weekNumber: 1, performedAt: hojeLocal(), notes: 'Nota antiga', rows: {}, extras: [] }) })
+    expect(screen.getByLabelText('Como foi o treino? (opcional)')).toHaveProperty('value', 'Nota antiga')
+    expect(screen.getByLabelText('Semana').matches(':disabled')).toBe(false)
+  })
+
+  it('congela todos os campos e a navegação durante uma conclusão pendente', async () => {
+    const submission = deferred<unknown>()
+    submitMock.mockReturnValue(submission.promise)
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Como foi o treino? (opcional)'), { target: { value: 'Nota enviada' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(true)
+    expect(screen.getByLabelText('Carga da série 2 de Supino reto').matches(':disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Histórico' }).matches(':disabled')).toBe(true)
+    await act(async () => { submission.resolve({ logId: 'log1' }) })
+    await screen.findByText(/Treino concluído! Seu treinador/)
+    expect(submitMock.mock.calls[0][0].notes).toBe('Nota enviada')
+    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(false)
+  })
+
+  it('não confirma conclusão se a remoção durável do rascunho falhar', async () => {
+    clearDraftMock.mockRejectedValueOnce(new Error('Armazenamento indisponível'))
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('Armazenamento indisponível')
+    expect(await campoCarga()).toHaveProperty('value', '40')
+    expect(screen.queryByText(/Treino concluído!/)).toBeNull()
+  })
+
   it('diferencia RIR 0 de falha explícita por série', async () => {
     await abrir()
     await campoCarga()
@@ -288,13 +378,14 @@ describe('TreinoAluno', () => {
       })
     )
     await abrir()
+    if (leitura === 'pendente') {
+      expect(screen.getByLabelText('Semana').matches(':disabled')).toBe(true)
+      expect(screen.queryAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(0)
+      await act(async () => { rascunho.resolve(null) })
+    }
+    await campoCarga()
     fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '2' } })
     await waitFor(() => expect(screen.getByText(/5×6-10/)).toBeTruthy())
-    if (leitura === 'pendente') {
-      // O resumo já mudou de semana, mas as linhas esperam o IndexedDB.
-      expect(screen.queryAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(0)
-      rascunho.resolve(null)
-    }
     await waitFor(() =>
       expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(5)
     )
@@ -459,6 +550,7 @@ describe('TreinoAluno', () => {
 
   it('salvar sem marcar nada avisa em vez de mandar sessão vazia', async () => {
     await abrir()
+    await campoCarga()
     fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
     await waitFor(() => expect(screen.getByText(/ao menos uma série/i)).toBeTruthy())
     expect(submitMock).not.toHaveBeenCalled()

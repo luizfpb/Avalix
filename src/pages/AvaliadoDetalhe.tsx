@@ -87,6 +87,13 @@ function Info({ label, value }: { label: string; value: string }) {
 
 export default function AvaliadoDetalhe() {
   const { id } = useParams()
+  // Troca direta pelo histórico pode conservar esta rota e os dados em cache.
+  // O estado de convites/consentimento nunca pode acompanhar outro titular.
+  return <AvaliadoDetalheContent key={id} />
+}
+
+function AvaliadoDetalheContent() {
+  const { id } = useParams()
   const { organization } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
   const subjectQuery = useSubject(id)

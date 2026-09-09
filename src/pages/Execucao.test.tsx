@@ -114,6 +114,51 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+describe('prescrição efetiva e proteção durante o envio', () => {
+  it('aplica séries, repetições, RIR, descanso e observação da semana', () => {
+    const detail = plano()
+    detail.overrides = [{ week_number: 2, workout_exercise_id: 'we-1', sets: 1, reps: '4-6', rir: 4,
+      rest_seconds: 180, is_skipped: false, notes: 'Reduzir intensidade' }] as WorkoutWeekOverrideRow[]
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir()
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '2' } })
+    expect(screen.getByText(/plano: 1×4-6 · RIR 4/)).toBeTruthy()
+    expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(1)
+    expect(screen.getByLabelText('Repetições da série 1 de Supino reto')).toHaveProperty('placeholder', '4-6')
+    expect(screen.getByLabelText('RIR da série 1 de Supino reto')).toHaveProperty('placeholder', '4')
+    expect(screen.getByLabelText('Descanso da série 1 de Supino reto')).toHaveProperty('placeholder', '180')
+    expect(screen.getByText('Reduzir intensidade')).toBeTruthy()
+  })
+
+  it('avisa que o exercício foi pulado, preservando séries já preenchidas', () => {
+    const detail = plano()
+    detail.overrides = [{ week_number: 2, workout_exercise_id: 'we-1', sets: null, reps: null, rir: null,
+      rest_seconds: null, is_skipped: true, notes: null }] as WorkoutWeekOverrideRow[]
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '2' } })
+    expect(screen.getAllByLabelText(/Carga da série .* de Supino reto/)).toHaveLength(1)
+    expect(screen.getByLabelText('Carga da série 1 de Supino reto')).toHaveProperty('value', '40')
+    expect(screen.getByText(/não executar/i)).toBeTruthy()
+  })
+
+  it('bloqueia séries, observações e avulsos enquanto registra o snapshot enviado', async () => {
+    let resolve!: (value: unknown) => void
+    criarMock.mockReturnValue(new Promise((next) => { resolve = next }))
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await waitFor(() => expect(criarMock).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText('Carga da série 2 de Supino reto').matches(':disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: /Adicionar exercício/ }).matches(':disabled')).toBe(true)
+    await act(async () => { resolve({ id: 'log-1' }) })
+    await screen.findByText('Treino registrado!')
+    expect(criarMock.mock.calls[0][0].sets).toHaveLength(1)
+    expect(screen.getByLabelText('Carga da série 2 de Supino reto').matches(':disabled')).toBe(false)
+  })
+})
+
 describe('Execucao — exercício fora do plano', () => {
   it('registra o avulso junto do prescrito, numerando as séries por exercício', async () => {
     abrir()

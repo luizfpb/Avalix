@@ -15,6 +15,14 @@ export type DraftStorageKind = 'private' | 'session'
 export type DraftOptions = { storage?: DraftStorageKind }
 
 let privateScope: { userId: string; orgId: string } | null = null
+let privateScopeRevision = 0
+const clearedRevisions = new Map<string, number>()
+const expiredRevisions = new Map<string, number>()
+
+function invalidateDraft(fullKey: string, expired = false): void {
+  const revisions = expired ? expiredRevisions : clearedRevisions
+  revisions.set(fullKey, (revisions.get(fullKey) ?? 0) + 1)
+}
 
 function storageOrNull(kind: DraftStorageKind): Storage | null {
   try {
@@ -44,7 +52,11 @@ function ttlFor(kind: DraftStorageKind): number {
 // Chamado antes de montar as telas profissionais. Sem ambos os identificadores
 // o modulo se recusa a ler/gravar para evitar um rascunho sem dono.
 export function setPrivateDraftScope(userId: string | null, orgId: string | null): void {
-  privateScope = userId && orgId ? { userId, orgId } : null
+  const next = userId && orgId ? { userId, orgId } : null
+  if (next?.userId !== privateScope?.userId || next?.orgId !== privateScope?.orgId) {
+    privateScopeRevision++
+  }
+  privateScope = next
 }
 
 export function saveDraft(
@@ -82,11 +94,13 @@ export function loadDraft<T>(
       env.savedAt > now + 60_000 ||
       now - env.savedAt > ttlFor(kind)
     ) {
+      invalidateDraft(fullKey, typeof env.savedAt === 'number' && now - env.savedAt > ttlFor(kind))
       storage.removeItem(fullKey)
       return null
     }
     return (env.data as T) ?? null
   } catch {
+    invalidateDraft(fullKey)
     storage.removeItem(fullKey)
     return null
   }
@@ -96,7 +110,11 @@ export function clearDraft(key: string, options: DraftOptions = {}): void {
   const kind = options.storage ?? 'private'
   const storage = storageOrNull(kind)
   const fullKey = scopedKey(key, kind)
-  if (!storage || !fullKey) return
+  if (!fullKey) return
+  // Cancelar também o debounce/cleanup já agendado no editor. Apagar só o
+  // localStorage permitiria que a desmontagem recriasse um registro concluído.
+  invalidateDraft(fullKey)
+  if (!storage) return
   try {
     storage.removeItem(fullKey)
   } catch {
@@ -117,6 +135,7 @@ function keysWithPrefix(storage: Storage, prefix: string): string[] {
 export function clearAllPrivateDrafts(): void {
   const storage = storageOrNull('private')
   privateScope = null
+  privateScopeRevision++
   if (!storage) return
   try {
     for (const key of keysWithPrefix(storage, PREFIX)) storage.removeItem(key)
@@ -130,12 +149,12 @@ function purgeStorage(kind: DraftStorageKind, now: number): void {
   if (!storage) return
   const expectedPrefix = kind === 'private' ? PRIVATE_PREFIX : SESSION_PREFIX
   try {
-    const stale: string[] = []
+    const stale: { key: string; expired: boolean }[] = []
     for (const key of keysWithPrefix(storage, PREFIX)) {
       // Remove automaticamente o formato antigo, que nao tinha dono, e nunca
       // deixa um tipo de draft aparecer no storage errado.
       if (!key.startsWith(expectedPrefix)) {
-        stale.push(key)
+        stale.push({ key, expired: false })
         continue
       }
       try {
@@ -145,13 +164,16 @@ function purgeStorage(kind: DraftStorageKind, now: number): void {
           env.savedAt > now + 60_000 ||
           now - env.savedAt > ttlFor(kind)
         ) {
-          stale.push(key)
+          stale.push({ key, expired: typeof env?.savedAt === 'number' && now - env.savedAt > ttlFor(kind) })
         }
       } catch {
-        stale.push(key)
+        stale.push({ key, expired: false })
       }
     }
-    for (const key of stale) storage.removeItem(key)
+    for (const { key, expired } of stale) {
+      invalidateDraft(key, expired)
+      storage.removeItem(key)
+    }
   } catch {
     // best-effort
   }
@@ -178,34 +200,92 @@ export function useFormDraft<T>(
   options: DraftOptions = {}
 ): { restored: boolean; dismiss: () => void } {
   const [restored, setRestored] = useState(false)
-  const ready = useRef(false)
   const restoreRef = useRef(restore)
+  const valueRef = useRef(value)
+  const writerRef = useRef<{ replace: (value: T) => void; skipInitial: boolean } | null>(null)
   const storageKind = options.storage ?? 'private'
   restoreRef.current = restore
+  valueRef.current = value
 
   useEffect(() => {
-    ready.current = false
     setRestored(false)
-    if (!key) {
-      ready.current = true
-      return
-    }
+    if (!key) return
     purgeExpiredDrafts()
     const draft = loadDraft<T>(key, Date.now(), { storage: storageKind })
+    const fullKey = scopedKey(key, storageKind)
+    if (!fullKey) return
+    const scopeRevision = privateScopeRevision
+    const clearedRevision = clearedRevisions.get(fullKey) ?? 0
+    let expirationRevision = expiredRevisions.get(fullKey) ?? 0
+    let pendingValue = draft ?? valueRef.current
+    let encodedValue = JSON.stringify(pendingValue)
+    let editedAt: number | null = null
+    let pending = true
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const flush = () => {
+      clearTimeout(timer)
+      if (!pending) return
+      pending = false
+      if (cancelled || scopedKey(key, storageKind) !== fullKey) return
+      if (storageKind === 'private' && scopeRevision !== privateScopeRevision) return
+      if ((clearedRevisions.get(fullKey) ?? 0) !== clearedRevision) return
+      if ((expiredRevisions.get(fullKey) ?? 0) !== expirationRevision) {
+        // TTL cancela conteúdo antigo, mas não desativa um formulário para
+        // sempre. Só uma alteração recente rearma a persistência; cleanup
+        // sem edição não pode trazer de volta o registro expirado.
+        if (editedAt === null || Date.now() - editedAt > ttlFor(storageKind)) return
+        expirationRevision = expiredRevisions.get(fullKey) ?? 0
+      }
+      saveDraft(key, pendingValue, Date.now(), { storage: storageKind })
+      editedAt = null
+    }
+    const writer = {
+      // O primeiro efeito de valor ainda enxerga o formulário anterior à
+      // restauração. Nunca descarregar esses valores por cima do rascunho lido.
+      skipInitial: true,
+      replace(next: T) {
+        const nextEncoded = JSON.stringify(next)
+        if (nextEncoded !== encodedValue) editedAt = Date.now()
+        encodedValue = nextEncoded
+        pendingValue = next
+        pending = true
+        clearTimeout(timer)
+        timer = setTimeout(flush, SAVE_DEBOUNCE_MS)
+      },
+    }
+    writerRef.current = writer
+    timer = setTimeout(flush, SAVE_DEBOUNCE_MS)
     if (draft != null) {
       restoreRef.current(draft)
       setRestored(true)
     }
-    ready.current = true
+
+    const onHidden = () => { if (document.visibilityState === 'hidden') flush() }
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== storageOrNull(storageKind)) return
+      if (event.key === null || (event.key === fullKey && event.newValue === null)) cancelled = true
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHidden)
+    window.addEventListener('storage', onStorage)
+    return () => {
+      // Usa o último valor desta chave, e não o valor de outro registro que
+      // possa já ter renderizado. A invalidação acima cobre sucesso e logout.
+      flush()
+      if (writerRef.current === writer) writerRef.current = null
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHidden)
+      window.removeEventListener('storage', onStorage)
+    }
   }, [key, storageKind])
 
   useEffect(() => {
-    if (!key || !ready.current) return
-    const timer = setTimeout(
-      () => saveDraft(key, value, Date.now(), { storage: storageKind }),
-      SAVE_DEBOUNCE_MS
-    )
-    return () => clearTimeout(timer)
+    const writer = writerRef.current
+    if (!writer) return
+    if (writer.skipInitial) writer.skipInitial = false
+    else writer.replace(value)
   }, [key, value, storageKind])
 
   return { restored, dismiss: () => setRestored(false) }

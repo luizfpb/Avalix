@@ -41,27 +41,54 @@ export async function signedLogoUrl(logoPath: string | null | undefined): Promis
   return data?.signedUrl ?? null
 }
 
-// Logo como data URL, pra embutir no PDF (@react-pdf). null = sem logo ou erro
-// (o PDF cai no fallback da plaqueta AVALIX).
+// Logo como data URL para o PDF. WebP é aceito pelo app e pelo navegador, mas
+// o renderer só recebe PNG/JPEG. O original no Storage permanece intacto.
+// null significa somente "sem logo": uma falha não pode gerar silenciosamente
+// um documento incompleto quando a organização configurou sua marca.
 export async function loadOrgLogoDataUrl(
   logoPath: string | null | undefined
 ): Promise<string | null> {
+  if (!logoPath) return null
   const url = await signedLogoUrl(logoPath)
-  if (!url) return null
+  if (!url) throw new Error('Não foi possível carregar o logo da organização. Tente gerar o PDF novamente.')
   try {
-    const res = await fetch(url)
-    if (!res.ok) return null
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const blob = await res.blob()
+    const mime = blob.type.toLowerCase().split(';')[0]
+    if (mime === 'image/webp') return await blobToDataUrl(await webpToPng(blob))
+    if (mime !== 'image/png' && mime !== 'image/jpeg') throw new Error('Formato de logo não suportado')
     return await blobToDataUrl(blob)
-  } catch {
-    return null
+  } catch (error) {
+    throw new Error('Não foi possível preparar o logo para o PDF. Tente novamente ou envie um logo PNG/JPEG em Ajustes.', { cause: error })
+  }
+}
+
+async function webpToPng(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob)
+  try {
+    if (bitmap.width <= 0 || bitmap.height <= 0) throw new Error('Logo sem dimensões válidas')
+    const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas indisponível')
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    // Canvas transparente: logos com alpha não ganham retângulo de fundo.
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!png || png.type !== 'image/png') throw new Error('Não foi possível converter o logo para PNG')
+    return png
+  } finally {
+    bitmap.close()
   }
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onloadend = () => resolve(reader.result as string)
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result) : reject(new Error('Não foi possível ler o logo'))
     reader.onerror = reject
     reader.readAsDataURL(blob)
   })

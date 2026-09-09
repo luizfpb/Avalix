@@ -18,6 +18,7 @@ import {
   flushQueue,
   isInvalidStudentLinkError,
   isNetworkFailure,
+  isTransientStudentError,
   isStudentLinkExpired,
   queuedSessionLabel,
   reconcileSetRows,
@@ -28,6 +29,9 @@ import {
 } from '../features/workout/studentSession'
 import {
   clearDraftSession,
+  captureStudentStorageAccess,
+  invalidateStudentStorageAccess,
+  isStudentStorageAccessCurrent,
   dequeueSession,
   enqueueSession,
   forgetStudentDevice,
@@ -35,7 +39,7 @@ import {
   readCachedHistory,
   readCachedPlan,
   readCachedWorkout,
-  readDraft,
+  readReconciledDraft,
   readQueue,
   removeCachedPlan,
   reserveDraftRevision,
@@ -45,9 +49,12 @@ import {
   writeCachedWorkout,
   writeDraft,
   STUDENT_TOKEN_KEY,
+  StudentStorageError,
   type QueuedSession,
+  type StudentStorageAccess,
+  type DraftSession,
 } from '../features/workout/studentStore'
-import { identidadeDaSessao, reconciliarRascunho } from '../features/workout/studentDraft'
+import { identidadeDaSessao } from '../features/workout/studentDraft'
 import { applyStudentManifest } from '../features/workout/studentPwa'
 import {
   effectivePrescription,
@@ -131,9 +138,30 @@ export default function TreinoAluno() {
   const [erroFila, setErroFila] = useState<string | null>(null)
   const [aba, setAba] = useState<Aba>('treino')
   const accessEpoch = useRef(0)
+  const storageAccess = useRef<StudentStorageAccess | null>(null)
+  const [registrando, setRegistrando] = useState(false)
+  const savingActive = useRef(false)
+  const pendingPackage = useRef<StudentWorkout | null>(null)
+  const receberPacote = useCallback((next: StudentWorkout) => {
+    if (savingActive.current) pendingPackage.current = next
+    else setPacote(next)
+  }, [])
+  const aoRegistrar = useCallback((busy: boolean) => {
+    savingActive.current = busy
+    setRegistrando(busy)
+    if (!busy && pendingPackage.current) {
+      setPacote(pendingPackage.current)
+      pendingPackage.current = null
+    }
+  }, [])
 
   const invalidarAcesso = useCallback(async (limpar = true) => {
+    // Esta montagem nunca reativa outro token. Respostas antigas não podem
+    // executar uma segunda purga depois de outra aba ter aberto um novo link.
+    if (accessEpoch.current > 0 || (storageAccess.current && !isStudentStorageAccessCurrent(storageAccess.current))) return
     const epoch = ++accessEpoch.current
+    if (storageAccess.current) invalidateStudentStorageAccess(storageAccess.current)
+    pendingPackage.current = null
     setPacote(null)
     setFila([])
     setInvalido(true)
@@ -148,9 +176,28 @@ export default function TreinoAluno() {
 
   useEffect(() => {
     if (!token) return
-    void studentScope(token).then(setScope)
+    let mounted = true
+    const epoch = accessEpoch.current
+    void Promise.all([studentScope(token), captureStudentStorageAccess()]).then(([nextScope, access]) => {
+      if (!mounted || epoch !== accessEpoch.current) { invalidateStudentStorageAccess(access); return }
+      storageAccess.current = access
+      setScope(nextScope)
+    })
     void requestPersistentStorage()
+    return () => {
+      mounted = false
+      if (storageAccess.current) invalidateStudentStorageAccess(storageAccess.current)
+    }
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    const outraAba = (event: StorageEvent) => {
+      if (event.key === STUDENT_TOKEN_KEY && event.newValue !== token) void invalidarAcesso(false)
+    }
+    window.addEventListener('storage', outraAba)
+    return () => window.removeEventListener('storage', outraAba)
+  }, [token, invalidarAcesso])
 
   // manifest próprio enquanto a página do aluno está aberta
   useEffect(() => applyStudentManifest(), [])
@@ -171,7 +218,8 @@ export default function TreinoAluno() {
   // Cache primeiro, rede depois: dentro da academia a página abre com o treino
   // na tela antes de saber se há internet.
   useEffect(() => {
-    if (!token || !scope) return
+    const access = storageAccess.current
+    if (!token || !scope || !access) return
     let vivo = true
     const epoch = accessEpoch.current
 
@@ -201,14 +249,11 @@ export default function TreinoAluno() {
         } else if (isStudentLinkExpired(fresco.link_expires_at)) {
           await invalidarAcesso()
         } else {
-          await writeCachedWorkout(scope, fresco)
-          if (!vivo || epoch !== accessEpoch.current) {
-            await purgeRevokedStudentDevice()
-            return
-          }
+          await writeCachedWorkout(scope, fresco, access)
+          if (!vivo || epoch !== accessEpoch.current) return
           setInvalido(false)
           setErroLimpeza(false)
-          setPacote(fresco)
+          receberPacote(fresco)
           setSincronizadoEm(new Date().toISOString())
           setSemRede(false)
         }
@@ -225,18 +270,22 @@ export default function TreinoAluno() {
     return () => {
       vivo = false
     }
-  }, [token, scope, recarregarFila, invalidarAcesso])
+  }, [token, scope, recarregarFila, invalidarAcesso, receberPacote])
 
   // Sobe a fila quando a rede volta e quando o app volta ao primeiro plano.
   const enviando = useRef(false)
-  const enviarFila = useCallback(async () => {
-    if (!token || !scope || enviando.current) return
+  const enviarFila = useCallback(async (force = false) => {
+    const access = storageAccess.current
+    if (!token || !scope || !access || !isStudentStorageAccessCurrent(access) || enviando.current) return
+    const epoch = accessEpoch.current
     enviando.current = true
     try {
-      const r = await withStudentSyncLock(scope, () => flushQueue(token, scope))
+      const r = await withStudentSyncLock(scope, () => flushQueue(token, scope, access, force))
+      if (epoch !== accessEpoch.current) return
       if (r.sent > 0) setSemRede(false)
       await recarregarFila()
     } catch (error) {
+      if (epoch !== accessEpoch.current) return
       if (isInvalidStudentLinkError(error)) await invalidarAcesso()
       else setErroFila(errorMessage(error, 'Não foi possível sincronizar os treinos salvos.'))
     } finally {
@@ -248,7 +297,8 @@ export default function TreinoAluno() {
   // mesma invalidação. A revalidação online também detecta revogação antecipada.
   const revalidando = useRef(false)
   const revalidarAcesso = useCallback(async () => {
-    if (!token || !scope || invalido || revalidando.current) return
+    const access = storageAccess.current
+    if (!token || !scope || !access || invalido || revalidando.current) return
     if (pacote && isStudentLinkExpired(pacote.link_expires_at)) {
       await invalidarAcesso()
       return
@@ -263,12 +313,9 @@ export default function TreinoAluno() {
         await invalidarAcesso()
         return
       }
-      await writeCachedWorkout(scope, fresco)
-      if (epoch !== accessEpoch.current) {
-        await purgeRevokedStudentDevice()
-        return
-      }
-      setPacote(fresco)
+      await writeCachedWorkout(scope, fresco, access)
+      if (epoch !== accessEpoch.current) return
+      receberPacote(fresco)
       setSincronizadoEm(new Date().toISOString())
       setSemRede(false)
     } catch (error) {
@@ -276,7 +323,7 @@ export default function TreinoAluno() {
     } finally {
       revalidando.current = false
     }
-  }, [invalido, invalidarAcesso, pacote, scope, token])
+  }, [invalido, invalidarAcesso, pacote, scope, token, receberPacote])
 
   useEffect(() => {
     if (!pacote?.link_expires_at || invalido) return
@@ -301,18 +348,11 @@ export default function TreinoAluno() {
     const aoFocar = () => {
       if (document.visibilityState === 'visible') void revalidarAcesso()
     }
-    const outraAba = (event: StorageEvent) => {
-      if (event.key === STUDENT_TOKEN_KEY && event.newValue !== token) {
-        void invalidarAcesso(false)
-      }
-    }
     window.addEventListener('online', aoVoltar)
     document.addEventListener('visibilitychange', aoFocar)
-    window.addEventListener('storage', outraAba)
     return () => {
       window.removeEventListener('online', aoVoltar)
       document.removeEventListener('visibilitychange', aoFocar)
-      window.removeEventListener('storage', outraAba)
     }
   }, [invalidarAcesso, revalidarAcesso, scope, token])
 
@@ -330,6 +370,12 @@ export default function TreinoAluno() {
       document.removeEventListener('visibilitychange', aoFocar)
     }
   }, [token, scope, enviarFila])
+
+  useEffect(() => {
+    if (!fila.some((item) => !item.error || isTransientStudentError({ message: item.error }))) return
+    const timer = window.setInterval(() => { void enviarFila() }, 30_000)
+    return () => window.clearInterval(timer)
+  }, [fila, enviarFila])
 
   if (!token) {
     return (
@@ -404,10 +450,10 @@ export default function TreinoAluno() {
         sincronizadoEm={sincronizadoEm}
         fila={fila}
         erro={erroFila}
-        onEnviar={() => void enviarFila()}
+        onEnviar={() => void enviarFila(true)}
         onDescartar={(clientRef) => {
           if (!scope) return
-          void dequeueSession(scope, clientRef).then(() => recarregarFila()).catch((error) => {
+          void dequeueSession(scope, clientRef, true, storageAccess.current ?? undefined).then(() => recarregarFila()).catch((error) => {
             setErroFila(errorMessage(error, 'Não foi possível remover este aviso.'))
           })
         }}
@@ -424,6 +470,7 @@ export default function TreinoAluno() {
           <button
             key={id}
             type="button"
+            disabled={registrando}
             onClick={() => setAba(id)}
             aria-current={aba === id ? 'page' : undefined}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm transition ${
@@ -442,6 +489,8 @@ export default function TreinoAluno() {
             token={token}
             scope={scope}
             pacote={pacote}
+            access={storageAccess.current!}
+            onSavingChange={aoRegistrar}
             onFilaMudou={recarregarFila}
             onSemRede={() => setSemRede(true)}
             onLinkInvalid={invalidarAcesso}
@@ -457,7 +506,7 @@ export default function TreinoAluno() {
       ) : null}
 
       {aba === 'historico' ? (
-        <Historico token={token} scope={scope} onLinkInvalid={invalidarAcesso}
+        <Historico token={token} scope={scope} access={storageAccess.current!} onLinkInvalid={invalidarAcesso}
           planId={pacote.plan?.id ?? null}
           exerciseOptions={pacote.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))}
           onEdited={async () => {
@@ -469,8 +518,8 @@ export default function TreinoAluno() {
                 await invalidarAcesso()
                 return
               }
-              setPacote(next)
-              await writeCachedWorkout(scope, next)
+              receberPacote(next)
+              await writeCachedWorkout(scope, next, storageAccess.current!)
             } catch {
               // A correção já foi salva; a referência de carga pode ser
               // atualizada na próxima conexão sem desfazer esse sucesso.
@@ -482,6 +531,7 @@ export default function TreinoAluno() {
         <Anteriores
           token={token}
           scope={scope}
+          access={storageAccess.current!}
           pacote={pacote}
           onLinkInvalid={invalidarAcesso}
         />
@@ -494,8 +544,10 @@ export default function TreinoAluno() {
         <button
           type="button"
           className="mt-2 text-[11px] text-muted-foreground underline"
+          disabled={registrando}
           onClick={() => {
-            void forgetStudentDevice().then(() => window.location.replace('/t'))
+            void invalidarAcesso(false).then(() => forgetStudentDevice())
+              .then(() => window.location.replace('/t')).catch(() => setErroLimpeza(true))
           }}
         >
           Sair deste aparelho
@@ -588,8 +640,8 @@ function StatusBar({
             {pendentes.length > 0 ? (
               <p>
                 {pendentes.length === 1
-                  ? '1 treino salvo no aparelho, aguardando internet.'
-                  : `${pendentes.length} treinos salvos no aparelho, aguardando internet.`}
+                  ? '1 treino salvo no aparelho, aguardando sincronização.'
+                  : `${pendentes.length} treinos salvos no aparelho, aguardando sincronização.`}
               </p>
             ) : (
               <p>Sem internet. Você pode treinar e registrar normalmente.</p>
@@ -641,11 +693,14 @@ function StatusBar({
 }
 
 type Linha = LogRow
+const studentDraftOperations = new Map<string, Promise<unknown>>()
 
 function TreinoDoDia({
   token,
   scope,
   pacote,
+  access,
+  onSavingChange,
   onFilaMudou,
   onSemRede,
   onLinkInvalid,
@@ -653,6 +708,8 @@ function TreinoDoDia({
   token: string
   scope: string
   pacote: StudentWorkout
+  access: StudentStorageAccess
+  onSavingChange: (saving: boolean) => void
   onFilaMudou: () => Promise<void>
   onSemRede: () => void
   onLinkInvalid: () => Promise<void>
@@ -681,7 +738,10 @@ function TreinoDoDia({
   const [extras, setExtras] = useState<string[]>([])
   const [escolhaExtra, setEscolhaExtra] = useState('')
   const [clientRef, setClientRef] = useState<string>(() => crypto.randomUUID())
-  const [revision, setRevision] = useState(0)
+  const revision = useRef(0)
+  const revisions = useRef(new Map<string, number>())
+  const draftOperations = useRef<Promise<unknown>>(Promise.resolve())
+  const saving = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<'progresso' | 'concluir' | null>(null)
@@ -691,8 +751,10 @@ function TreinoDoDia({
   const [dirty, setDirty] = useState(false)
   const [switchingSession, setSwitchingSession] = useState(false)
   const [resetEpoch, setResetEpoch] = useState(0)
-  const draftReadKey = useRef<string | null>(null)
+  const draftPlan = useRef({ days: dias, exercises: pacote.exercises })
+  draftPlan.current = { days: dias, exercises: pacote.exercises }
   const switchGeneration = useRef(0)
+  const switchAccess = useRef<StudentStorageAccess | null>(null)
   const localConclusions = useRef(0)
 
   const exerciciosDoDia = useMemo(
@@ -743,20 +805,12 @@ function TreinoDoDia({
   // treinador pode ter regravado o plano (o que troca TODOS os ids filhos)
   // enquanto o aluno treinava. Ver features/workout/studentDraft.ts.
   useEffect(() => {
-    const planDraftKey = `${scope}:${plano.id}`
-    if (draftReadKey.current === planDraftKey) return
-    draftReadKey.current = planDraftKey
     let vivo = true
+    const readAccess = { ...access, parent: access }
     void (async () => {
-      const rascunho = await readDraft(scope, plano.id)
+      await studentDraftOperations.get(`${scope}:${plano.id}`)
+      const conciliado = await readReconciledDraft(scope, plano.id, draftPlan.current, readAccess)
       if (!vivo) return
-      const ageInDays = rascunho
-        ? Math.floor((Date.parse(`${hoje()}T00:00:00`) - Date.parse(`${rascunho.performedAt}T00:00:00`)) / 86_400_000)
-        : -1
-      const conciliado =
-        rascunho && ageInDays >= 0 && ageInDays <= 7
-          ? reconciliarRascunho(rascunho, { days: dias, exercises: pacote.exercises })
-          : null
       if (conciliado) {
         const d = conciliado.draft
         if (d.dayId) setDayId(d.dayId)
@@ -766,7 +820,8 @@ function TreinoDoDia({
         setLinhas(d.rows)
         setExtras(d.extras ?? [])
         setClientRef(d.clientRef)
-        setRevision(d.revision ?? 0)
+        revision.current = d.revision ?? 0
+        revisions.current.set(d.clientRef, revision.current)
         setDirty(true)
         // O aviso só aparece quando houve remapeamento de verdade: dizer "o
         // treino mudou" a cada abertura ensinaria a ignorar o recado.
@@ -779,11 +834,14 @@ function TreinoDoDia({
         }
       }
       setRascunhoLido(true)
-    })()
+    })().catch((error) => {
+      if (vivo && isStudentStorageAccessCurrent(access)) setErro(errorMessage(error, 'Não foi possível recuperar o rascunho. Reabra esta tela.'))
+    })
     return () => {
       vivo = false
+      invalidateStudentStorageAccess(readAccess)
     }
-  }, [dias, pacote.exercises, plano.id, scope])
+  }, [plano.id, scope, access])
 
   // Garante uma linha por série prescrita ao trocar de divisão/semana.
   useEffect(() => {
@@ -795,7 +853,7 @@ function TreinoDoDia({
           ex as unknown as WorkoutExerciseRow,
           overrideFor(indice, semana, ex.id)
         )
-        proximo[ex.id] = reconcileSetRows(proximo[ex.id] ?? [], efetiva.sets)
+        proximo[ex.id] = reconcileSetRows(proximo[ex.id] ?? [], efetiva.skipped ? 0 : efetiva.sets)
       }
       // O avulso usa as séries prescritas na divisão de origem como ponto de
       // partida; override de semana não se aplica, porque ele não está sendo
@@ -813,13 +871,17 @@ function TreinoDoDia({
   // perdia a escolha na retomada, porque o campo simplesmente não era gravado.
   const draftRef = useRef(draftAtual)
   draftRef.current = draftAtual
+  const persistRef = useRef(persistDraft)
+  persistRef.current = persistDraft
   useEffect(() => {
-    if (!rascunhoLido || !dirty) return
+    if (!rascunhoLido || !dirty || salvando !== null) return
     const id = setTimeout(() => {
-      void writeDraft(scope, draftRef.current())
+      void persistRef.current(draftRef.current()).catch((error) => {
+        if (isStudentStorageAccessCurrent(access)) setErro(errorMessage(error, 'Não foi possível guardar o rascunho neste aparelho.'))
+      })
     }, 500)
     return () => clearTimeout(id)
-  }, [scope, clientRef, revision, plano.id, dayId, semana, data, notas, linhas, extras, rascunhoLido, dirty])
+  }, [scope, clientRef, plano.id, dayId, semana, data, notas, linhas, extras, rascunhoLido, dirty, salvando, access])
 
   // Descarga ao desmontar: o pacote novo que chega do servidor remonta esta
   // tela (a `key` acompanha os ids das divisões), e o debounce de 500 ms acima
@@ -830,9 +892,13 @@ function TreinoDoDia({
   dirtyRef.current = dirty
   useEffect(() => {
     return () => {
-      if (dirtyRef.current) void writeDraft(scope, draftRef.current())
+      switchGeneration.current += 1
+      if (switchAccess.current) invalidateStudentStorageAccess(switchAccess.current)
+      if (dirtyRef.current && !saving.current && isStudentStorageAccessCurrent(access)) {
+        void persistRef.current(draftRef.current()).catch(() => undefined)
+      }
     }
-  }, [scope])
+  }, [scope, access])
 
   function setCelula(exId: string, i: number, campo: keyof Linha, valor: string | boolean) {
     setDirty(true)
@@ -870,7 +936,7 @@ function TreinoDoDia({
 
   const dia = dias.find((d) => d.id === dayId)
 
-  function draftAtual(nextRevision = revision) {
+  function draftAtual(nextRevision = revision.current): DraftSession {
     return {
       clientRef,
       revision: nextRevision,
@@ -887,13 +953,38 @@ function TreinoDoDia({
     }
   }
 
+  function persistDraft(snapshot: DraftSession, required = false, reserve = false): Promise<number> {
+    const key = `${scope}:${snapshot.planId}`
+    const operation = (studentDraftOperations.get(key) ?? draftOperations.current).then(async () => {
+      const base = revisions.current.get(snapshot.clientRef) ?? snapshot.revision
+      const allocated = await (reserve ? reserveDraftRevision : writeDraft)(
+        scope, { ...snapshot, revision: base }, required, access
+      )
+      revisions.current.set(snapshot.clientRef, allocated)
+      if (draftRef.current().clientRef === snapshot.clientRef) revision.current = allocated
+      return allocated
+    })
+    draftOperations.current = operation.catch(() => undefined)
+    const settled = draftOperations.current
+    studentDraftOperations.set(key, settled)
+    void settled.then(() => {
+      if (studentDraftOperations.get(key) === settled) studentDraftOperations.delete(key)
+    })
+    return operation
+  }
+
   async function trocarSessao(nextDayId: string, nextDate: string) {
+    if (!rascunhoLido || saving.current) return
     if (nextDayId === dayId && nextDate === data) return
     const generation = ++switchGeneration.current
+    const readAccess = { ...access, parent: access }
+    switchAccess.current = readAccess
     setSwitchingSession(true)
     try {
-      if (dirty) await writeDraft(scope, draftAtual())
-      const target = await readDraft(scope, plano.id, nextDayId, nextDate)
+      if (dirty) await persistDraft(draftAtual(), true)
+      else await draftOperations.current
+      const reconciled = await readReconciledDraft(scope, plano.id, draftPlan.current, readAccess, nextDayId, nextDate)
+      const target = reconciled?.draft
       if (generation !== switchGeneration.current) return
       setDayId(nextDayId)
       setData(nextDate)
@@ -903,19 +994,22 @@ function TreinoDoDia({
       setExtras(target?.extras ?? [])
       setEscolhaExtra('')
       setClientRef(target?.clientRef ?? crypto.randomUUID())
-      setRevision(target?.revision ?? 0)
+      revision.current = target?.revision ?? 0
+      if (target) revisions.current.set(target.clientRef, revision.current)
       setDirty(Boolean(target))
       setErro(null)
       setOk(null)
       setPlanoMudou(null)
       setResetEpoch((value) => value + 1)
+    } catch (error) {
+      if (generation === switchGeneration.current) setErro(errorMessage(error, 'Não foi possível guardar e trocar a sessão.'))
     } finally {
       if (generation === switchGeneration.current) setSwitchingSession(false)
     }
   }
 
   async function salvar(concluir: boolean) {
-    if (switchingSession) return
+    if (switchingSession || !rascunhoLido || saving.current) return
     setErro(null)
     setOk(null)
     const erroDescanso = validateLogRows(Object.fromEntries(
@@ -931,17 +1025,14 @@ function TreinoDoDia({
       return
     }
 
+    saving.current = true
+    onSavingChange(true)
     setSalvando(concluir ? 'concluir' : 'progresso')
     try {
       // A reserva é uma transação IndexedDB: duas abas nunca recebem a mesma
       // revisão. No progresso ela é obrigatória, pois a mensagem promete que a
       // sessão poderá ser retomada mesmo se a aba fechar logo depois.
-      const allocatedRevision = await reserveDraftRevision(
-        scope,
-        draftAtual(),
-        !concluir
-      )
-      setRevision(allocatedRevision)
+      const allocatedRevision = await persistDraft(draftAtual(), !concluir, true)
 
       const sessao: QueuedSession = {
         clientRef,
@@ -958,9 +1049,10 @@ function TreinoDoDia({
       const result = await withStudentSyncLock(scope, async () => {
         let durableOutbox = false
         try {
-          await enqueueSession(scope, sessao)
+          await enqueueSession(scope, sessao, access)
           durableOutbox = true
-        } catch {
+        } catch (storageError) {
+          if (!(storageError instanceof StudentStorageError)) throw storageError
           // IndexedDB indisponível não impede o uso online. Se a rede também
           // falhar, o bloco abaixo exige a fila antes de confirmar o salvamento.
         }
@@ -981,27 +1073,29 @@ function TreinoDoDia({
             throw new Error(enviado.corrected ? CORRECTED_SESSION_MESSAGE
               : 'Este treino tem um envio mais recente. Confira o histórico antes de salvar novamente.')
           }
-          if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false)
+          if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false, access, sessao.revision)
           return { offline: false }
         } catch (error) {
-          if (!isNetworkFailure(error)) {
-            if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false)
+          if (!isTransientStudentError(error)) {
+            if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false, access, sessao.revision)
             throw error
           }
           if (!durableOutbox) {
-            await enqueueSession(scope, sessao)
+            await enqueueSession(scope, sessao, access)
             durableOutbox = true
           }
           return { offline: true }
         }
       })
 
+      if (!isStudentStorageAccessCurrent(access)) return
+      if (concluir) await clearDraftSession(scope, plano.id, dayId, data, access, clientRef, allocatedRevision)
       if (result.offline) {
         await onFilaMudou()
         onSemRede()
         setOk(
           concluir
-            ? 'Treino concluído e salvo no aparelho. Vai subir sozinho quando houver internet.'
+            ? 'Treino concluído e salvo no aparelho. Será sincronizado automaticamente.'
             : 'Progresso salvo no aparelho. Você pode continuar o treino.'
         )
       } else {
@@ -1013,13 +1107,14 @@ function TreinoDoDia({
         )
       }
       if (concluir) {
-        await clearDraftSession(scope, plano.id, dayId, data)
         reiniciar()
       }
     } catch (error) {
       if (isInvalidStudentLinkError(error)) await onLinkInvalid()
       else setErro(errorMessage(error, 'Não foi possível salvar o treino no servidor nem neste aparelho. Mantenha esta tela aberta e tente novamente.'))
     } finally {
+      saving.current = false
+      onSavingChange(false)
       setSalvando(null)
     }
   }
@@ -1035,7 +1130,7 @@ function TreinoDoDia({
     setData(hoje())
     setSemana(semanaSugerida)
     setClientRef(crypto.randomUUID())
-    setRevision(0)
+    revision.current = 0
     setNotas('')
     setLinhas({})
     setExtras([])
@@ -1057,6 +1152,8 @@ function TreinoDoDia({
 
   return (
     <div className="space-y-4">
+      {!rascunhoLido ? <p role="status" className="text-sm text-muted-foreground">Recuperando seu rascunho...</p> : null}
+      <fieldset disabled={!rascunhoLido || switchingSession || salvando !== null} className="min-w-0 space-y-4">
       {planoMudou ? (
         <div
           role="status"
@@ -1371,6 +1468,7 @@ function TreinoDoDia({
           {salvando === 'concluir' ? 'Concluindo...' : 'Concluir treino'}
         </Button>
       </div>
+      </fieldset>
     </div>
   )
 }
@@ -1378,6 +1476,7 @@ function TreinoDoDia({
 function Historico({
   token,
   scope,
+  access,
   onLinkInvalid,
   onEdited,
   planId,
@@ -1385,6 +1484,7 @@ function Historico({
 }: {
   token: string
   scope: string
+  access: StudentStorageAccess
   onLinkInvalid: () => Promise<void>
   onEdited: () => Promise<void>
   planId: string | null
@@ -1428,7 +1528,7 @@ function Historico({
         }
         setSessoes(fresco.items)
         setCursor(fresco.next_cursor)
-        await writeCachedHistory(scope, fresco.items, fresco.next_cursor)
+        await writeCachedHistory(scope, fresco.items, fresco.next_cursor, access)
         setOffline(false)
       } catch (error) {
         if (!vivo) return
@@ -1444,7 +1544,7 @@ function Historico({
     return () => {
       vivo = false
     }
-  }, [token, scope, onLinkInvalid, refreshKey])
+  }, [token, scope, onLinkInvalid, refreshKey, access])
 
   async function abrirEdicao(session: StudentHistorySession) {
     if (openingEdit || !session.updated_at || session.source !== 'student') return
@@ -1495,7 +1595,7 @@ function Historico({
       setSessoes(next)
       setEditing(null)
       setSavedMessage('Correções salvas no treino.')
-      await writeCachedHistory(scope, next, cursor)
+      await writeCachedHistory(scope, next, cursor, access)
       // A data participa da paginação: recarregar a primeira página evita
       // manter um cursor antigo depois de mover uma sessão para outra data.
       setRefreshKey((key) => key + 1)
@@ -1512,6 +1612,7 @@ function Historico({
     setErroMais(null)
     try {
       const pagina = await getHistoryPageForLink(token, { limit: 30, cursor })
+      if (!mounted.current || !isStudentStorageAccessCurrent(access)) return
       if (!pagina) {
         await onLinkInvalid()
         return
@@ -1521,7 +1622,7 @@ function Historico({
       setSessoes(merged)
       setCursor(pagina.next_cursor)
       setOffline(false)
-      await writeCachedHistory(scope, merged, pagina.next_cursor)
+      await writeCachedHistory(scope, merged, pagina.next_cursor, access)
     } catch (error) {
       if (isInvalidStudentLinkError(error)) await onLinkInvalid()
       else {
@@ -1624,11 +1725,13 @@ function Historico({
 function Anteriores({
   token,
   scope,
+  access,
   pacote,
   onLinkInvalid,
 }: {
   token: string
   scope: string
+  access: StudentStorageAccess
   pacote: StudentWorkout
   onLinkInvalid: () => Promise<void>
 }) {
@@ -1637,6 +1740,7 @@ function Anteriores({
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const pedidoAtual = useRef(0)
+  useEffect(() => () => { pedidoAtual.current += 1 }, [])
 
   async function abrir(planId: string) {
     if (aberto === planId) {
@@ -1650,20 +1754,21 @@ function Anteriores({
     setErro(null)
     setCarregando(true)
     const cache = await readCachedPlan(scope, planId)
-    if (pedido !== pedidoAtual.current) return
+    if (pedido !== pedidoAtual.current || !isStudentStorageAccessCurrent(access)) return
     if (cache) setDetalhe(cache)
     let planUnavailable = false
     try {
       const fresco = await getPlanForLink(token, planId)
-      if (pedido !== pedidoAtual.current) return
+      if (pedido !== pedidoAtual.current || !isStudentStorageAccessCurrent(access)) return
       if (fresco) {
         setDetalhe(fresco)
-        await writeCachedPlan(scope, planId, fresco)
+        await writeCachedPlan(scope, planId, fresco, access)
       } else {
         planUnavailable = true
         setDetalhe(null)
-        await removeCachedPlan(scope, planId)
+        await removeCachedPlan(scope, planId, access)
         const acesso = await getWorkoutForLink(token)
+        if (pedido !== pedidoAtual.current || !isStudentStorageAccessCurrent(access)) return
         if (!acesso || isStudentLinkExpired(acesso.link_expires_at)) {
           await onLinkInvalid()
           return

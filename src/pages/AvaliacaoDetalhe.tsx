@@ -65,6 +65,7 @@ export default function AvaliacaoDetalhe() {
     !query.data.assessment ||
     subjectQuery.isError ||
     !subjectQuery.data ||
+    query.data.assessment.subject_id !== subjectQuery.data.id ||
     assessmentsQuery.isError
   ) {
     return (
@@ -103,6 +104,8 @@ export default function AvaliacaoDetalhe() {
             bodyFatPct: rr?.bodyFatPct ?? null,
             leanMassKg: rr?.leanMassKg ?? null,
             fatMassKg: rr?.fatMassKg ?? null,
+            warnings: rr?.warnings,
+            assessedAt: x.assessed_at,
           }
         })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
@@ -154,7 +157,7 @@ export default function AvaliacaoDetalhe() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <Link
             to={`/avaliados/${id}`}
@@ -170,7 +173,7 @@ export default function AvaliacaoDetalhe() {
             {assessment.height_cm} cm
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
           <Button asChild variant="outline" size="sm">
             <Link to={`/avaliados/${id}/avaliacoes/${assessment.id}/editar`}>
               <Pencil /> Editar
@@ -254,6 +257,13 @@ export default function AvaliacaoDetalhe() {
             <CardDescription>motor {result.engineVersion}</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {result.warnings?.length ? (
+              <div className="col-span-2 space-y-2 sm:col-span-4">
+                {result.warnings.map((warning) => (
+                  <p key={warning.code} role="status" className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">{warning.message}</p>
+                ))}
+              </div>
+            ) : null}
             <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1)}%`} />
             {result.bodyDensity != null ? (
               <Stat label="Densidade" value={result.bodyDensity.toFixed(4)} />

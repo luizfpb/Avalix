@@ -68,5 +68,18 @@ export function RouteGuard({ children }: { children: ReactNode }) {
     return <Navigate to={target} replace />
   }
 
-  return <>{children}</>
+  return (
+    <>
+      {org.refreshFailed && !mfaRequired ? (
+        <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm">
+          <span>A conexão com sua organização falhou. Seu preenchimento foi mantido.</span>
+          <button type="button" disabled={org.refreshing} onClick={() => void org.refresh()}
+            className="shrink-0 font-medium underline underline-offset-2 disabled:opacity-60">
+            {org.refreshing ? 'Reconectando...' : 'Tentar novamente'}
+          </button>
+        </div>
+      ) : null}
+      {children}
+    </>
+  )
 }

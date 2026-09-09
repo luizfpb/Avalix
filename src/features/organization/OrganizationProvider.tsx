@@ -11,13 +11,22 @@ import {
   type OrgStatus,
 } from './context'
 
+class MembershipLoadError extends Error {
+  readonly temporary: boolean
+
+  constructor(error: unknown, status: number) {
+    super('Não foi possível carregar sua organização.', { cause: error })
+    this.temporary = status === 0 || status === 408 || status === 429 || status >= 500
+  }
+}
+
 // V1 opera com uma org por usuário; se houver mais de uma membership, carrega
 // a mais antiga (determinístico — sem o order, qual org abre seria loteria).
 async function fetchMembership(userId: string): Promise<{
   membership: MembershipRow | null
   organization: OrganizationRow | null
 }> {
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('org_members')
     .select('*, organizations(*)')
     .eq('user_id', userId)
@@ -25,7 +34,7 @@ async function fetchMembership(userId: string): Promise<{
     .limit(1)
     .maybeSingle()
 
-  if (error) throw error
+  if (error) throw new MembershipLoadError(error, status)
   if (!data) return { membership: null, organization: null }
 
   const row = data as MembershipRow & {
@@ -51,6 +60,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     retry: 1,
   })
   const { refetch } = query
+  // Erro de rede no refetch não invalida os dados já carregados nem pode
+  // desmontar o formulário. Uma resposta sem membership ou uma recusa de
+  // autenticação/autorização continua fechando a rota normalmente.
+  const refreshFailed = query.isError && !!query.data?.organization &&
+    query.error instanceof MembershipLoadError && query.error.temporary
 
   // o log de erros (client_errors) precisa da org pra RLS; módulo fora do React
   const currentOrgId = query.data?.organization?.id ?? null
@@ -60,10 +74,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   const status: OrgStatus = useMemo(() => {
     if (authStatus !== 'signedIn') return 'absent'
-    if (query.isError) return 'error'
+    if (query.isError && !refreshFailed) return 'error'
     if (query.isPending) return 'loading'
     return query.data?.organization ? 'present' : 'absent'
-  }, [authStatus, query.isError, query.isPending, query.data])
+  }, [authStatus, query.isError, query.isPending, query.data, refreshFailed])
 
   const refresh = useCallback(async () => {
     await refetch()
@@ -77,8 +91,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       role:
         (query.data?.membership as { role?: string | null } | null | undefined)?.role ?? null,
       refresh,
+      refreshFailed,
+      refreshing: query.isFetching,
     }),
-    [status, query.data?.organization, query.data?.membership, refresh]
+    [status, query.data?.organization, query.data?.membership, refresh, refreshFailed, query.isFetching]
   )
 
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>

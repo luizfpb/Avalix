@@ -7,8 +7,8 @@ import {
   updateAnamnese,
   type CreateAnamneseInput,
   type UpdateAnamneseInput,
+  type SetLiberacaoMedicaInput,
 } from './api'
-import type { LiberacaoInput } from './clearance'
 
 export function useAnamneses(subjectId: string | undefined) {
   return useQuery({
@@ -52,7 +52,7 @@ export function useUpdateAnamnese(subjectId: string | undefined, id: string | un
 export function useSetLiberacaoMedica(subjectId: string | undefined, id: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: LiberacaoInput) => setLiberacaoMedica(id as string, input),
+    mutationFn: (input: SetLiberacaoMedicaInput) => setLiberacaoMedica(id as string, input),
     onSuccess: (row) => {
       qc.invalidateQueries({ queryKey: ['anamneses', subjectId] })
       qc.invalidateQueries({ queryKey: ['anamnese', row.id] })

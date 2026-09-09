@@ -38,7 +38,8 @@ export function useCreateSubject(orgId: string | null | undefined) {
 export function useUpdateSubject(id: string | undefined, orgId: string | null | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (patch: SubjectUpdate) => updateSubject(id as string, patch),
+    mutationFn: ({ patch, expectedUpdatedAt }: { patch: SubjectUpdate; expectedUpdatedAt: string }) =>
+      updateSubject(id as string, patch, expectedUpdatedAt),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['subjects', orgId] })
       qc.invalidateQueries({ queryKey: ['subject', id] })

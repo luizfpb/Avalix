@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Session } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { clearPersistedAuthSession, supabase } from '../../lib/supabase'
 import { AuthContext, type AuthContextValue, type MfaStatus } from './context'
 import type { AuthStatus } from '../../lib/routing'
@@ -11,6 +11,7 @@ import {
   setPrivateClientScope,
 } from './clientPrivacy'
 import { mfaStatusFromAssurance } from './mfa'
+import { updateRecoveryFlow } from './recovery'
 
 // Sobrevive ao unmount deliberado na rota publica /a. Assim, ao voltar para
 // a area autenticada, uma troca de conta ocorrida em outra aba ainda limpa o
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const applySession = useCallback(
-    (newSession: Session | null) => {
+    (newSession: Session | null, event?: AuthChangeEvent) => {
       const nextUserId = newSession?.user.id ?? null
       const transition = classifySessionTransition(lastObservedUserId, nextUserId)
       if (identityChanged(lastObservedUserId, nextUserId)) {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastObservedUserId = nextUserId
       setSession(newSession)
       setStatus(newSession ? 'signedIn' : 'signedOut')
+      setIsRecovering(updateRecoveryFlow(newSession, event))
       if (transition === 'revalidated') {
         // Mesma identidade: o escopo de rascunho ja esta completo (userId+orgId,
         // aplicado por PrivateScope) e precisa continuar valendo — zera-lo aqui
@@ -106,9 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!active) return
       authEventSeen = true
-      if (event === 'PASSWORD_RECOVERY') setIsRecovering(true)
-      if (event === 'SIGNED_OUT') setIsRecovering(false)
-      applySession(newSession)
+      applySession(newSession, event)
     })
 
     return () => {

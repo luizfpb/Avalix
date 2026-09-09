@@ -120,12 +120,15 @@ const ERROS_LIBERACAO: Record<string, string> = {
 // anamnese. As colunas da triagem NÃO entram no update: elas descrevem as
 // respostas e continuam derivadas do payload pelo banco. Autoria e carimbo são
 // escritos pelo servidor (migration 0029) e por isso não são enviados daqui.
+export type SetLiberacaoMedicaInput = LiberacaoInput & { expectedUpdatedAt: string }
+
 export async function setLiberacaoMedica(
   id: string,
-  input: LiberacaoInput
+  input: SetLiberacaoMedicaInput
 ): Promise<AnamneseRow> {
   const invalido = validarLiberacao(input)
   if (invalido) throw new Error(invalido)
+  if (!input.expectedUpdatedAt) throw new Error('Não foi possível confirmar a versão do parecer. Reabra a edição antes de salvar.')
 
   const registro =
     input.status === 'pendente'
@@ -146,10 +149,11 @@ export async function setLiberacaoMedica(
     .from('anamneses')
     .update(registro)
     .eq('id', id)
+    .eq('updated_at', input.expectedUpdatedAt)
     .select('*')
     .single()
   if (error?.code === 'PGRST116') {
-    throw new Error('Esta anamnese não está mais disponível para edição. Recarregue a página.')
+    throw new Error(await motivoDaRecusa(id, input.expectedUpdatedAt))
   }
   if (error) {
     const traduzido = ERROS_LIBERACAO[(error.message ?? '').trim()]

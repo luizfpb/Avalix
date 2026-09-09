@@ -109,6 +109,7 @@ export async function exportSubjectArchive(input: {
     'LEIA-ME.txt',
     'Exportação de portabilidade do Avalix.\n' +
       'dados.json contém o snapshot completo dos registros disponíveis.\n' +
+      'posture_annotations_shadowed reúne folhas antigas preservadas por duplicidade; as anotações atuais ficam em posture_annotations.\n' +
       'fotos/ contém as imagens posturais originais. Miniaturas não são duplicadas.\n' +
       'O arquivo contém dados pessoais sensíveis: armazene e compartilhe com cuidado.\n'
   )

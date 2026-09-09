@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ensureLogRows, updateLogRow, validateLogRows, validateRestRows } from './logRows'
+import { ensureLogRows, reconcileSetRows, updateLogRow, validateLogRows, validateRestRows } from './logRows'
 
 describe('ensureLogRows', () => {
+  it('cria todas as 20 séries admitidas pela prescrição', () => {
+    expect(ensureLogRows({}, [{ id: 'a', sets: 20 }]).a).toHaveLength(20)
+    expect(reconcileSetRows([], 20)).toHaveLength(20)
+  })
   it('preserva séries digitadas ao inicializar outra divisão', () => {
     const divisionA = { a1: [{ weight: '40', reps: '10', rir: '2' }] }
     const withDivisionB = ensureLogRows(divisionA, [{ id: 'b1', sets: 2 }])

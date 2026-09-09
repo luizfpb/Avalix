@@ -22,6 +22,7 @@ import type {
   SubjectCircumference,
 } from '../assessment/api'
 import type { AssessmentResultSnapshot } from '../assessment/result'
+import type { ResultWarning } from '../assessment/protocols'
 import { protocolLabel } from '../assessment/protocols'
 import { comparabilidadeDeProtocolos, METRICAS_DEPENDENTES_DO_PROTOCOLO } from '../assessment/comparability'
 import { registerReportFonts } from './pdfFonts'
@@ -54,11 +55,22 @@ export type AssessmentHistoryPoint = {
   date: string
   /** protocolo da avaliação; a série mistura métodos quando ele varia */
   protocolId?: string | null
+  assessedAt?: string
+  warnings?: ResultWarning[]
   weightKg: number | null
   bmi: number | null
   bodyFatPct: number | null
   leanMassKg: number | null
   fatMassKg: number | null
+}
+
+// O relatório da série conserva as ressalvas de CADA coleta, com sua data.
+// A nota genérica de método não substitui um aviso específico do snapshot.
+export function historyWarnings(history: AssessmentHistoryPoint[]): { code: string; message: string }[] {
+  return history.flatMap((point, index) => (point.warnings ?? []).map((warning) => ({
+    code: `${index}:${warning.code}`,
+    message: `${fmtDate(point.assessedAt ?? point.date)} · ${protocolLabel(point.protocolId ?? null)}: ${warning.message}`,
+  })))
 }
 
 export type AssessmentPdfData = {
@@ -806,7 +818,7 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
         {comparabilidade.aviso ? <FreeTextSection title="Comparabilidade do período" text={comparabilidade.aviso} /> : null}
         <EvolutionSection history={data.history} maxCharts={5} />
         <CircumferenceEvolution rows={data.circumferenceHistory} />
-        <MethodNote>
+        <MethodNote warnings={historyWarnings(data.history)}>
           Valores calculados a partir das avaliações registradas no período. Antropometria estima
           a composição corporal por equação de regressão e carrega erro padrão inerente ao método;
           serve para acompanhamento da evolução e não constitui diagnóstico ou orientação médica.

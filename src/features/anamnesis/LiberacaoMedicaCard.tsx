@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../../lib/errors'
+import { VersionConflictBanner } from '../../components/VersionConflict'
 
 function formatDataHora(iso: string | null): string {
   if (!iso) return ''
@@ -61,6 +62,7 @@ export function LiberacaoMedicaCard({
   const [editando, setEditando] = useState(false)
   const [confirmandoRetirada, setConfirmandoRetirada] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [baseVersion, setBaseVersion] = useState<string | null>(null)
   const [form, setForm] = useState<{
     status: Exclude<LiberacaoStatus, 'pendente'>
     em: string
@@ -76,9 +78,10 @@ export function LiberacaoMedicaCard({
   const ids = useId()
   const registrado = liberacao.status !== 'pendente'
 
-  if (!alerta.pedeLiberacao && !registrado) return null
+  if (!alerta.pedeLiberacao && !registrado && !editando && !confirmandoRetirada) return null
 
   function abrirEdicao() {
+    setBaseVersion(anamnese.updated_at)
     setForm({
       status: liberacao.status === 'pendente' ? 'liberado' : liberacao.status,
       em: liberacao.em ?? declaracao.em ?? todayIso(),
@@ -92,7 +95,11 @@ export function LiberacaoMedicaCard({
 
   function enviar(input: LiberacaoInput, aoTerminar: () => void) {
     setErro(null)
-    salvar.mutate(input, {
+    if (!baseVersion) {
+      setErro('Reabra a edição para confirmar a versão do parecer antes de salvar.')
+      return
+    }
+    salvar.mutate({ ...input, expectedUpdatedAt: baseVersion }, {
       onSuccess: aoTerminar,
       onError: (e) => setErro(normalizeDbError(e)),
     })
@@ -122,6 +129,9 @@ export function LiberacaoMedicaCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {(editando || confirmandoRetirada) && baseVersion && baseVersion !== anamnese.updated_at ? (
+          <VersionConflictBanner what="Esta anamnese" />
+        ) : null}
         {registrado && !editando ? (
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
@@ -166,7 +176,7 @@ export function LiberacaoMedicaCard({
         ) : null}
 
         {editando ? (
-          <div className="space-y-4">
+          <fieldset disabled={salvar.isPending} className="space-y-4">
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">O que o médico decidiu</legend>
               {LIBERACAO_OPCOES.map((op) => (
@@ -255,10 +265,10 @@ export function LiberacaoMedicaCard({
                 Cancelar
               </Button>
             </div>
-          </div>
+          </fieldset>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant={registrado ? 'outline' : 'default'} onClick={abrirEdicao}>
+            <Button size="sm" variant={registrado ? 'outline' : 'default'} onClick={abrirEdicao} disabled={salvar.isPending}>
               {registrado ? 'Editar parecer' : 'Registrar liberação médica'}
             </Button>
             {registrado ? (
@@ -291,7 +301,10 @@ export function LiberacaoMedicaCard({
                   size="sm"
                   variant="ghost"
                   className="text-destructive hover:text-destructive"
-                  onClick={() => setConfirmandoRetirada(true)}
+                  onClick={() => {
+                    setBaseVersion(anamnese.updated_at)
+                    setConfirmandoRetirada(true)
+                  }}
                 >
                   Retirar registro
                 </Button>

@@ -104,7 +104,7 @@ export default function AvaliacaoNova() {
       </div>
     )
   }
-  if (isEdit && (!assessmentQuery.data || !assessmentQuery.data.assessment)) {
+  if (isEdit && (!assessmentQuery.data?.assessment || assessmentQuery.data.assessment.subject_id !== subjectQuery.data.id)) {
     return (
       <div className="space-y-3">
         <p className="text-sm text-destructive">Não foi possível carregar a avaliação.</p>
@@ -128,7 +128,7 @@ export default function AvaliacaoNova() {
   // inicial vem de useState e não acompanharia a mudança de props)
   return (
     <Form
-      key={existing?.assessment.id ?? 'nova'}
+      key={`${subjectQuery.data.id}:${existing?.assessment.id ?? 'nova'}`}
       subject={subjectQuery.data}
       existing={existing}
     />
@@ -428,9 +428,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
 
     const skinfoldRows: NewSkinfoldReading[] = []
     for (const site of protocol.skinfoldSites) {
-      const nums = trioOf(site).map(Number).filter((n) => n > 0)
+      const nums = trioOf(site).filter((raw) => raw.trim() !== '').map(Number)
       if (nums.length === 0) continue
-      if (nums.some((n) => n < 1 || n > 99)) {
+      if (nums.some((n) => !Number.isFinite(n) || n < 1 || n > 99)) {
         return setSubmitError(`Dobra ${SKINFOLD_LABELS[site as SkinfoldSite]} deve estar entre 1 e 99 mm.`)
       }
       skinfoldRows.push({
@@ -445,9 +445,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
     // todas as circunferências do catálogo que foram preenchidas (não só as do
     // protocolo) — pra acompanhar a evolução
     for (const [site, raw] of Object.entries(circumferences)) {
+      if (raw.trim() === '') continue
       const v = Number(raw)
-      if (!(v > 0)) continue
-      if (v < 10 || v > 250) {
+      if (!Number.isFinite(v) || v < 10 || v > 250) {
         return setSubmitError(`Circunferência ${circumferenceLabel(site)} deve estar entre 10 e 250 cm.`)
       }
       circRows.push({ site, value_cm: v })
@@ -456,10 +456,11 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
     const seen = new Set(circRows.map((c) => c.site))
     for (const c of customCircs) {
       const name = c.site.trim()
+      if (!name && c.value.trim() === '') continue
+      if (!name || c.value.trim() === '') return setSubmitError('Preencha o nome e a medida de cada circunferência personalizada, ou remova a linha.')
       const v = Number(c.value)
-      if (!name || !(v > 0)) continue
       if (seen.has(name)) return setSubmitError(`Circunferência "${name}" está duplicada.`)
-      if (v < 10 || v > 250) {
+      if (!Number.isFinite(v) || v < 10 || v > 250) {
         return setSubmitError(`Circunferência "${name}" deve estar entre 10 e 250 cm.`)
       }
       seen.add(name)

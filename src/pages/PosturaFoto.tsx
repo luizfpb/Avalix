@@ -36,6 +36,11 @@ const HINTS: Record<Tool, string> = {
 }
 
 export default function PosturaFoto() {
+  const { photoId } = useParams()
+  return <PosturaFotoEditor key={photoId} />
+}
+
+function PosturaFotoEditor() {
   const { id, sessionId, photoId } = useParams()
   const { organization } = useOrganization()
   const photoQuery = usePhoto(photoId)
@@ -54,6 +59,7 @@ export default function PosturaFoto() {
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState<string | null>(null)
   const inited = useRef(false)
+  const editRevision = useRef(0)
   const blocker = useBlocker(dirty)
 
   // carrega as anotações existentes uma vez
@@ -81,6 +87,7 @@ export default function PosturaFoto() {
       if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
       if (e.key === 'Escape') setSelectedId(null)
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        editRevision.current += 1
         setShapes((s) => s.filter((x) => x.id !== selectedId))
         setSelectedId(null)
         setDirty(true)
@@ -91,12 +98,14 @@ export default function PosturaFoto() {
   }, [selectedId])
 
   function update(next: Shape[]) {
+    editRevision.current += 1
     setShapes(next)
     setDirty(true)
   }
 
   function deleteSelected() {
     if (!selectedId) return
+    editRevision.current += 1
     setShapes((s) => s.filter((x) => x.id !== selectedId))
     setSelectedId(null)
     setDirty(true)
@@ -113,6 +122,7 @@ export default function PosturaFoto() {
     try {
       const { detectPoseShapes } = await import('../features/posture/poseDetect')
       const suggested = await detectPoseShapes(url)
+      editRevision.current += 1
       setShapes((s) => [...s, ...suggested])
       setDirty(true)
       setTool('move')
@@ -127,10 +137,11 @@ export default function PosturaFoto() {
 
   async function save() {
     if (!organization) return
+    const sentRevision = editRevision.current
     try {
       const newRowId = await saveMut.mutateAsync({ orgId: organization.id, rowId, shapes })
       setRowId(newRowId)
-      setDirty(false)
+      if (editRevision.current === sentRevision) setDirty(false)
     } catch {
       // erro mostrado abaixo
     }
@@ -186,6 +197,7 @@ export default function PosturaFoto() {
           size="sm"
           variant="ghost"
           onClick={() => {
+            editRevision.current += 1
             setShapes([])
             setSelectedId(null)
             setDirty(true)

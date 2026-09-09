@@ -21,6 +21,7 @@ vi.mock('./studentStore', async (original) => ({
   readQueue: queueMocks.readQueue,
   dequeueSession: queueMocks.dequeueSession,
   markSessionRejected: queueMocks.markSessionRejected,
+  markSessionRetry: vi.fn(),
 }))
 vi.mock('./studentApi', async (original) => ({
   ...(await original<typeof import('./studentApi')>()),
@@ -331,7 +332,7 @@ describe('reenvio após edição no histórico', () => {
       sent: 0, pending: 0,
       rejected: [{ clientRef: 'ref-1', message: CORRECTED_SESSION_MESSAGE }],
     })
-    expect(queueMocks.markSessionRejected).toHaveBeenCalledWith('scope-1', 'ref-1', CORRECTED_SESSION_MESSAGE)
+    expect(queueMocks.markSessionRejected).toHaveBeenCalledWith('scope-1', 'ref-1', CORRECTED_SESSION_MESSAGE, expect.any(Object), 3)
     expect(queueMocks.dequeueSession).not.toHaveBeenCalled()
     expect(await flushQueue(TOKEN, 'scope-1')).toEqual({ sent: 0, pending: 0, rejected: [] })
     expect(queueMocks.submitSession).toHaveBeenCalledTimes(1)
@@ -346,7 +347,7 @@ describe('reenvio após edição no histórico', () => {
     queueMocks.readQueue.mockResolvedValueOnce([queued]).mockResolvedValue([])
     queueMocks.submitSession.mockResolvedValue({ logId: 'log-1', stale: true })
     expect(await flushQueue(TOKEN, 'scope-1')).toEqual({ sent: 1, pending: 0, rejected: [] })
-    expect(queueMocks.dequeueSession).toHaveBeenCalledWith('scope-1', 'ref-1')
+    expect(queueMocks.dequeueSession).toHaveBeenCalledWith('scope-1', 'ref-1', true, expect.any(Object), 2)
     expect(queueMocks.markSessionRejected).not.toHaveBeenCalled()
   })
 })

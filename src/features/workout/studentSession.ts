@@ -4,11 +4,16 @@ import { validateLogRows, type LogRow } from './logRows'
 import { submitSession, type SubmitSet } from './studentApi'
 import {
   dequeueSession,
+  captureStudentStorageAccess,
+  isStudentStorageAccessCurrent,
+  StudentAccessEndedError,
   loadStudentToken,
   markSessionRejected,
+  markSessionRetry,
   readQueue,
   saveStudentToken,
   type QueuedSession,
+  type StudentStorageAccess,
 } from './studentStore'
 
 const localSyncTails = new Map<string, Promise<void>>()
@@ -108,6 +113,15 @@ export function isNetworkFailure(error: unknown): boolean {
   )
 }
 
+export function isTransientStudentError(error: unknown): boolean {
+  if (isNetworkFailure(error)) return true
+  const detail = error && typeof error === 'object' ? error as { code?: string; status?: number; message?: string } : {}
+  if (detail.status === 408 || detail.status === 425 || detail.status === 429 || (detail.status ?? 0) >= 500) return true
+  if (/^(08|53|57)/.test(detail.code ?? '') || ['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003', '40001', '40P01'].includes(detail.code ?? '')) return true
+  const message = (detail.message ?? String(error ?? '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return /schema cache|statement timeout|too many requests|rate limit|muitas requisicoes|muitas tentativas/.test(message)
+}
+
 export function isInvalidStudentLinkError(error: unknown): boolean {
   const message = (
     error && typeof error === 'object' && 'message' in error
@@ -140,12 +154,15 @@ export const CORRECTED_SESSION_MESSAGE =
 // Sobe a fila inteira. Reenviar é inofensivo por construção (client_ref), então
 // não há estado a proteger contra execução concorrente além de não duplicar
 // esforço — quem chama evita isso com o `flushing` da página.
-export async function flushQueue(token: string, scope: string): Promise<FlushResult> {
+export async function flushQueue(token: string, scope: string, access?: StudentStorageAccess, force = false): Promise<FlushResult> {
+  const lease = access ?? await captureStudentStorageAccess()
   const queue = await readQueue(scope)
   const result: FlushResult = { sent: 0, pending: 0, rejected: [] }
 
   for (const item of queue) {
-    if (item.error) continue
+    if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()
+    if (item.error && !isTransientStudentError({ message: item.error })) continue
+    if (!force && (item.retryAt ?? 0) > Date.now()) continue
     let submitted: Awaited<ReturnType<typeof submitSession>>
     try {
       submitted = await submitSession({
@@ -160,7 +177,9 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
         planId: item.planId,
       })
     } catch (error) {
-      if (isNetworkFailure(error)) {
+      if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()
+      if (isTransientStudentError(error)) {
+        await markSessionRetry(scope, item, lease)
         // ainda sem rede: para por aqui e tenta tudo de novo depois
         result.pending = (await readQueue(scope)).filter((q) => !q.error).length
         return result
@@ -170,23 +189,24 @@ export async function flushQueue(token: string, scope: string): Promise<FlushRes
         error && typeof error === 'object' && 'message' in error
           ? String((error as { message?: unknown }).message ?? '')
           : 'não foi possível registrar'
-      await markSessionRejected(scope, item.clientRef, message)
+      await markSessionRejected(scope, item.clientRef, message, lease, item.revision ?? 1)
       result.rejected.push({ clientRef: item.clientRef, message })
       continue
     }
 
+    if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()
     if (submitted.corrected) {
       // A correção feita no histórico prevalece sobre o rascunho anterior.
       // Mantém o envio local visível, sem repetir nem confirmar uma gravação
       // que não aconteceu. O rascunho em andamento continua no aparelho.
-      await markSessionRejected(scope, item.clientRef, CORRECTED_SESSION_MESSAGE)
+      await markSessionRejected(scope, item.clientRef, CORRECTED_SESSION_MESSAGE, lease, item.revision ?? 1)
       result.rejected.push({ clientRef: item.clientRef, message: CORRECTED_SESSION_MESSAGE })
       continue
     }
 
     // Se remover do IndexedDB falhar, a exceção sobe. O item permanece e o
     // replay é seguro pelo client_ref; fingir sucesso perderia rastreabilidade.
-    await dequeueSession(scope, item.clientRef)
+    await dequeueSession(scope, item.clientRef, true, lease, item.revision ?? 1)
     result.sent += 1
   }
 
@@ -238,25 +258,7 @@ export function buildSets(
 }
 
 export type StudentSetRow = LogRow
-
-function emptySetRow(): StudentSetRow {
-  return { weight: '', reps: '', rir: '', rest: '', failure: false }
-}
-
-function rowIsEmpty(row: StudentSetRow): boolean {
-  return !row.weight.trim() && !row.reps.trim() && !row.rir.trim()
-    && !(row.rest ?? '').trim() && row.failure !== true
-}
-
-// Ajusta a grade à prescrição sem apagar série preenchida. Linhas vazias que
-// excedem a nova quantidade somem; uma série extra com dado continua explícita.
-export function reconcileSetRows(rows: StudentSetRow[], prescribedSets: number): StudentSetRow[] {
-  const target = Math.max(0, Math.min(Math.trunc(prescribedSets), 12))
-  const next = rows.slice()
-  while (next.length > target && rowIsEmpty(next[next.length - 1])) next.pop()
-  while (next.length < target) next.push(emptySetRow())
-  return next
-}
+export { reconcileSetRows } from './logRows'
 
 export function suggestedWorkoutDayId(
   weeklySchedule: string[],

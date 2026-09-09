@@ -159,6 +159,33 @@ function salvar() {
   fireEvent.click(screen.getByRole('button', { name: 'Salvar plano' }))
 }
 
+describe('integridade da sequência semanal', () => {
+  it('renomeia todas as repetições da divisão na sequência e preserva seu volume', async () => {
+    const detail = planoSalvo()
+    detail.plan!.weekly_schedule = ['A', 'A']
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+    fireEvent.change(screen.getByLabelText('Rótulo da divisão 1'), { target: { value: 'C' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    await vi.waitFor(() => expect(atualizarMock).toHaveBeenCalledTimes(1))
+    const saved = atualizarMock.mock.calls[0][0] as SaveWorkoutPlanInput
+    expect(saved.days[0].label).toBe('C')
+    expect(saved.weeklySchedule).toEqual(['C', 'C'])
+    expect(saved.volume.perWeek[0].totalSets).toBe(8)
+  })
+
+  it('recusa um rótulo já usado antes de misturar as duas divisões na sequência', () => {
+    const detail = planoSalvo()
+    detail.days.push({ ...detail.days[0], id: 'day-2', label: 'B', position: 1 })
+    detail.plan!.weekly_schedule = ['A', 'B', 'A']
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+    fireEvent.change(screen.getByLabelText('Rótulo da divisão 1'), { target: { value: 'B' } })
+    expect(screen.getByLabelText('Rótulo da divisão 1')).toHaveProperty('value', 'A')
+    expect(screen.getByText('Cada divisão precisa ter uma letra diferente.')).toBeTruthy()
+  })
+})
+
 describe('TreinoNovo — reps e RIR em branco', () => {
   it('salva sem faixa de reps e sem RIR, em vez de recusar', async () => {
     abrir()

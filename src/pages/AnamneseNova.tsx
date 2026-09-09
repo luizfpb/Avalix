@@ -80,7 +80,7 @@ export default function AnamneseNova() {
   // inicial vem de useState e não acompanharia a mudança de props)
   return (
     <Form
-      key={anamneseQuery.data?.id ?? 'nova'}
+      key={`${subjectQuery.data.id}:${anamneseQuery.data?.id ?? 'nova'}`}
       subject={subjectQuery.data}
       existing={isEdit ? (anamneseQuery.data ?? undefined) : undefined}
     />

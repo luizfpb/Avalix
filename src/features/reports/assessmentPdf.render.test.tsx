@@ -3,6 +3,8 @@ import {
   buildCircSeries,
   evolutionSummaryRows,
   generateAssessmentPdf,
+  generateEvolutionPdf,
+  historyWarnings,
   type AssessmentPdfData,
 } from './assessmentPdf'
 import type { AssessmentRow, SubjectCircumference } from '../assessment/api'
@@ -74,6 +76,19 @@ const data: AssessmentPdfData = {
 }
 
 describe('render do PDF de avaliação', () => {
+  it('preserva a data de cada ressalva e renderiza uma série extensa de avisos', async () => {
+    const history = Array.from({ length: 30 }, (_, index) => ({
+      ...data.history![0], date: '01/01', assessedAt: `${2020 + index}-01-01`, protocolId: 'jp7',
+      warnings: [{ code: 'idade-fora-da-faixa' as const, message: 'A estimativa extrapola a população de validação; interpretar com reserva.' }],
+    }))
+    const warnings = historyWarnings(history)
+    expect(warnings).toHaveLength(30)
+    expect(warnings[0].message).toContain('01/01/2020')
+    expect(warnings[29].message).toContain('01/01/2049')
+    expect(new Set(warnings.map((warning) => warning.code)).size).toBe(30)
+    const blob = await generateEvolutionPdf({ orgName: data.orgName, subjectName: data.subjectName, history, circumferenceHistory: [] })
+    expect(blob.size).toBeGreaterThan(1000)
+  }, 15_000)
   it(
     'gera um PDF não-vazio com os gráficos de evolução',
     async () => {

@@ -29,8 +29,8 @@ export default function AnamneseDetalhe() {
   const subjectQuery = useSubject(id)
   const { organization } = useOrganization()
 
-  if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
-  if (query.isError || !query.data) {
+  if (query.isPending || subjectQuery.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
+  if (query.isError || !query.data || subjectQuery.isError || !subjectQuery.data || query.data.subject_id !== subjectQuery.data.id) {
     return (
       <div className="space-y-3">
         <p className="text-sm text-destructive">Não foi possível carregar a anamnese.</p>
@@ -107,7 +107,7 @@ export default function AnamneseDetalhe() {
         assessedAt={row.assessed_at}
         updatedAt={row.updated_at}
         afterGate={
-          id ? <LiberacaoMedicaCard subjectId={id} anamnese={row} answers={a} /> : null
+          id ? <LiberacaoMedicaCard key={row.id} subjectId={id} anamnese={row} answers={a} /> : null
         }
       />
     </div>

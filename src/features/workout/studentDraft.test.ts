@@ -179,10 +179,10 @@ describe('reconciliarRascunho', () => {
     expect(r.remapeado).toBe(false)
   })
 
-  it('duas chaves antigas no mesmo destino: fica a que tem mais registro', () => {
+  it('duas chaves antigas no mesmo destino: mantém todas as séries preenchidas', () => {
     const draft = rascunho({
       rows: {
-        we1: [{ weight: '', reps: '', rir: '' }],
+        we1: [{ weight: '38', reps: '12', rir: '' }],
         we2: [{ weight: '40', reps: '10', rir: '2' }],
       },
       identity: {
@@ -197,7 +197,8 @@ describe('reconciliarRascunho', () => {
 
     const r = reconciliarRascunho(draft, plano)!
 
-    expect(r.draft.rows['we-novo'][0].weight).toBe('40')
+    expect(r.draft.rows['we-novo'].map((row) => row.weight)).toEqual(['38', '40'])
+    expect(r.draft.identity?.rowExercises).toEqual({ 'we-novo': 'cat-supino' })
   })
 })
 

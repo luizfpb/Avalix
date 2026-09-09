@@ -46,14 +46,28 @@ export async function createSubject(input: SubjectInsert): Promise<SubjectRow> {
   return data
 }
 
-export async function updateSubject(id: string, patch: SubjectUpdate): Promise<SubjectRow> {
+export async function updateSubject(
+  id: string,
+  patch: SubjectUpdate,
+  expectedUpdatedAt: string
+): Promise<SubjectRow> {
+  if (!expectedUpdatedAt) throw new Error('Não foi possível confirmar a versão deste cadastro. Recarregue antes de salvar.')
   const { data, error } = await supabase
     .from('subjects')
     .update(patch)
     .eq('id', id)
+    .eq('updated_at', expectedUpdatedAt)
     .select('*')
-    .single()
+    .maybeSingle()
   if (error) throw error
+  if (!data) {
+    const current = await supabase.from('subjects').select('updated_at').eq('id', id).maybeSingle()
+    if (current.error) throw new Error('Não foi possível confirmar se o cadastro mudou. Seu preenchimento foi preservado; tente novamente.')
+    if (current.data && current.data.updated_at !== expectedUpdatedAt) {
+      throw new Error('Este cadastro foi alterado em outro dispositivo. Recarregue para ver a versão atual antes de salvar.')
+    }
+    throw new Error('Este cadastro não está mais disponível para edição. Recarregue a página.')
+  }
   return data
 }
 

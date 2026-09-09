@@ -209,22 +209,20 @@ export async function getAssessment(id: string): Promise<{
   skinfolds: SkinfoldReadingRow[]
   circumferences: CircumferenceReadingRow[]
 }> {
-  const { data: assessment, error } = await supabase
+  // O join aninhado é executado em uma única consulta/snapshot pelo PostgREST.
+  // Três requests independentes podiam misturar o cabeçalho anterior a um save
+  // concorrente com as leituras posteriores, mesmo com escrita atômica.
+  const { data, error } = await supabase
     .from('assessments')
-    .select('*')
+    .select('*, skinfold_readings(*), circumference_readings(*)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw error
-  if (!assessment) return { assessment: null, skinfolds: [], circumferences: [] }
-
-  const sk = await supabase.from('skinfold_readings').select('*').eq('assessment_id', id).order('site')
-  if (sk.error) throw sk.error
-  const ci = await supabase
-    .from('circumference_readings')
-    .select('*')
-    .eq('assessment_id', id)
-    .order('site')
-  if (ci.error) throw ci.error
-
-  return { assessment, skinfolds: sk.data ?? [], circumferences: ci.data ?? [] }
+  if (!data) return { assessment: null, skinfolds: [], circumferences: [] }
+  const { skinfold_readings, circumference_readings, ...assessment } = data
+  return {
+    assessment,
+    skinfolds: [...skinfold_readings].sort((a, b) => a.site.localeCompare(b.site)),
+    circumferences: [...circumference_readings].sort((a, b) => a.site.localeCompare(b.site)),
+  }
 }

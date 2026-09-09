@@ -1,6 +1,18 @@
 // Rascunhos anteriores ao campo de descanso continuam legíveis.
 export type LogRow = { weight: string; reps: string; rir: string; rest?: string; failure?: boolean | null }
 
+// Os limites são os mesmos da prescrição (1–20). Ao reduzir ou pular um
+// exercício, só removemos linhas vazias ao final: registro real permanece.
+export function reconcileSetRows(rows: LogRow[], prescribedSets: number): LogRow[] {
+  const target = Math.max(0, Math.min(Math.trunc(prescribedSets), 20))
+  const next = rows.slice()
+  const empty = (row: LogRow) => !row.weight.trim() && !row.reps.trim() && !row.rir.trim()
+    && !(row.rest ?? '').trim() && row.failure !== true
+  while (next.length > target && empty(next[next.length - 1])) next.pop()
+  while (next.length < target) next.push({ weight: '', reps: '', rir: '', rest: '', failure: false })
+  return next
+}
+
 export function updateLogRow(row: LogRow, field: keyof LogRow, value: string | boolean): LogRow {
   if (field === 'failure') {
     const failure = value === true
@@ -47,7 +59,7 @@ export function ensureLogRows(
   for (const exercise of exercises) {
     if (!next[exercise.id]) {
       next[exercise.id] = Array.from(
-        { length: Math.min(exercise.sets, 12) },
+        { length: Math.min(exercise.sets, 20) },
         () => ({ weight: '', reps: '', rir: '', rest: '', failure: false })
       )
     }

@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { QueryError } from '../components/QueryError'
+import { useClock } from '../lib/useClock'
 
 export default function Dashboard() {
   const { organization } = useOrganization()
@@ -43,12 +44,13 @@ export default function Dashboard() {
 
   const intakesQ = usePendingIntakes(orgId)
   const pendingIntakes = intakesQ.data ?? []
-  const now = useMemo(() => new Date(), [])
+  const now = useClock()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const appointmentWindow = useMemo(() => {
-    const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    const endsAt = new Date(now.getTime() + 7 * 86400000).toISOString()
-    return { startsAt, endsAt }
-  }, [now])
+    const end = new Date(todayStart)
+    end.setDate(end.getDate() + 7)
+    return { startsAt: new Date(todayStart).toISOString(), endsAt: end.toISOString() }
+  }, [todayStart])
   const apptsQ = useUpcomingAppointments(
     orgId,
     appointmentWindow.startsAt,
@@ -57,7 +59,7 @@ export default function Dashboard() {
   const lastAssessQ = useLastAssessmentBySubject(orgId)
   const plansQ = useOrgActivePlans(orgId)
   const logsQ = useOrgWorkoutLogSummary(orgId)
-  const upcoming = apptsQ.data ?? []
+  const upcoming = (apptsQ.data ?? []).filter(appointment => new Date(appointment.starts_at).getTime() >= now.getTime())
   const rows = useMemo(
     () =>
       buildCarteira({

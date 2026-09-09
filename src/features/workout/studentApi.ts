@@ -235,7 +235,7 @@ export async function submitSession(
   // Argumento com default na RPC é opcional no tipo gerado (string | undefined,
   // não null): valor ausente se OMITE, e o banco aplica o default. Mandar null
   // explícito não compila — e, se compilasse, sobrescreveria o default.
-  const { data, error } = await supabase.rpc('submit_workout_session', {
+  const { data, error, status } = await supabase.rpc('submit_workout_session', {
     p_token: input.token,
     p_client_ref: input.clientRef,
     p_client_revision: input.revision,
@@ -246,7 +246,7 @@ export async function submitSession(
     ...(input.notes ? { p_notes: input.notes } : {}),
     ...(input.planId ? { p_plan: input.planId } : {}),
   })
-  if (error) throw error
+  if (error) throw Object.assign(error, { status })
   const row = data as unknown as { log_id?: string; stale?: boolean; corrected?: boolean } | null
   return {
     logId: row?.log_id ?? '',

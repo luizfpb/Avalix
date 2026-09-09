@@ -169,8 +169,19 @@ describe('updateAnamnese', () => {
 // as colunas derivadas do payload, nem carimbar autoria pelo cliente (o
 // servidor faz isso na 0029).
 describe('setLiberacaoMedica', () => {
+  it('recusa ausência de versão antes de tentar alterar o parecer', async () => {
+    await expect(setLiberacaoMedica('an-1', { status: 'pendente', em: null, validade: null, obs: null, expectedUpdatedAt: '' })).rejects.toThrow(/versão do parecer/)
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+  it.each(['liberado', 'pendente'] as const)('exige a versão-base para %s e informa conflito sem substituir o parecer', async (status) => {
+    mocks.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+    mocks.maybeSingle.mockResolvedValue({ data: { updated_at: 'v2' }, error: null })
+    await expect(setLiberacaoMedica('an-1', { status, em: '2026-08-20', validade: null, obs: null, expectedUpdatedAt: 'v1' })).rejects.toThrow(/alterada em outro dispositivo/)
+    expect(mocks.eq).toHaveBeenCalledWith('updated_at', 'v1')
+  })
   it('grava só o bloco do parecer', async () => {
     await setLiberacaoMedica('an-1', {
+      expectedUpdatedAt: '2026-08-01T10:00:00.000Z',
       status: 'liberado_com_restricoes',
       em: '2026-08-20',
       validade: '2027-02-20',
@@ -189,6 +200,7 @@ describe('setLiberacaoMedica', () => {
 
   it('retirar o registro zera o bloco inteiro', async () => {
     await setLiberacaoMedica('an-1', {
+      expectedUpdatedAt: '2026-08-01T10:00:00.000Z',
       status: 'pendente',
       em: '2026-08-20',
       validade: '2027-02-20',
@@ -206,6 +218,7 @@ describe('setLiberacaoMedica', () => {
   it('registro inválido não chega ao servidor', async () => {
     await expect(
       setLiberacaoMedica('an-1', {
+      expectedUpdatedAt: '2026-08-01T10:00:00.000Z',
         status: 'liberado',
         em: null,
         validade: null,
@@ -226,6 +239,7 @@ describe('setLiberacaoMedica', () => {
 
     await expect(
       setLiberacaoMedica('an-1', {
+      expectedUpdatedAt: '2026-08-01T10:00:00.000Z',
         status: 'liberado',
         em: '2026-08-20',
         validade: null,

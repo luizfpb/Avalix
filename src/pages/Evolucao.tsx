@@ -107,6 +107,8 @@ export default function Evolucao() {
           bodyFatPct: rr?.bodyFatPct ?? null,
           leanMassKg: rr?.leanMassKg ?? null,
           fatMassKg: rr?.fatMassKg ?? null,
+          warnings: rr?.warnings,
+          assessedAt: x.assessed_at,
         }
       })
       const logoUrl = await loadOrgLogoDataUrl(organization?.logo_path)
@@ -225,6 +227,13 @@ export default function Evolucao() {
       </div>
 
       {pdfError ? <p role="alert" className="text-sm text-destructive">{pdfError}</p> : null}
+
+      {lastRes?.warnings?.length ? (
+        <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm" role="status">
+          <p className="font-medium">Ressalvas da avaliação mais recente</p>
+          {lastRes.warnings.map((warning) => <p key={warning.code}>{warning.message}</p>)}
+        </div>
+      ) : null}
 
       {/* Progressão: só faz sentido a partir de dois pontos. Com um ponto só,
           o prompt da avaliação isolada está na tela da própria avaliação. */}

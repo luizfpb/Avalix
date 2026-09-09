@@ -118,11 +118,11 @@ export function reconciliarRascunho(
       continue
     }
     if (alvo.id !== chave) remapeado = true
-    // duas chaves antigas apontando para a mesma linha nova: fica a que tem
-    // mais registro, para o remapeamento nunca custar dado ao aluno
+    // Quando duas grades convergem, ambas podem conter séries reais.
+    // Mantém todas as linhas preenchidas em vez de eleger uma vencedora.
     const anterior = rows[alvo.id]
     rows[alvo.id] =
-      anterior && preenchidas(anterior) >= preenchidas(linhas) ? anterior : linhas
+      anterior ? [...anterior.filter((row) => temConteudo([row])), ...linhas] : linhas
     destinoDe.set(chave, alvo.id)
   }
 
@@ -142,7 +142,8 @@ export function reconciliarRascunho(
   }
 
   return {
-    draft: { ...draft, dayId, rows, extras: [...extras] },
+    draft: { ...draft, dayId, rows, extras: [...extras],
+      identity: identidadeDaSessao(plano.days, dayId, rows, plano.exercises) },
     remapeado,
     perdidas,
   }

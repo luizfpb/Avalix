@@ -14,6 +14,8 @@ export interface OrganizationContextValue {
   membership: MembershipRow | null
   role: string | null
   refresh: () => Promise<void>
+  refreshFailed?: boolean
+  refreshing?: boolean
 }
 
 export const OrganizationContext = createContext<OrganizationContextValue | null>(null)

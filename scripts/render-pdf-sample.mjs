@@ -111,6 +111,7 @@ function assessmentData(stress = false) {
   }
   const history = records.map(row => ({
     date: shortDate(row.assessed_at), protocolId: row.protocol_id, weightKg: row.weight_kg,
+    assessedAt: row.assessed_at, warnings: row.results?.warnings,
     bmi: computeBmi(row.weight_kg, row.height_cm), bodyFatPct: row.results?.bodyFatPct ?? null,
     leanMassKg: row.results?.leanMassKg ?? null, fatMassKg: row.results?.fatMassKg ?? null,
   }))

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -26,6 +26,8 @@ import { Label } from '@/components/ui/label'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { QueryError } from '../components/QueryError'
+import { useBaseVersion } from '../lib/baseVersion'
+import { VersionConflictBanner } from '../components/VersionConflict'
 
 function Field({
   id,
@@ -54,6 +56,10 @@ function Field({
 
 export default function AvaliadoForm() {
   const { id } = useParams()
+  return <SubjectEditor key={id ?? 'novo'} id={id} />
+}
+
+function SubjectEditor({ id }: { id: string | undefined }) {
   const isEdit = !!id
   const navigate = useNavigate()
   const { organization, role } = useOrganization()
@@ -62,43 +68,56 @@ export default function AvaliadoForm() {
   const subjectQuery = useSubject(isEdit ? id : undefined)
   const createMut = useCreateSubject(organization?.id)
   const updateMut = useUpdateSubject(id, organization?.id)
+  const version = useBaseVersion(subjectQuery.data?.updated_at)
+  const initialized = useRef(false)
+  const active = useRef(true)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     reset,
     watch,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectFormSchema),
     defaultValues: emptySubjectForm(),
   })
 
-  // no modo edição, preenche o formulário quando o subject carregar; ao voltar
-  // pro modo "novo" (mesma rota montada), limpa pra não vazar dados do anterior
+  // Refetch pode trazer trabalho de outro aparelho. Valores e versão-base
+  // pertencem à abertura; a chave do editor isola uma troca real de titular.
   useEffect(() => {
-    if (isEdit && subjectQuery.data) reset(subjectToForm(subjectQuery.data))
-    if (!isEdit) reset(emptySubjectForm())
+    if (isEdit && subjectQuery.data && !initialized.current) {
+      initialized.current = true
+      reset(subjectToForm(subjectQuery.data))
+    }
   }, [isEdit, subjectQuery.data, reset])
+
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
 
   const age = ageFromBirthDate(watch('birth_date') ?? '')
   const isMinor = age !== null && age < 18
 
   const mutationError = (createMut.error ?? updateMut.error) as Error | null
-  const submitting = createMut.isPending || updateMut.isPending
+  const submitting = isSubmitting || createMut.isPending || updateMut.isPending
 
   async function onSubmit(values: SubjectFormValues) {
     if (!organization) return
+    setSubmitError(null)
     try {
       if (isEdit) {
-        await updateMut.mutateAsync(formToUpdate(values))
-        navigate(`/avaliados/${id}`)
+        if (!version.base) throw new Error('Não foi possível confirmar a versão deste cadastro. Recarregue antes de salvar.')
+        await updateMut.mutateAsync({ patch: formToUpdate(values), expectedUpdatedAt: version.base })
+        if (active.current) navigate(`/avaliados/${id}`)
       } else {
         const created = await createMut.mutateAsync(formToInsert(values, organization.id))
-        navigate(`/avaliados/${created.id}`)
+        if (active.current) navigate(`/avaliados/${created.id}`)
       }
-    } catch {
-      // erro mostrado via mutationError
+    } catch (error) {
+      if (active.current) setSubmitError(normalizeDbError(error))
     }
   }
 
@@ -106,7 +125,7 @@ export default function AvaliadoForm() {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
 
-  if (isEdit && (subjectQuery.isError || !subjectQuery.data)) {
+  if (isEdit && !subjectQuery.data) {
     return (
       <div className="max-w-xl space-y-4">
         <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
@@ -133,7 +152,16 @@ export default function AvaliadoForm() {
         </h1>
       </div>
 
+      {version.conflict ? <VersionConflictBanner what="Este cadastro" /> : null}
+      {isEdit && subjectQuery.isError ? (
+        <QueryError
+          message="Não foi possível atualizar os dados do cadastro. Seu preenchimento foi preservado."
+          onRetry={() => void subjectQuery.refetch()}
+        />
+      ) : null}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <fieldset disabled={submitting} className="space-y-4">
         <Field id="subject-full-name" label="Nome completo" error={errors.full_name?.message}>
           <Input id="subject-full-name" aria-describedby={errors.full_name ? 'subject-full-name-error' : undefined} {...register('full_name')} />
         </Field>
@@ -192,8 +220,8 @@ export default function AvaliadoForm() {
           </label>
         ) : null}
 
-        {mutationError ? (
-          <p role="alert" className="text-sm text-destructive">{normalizeDbError(mutationError)}</p>
+        {submitError || mutationError ? (
+          <p role="alert" className="text-sm text-destructive">{submitError ?? normalizeDbError(mutationError)}</p>
         ) : null}
 
         <div className="flex gap-3">
@@ -204,6 +232,7 @@ export default function AvaliadoForm() {
             <Link to={backTo}>Cancelar</Link>
           </Button>
         </div>
+        </fieldset>
       </form>
 
       {isEdit && subjectQuery.data && (role === 'owner' || role === 'admin') ? (

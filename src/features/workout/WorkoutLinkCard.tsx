@@ -26,15 +26,21 @@ function desde(iso: string | null): string | null {
 // O segredo só existe no aparelho que emitiu (mesma regra do convite de
 // anamnese) — mas aqui perder o link não custa nada, porque as sessões
 // pertencem ao plano e não ao token: reemitir é sempre seguro.
-export function WorkoutLinkCard({
-  subjectId,
-  subjectName,
-  orgName,
-}: {
+type WorkoutLinkCardProps = {
   subjectId: string
   subjectName: string
   orgName: string
-}) {
+}
+
+export function WorkoutLinkCard(props: WorkoutLinkCardProps) {
+  return <WorkoutLinkCardContent key={props.subjectId} {...props} />
+}
+
+function WorkoutLinkCardContent({
+  subjectId,
+  subjectName,
+  orgName,
+}: WorkoutLinkCardProps) {
   const linkQuery = useWorkoutLink(subjectId)
   const issue = useIssueWorkoutLink(subjectId)
   const revoke = useRevokeWorkoutLink(subjectId)

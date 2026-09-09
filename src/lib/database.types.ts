@@ -858,7 +858,22 @@ export type Database = {
           photo_id?: string
           shadowed_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "posture_annotations_shadowed_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posture_annotations_shadowed_photo_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "posture_photos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       posture_photos: {
         Row: {

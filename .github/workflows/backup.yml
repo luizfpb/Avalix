@@ -74,6 +74,15 @@ jobs:
             pg_restore --list /backup/db.dump > "$root/db.restore-list.txt"
           node scripts/backup-storage.mjs --output "$root/storage"
 
+          # Exclusão/upload durante a captura pode deixar o dump apontando
+          # para bytes que a listagem posterior não viu. Só publica quando
+          # TODAS as referências do próprio dump existem no artifact e seus
+          # tamanhos/hashes conferem. pipefail também detecta extração parcial.
+          docker run --rm -v "$PWD/$root:/backup:ro" \
+            postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
+            pg_restore --data-only --schema=public --table=organizations --table=posture_photos --file=- /backup/db.dump \
+            | node scripts/verify-backup.mjs --storage "$root/storage"
+
           tar -czf "$root.tar.gz" "$root"
           printf '%s' "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 --symmetric --cipher-algo AES256 \
@@ -85,6 +94,7 @@ jobs:
             --passphrase-fd 0 --decrypt "$root.tar.gz.gpg" | tar -tzf - > "$root.contents.txt"
           grep -q "/db.dump$" "$root.contents.txt"
           grep -q "/storage/manifest.json$" "$root.contents.txt"
+          grep -q "/storage/reference-check.json$" "$root.contents.txt"
           rm -rf "$root" "$root.tar.gz" "$root.contents.txt"
           echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
 

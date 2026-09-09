@@ -1,10 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }))
 
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: mocks.rpc } }))
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }))
 
-import { createAssessment, mapCircumferences } from './api'
+import { createAssessment, getAssessment, mapCircumferences } from './api'
+
+it('lê cabeçalho e aferições de uma única resposta, sem montar snapshots de requisições diferentes', async () => {
+  const row = { id: 'a1', subject_id: 's1', updated_at: 'v1', skinfold_readings: [{ site: 'triceps', reading_1: 10 }], circumference_readings: [{ site: 'waist', value_cm: 80 }] }
+  const select = vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: async () => ({ data: row, error: null }) })) }))
+  mocks.from.mockReset().mockReturnValue({ select })
+  const result = await getAssessment('a1')
+  expect(mocks.from.mock.calls).toEqual([['assessments']])
+  expect(select).toHaveBeenCalledWith('*, skinfold_readings(*), circumference_readings(*)')
+  expect(result.skinfolds).toEqual(row.skinfold_readings)
+  expect(result.circumferences).toEqual(row.circumference_readings)
+  expect(result.assessment).not.toHaveProperty('skinfold_readings')
+})
 
 beforeEach(() => mocks.rpc.mockReset())
 

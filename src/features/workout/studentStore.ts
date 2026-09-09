@@ -5,6 +5,7 @@ import type {
   StudentWorkout,
   SubmitSet,
 } from './studentApi'
+import { reconciliarRascunho, type PlanoVigente, type RascunhoReconciliado } from './studentDraft'
 
 // Armazenamento local da página do aluno: o que permite treinar sem internet.
 //
@@ -30,6 +31,38 @@ const STORE = 'kv'
 type Key = string
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
+const ACCESS_GENERATION = '@access-generation'
+let localGeneration = 0
+
+// Capturada antes de iniciar rede/rascunho. A geração persistida fecha também
+// a corrida entre abas: a purga troca o carimbo na MESMA transação do clear.
+export type StudentStorageAccess = { generation: string; localGeneration: number; active: boolean; parent?: StudentStorageAccess }
+
+export class StudentAccessEndedError extends Error {
+  constructor() { super('O acesso a este aparelho foi encerrado.'); this.name = 'StudentAccessEndedError' }
+}
+
+export class StudentDraftConflictError extends Error {
+  constructor() {
+    super('Este treino mudou ou foi concluído em outra aba. Seu preenchimento foi mantido nesta tela. Atualize o treino antes de continuar.')
+    this.name = 'StudentDraftConflictError'
+  }
+}
+
+export async function captureStudentStorageAccess(): Promise<StudentStorageAccess> {
+  const generation = localGeneration
+  return { generation: await idbGet<string>(ACCESS_GENERATION) ?? '', localGeneration: generation, active: true }
+}
+
+export function isStudentStorageAccessCurrent(access: StudentStorageAccess): boolean {
+  return access.active && access.localGeneration === localGeneration && (!access.parent || isStudentStorageAccessCurrent(access.parent))
+}
+
+export function invalidateStudentStorageAccess(access: StudentStorageAccess): void { access.active = false }
+
+function assertAccess(access: StudentStorageAccess): void {
+  if (!isStudentStorageAccessCurrent(access)) throw new StudentAccessEndedError()
+}
 
 export class StudentStorageError extends Error {
   constructor() {
@@ -78,17 +111,65 @@ async function idbGet<T>(key: Key, required = false): Promise<T | null> {
   })
 }
 
-async function idbSet(key: Key, value: unknown, required = false): Promise<void> {
+async function idbSet(key: Key, value: unknown, access?: StudentStorageAccess): Promise<void> {
+  await idbUpdate(key, () => value, false, access)
+}
+
+// Read-modify-write dentro da mesma transação. O IndexedDB serializa
+// transações readwrite concorrentes sobre o object store, inclusive entre
+// abas; separar get() e put() permitia que uma aba gravasse um snapshot velho.
+async function idbUpdate<T>(
+  key: Key,
+  update: (current: T | null) => T | null,
+  required = false,
+  access?: StudentStorageAccess,
+  legacy?: { key: string; matches: (value: T) => boolean }
+): Promise<void> {
+  const lease = access ?? await captureStudentStorageAccess()
+  assertAccess(lease)
   const db = await openDb()
+  assertAccess(lease)
   if (!db) {
     if (required) throw new StudentStorageError()
     return
   }
   await new Promise<void>((resolve, reject) => {
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve())
+    let cause: unknown
+    const fail = () => (cause ? reject(cause) : required ? reject(new StudentStorageError()) : resolve())
     try {
       const tx = db.transaction(STORE, 'readwrite')
-      tx.objectStore(STORE).put(value, key)
+      const store = tx.objectStore(STORE)
+      const generation = store.get(ACCESS_GENERATION)
+      generation.onsuccess = () => {
+        try {
+          assertAccess(lease)
+          if ((generation.result ?? '') !== lease.generation) throw new StudentAccessEndedError()
+          const request = store.get(key)
+          const apply = (current: T | null) => {
+            try {
+              assertAccess(lease)
+              const next = update(current)
+              if (next == null) store.delete(key)
+              else store.put(next, key)
+            } catch (error) { cause = error; tx.abort() }
+          }
+          request.onsuccess = () => {
+            if (request.result != null || !legacy) { apply((request.result as T) ?? null); return }
+            const old = store.get(legacy.key)
+            old.onsuccess = () => {
+              const value = old.result as T | undefined
+              if (value != null && legacy.matches(value)) { store.delete(legacy.key); apply(value) }
+              else apply(null)
+            }
+            old.onerror = fail
+          }
+          request.onerror = fail
+        } catch (error) {
+          cause = error
+          tx.abort()
+        }
+      }
+      generation.onerror = fail
       tx.oncomplete = () => resolve()
       tx.onerror = fail
       tx.onabort = fail
@@ -98,14 +179,12 @@ async function idbSet(key: Key, value: unknown, required = false): Promise<void>
   })
 }
 
-// Read-modify-write dentro da mesma transação. O IndexedDB serializa
-// transações readwrite concorrentes sobre o object store, inclusive entre
-// abas; separar get() e put() permitia que uma aba gravasse um snapshot velho.
-async function idbUpdate<T>(
-  key: Key,
-  update: (current: T | null) => T | null,
-  required = false
-): Promise<void> {
+async function idbDelete(key: Key, required = false, access?: StudentStorageAccess): Promise<void> {
+  await idbUpdate(key, () => null, required, access)
+}
+
+async function idbClearAll(required = false): Promise<void> {
+  localGeneration += 1
   const db = await openDb()
   if (!db) {
     if (required) throw new StudentStorageError()
@@ -116,57 +195,8 @@ async function idbUpdate<T>(
     try {
       const tx = db.transaction(STORE, 'readwrite')
       const store = tx.objectStore(STORE)
-      const request = store.get(key)
-      request.onsuccess = () => {
-        try {
-          const next = update((request.result as T) ?? null)
-          if (next == null) store.delete(key)
-          else store.put(next, key)
-        } catch {
-          tx.abort()
-        }
-      }
-      request.onerror = fail
-      tx.oncomplete = () => resolve()
-      tx.onerror = fail
-      tx.onabort = fail
-    } catch {
-      fail()
-    }
-  })
-}
-
-async function idbDelete(key: Key, required = false): Promise<void> {
-  const db = await openDb()
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return
-  }
-  await new Promise<void>((resolve, reject) => {
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve())
-    try {
-      const tx = db.transaction(STORE, 'readwrite')
-      tx.objectStore(STORE).delete(key)
-      tx.oncomplete = () => resolve()
-      tx.onerror = fail
-      tx.onabort = fail
-    } catch {
-      fail()
-    }
-  })
-}
-
-async function idbClearAll(required = false): Promise<void> {
-  const db = await openDb()
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return
-  }
-  await new Promise<void>((resolve, reject) => {
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve())
-    try {
-      const tx = db.transaction(STORE, 'readwrite')
-      tx.objectStore(STORE).clear()
+      store.clear()
+      store.put(crypto.randomUUID(), ACCESS_GENERATION)
       tx.oncomplete = () => resolve()
       tx.onerror = fail
       tx.onabort = fail
@@ -204,8 +234,8 @@ export function saveStudentToken(token: string): void {
 // "Sair deste aparelho": apaga token, cache e fila. É o contrapeso de guardar
 // uma credencial de vida longa num aparelho que pode ser emprestado ou perdido.
 export async function forgetStudentDevice(): Promise<void> {
-  await idbClearAll()
   removeStudentToken()
+  await idbClearAll(true)
 }
 
 function removeStudentToken(): void {
@@ -220,6 +250,7 @@ function removeStudentToken(): void {
 // nunca confirmamos a revogacao local enquanto cache, fila ou rascunho puderem
 // reaparecer na proxima abertura offline.
 export async function purgeRevokedStudentDevice(): Promise<void> {
+  removeStudentToken()
   let storageError: unknown
   try {
     if (typeof indexedDB !== 'undefined') await idbClearAll(true)
@@ -252,8 +283,8 @@ export async function readCachedWorkout(scope: string): Promise<CachedWorkout | 
   return idbGet<CachedWorkout>(`workout:${scope}`)
 }
 
-export async function writeCachedWorkout(scope: string, data: StudentWorkout): Promise<void> {
-  await idbSet(`workout:${scope}`, { at: new Date().toISOString(), data } satisfies CachedWorkout)
+export async function writeCachedWorkout(scope: string, data: StudentWorkout, access?: StudentStorageAccess): Promise<void> {
+  await idbSet(`workout:${scope}`, { at: new Date().toISOString(), data } satisfies CachedWorkout, access)
 }
 
 export type CachedHistory = {
@@ -272,9 +303,10 @@ export async function readCachedHistory(scope: string): Promise<CachedHistory | 
 export async function writeCachedHistory(
   scope: string,
   sessions: StudentHistorySession[],
-  nextCursor: StudentHistoryCursor | null
+  nextCursor: StudentHistoryCursor | null,
+  access?: StudentStorageAccess
 ): Promise<void> {
-  await idbSet(`history:${scope}`, { sessions, nextCursor } satisfies CachedHistory)
+  await idbSet(`history:${scope}`, { sessions, nextCursor } satisfies CachedHistory, access)
 }
 
 export async function readCachedPlan(
@@ -287,13 +319,14 @@ export async function readCachedPlan(
 export async function writeCachedPlan(
   scope: string,
   planId: string,
-  detail: StudentPlanDetail
+  detail: StudentPlanDetail,
+  access?: StudentStorageAccess
 ): Promise<void> {
-  await idbSet(`plan:${scope}:${planId}`, detail)
+  await idbSet(`plan:${scope}:${planId}`, detail, access)
 }
 
-export async function removeCachedPlan(scope: string, planId: string): Promise<void> {
-  await idbDelete(`plan:${scope}:${planId}`)
+export async function removeCachedPlan(scope: string, planId: string, access?: StudentStorageAccess): Promise<void> {
+  await idbDelete(`plan:${scope}:${planId}`, false, access)
 }
 
 // ---------------------------------------------------------------- fila
@@ -310,6 +343,8 @@ export type QueuedSession = {
   queuedAt: string
   // motivo da última recusa definitiva, quando houver
   error?: string
+  retryAt?: number
+  retries?: number
 }
 
 export async function readQueue(scope: string): Promise<QueuedSession[]> {
@@ -318,43 +353,59 @@ export async function readQueue(scope: string): Promise<QueuedSession[]> {
 
 // Enfileirar a MESMA sessão de novo substitui a anterior: o aluno que salva
 // três vezes durante o treino tem uma pendência, não três.
-export async function enqueueSession(scope: string, session: QueuedSession): Promise<void> {
+export async function enqueueSession(scope: string, session: QueuedSession, access?: StudentStorageAccess): Promise<void> {
   await idbUpdate<QueuedSession[]>(
     `queue:${scope}`,
-    (queue) => [...(queue ?? []).filter((item) => item.clientRef !== session.clientRef), session],
-    true
+    (queue) => {
+      const previous = queue?.find((item) => item.clientRef === session.clientRef)
+      if (previous && previous.revision > session.revision) throw new StudentDraftConflictError()
+      return [...(queue ?? []).filter((item) => item.clientRef !== session.clientRef), session]
+    },
+    true, access
   )
 }
 
 export async function dequeueSession(
   scope: string,
   clientRef: string,
-  required = true
+  required = true,
+  access?: StudentStorageAccess,
+  revision?: number
 ): Promise<void> {
   await idbUpdate<QueuedSession[]>(
     `queue:${scope}`,
-    (queue) => (queue ?? []).filter((item) => item.clientRef !== clientRef),
-    required
+    (queue) => (queue ?? []).filter((item) => item.clientRef !== clientRef || (revision != null && (item.revision ?? 1) !== revision)),
+    required, access
   )
 }
 
 export async function markSessionRejected(
   scope: string,
   clientRef: string,
-  message: string
+  message: string,
+  access?: StudentStorageAccess,
+  revision?: number
 ): Promise<void> {
   await idbUpdate<QueuedSession[]>(
     `queue:${scope}`,
     (queue) =>
       (queue ?? []).map((item) =>
-        item.clientRef === clientRef ? { ...item, error: message } : item
+        item.clientRef === clientRef && (revision == null || (item.revision ?? 1) === revision) ? { ...item, error: message } : item
       ),
-    true
+    true, access
   )
 }
 
 export async function clearQueue(scope: string): Promise<void> {
   await idbDelete(`queue:${scope}`, true)
+}
+
+export async function markSessionRetry(scope: string, session: QueuedSession, access?: StudentStorageAccess): Promise<void> {
+  await idbUpdate<QueuedSession[]>(`queue:${scope}`, (queue) => (queue ?? []).map((item) => {
+    if (item.clientRef !== session.clientRef || (item.revision ?? 1) !== (session.revision ?? 1)) return item
+    const retries = Math.min((item.retries ?? 0) + 1, 6)
+    return { ...item, error: undefined, retries, retryAt: Date.now() + Math.min(300_000, 15_000 * 2 ** (retries - 1)) }
+  }), true, access)
 }
 
 // ---------------------------------------------------------------- rascunho
@@ -394,191 +445,146 @@ export type DraftSession = {
 }
 
 type StoredDraftSession = DraftSession & { updatedAt: string }
+type LegacyDraftBucket = { version: 2; active: string; sessions: StoredDraftSession[] }
 type DraftBucket = {
-  version: 2
-  active: string
+  version: 3
+  // A divisão pode trocar de ID; a sessão mantém seu clientRef.
+  active: string | null
   sessions: StoredDraftSession[]
+  completed: string[]
 }
+type DraftStorage = DraftBucket | LegacyDraftBucket | DraftSession
 
 function draftKey(scope: string, planId: string | null): string {
   return `draft:${scope}:${planId ?? 'sem-plano'}`
 }
-
 function draftSessionKey(dayId: string | null, performedAt: string): string {
   return `${dayId ?? 'sem-divisao'}:${performedAt}`
 }
-
-function isDraftBucket(value: DraftBucket | DraftSession): value is DraftBucket {
-  return 'version' in value && value.version === 2 && Array.isArray(value.sessions)
+function bucketOf(value: DraftStorage | null): DraftBucket {
+  if (!value) return { version: 3, active: null, sessions: [], completed: [] }
+  if (!('version' in value)) {
+    return { version: 3, active: value.clientRef, completed: [],
+      sessions: [{ ...value, revision: value.revision ?? 0, updatedAt: '' }] }
+  }
+  const completed = value.version === 3 ? value.completed ?? [] : []
+  const unique = new Map<string, StoredDraftSession>()
+  for (const session of value.sessions) {
+    if (completed.includes(session.clientRef)) continue
+    const previous = unique.get(session.clientRef)
+    if (!previous || session.revision > previous.revision ||
+      (session.revision === previous.revision && session.updatedAt > previous.updatedAt)) {
+      unique.set(session.clientRef, { ...session, revision: session.revision ?? 0 })
+    }
+  }
+  const sessions = [...unique.values()]
+  const active = value.version === 3 ? value.active : value.sessions.find((session) =>
+    draftSessionKey(session.dayId, session.performedAt) === value.active)?.clientRef
+  return { version: 3, completed, sessions,
+    active: sessions.some((session) => session.clientRef === active) ? active ?? null : sessions[0]?.clientRef ?? null }
+}
+function legacyDraft(scope: string, planId: string | null) {
+  return { key: `draft:${scope}`, matches: (value: DraftStorage) =>
+    !('version' in value) && value.planId === planId }
+}
+function selectedDraft(bucket: DraftBucket, dayId?: string | null, date?: string) {
+  return bucket.sessions.find((session) => dayId === undefined || date === undefined
+    ? session.clientRef === bucket.active : session.dayId === dayId && session.performedAt === date) ?? null
 }
 
 export async function readDraft(
-  scope: string,
-  planId: string | null,
-  dayId?: string | null,
-  performedAt?: string
+  scope: string, planId: string | null, dayId?: string | null, performedAt?: string,
+  access?: StudentStorageAccess
 ): Promise<DraftSession | null> {
-  const scoped = await idbGet<DraftBucket | DraftSession>(draftKey(scope, planId))
-  if (scoped) {
-    if (!isDraftBucket(scoped)) {
-      const legacy = { ...scoped, revision: scoped.revision ?? 0 }
-      const exact =
-        dayId === undefined || performedAt === undefined
-        || (legacy.dayId === dayId && legacy.performedAt === performedAt)
-      return exact ? legacy : null
-    }
-    const wanted =
-      dayId !== undefined && performedAt !== undefined
-        ? draftSessionKey(dayId, performedAt)
-        : scoped.active
-    const found = scoped.sessions.find(
-      (session) => draftSessionKey(session.dayId, session.performedAt) === wanted
-    )
-    return found ? { ...found, revision: found.revision ?? 0 } : null
-  }
+  if (access) assertAccess(access)
+  if (!await openDb()) return null
+  let selected: DraftSession | null = null
+  await idbUpdate<DraftStorage>(draftKey(scope, planId), (value) => {
+    const bucket = bucketOf(value)
+    selected = selectedDraft(bucket, dayId, performedAt)
+    return bucket
+  }, true, access, legacyDraft(scope, planId))
+  return selected
+}
 
-  // Migra o formato da primeira versão, que tinha um único rascunho por token.
-  const legacy = await idbGet<DraftSession>(`draft:${scope}`)
-  if (!legacy || legacy.planId !== planId) return null
-  const migrated = { ...legacy, revision: legacy.revision ?? 0 }
-  await writeDraft(scope, migrated)
-  await idbDelete(`draft:${scope}`)
-  const exact =
-    dayId === undefined || performedAt === undefined
-    || (migrated.dayId === dayId && migrated.performedAt === performedAt)
-  return exact ? migrated : null
+// Migra TODO o bucket na mesma transação, sem deixar cópias nos IDs antigos.
+// Rascunho cuja divisão desapareceu permanece armazenado; não o apagamos para
+// fabricar uma restauração bem-sucedida. Os rascunhos válidos seguem acessíveis.
+export async function readReconciledDraft(
+  scope: string, planId: string | null, plan: PlanoVigente,
+  access?: StudentStorageAccess, dayId?: string | null, performedAt?: string
+): Promise<RascunhoReconciliado | null> {
+  if (access) assertAccess(access)
+  if (!await openDb()) return null
+  let selected: RascunhoReconciliado | null = null
+  await idbUpdate<DraftStorage>(draftKey(scope, planId), (value) => {
+    const bucket = bucketOf(value)
+    const changes = new Map<string, RascunhoReconciliado>()
+    bucket.sessions = bucket.sessions.map((session) => {
+      const result = reconciliarRascunho(session, plan)
+      if (!result) return session
+      if (result.remapeado || result.perdidas > 0) result.draft.revision = (session.revision ?? 0) + 1
+      changes.set(session.clientRef, result)
+      return { ...result.draft, updatedAt: session.updatedAt }
+    })
+    const session = selectedDraft(bucket, dayId, performedAt)
+    selected = session ? changes.get(session.clientRef) ?? null : null
+    return bucket
+  }, true, access, legacyDraft(scope, planId))
+  return selected
 }
 
 export async function writeDraft(
-  scope: string,
-  draft: DraftSession,
-  required = false
-): Promise<void> {
-  const key = draftSessionKey(draft.dayId, draft.performedAt)
-  const now = new Date().toISOString()
-  await idbUpdate<DraftBucket | DraftSession>(
-    draftKey(scope, draft.planId),
-    (current) => {
-      const sessions = current
-        ? isDraftBucket(current)
-          ? current.sessions
-          : [{ ...current, revision: current.revision ?? 0, updatedAt: now }]
-        : []
-      const previous = sessions.find(
-        (session) => draftSessionKey(session.dayId, session.performedAt) === key
-      )
-      const incomingRevision = Math.max(0, Math.trunc(draft.revision || 0))
-      const updated: StoredDraftSession =
-        previous && previous.revision > incomingRevision
-          ? previous
-          : { ...draft, revision: incomingRevision, updatedAt: now }
-      return {
-        version: 2,
-        active: key,
-        sessions: [
-          updated,
-          ...sessions.filter(
-            (session) => draftSessionKey(session.dayId, session.performedAt) !== key
-          ),
-        ].slice(0, 14),
-      }
-    },
-    required
-  )
+  scope: string, draft: DraftSession, _required = false, access?: StudentStorageAccess
+): Promise<number> {
+  const base = Math.max(0, Math.trunc(draft.revision || 0))
+  const revision = base + 1
+  await idbUpdate<DraftStorage>(draftKey(scope, draft.planId), (value) => {
+    const bucket = bucketOf(value)
+    if (bucket.completed.includes(draft.clientRef)) throw new StudentDraftConflictError()
+    const previous = bucket.sessions.find((session) => session.clientRef === draft.clientRef)
+      ?? bucket.sessions.find((session) => session.dayId === draft.dayId && session.performedAt === draft.performedAt)
+    if (previous ? previous.clientRef !== draft.clientRef || previous.revision !== base : base !== 0) {
+      throw new StudentDraftConflictError()
+    }
+    const updated = { ...draft, revision, updatedAt: new Date().toISOString() }
+    return { ...bucket, active: draft.clientRef,
+      sessions: [updated, ...bucket.sessions.filter((session) => session.clientRef !== draft.clientRef)] }
+  }, true, access, legacyDraft(scope, draft.planId))
+  return revision
 }
 
-// Reserva atomica da próxima revisão da sessão. Como a leitura e a escrita
-// usam uma única transação readwrite, duas abas nunca recebem o mesmo número.
-// O próprio rascunho é persistido junto da reserva, eliminando a janela entre
-// "Salvar progresso" e o debounce do autosave.
+// A revisão-base é do conteúdo conhecido pela aba. Nunca promovemos conteúdo
+// antigo usando a revisão mais recente encontrada no banco local.
 export async function reserveDraftRevision(
-  scope: string,
-  draft: DraftSession,
-  required = false
+  scope: string, draft: DraftSession, required = false, access?: StudentStorageAccess
 ): Promise<number> {
-  const fallback = Math.max(0, Math.trunc(draft.revision || 0)) + 1
-  const db = await openDb()
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return fallback
+  // Sem conexão IndexedDB desde a abertura, não há rascunho recuperado nem
+  // gravação local a confirmar. Só a conclusão online admite revisão efêmera.
+  if (!required && !await openDb()) {
+    if (access) assertAccess(access)
+    return Math.max(0, Math.trunc(draft.revision || 0)) + 1
   }
-  return new Promise<number>((resolve, reject) => {
-    let allocated = fallback
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve(fallback))
-    try {
-      const key = draftSessionKey(draft.dayId, draft.performedAt)
-      const now = new Date().toISOString()
-      const tx = db.transaction(STORE, 'readwrite')
-      const store = tx.objectStore(STORE)
-      const request = store.get(draftKey(scope, draft.planId))
-      request.onsuccess = () => {
-        try {
-          const current = (request.result as DraftBucket | DraftSession | undefined) ?? null
-          const sessions = current
-            ? isDraftBucket(current)
-              ? current.sessions
-              : [{ ...current, revision: current.revision ?? 0, updatedAt: now }]
-            : []
-          const previous = sessions.find(
-            (session) => draftSessionKey(session.dayId, session.performedAt) === key
-          )
-          allocated = Math.max(
-            Math.trunc(previous?.revision ?? 0),
-            Math.trunc(draft.revision || 0)
-          ) + 1
-          const updated: StoredDraftSession = { ...draft, revision: allocated, updatedAt: now }
-          const bucket: DraftBucket = {
-            version: 2,
-            active: key,
-            sessions: [
-              updated,
-              ...sessions.filter(
-                (session) => draftSessionKey(session.dayId, session.performedAt) !== key
-              ),
-            ].slice(0, 14),
-          }
-          store.put(bucket, draftKey(scope, draft.planId))
-        } catch {
-          tx.abort()
-        }
-      }
-      request.onerror = fail
-      tx.oncomplete = () => resolve(allocated)
-      tx.onerror = fail
-      tx.onabort = fail
-    } catch {
-      fail()
-    }
-  })
+  return writeDraft(scope, draft, required, access)
 }
 
 export async function clearDraftSession(
-  scope: string,
-  planId: string | null,
-  dayId?: string | null,
-  performedAt?: string
+  scope: string, planId: string | null, dayId?: string | null, performedAt?: string,
+  access?: StudentStorageAccess, clientRef?: string, expectedRevision?: number
 ): Promise<void> {
-  if (dayId === undefined || performedAt === undefined) {
-    await idbDelete(draftKey(scope, planId))
-    return
-  }
-  const removed = draftSessionKey(dayId, performedAt)
-  await idbUpdate<DraftBucket | DraftSession>(draftKey(scope, planId), (current) => {
-    if (!current) return null
-    if (!isDraftBucket(current)) {
-      return draftSessionKey(current.dayId, current.performedAt) === removed ? null : current
+  if (access) assertAccess(access)
+  if (!await openDb()) return
+  await idbUpdate<DraftStorage>(draftKey(scope, planId), (value) => {
+    const bucket = bucketOf(value)
+    const removed = bucket.sessions.filter((session) => clientRef != null ? session.clientRef === clientRef
+      : dayId === undefined || performedAt === undefined ||
+        (session.dayId === dayId && session.performedAt === performedAt))
+    if (expectedRevision != null && removed.some((session) => session.revision !== expectedRevision)) {
+      throw new StudentDraftConflictError()
     }
-    const sessions = current.sessions.filter(
-      (session) => draftSessionKey(session.dayId, session.performedAt) !== removed
-    )
-    if (sessions.length === 0) return null
-    return {
-      ...current,
-      active:
-        current.active === removed
-          ? draftSessionKey(sessions[0].dayId, sessions[0].performedAt)
-          : current.active,
-      sessions,
-    }
-  })
+    const refs = new Set([...removed.map((session) => session.clientRef), ...(clientRef ? [clientRef] : [])])
+    const sessions = bucket.sessions.filter((session) => !refs.has(session.clientRef))
+    return { ...bucket, sessions, completed: [...new Set([...bucket.completed, ...refs])],
+      active: bucket.active && !refs.has(bucket.active) ? bucket.active : sessions[0]?.clientRef ?? null }
+  }, true, access, legacyDraft(scope, planId))
 }

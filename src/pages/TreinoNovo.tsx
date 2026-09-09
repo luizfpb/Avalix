@@ -312,7 +312,13 @@ function Builder({
     }))
   }
   function removeDay(dayKey: string) {
-    setPlan((p) => ({ ...p, days: p.days.filter((d) => d.key !== dayKey) }))
+    setPlan((p) => {
+      const removed = p.days.find((d) => d.key === dayKey)
+      const exercises = new Set(removed?.exercises.map((ex) => ex.key) ?? [])
+      return { ...p, days: p.days.filter((d) => d.key !== dayKey),
+        weeklySchedule: p.weeklySchedule.filter((label) => label !== removed?.label),
+        overrides: p.overrides.filter((override) => !exercises.has(override.exerciseKey)) }
+    })
   }
   function moveDay(from: number, to: number) {
     if (to < 0 || to >= plan.days.length) return
@@ -346,8 +352,15 @@ function Builder({
     patchDayExercises(dayKey, (list) => setGroupKind(list, groupKey, kind))
   }
   function patchDay(dayKey: string, patch: Partial<{ label: string; name: string | null }>) {
+    if (patch.label != null && plan.days.some((day) => day.key !== dayKey && day.label === patch.label)) {
+      setSubmitError('Cada divisão precisa ter uma letra diferente.')
+      return
+    }
+    setSubmitError(null)
     setPlan((p) => ({
       ...p,
+      weeklySchedule: patch.label == null ? p.weeklySchedule : p.weeklySchedule.map((label) =>
+        label === p.days.find((day) => day.key === dayKey)?.label ? patch.label! : label),
       days: p.days.map((d) => (d.key === dayKey ? { ...d, ...patch } : d)),
     }))
   }
@@ -728,6 +741,12 @@ function Builder({
     }
     if (plan.days.some((d) => !d.label.trim())) {
       return setSubmitError('Toda divisão precisa de um rótulo (A, B, C...).')
+    }
+    if (new Set(plan.days.map((day) => day.label)).size !== plan.days.length) {
+      return setSubmitError('Use um rótulo diferente para cada divisão.')
+    }
+    if (plan.weeklySchedule.some((label) => !plan.days.some((day) => day.label === label))) {
+      return setSubmitError('A sequência semanal aponta para uma divisão que não existe. Ajuste a sequência antes de salvar.')
     }
     const duplicate = duplicateExerciseInDay(plan)
     if (duplicate) {
