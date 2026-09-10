@@ -1911,7 +1911,7 @@ export type Database = {
         Returns: Json
       }
       issue_workout_link: {
-        Args: { p_expires_at: string; p_subject: string; p_token_hash: string }
+        Args: { p_expires_at?: string; p_subject: string; p_token_hash: string }
         Returns: {
           created_at: string
           created_by: string

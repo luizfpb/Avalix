@@ -7,9 +7,8 @@ export type WorkoutLinkRow = Database['public']['Tables']['workout_links']['Row'
 
 // O link do treino é do ALUNO, não do plano: ele aponta para o avaliado e
 // resolve o plano vigente no momento do acesso. Por isso a validade é longa —
-// o aluno salva na tela do celular e abre por meses. O teto de 180 dias é
-// garantido pelo banco (check da 0027), não por esta constante.
-const LINK_TTL_DAYS = 180
+// o aluno salva na tela do celular e abre por meses. A validade de 180 dias é
+// calculada pelo banco (0036), usando o mesmo relógio do check da 0027.
 
 // token = 256 bits aleatórios em base64url, igual ao link de anamnese. O banco
 // guarda só o sha256; o cru só existe dentro da URL. Vazamento do banco não
@@ -34,12 +33,6 @@ export function workoutLinkUrl(token: string, origin?: string): string {
   return `${base}/t#${token}`
 }
 
-function expiresAtIso(now = new Date()): string {
-  const d = new Date(now)
-  d.setDate(d.getDate() + LINK_TTL_DAYS)
-  return d.toISOString()
-}
-
 export async function getWorkoutLink(subjectId: string): Promise<WorkoutLinkRow | null> {
   const { data, error } = await supabase
     .from('workout_links')
@@ -59,16 +52,22 @@ export type IssuedWorkoutLink = { row: WorkoutLinkRow; url: string }
 export async function issueWorkoutLink(subjectId: string): Promise<IssuedWorkoutLink> {
   const token = randomToken()
   const tokenHash = await sha256Hex(token)
-  const expiresAt = expiresAtIso()
-
-  const { data, error } = await supabase.rpc('issue_workout_link', {
+  // Contrato restrito até regenerar database.types após a 0036: omitir o
+  // prazo deixa o servidor defini-lo, sem depender do relógio/fuso do aparelho.
+  const client = supabase as unknown as {
+    rpc(name: 'issue_workout_link', args: {
+      p_subject: string
+      p_token_hash: string
+    }): PromiseLike<{ data: WorkoutLinkRow | null; error: unknown }>
+  }
+  const { data, error } = await client.rpc('issue_workout_link', {
     p_subject: subjectId,
     p_token_hash: tokenHash,
-    p_expires_at: expiresAt,
   })
   if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar a emissão do link de treino.')
 
-  const row = data as unknown as WorkoutLinkRow
+  const row = data
   const url = workoutLinkUrl(token)
   // A URL crua fica só neste aparelho, para reexibir Copiar/WhatsApp. Em outro
   // aparelho o segredo nunca existiu: lá o caminho é reemitir.

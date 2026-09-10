@@ -1,9 +1,16 @@
 # Treino executado pelo aluno (link) — Especificação
 
-> **Estado atual (schema 0028).** Este documento preserva abaixo o desenho-base
+> **Estado atual (schema 0036, aplicado).** Este documento preserva abaixo o desenho-base
 > que originou a migration 0027. O contrato operacional vigente inclui também a
 > estabilização da 0028; em qualquer divergência, `docs/DECISIONS.md`, as
 > migrations e o bloco a seguir prevalecem sobre os exemplos históricos.
+
+## Atualização — validade pelo servidor (0036, aplicada)
+
+- A emissão passa a calcular os 180 dias no banco, pela mesma referência de `created_at`. O frontend omite `p_expires_at` e usa `expires_at` retornado para exibição e armazenamento local.
+- A assinatura antiga continua aceita: prazo futuro menor é preservado e prazo acima do teto é limitado a 180 dias. Assim, relógio adiantado ou mudança de fuso no cálculo do frontend anterior não provoca `workout_links_ttl_chk`.
+- Prazo vencido é recusado antes de revogar o link atual; qualquer falha na inserção também desfaz a revogação pela transação. O check, a RLS e os grants permanecem.
+- A 0036 foi aplicada pelo usuário, que confirmou a emissão normal do link; carimbo remoto `0036` verificado em 10/09/2026. Regenerar os tipos antes de publicar o frontend. Nenhum link existente é regravado pela migration.
 
 ## Atualização — falha e edição de sessões (0033, pendente de aplicação)
 
