@@ -133,6 +133,9 @@ export type StudentHistorySession = {
   plan_name: string
   source: 'trainer' | 'student'
   notes: string | null
+  // Sensação relatada ao concluir (1 difícil, 2 normal, 3 bem). Ausente no
+  // cache anterior à 0038 e em toda sessão lançada pelo profissional.
+  feel?: number | null
   sets: StudentHistorySet[]
 }
 
@@ -233,6 +236,9 @@ export type SubmitSessionInput = {
   // Monotono por client_ref. Replays antigos da fila nao podem substituir um
   // payload mais novo que ja chegou ao servidor.
   revision: number
+  // Como o aluno disse que foi o treino: 1 dificil, 2 normal, 3 bem. Opcional
+  // em todo o caminho — ninguem precisa responder para concluir.
+  feel?: number | null
 }
 
 export async function submitSession(
@@ -241,7 +247,15 @@ export async function submitSession(
   // Argumento com default na RPC é opcional no tipo gerado (string | undefined,
   // não null): valor ausente se OMITE, e o banco aplica o default. Mandar null
   // explícito não compila — e, se compilasse, sobrescreveria o default.
-  const { data, error, status } = await supabase.rpc('submit_workout_session', {
+  // Contrato restrito ate regenerar database.types apos a 0038: p_feel e um
+  // argumento com default, entao a chamada sem ele continua valendo.
+  const client = supabase as unknown as {
+    rpc(
+      name: 'submit_workout_session',
+      args: Record<string, unknown>
+    ): PromiseLike<{ data: unknown; error: { message?: string } | null; status: number }>
+  }
+  const { data, error, status } = await client.rpc('submit_workout_session', {
     p_token: input.token,
     p_client_ref: input.clientRef,
     p_client_revision: input.revision,
@@ -251,6 +265,7 @@ export async function submitSession(
     ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
     ...(input.notes ? { p_notes: input.notes } : {}),
     ...(input.planId ? { p_plan: input.planId } : {}),
+    ...(input.feel != null ? { p_feel: input.feel } : {}),
   })
   if (error) throw Object.assign(error, { status })
   const row = data as unknown as { log_id?: string; stale?: boolean; corrected?: boolean } | null

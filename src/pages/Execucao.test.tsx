@@ -202,10 +202,11 @@ describe('Execucao — exercício fora do plano', () => {
     abrir()
     fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))
 
-    expect(screen.getByRole('button', { name: /Crucifixo/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Crucifixo/ })).toBeTruthy()
     // Supino reto já está prescrito hoje: dois cartões do mesmo movimento na
-    // mesma sessão só confundiriam quem digita.
-    expect(screen.queryByRole('button', { name: /Supino reto/ })).toBeNull()
+    // mesma sessão só confundiriam quem digita. (O nome exato exclui os botões
+    // de marcar série feita, que também citam o exercício.)
+    expect(screen.queryByRole('button', { name: /^Supino reto/ })).toBeNull()
   })
 
   it('remover o avulso tira as séries dele do registro', async () => {
@@ -490,5 +491,67 @@ describe('semana do mesociclo', () => {
     abrir()
     expect(screen.getByText(/Semana do mesociclo:/)).toBeTruthy()
     expect(screen.getByText(/atrás do calendário/)).toBeTruthy()
+  })
+})
+
+// Quem fica com o celular na mão entre as séries é o profissional que conduz
+// a sessão. O campo de descanso existe desde a 0032, mas dependia de alguém
+// cronometrar de cabeça e digitar — na prática, um dado que nascia chutado.
+describe('cronômetro de descanso', () => {
+  it('marcar a série feita começa a contar, e o toque seguinte grava o descanso', () => {
+    vi.useFakeTimers()
+    try {
+      abrir()
+      fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+      expect(screen.getByRole('timer').textContent).toBe('0:00')
+      act(() => { vi.advanceTimersByTime(75_000) })
+      expect(screen.getByRole('timer').textContent).toBe('1:15')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Começou a série' }))
+      expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('75')
+      expect(screen.queryByRole('timer')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('desmarcar a série cancela a contagem sem gravar nada', () => {
+    abrir()
+    const marcar = screen.getByRole('button', { name: 'Série 1 de Supino reto feita' })
+    fireEvent.click(marcar)
+    expect(screen.getByRole('timer')).toBeTruthy()
+    fireEvent.click(marcar)
+    expect(screen.queryByRole('timer')).toBeNull()
+    expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
+  })
+
+  it('a série seguinte reinicia a contagem a partir dela', () => {
+    vi.useFakeTimers()
+    try {
+      abrir()
+      fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+      act(() => { vi.advanceTimersByTime(40_000) })
+      fireEvent.click(screen.getByRole('button', { name: 'Série 2 de Supino reto feita' }))
+      expect(screen.getByRole('timer').textContent).toBe('0:00')
+      // nada foi gravado na série 1: o intervalo entre duas séries concluídas
+      // inclui a execução da segunda, e não é descanso
+      expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
+      expect(screen.getByText(/descanso desde a série 2 de Supino reto/)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('avisa quando o descanso prescrito foi cumprido', () => {
+    vi.useFakeTimers()
+    try {
+      abrir() // prescrição do fixture: 90 s
+      fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+      expect(screen.getByText(/alvo 90s/)).toBeTruthy()
+      act(() => { vi.advanceTimersByTime(90_000) })
+      expect(screen.getByText(/alvo de 90s cumprido/)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

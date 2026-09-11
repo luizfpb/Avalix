@@ -1390,6 +1390,7 @@ export type Database = {
           corrected_at: string | null
           created_at: string
           day_label: string | null
+          feel: number | null
           id: string
           notes: string | null
           org_id: string
@@ -1406,6 +1407,7 @@ export type Database = {
           corrected_at?: string | null
           created_at?: string
           day_label?: string | null
+          feel?: number | null
           id?: string
           notes?: string | null
           org_id: string
@@ -1422,6 +1424,7 @@ export type Database = {
           corrected_at?: string | null
           created_at?: string
           day_label?: string | null
+          feel?: number | null
           id?: string
           notes?: string | null
           org_id?: string
@@ -1813,6 +1816,7 @@ export type Database = {
           corrected_at: string | null
           created_at: string
           day_label: string | null
+          feel: number | null
           id: string
           notes: string | null
           org_id: string
@@ -2081,6 +2085,7 @@ export type Database = {
           p_client_ref: string
           p_client_revision?: number
           p_day_label?: string
+          p_feel?: number
           p_notes?: string
           p_performed_at?: string
           p_plan?: string
@@ -2094,6 +2099,7 @@ export type Database = {
         Args: {
           p_client_ref: string
           p_day_label?: string
+          p_feel?: number
           p_notes?: string
           p_performed_at?: string
           p_plan?: string
@@ -2117,6 +2123,7 @@ export type Database = {
           corrected_at: string | null
           created_at: string
           day_label: string | null
+          feel: number | null
           id: string
           notes: string | null
           org_id: string

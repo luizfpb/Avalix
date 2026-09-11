@@ -271,11 +271,11 @@ describe('TreinoAluno', () => {
     readDraftMock.mockReturnValue(draft.promise)
     await abrir()
     expect(screen.getByLabelText('Semana').matches(':disabled')).toBe(true)
-    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(true)
+    expect(screen.getByLabelText('Quer contar alguma coisa? (opcional)').matches(':disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'Concluir treino' }).matches(':disabled')).toBe(true)
     await act(async () => { draft.resolve({ clientRef: 'salvo', revision: 1, planId: 'p1', dayId: 'd1',
       weekNumber: 1, performedAt: hojeLocal(), notes: 'Nota antiga', rows: {}, extras: [] }) })
-    expect(screen.getByLabelText('Como foi o treino? (opcional)')).toHaveProperty('value', 'Nota antiga')
+    expect(screen.getByLabelText('Quer contar alguma coisa? (opcional)')).toHaveProperty('value', 'Nota antiga')
     expect(screen.getByLabelText('Semana').matches(':disabled')).toBe(false)
   })
 
@@ -284,16 +284,16 @@ describe('TreinoAluno', () => {
     submitMock.mockReturnValue(submission.promise)
     await abrir()
     fireEvent.change(await campoCarga(), { target: { value: '40' } })
-    fireEvent.change(screen.getByLabelText('Como foi o treino? (opcional)'), { target: { value: 'Nota enviada' } })
+    fireEvent.change(screen.getByLabelText('Quer contar alguma coisa? (opcional)'), { target: { value: 'Nota enviada' } })
     fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(true)
+    expect(screen.getByLabelText('Quer contar alguma coisa? (opcional)').matches(':disabled')).toBe(true)
     expect(screen.getByLabelText('Carga da série 2 de Supino reto').matches(':disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'Histórico' }).matches(':disabled')).toBe(true)
     await act(async () => { submission.resolve({ logId: 'log1' }) })
     await screen.findByText(/Treino concluído! Seu treinador/)
     expect(submitMock.mock.calls[0][0].notes).toBe('Nota enviada')
-    expect(screen.getByLabelText('Como foi o treino? (opcional)').matches(':disabled')).toBe(false)
+    expect(screen.getByLabelText('Quer contar alguma coisa? (opcional)').matches(':disabled')).toBe(false)
   })
 
   it('não confirma conclusão se a remoção durável do rascunho falhar', async () => {
@@ -315,7 +315,7 @@ describe('TreinoAluno', () => {
     fireEvent.change(screen.getByLabelText('Repetições da série 2 de Supino reto'), { target: { value: '8' } })
     fireEvent.click(screen.getByLabelText('Falha na série 2 de Supino reto'))
     expect(screen.getByLabelText('RIR da série 2 de Supino reto')).toMatchObject({ value: '0', disabled: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
     await waitFor(() => expect(submitMock).toHaveBeenCalled())
     expect(submitMock.mock.calls[0][0].sets.map((s: { rir: number; reached_failure: boolean }) => [s.rir, s.reached_failure]))
       .toEqual([[0, false], [0, true]])
@@ -434,7 +434,7 @@ describe('TreinoAluno', () => {
     await abrir()
     const carga = await campoCarga()
     fireEvent.change(carga, { target: { value: '40' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
 
     expect(await screen.findByText(/Progresso salvo/)).toBeTruthy()
     expect((carga as HTMLInputElement).value).toBe('40')
@@ -462,7 +462,7 @@ describe('TreinoAluno', () => {
     fireEvent.change(screen.getByLabelText('Repetições da série 2 de Supino reto'), { target: { value: '8' } })
     fireEvent.change(screen.getByLabelText('Descanso da série 2 de Supino reto'), { target: { value: '0' } })
     fireEvent.change(screen.getByLabelText('Repetições da série 3 de Supino reto'), { target: { value: '6' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
 
     await waitFor(() => expect(submitMock).toHaveBeenCalled())
     expect(submitMock.mock.calls[0][0].sets.map((s: { rest_seconds: number | null }) => s.rest_seconds)).toEqual([75, 0, null])
@@ -485,7 +485,7 @@ describe('TreinoAluno', () => {
     await abrir()
     await campoCarga()
     fireEvent.change(screen.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '90' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
     expect((await screen.findByRole('alert')).textContent).toMatch(/carga ou as repetições/)
     expect(submitMock).not.toHaveBeenCalled()
   })
@@ -526,7 +526,7 @@ describe('TreinoAluno', () => {
     await abrir()
     const carga = await campoCarga()
     fireEvent.change(carga, { target: { value: '40' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/não foi possível salvar no aparelho/i)
     expect(screen.queryByText(/Progresso salvo no aparelho/)).toBeNull()
@@ -715,13 +715,13 @@ describe('TreinoAluno', () => {
     )
     await abrir()
     fireEvent.change(await campoCarga(), { target: { value: '40' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1))
 
     fireEvent.click(screen.getByRole('button', { name: /B.*Inferiores/ }))
     const cargaB = await screen.findByLabelText(/Carga da série 1 de Agachamento/)
     fireEvent.change(cargaB, { target: { value: '60' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2))
 
     // "Ontem" tem de sair do calendário LOCAL — é o que a tela usa (`hoje()`).
@@ -1153,7 +1153,7 @@ describe('TreinoAluno — troca de exercício', () => {
     await abrir()
     fireEvent.change(await campoCarga(), { target: { value: '40' } })
     await trocar()
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar progresso' }))
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
 
     await waitFor(() => expect(reserveDraftRevisionMock).toHaveBeenCalled())
     expect(reserveDraftRevisionMock.mock.calls[0][1]).toEqual(
@@ -1266,5 +1266,66 @@ describe('TreinoAluno — semana do mesociclo', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('3')
     )
+  })
+})
+// A tela era um formulário longo em que nada distinguia "série feita" de
+// "campo ainda vazio", e terminar o treino devolvia uma linha de texto.
+describe('TreinoAluno — execução da sessão', () => {
+  it('marcar a série feita alimenta o progresso da sessão', async () => {
+    await abrir()
+    await campoCarga()
+    expect(screen.getByText('0 de 3 séries feitas')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+    expect(screen.getByText('1 de 3 séries feitas')).toBeTruthy()
+    // e desmarcar volta atrás
+    fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+    expect(screen.getByText('0 de 3 séries feitas')).toBeTruthy()
+  })
+
+  it('conclui com um resumo do que foi feito', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 1 de Supino reto'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Carga da série 2 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 2 de Supino reto'), { target: { value: '8' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+
+    await screen.findByText(/Treino A concluído/)
+    expect(screen.getByText(/2 séries · 1 exercício · 720 kg levantados/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar o resumo do treino' }))
+    expect(screen.queryByText(/Treino A concluído/)).toBeNull()
+  })
+
+  it('diz quantas séries marcadas ficaram sem número e não entraram', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 1 de Supino reto'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Série 2 de Supino reto feita' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+
+    await screen.findByText(/Treino A concluído/)
+    expect(screen.getByText(/1 série marcada ficou sem carga e repetições/)).toBeTruthy()
+    expect(submitMock.mock.calls[0][0].sets).toHaveLength(1)
+  })
+  it('a sensação vai junto com a sessão, em um toque', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Foi difícil' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino A concluído/)
+    expect(submitMock.mock.calls[0][0].feel).toBe(1)
+  })
+
+  it('tocar de novo desmarca, e quem não responde envia sem sensação', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    const carinha = screen.getByRole('button', { name: 'Foi bem' })
+    fireEvent.click(carinha)
+    expect(carinha.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(carinha)
+    expect(carinha.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino A concluído/)
+    expect(submitMock.mock.calls[0][0].feel).toBeNull()
   })
 })

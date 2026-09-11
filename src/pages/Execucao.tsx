@@ -34,6 +34,7 @@ import { roundToIncrement } from '../features/workout/oneRm'
 import { effectivePrescription, formatSetsReps, overrideFor, overrideIndex } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { GroupBlock } from '../features/workout/GroupBlock'
+import { SessionFeel } from '../features/workout/SessionFeel'
 import { ExercisePicker } from '../features/workout/ExercisePicker'
 import { linePath } from '../features/reports/charts'
 import { Button } from '@/components/ui/button'
@@ -418,6 +419,15 @@ function LogRowItem({
             {log.week_number ? (
               <span className="text-muted-foreground"> · semana {log.week_number}</span>
             ) : null}
+            {/* Sensação relatada pelo aluno (0038). O tipo gerado só conhece a
+                coluna depois de regenerar database.types; até lá ela chega no
+                select('*') sem estar declarada. */}
+            {(log as WorkoutLogRow & { feel?: number | null }).feel != null ? (
+              <>
+                <span className="text-muted-foreground"> · </span>
+                <SessionFeel feel={(log as WorkoutLogRow & { feel?: number | null }).feel} />
+              </>
+            ) : null}
             {/* Quem digitou. O acesso do aluno é anônimo, então
                 audit_logs.user_id fica nulo: sem esta marca ninguém distingue
                 o registro dele do seu. */}
@@ -519,7 +529,7 @@ function SetGrid({
 }) {
   return (
     <div className="mt-2 max-w-md space-y-1">
-      <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+      <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
         <span />
         <span>carga (kg)</span>
         <span>reps</span>
@@ -541,7 +551,7 @@ function SetGrid({
       <button
         type="button"
         onClick={onAddRow}
-        className="flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Plus className="size-3" /> série
       </button>
@@ -607,6 +617,29 @@ function LogForm({
     setWeek(String(suggestedWeek))
   }, [suggestedWeek, weekTouched])
 
+  // Cronômetro de descanso. Existe só aqui, e não na tela do aluno: quem fica
+  // com o celular na mão entre as séries é o profissional que conduz. Guarda
+  // o INSTANTE do início, não um contador — a tela pode apagar, o app pode ir
+  // para segundo plano, e o tempo continua certo quando ele volta.
+  const [restTimer, setRestTimer] = useState<{
+    rowId: string
+    index: number
+    name: string
+    targetSeconds: number | null
+    startedAt: number
+  } | null>(null)
+  const [restNow, setRestNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!restTimer) return
+    setRestNow(Date.now())
+    const id = window.setInterval(() => setRestNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [restTimer])
+  const restSeconds = restTimer
+    ? Math.max(0, Math.floor((restNow - restTimer.startedAt) / 1000))
+    : 0
+  const restDone = restTimer?.targetSeconds != null && restSeconds >= restTimer.targetSeconds
+
   const dayExercises = useMemo(
     () => detail.exercises.filter((e) => e.day_id === dayKey).sort((a, b) => a.position - b.position),
     [detail.exercises, dayKey]
@@ -629,6 +662,41 @@ function LogForm({
       rows[i] = updateLogRow(rows[i], field, val)
       return { ...prev, [exRowId]: rows }
     })
+    if (field !== 'done') return
+    // Marcar a série feita é o gatilho natural do descanso: é o instante em
+    // que ele começa. Desmarcar a série que está cronometrando cancela.
+    if (val === true) {
+      const doPlano = dayExercises.find((ex) => ex.id === exRowId)
+      const alvo = doPlano
+        ? effectivePrescription(doPlano, overrideFor(overrides, weekNumber, doPlano.id)).restSeconds
+        : null
+      setRestTimer({
+        rowId: exRowId,
+        index: i,
+        name: nomeDaGrade(exRowId),
+        targetSeconds: alvo,
+        startedAt: Date.now(),
+      })
+    } else {
+      setRestTimer((atual) => (atual?.rowId === exRowId && atual.index === i ? null : atual))
+    }
+  }
+
+  function nomeDaGrade(exRowId: string): string {
+    const doPlano = dayExercises.find((ex) => ex.id === exRowId)
+    if (doPlano) return names[doPlano.exercise_id] ?? 'exercício'
+    const avulso = extras.find((x) => x.rowId === exRowId)
+    return (avulso ? names[avulso.exerciseId] : null) ?? 'exercício'
+  }
+
+  // Grava o tempo medido no descanso da série que o iniciou e encerra a
+  // contagem. É um toque só, no momento em que o aluno volta ao aparelho — e
+  // é por isso que o número gravado é descanso de verdade, e não o intervalo
+  // entre duas séries concluídas (que inclui a execução da segunda).
+  function registrarDescanso() {
+    if (!restTimer) return
+    setCell(restTimer.rowId, restTimer.index, 'rest', String(Math.min(3600, restSeconds)))
+    setRestTimer(null)
   }
   function addRow(exRowId: string) {
     setSets((prev) => ({ ...prev, [exRowId]: [...(prev[exRowId] ?? []), { weight: '', reps: '', rir: '', rest: '', failure: false }] }))
@@ -727,6 +795,7 @@ function LogForm({
       })
       setExtras([])
       setNotes('')
+      setRestTimer(null)
       // A sessão gravada muda a sugestão (pode ter fechado a semana): o campo
       // volta a segui-la para a próxima.
       setWeekTouched(false)
@@ -963,9 +1032,54 @@ function LogForm({
           {createMut.isPending ? 'Salvando...' : 'Registrar treino'}
         </Button>
         </fieldset>
+
+        {/* Fora do fieldset: o cronômetro não pode congelar enquanto a sessão
+            anterior está sendo gravada — o aluno já está descansando. */}
+        {restTimer ? (
+          <div
+            className={`sticky bottom-2 z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2 shadow-sm backdrop-blur ${
+              restDone ? 'border-success bg-success/10' : 'bg-background/95'
+            }`}
+          >
+            <span
+              className={`text-lg font-semibold tabular-nums ${restDone ? 'text-success' : ''}`}
+              role="timer"
+              aria-live="off"
+            >
+              {formatRest(restSeconds)}
+            </span>
+            <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+              descanso desde a série {restTimer.index + 1} de {restTimer.name}
+              {restTimer.targetSeconds != null
+                ? restDone
+                  ? ` · alvo de ${restTimer.targetSeconds}s cumprido`
+                  : ` · alvo ${restTimer.targetSeconds}s`
+                : ''}
+            </span>
+            <Button size="sm" variant={restDone ? 'default' : 'outline'} onClick={registrarDescanso}>
+              Começou a série
+            </Button>
+            <button
+              type="button"
+              onClick={() => setRestTimer(null)}
+              aria-label="Descartar o cronômetro sem registrar o descanso"
+              className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
+}
+
+// mm:ss a partir dos segundos corridos. Passa de 60 minutos? O treinador tem
+// problema maior que a formatação.
+function formatRest(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 function planWeeks(detail: WorkoutPlanDetail): number {

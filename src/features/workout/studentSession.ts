@@ -175,6 +175,7 @@ export async function flushQueue(token: string, scope: string, access?: StudentS
         performedAt: item.performedAt,
         notes: item.notes,
         planId: item.planId,
+        feel: item.feel ?? null,
       })
     } catch (error) {
       if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()

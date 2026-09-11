@@ -65,7 +65,15 @@ import {
 import { GroupBlock } from '../features/workout/GroupBlock'
 import { groupLabel, techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { SessionSets } from '../features/workout/SessionSets'
-import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
+import { FEEL_OPTIONS } from '../features/workout/feel'
+import { SessionFeel } from '../features/workout/SessionFeel'
+import {
+  tallySession,
+  updateLogRow,
+  validateLogRows,
+  type LogRow,
+  type SessionTally,
+} from '../features/workout/logRows'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type SessionEditValues } from '../features/workout/SessionEditForm'
 import {
@@ -701,6 +709,7 @@ function StatusBar({
 type Linha = LogRow
 const studentDraftOperations = new Map<string, Promise<unknown>>()
 
+
 // Explica na língua do aluno de onde saiu a semana pré-selecionada. A regra é
 // a mesma da tela do profissional (`suggestedPlanWeek`); só o texto muda.
 function dicaSemanaAluno(s: PlanWeekSuggestion): string {
@@ -794,6 +803,9 @@ function TreinoDoDia({
   const [semana, setSemana] = useState<number | null>(semanaSugerida)
   const [data, setData] = useState(hoje())
   const [notas, setNotas] = useState('')
+  // Como foi o treino, em um toque: 1 difícil, 2 normal, 3 bem. O texto livre
+  // continua do lado, para quem tem algo a contar.
+  const [sensacao, setSensacao] = useState<number | null>(null)
   const [linhas, setLinhas] = useState<Record<string, Linha[]>>({})
   // Exercícios de outra divisão do plano feitos nesta sessão: equipamento
   // ocupado, dor no dia, troca combinada na hora. Guardamos o id do exercício
@@ -808,6 +820,12 @@ function TreinoDoDia({
   const saving = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  // O que a sessão que acabou de ser concluída teve. Fica na tela até o aluno
+  // fechar: terminar o treino e receber só uma linha de texto verde era pouco
+  // para o esforço de registrar tudo.
+  const [resumo, setResumo] = useState<
+    (SessionTally & { dayLabel: string; weekNumber: number | null }) | null
+  >(null)
   const [salvando, setSalvando] = useState<'progresso' | 'concluir' | null>(null)
   const [rascunhoLido, setRascunhoLido] = useState(false)
   // aviso de "o plano foi regravado e o rascunho foi remapeado"
@@ -954,7 +972,7 @@ function TreinoDoDia({
       })
     }, 500)
     return () => clearTimeout(id)
-  }, [scope, clientRef, plano.id, dayId, semana, data, notas, linhas, extras, rascunhoLido, dirty, salvando, access])
+  }, [scope, clientRef, plano.id, dayId, semana, data, notas, sensacao, linhas, extras, rascunhoLido, dirty, salvando, access])
 
   // Descarga ao desmontar: o pacote novo que chega do servidor remonta esta
   // tela (a `key` acompanha os ids das divisões), e o debounce de 500 ms acima
@@ -1009,6 +1027,18 @@ function TreinoDoDia({
 
   const dia = dias.find((d) => d.id === dayId)
 
+  // Progresso da sessão. A tela era um formulário longo em que nada
+  // distinguia "série feita" de "campo ainda vazio".
+  const progresso = useMemo(
+    () =>
+      tallySession(
+        Object.fromEntries(
+          [...exerciciosDoDia, ...exerciciosExtras].map((ex) => [ex.id, linhas[ex.id] ?? []])
+        )
+      ),
+    [exerciciosDoDia, exerciciosExtras, linhas]
+  )
+
   function draftAtual(nextRevision = revision.current): DraftSession {
     return {
       clientRef,
@@ -1018,6 +1048,7 @@ function TreinoDoDia({
       weekNumber: semana,
       performedAt: data,
       notes: notas,
+      feel: sensacao,
       rows: linhas,
       extras,
       // rótulo da divisão + exercício do catálogo de cada linha: é o que
@@ -1063,6 +1094,7 @@ function TreinoDoDia({
       setData(nextDate)
       setSemana(target?.weekNumber ?? semanaSugerida)
       setNotas(target?.notes ?? '')
+      setSensacao(target?.feel ?? null)
       setLinhas(target?.rows ?? {})
       setExtras(target?.extras ?? [])
       setEscolhaExtra('')
@@ -1085,6 +1117,7 @@ function TreinoDoDia({
     if (switchingSession || !rascunhoLido || saving.current) return
     setErro(null)
     setOk(null)
+    setResumo(null)
     const erroDescanso = validateLogRows(Object.fromEntries(
       [...exerciciosDoDia, ...exerciciosExtras].map((ex) => [ex.id, linhas[ex.id] ?? []])
     ))
@@ -1115,6 +1148,7 @@ function TreinoDoDia({
         weekNumber: semana,
         performedAt: data,
         notes: notas.trim() || null,
+        feel: sensacao,
         sets,
         queuedAt: new Date().toISOString(),
       }
@@ -1140,6 +1174,7 @@ function TreinoDoDia({
             weekNumber: sessao.weekNumber,
             performedAt: sessao.performedAt,
             notes: sessao.notes,
+            feel: sessao.feel,
             sets,
           })
           if (enviado.stale) {
@@ -1180,6 +1215,16 @@ function TreinoDoDia({
         )
       }
       if (concluir) {
+        // Antes de reiniciar, porque reiniciar() zera as linhas.
+        setResumo({
+          ...tallySession(
+            Object.fromEntries(
+              [...exerciciosDoDia, ...exerciciosExtras].map((ex) => [ex.id, linhas[ex.id] ?? []])
+            )
+          ),
+          dayLabel: dia?.label ?? '',
+          weekNumber: semana,
+        })
         reiniciar()
       }
     } catch (error) {
@@ -1210,6 +1255,7 @@ function TreinoDoDia({
     setClientRef(crypto.randomUUID())
     revision.current = 0
     setNotas('')
+    setSensacao(null)
     setLinhas({})
     setExtras([])
     setEscolhaExtra('')
@@ -1260,7 +1306,7 @@ function TreinoDoDia({
               onClick={() => void trocarSessao(d.id, data)}
               disabled={switchingSession || salvando !== null}
               aria-pressed={dayId === d.id}
-              className={`rounded-md border px-3 py-1.5 text-sm ${
+              className={`min-h-11 rounded-md border px-4 text-sm ${
                 dayId === d.id
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'bg-background'
@@ -1351,6 +1397,31 @@ function TreinoDoDia({
         {' '}Marque Falha quando tentou e não conseguiu completar a repetição; RIR 0 sozinho não marca falha.
       </p>
 
+      {progresso.total > 0 ? (
+        <div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium">
+              {progresso.done} de {progresso.total} séries feitas
+            </span>
+            {progresso.done > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                {Math.round((progresso.done / progresso.total) * 100)}%
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                toque no número da série quando terminar
+              </span>
+            )}
+          </div>
+          <div className="mt-1 h-2 rounded bg-muted">
+            <div
+              className="h-2 rounded bg-success transition-all"
+              style={{ width: `${Math.round((progresso.done / progresso.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <div className="space-y-3">
         {/* Quem executa o treino é esta tela: se ela listar os exercícios de uma
             super-série soltos, a super-série não acontece. */}
@@ -1405,7 +1476,7 @@ function TreinoDoDia({
                   ) : null}
 
                   <div className="mt-2 max-w-md space-y-1">
-                    <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                    <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
                       <span />
                       <span>carga (kg)</span>
                       <span>reps</span>
@@ -1421,7 +1492,7 @@ function TreinoDoDia({
                   ))}
                     <button
                       type="button"
-                      className="px-1 text-xs text-muted-foreground underline"
+                      className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() => addLinha(ex.id)}
                     >
                       + série
@@ -1470,7 +1541,7 @@ function TreinoDoDia({
                 </p>
               ) : null}
               <div className="mt-2 max-w-md space-y-1">
-                <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
                   <span />
                   <span>carga (kg)</span>
                   <span>reps</span>
@@ -1486,7 +1557,7 @@ function TreinoDoDia({
                   ))}
                 <button
                   type="button"
-                  className="px-1 text-xs text-muted-foreground underline"
+                  className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => addLinha(ex.id)}
                 >
                   + série
@@ -1539,9 +1610,43 @@ function TreinoDoDia({
         </div>
       ) : null}
 
+      {/* Um toque no lugar de digitar. O texto livre quase nunca era
+          preenchido no meio da academia, e é justamente esse sinal — treino
+          pesado demais, semana após semana — que antecede lesão e abandono. */}
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium" id="aluno-sensacao-titulo">
+          Como você se sentiu? (opcional)
+        </span>
+        <div className="flex gap-2" role="group" aria-labelledby="aluno-sensacao-titulo">
+          {FEEL_OPTIONS.map((opcao) => {
+            const ativa = sensacao === opcao.value
+            const Icone = opcao.icon
+            return (
+              <button
+                key={opcao.value}
+                type="button"
+                aria-pressed={ativa}
+                aria-label={opcao.label}
+                disabled={switchingSession || salvando !== null}
+                onClick={() => {
+                  setDirty(true)
+                  setSensacao(ativa ? null : opcao.value)
+                }}
+                className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                  ativa ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                <Icone className="size-5" aria-hidden="true" />
+                {opcao.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         <Label htmlFor="aluno-notas" className="text-xs">
-          Como foi o treino? (opcional)
+          Quer contar alguma coisa? (opcional)
         </Label>
         <textarea
           id="aluno-notas"
@@ -1562,24 +1667,74 @@ function TreinoDoDia({
         </p>
       ) : null}
 
-      {ok ? (
+      {resumo ? (
+        <div className="rounded-md border border-success/30 bg-success/[0.07] p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-success">
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+              Treino {resumo.dayLabel} concluído
+              {resumo.weekNumber != null ? ` · semana ${resumo.weekNumber}` : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => setResumo(null)}
+              aria-label="Fechar o resumo do treino"
+              className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mt-1 text-sm tabular-nums">
+            {resumo.logged} {resumo.logged === 1 ? 'série' : 'séries'} · {resumo.exercises}{' '}
+            {resumo.exercises === 1 ? 'exercício' : 'exercícios'}
+            {resumo.volumeKg > 0
+              ? ` · ${resumo.volumeKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg levantados`
+              : ''}
+          </p>
+          {/* Marcar a série como feita não basta para registrá-la: sem carga
+              nem repetição não há o que guardar. Dizer isso aqui é melhor do
+              que descartar em silêncio. */}
+          {resumo.doneWithoutNumbers > 0 ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumo.doneWithoutNumbers}{' '}
+              {resumo.doneWithoutNumbers === 1
+                ? 'série marcada ficou sem carga e repetições, então não entrou'
+                : 'séries marcadas ficaram sem carga e repetições, então não entraram'}{' '}
+              no registro.
+            </p>
+          ) : null}
+          {ok ? <p className="mt-1 text-xs text-muted-foreground">{ok}</p> : null}
+        </div>
+      ) : ok ? (
         <p className="flex items-center gap-1.5 text-sm text-success">
           <CheckCircle2 className="size-4" aria-hidden="true" />
           {ok}
         </p>
       ) : null}
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="space-y-2">
         <Button
-          variant="outline"
+          className="h-12 w-full text-base"
+          onClick={() => void salvar(true)}
+          disabled={salvando !== null || switchingSession}
+        >
+          {salvando === 'concluir' ? 'Concluindo...' : 'Concluir treino'}
+        </Button>
+        {/* O rascunho já é gravado sozinho a cada digitação. Este botão existe
+            para quem quer a confirmação de que pode fechar a tela — e o texto
+            abaixo diz o que ele faz, em vez de deixar o aluno na dúvida sobre
+            perder o que digitou. */}
+        <Button
+          variant="ghost"
+          className="h-10 w-full text-sm font-normal text-muted-foreground"
           onClick={() => void salvar(false)}
           disabled={salvando !== null || switchingSession}
         >
-          {salvando === 'progresso' ? 'Salvando...' : 'Salvar progresso'}
+          {salvando === 'progresso' ? 'Salvando...' : 'Parar por aqui e continuar depois'}
         </Button>
-        <Button onClick={() => void salvar(true)} disabled={salvando !== null || switchingSession}>
-          {salvando === 'concluir' ? 'Concluindo...' : 'Concluir treino'}
-        </Button>
+        <p className="text-center text-[11px] text-muted-foreground">
+          O que você digita já fica guardado neste aparelho, mesmo sem internet.
+        </p>
       </div>
       </fieldset>
     </div>
@@ -1792,9 +1947,17 @@ function Historico({
               {s.source === 'trainer' ? 'registrado pelo treinador' : null}
             </span>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {s.plan_name}
-            {s.week_number != null ? ` · semana ${s.week_number}` : ''}
+          <p className="flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground">
+            <span>
+              {s.plan_name}
+              {s.week_number != null ? ` · semana ${s.week_number}` : ''}
+            </span>
+            {s.feel != null ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <SessionFeel feel={s.feel} />
+              </>
+            ) : null}
           </p>
           <div className="mt-1.5">
             <SessionSets

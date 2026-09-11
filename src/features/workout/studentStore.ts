@@ -339,6 +339,9 @@ export type QueuedSession = {
   weekNumber: number | null
   performedAt: string
   notes: string | null
+  // Sensação relatada ao concluir. Vai junto na fila: quem treinou sem sinal
+  // respondeu na hora, e a resposta não pode ficar para trás no envio.
+  feel?: number | null
   sets: SubmitSet[]
   queuedAt: string
   // motivo da última recusa definitiva, quando houver
@@ -418,6 +421,8 @@ export type DraftRow = {
   rir: string
   rest?: string
   failure?: boolean | null
+  /** série já executada. Estado da tela, não vai para o banco. */
+  done?: boolean
 }
 
 export type DraftSession = {
@@ -428,6 +433,8 @@ export type DraftSession = {
   weekNumber: number | null
   performedAt: string
   notes: string
+  /** sensação escolhida (1 a 3), para não se perder ao trocar de sessão */
+  feel?: number | null
   rows: Record<string, DraftRow[]>
   // Exercícios de OUTRA divisão do plano feitos nesta sessão (substituição de
   // última hora). Guardados como id do exercício do plano, que é a mesma chave

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { ensureLogRows, reconcileSetRows, updateLogRow, validateLogRows, validateRestRows } from './logRows'
+import {
+  ensureLogRows,
+  isLoggedRow,
+  reconcileSetRows,
+  tallySession,
+  updateLogRow,
+  validateLogRows,
+  validateRestRows,
+} from './logRows'
 
 describe('ensureLogRows', () => {
   it('cria todas as 20 séries admitidas pela prescrição', () => {
@@ -48,5 +56,51 @@ describe('validateRestRows', () => {
 
   it('impede que um descanso sem série executada seja descartado ao salvar', () => {
     expect(validateRestRows({ ex: [{ weight: '', reps: '', rir: '', rest: '90' }] })).toMatch(/carga ou as repetições/)
+  })
+})
+
+describe('série feita e contagem da sessão', () => {
+  it('marcar e desmarcar "feita" não mexe nos números digitados', () => {
+    const feita = updateLogRow({ weight: '40', reps: '10', rir: '2' }, 'done', true)
+    expect(feita).toMatchObject({ done: true, weight: '40', reps: '10' })
+    expect(updateLogRow(feita, 'done', false)).toMatchObject({ done: false, weight: '40' })
+  })
+
+  it('série marcada não é descartada quando a prescrição encolhe', () => {
+    // quem tocou na linha está no meio da sessão: apagar seria perder trabalho
+    const rows = [
+      { weight: '40', reps: '10', rir: '' },
+      { weight: '', reps: '', rir: '', done: true },
+      { weight: '', reps: '', rir: '' },
+    ]
+    expect(reconcileSetRows(rows, 1)).toHaveLength(2)
+  })
+
+  it('conta feitas, registráveis, volume e o que vai ficar de fora', () => {
+    const tally = tallySession({
+      supino: [
+        { weight: '40', reps: '10', rir: '2', done: true },
+        { weight: '40', reps: '8', rir: '1', done: true },
+        { weight: '', reps: '', rir: '', done: true }, // feita, mas sem número
+      ],
+      abdominal: [
+        { weight: '', reps: '20', rir: '' }, // sem carga: entra no registro
+        { weight: '', reps: '', rir: '' },
+      ],
+    })
+    expect(tally).toEqual({
+      done: 3,
+      logged: 3,
+      total: 5,
+      doneWithoutNumbers: 1,
+      volumeKg: 720, // 40×10 + 40×8; peso corporal não soma volume
+      exercises: 2,
+    })
+  })
+
+  it('sessão vazia não inventa números', () => {
+    expect(tallySession({})).toMatchObject({ done: 0, logged: 0, total: 0, volumeKg: 0 })
+    expect(isLoggedRow({ weight: '', reps: '', rir: '3' })).toBe(false)
+    expect(isLoggedRow({ weight: '', reps: '12', rir: '' })).toBe(true)
   })
 })

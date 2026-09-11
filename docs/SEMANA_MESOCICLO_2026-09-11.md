@@ -1,5 +1,10 @@
 # Semana do mesociclo pelo histórico
 
+> A **0038** (sensação da sessão) veio depois desta entrega e o gate já exige
+> `0038`. Os passos consolidados — aplicar a 0037, depois a 0038, regenerar os
+> tipos e publicar as duas de uma vez — estão em
+> [`EXECUCAO_DO_TREINO_2026-09-11.md`](EXECUCAO_DO_TREINO_2026-09-11.md).
+
 ## O problema
 
 A semana da sessão era calculada pela data: início do plano (ou, na falta dele,
@@ -78,8 +83,8 @@ npx supabase gen types typescript --linked > src\lib\database.types.ts
 npm run check:remote-schema
 ```
 
-O resultado esperado é `schema gate ok: 0037`. O gate deste frontend já exige a
-0037, então ele reprova enquanto a migration não estiver aplicada.
+O resultado esperado é o carimbo da última migration aplicada. Com a 0038
+também aplicada, o gate espera `schema gate ok: 0038`.
 
 4. Rodar a validação completa:
 

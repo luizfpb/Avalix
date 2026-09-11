@@ -147,14 +147,14 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             {exercises.map((ex) => (
               <div key={ex.id} className="rounded-md border bg-muted/20 p-2.5">
                 <p className="mb-2 text-sm font-medium">{ex.name}</p>
-                <div className="grid grid-cols-[1.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
                   <span /><span>carga (kg)</span><span>reps</span><span>RIR</span><span>desc. (s)</span>
                 </div>
                 {ex.rows.map((row, index) => (
                   <div key={row.key} className="mt-1">
-                    <SetRowFields name={ex.name} index={index} row={row} disabled={saving}
+                    <SetRowFields name={ex.name} index={index} row={row} disabled={saving} markable={false}
                       onChange={(field, value) => changeRows(ex.id, (rows) => rows.map((r) => r.key === row.key ? { ...updateLogRow(r, field, value), key: r.key } : r))} />
-                    <button type="button" className="-mt-8 flex min-h-8 items-center gap-1 px-1 text-xs text-muted-foreground hover:text-destructive"
+                    <button type="button" className="-mt-11 flex min-h-11 items-center gap-1 px-1 text-xs text-muted-foreground hover:text-destructive"
                       aria-label={`Remover série ${index + 1} de ${ex.name}`}
                       onClick={() => changeRows(ex.id, (rows) => rows.filter((r) => r.key !== row.key))}>
                       <Trash2 className="size-3" aria-hidden="true" /> Remover
