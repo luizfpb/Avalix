@@ -1,5 +1,5 @@
 import type { ActivePlanSummary, LogSummary } from './api'
-import { adherencePct, plannedSessionsToDate } from './progress'
+import { adherencePct, effectivePlanStart, plannedSessionsToDate } from './progress'
 import { daysSince, dueForReassessment } from '../../lib/reminders'
 
 // dias sem treino registrado (com plano ativo) que pedem atenção do profissional
@@ -48,13 +48,17 @@ export function buildCarteira(input: {
     let lastLogAt: string | null = null
     let quiet = false
     if (plan) {
-      const summary = input.logSummary[plan.planId] ?? { count: 0, lastDate: null }
+      const summary = input.logSummary[plan.planId] ?? { count: 0, lastDate: null, firstDate: null }
+      // Início real: quem recebeu o plano em janeiro e só apareceu em março
+      // era cobrado desde janeiro, e entrava na lista de atenção por uma
+      // ausência que nunca existiu.
+      const startedOn = effectivePlanStart(plan.startsOn, summary.firstDate, plan.createdOn)
       // Denominador por semanas já fechadas: enquanto a primeira semana corre,
       // não há percentual a cobrar (null), em vez de 0%.
       const planned = plannedSessionsToDate(
         plan.weeks,
         plan.sessionsPerWeek,
-        plan.startedOn,
+        startedOn,
         input.now
       )
       adherence = planned != null && planned > 0 ? adherencePct(summary.count, planned) : null
@@ -62,7 +66,7 @@ export function buildCarteira(input: {
       // Sem log nenhum, o silêncio conta a partir do início do plano — antes
       // era Infinity, então um plano criado no mesmo dia já entrava como "sem
       // treino recente" e ia para o topo da lista de atenção.
-      const referencia = lastLogAt ?? plan.startedOn
+      const referencia = lastLogAt ?? startedOn
       const since = referencia ? daysSince(referencia, input.now) : 0
       quiet = since >= quietDays
     }

@@ -3,10 +3,12 @@ import {
   adherencePct,
   completedWeeks,
   currentWeek,
+  effectivePlanStart,
   exerciseProgression,
   plannedSessions,
   plannedSessionsToDate,
   sessionsPerWeek,
+  suggestedPlanWeek,
   weekSessionLabels,
 } from './progress'
 import type { SetHistoryPoint } from './api'
@@ -128,5 +130,165 @@ describe('exerciseProgression', () => {
     const prog = exerciseProgression(history)
     expect(prog.map((p) => p.exerciseId)).not.toContain('abdominal')
     expect(prog[0].exerciseId).toBe('sup') // 2 sessões antes do agacho (1)
+  })
+})
+
+describe('suggestedPlanWeek — a semana vem do histórico, não do relógio', () => {
+  // Sessões sempre do mais recente para o mais antigo, como as telas recebem.
+  const log = (performed_at: string, week_number: number | null) => ({ performed_at, week_number })
+
+  it('plano sem nenhuma sessão começa na semana 1', () => {
+    expect(suggestedPlanWeek({ weeks: 8, sessionsPerWeek: 3, logs: [] })).toEqual({
+      week: 1,
+      basis: 'first',
+      lastLoggedWeek: null,
+      sessionsInCurrentPass: 0,
+      sessionsPerWeek: 3,
+    })
+  })
+
+  it('quem recebeu o plano em janeiro e começou em março também começa na semana 1', () => {
+    // é o caso que o calendário errava: currentWeek diria semana 9
+    const s = suggestedPlanWeek({ weeks: 8, sessionsPerWeek: 3, logs: [] })
+    expect(s.week).toBe(1)
+  })
+
+  it('continua na semana do último treino enquanto ela não fecha', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24', 2), log('2026-06-22', 2)],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue', sessionsInCurrentPass: 2 })
+  })
+
+  it('avança quando a semana fecha', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24', 2), log('2026-06-22', 2), log('2026-06-20', 2)],
+    })
+    expect(s).toMatchObject({ week: 3, basis: 'advance', lastLoggedWeek: 2, sessionsInCurrentPass: 3 })
+  })
+
+  it('faltar uma semana não pula semana do mesociclo', () => {
+    // três semanas sem treinar e ele volta: continua na 2, não na 5
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-01', 2), log('2026-05-30', 2)],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue' })
+  })
+
+  it('quem retrocedeu conta a passada nova, não a antiga', () => {
+    // fez a semana 2 inteira, entrou na 3, voltou para a 2: a semana 2
+    // recomeça do zero — somar as duas passadas mandaria ele para a 3 já na
+    // primeira sessão da repetição
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [
+        log('2026-06-24', 2),
+        log('2026-06-17', 3),
+        log('2026-06-15', 3),
+        log('2026-06-13', 3),
+        log('2026-06-10', 2),
+        log('2026-06-08', 2),
+        log('2026-06-06', 2),
+      ],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue', sessionsInCurrentPass: 1 })
+  })
+
+  it('a última semana fechada não vira semana 9 de 8', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 2,
+      logs: [log('2026-06-24', 8), log('2026-06-22', 8)],
+    })
+    expect(s).toMatchObject({ week: 8, basis: 'end' })
+  })
+
+  it('sessão sem semana anotada é ignorada, e não interrompe a passada', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24', null), log('2026-06-22', 2), log('2026-06-20', 2)],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue', sessionsInCurrentPass: 2 })
+  })
+
+  it('histórico só com sessões sem semana equivale a histórico vazio', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24', null), log('2026-06-22', null)],
+    })
+    expect(s).toMatchObject({ week: 1, basis: 'first' })
+  })
+
+  it('reordena por data quando a lista chega fora de ordem', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-10', 2), log('2026-06-24', 3), log('2026-06-12', 2)],
+    })
+    expect(s).toMatchObject({ week: 3, lastLoggedWeek: 3, sessionsInCurrentPass: 1 })
+  })
+
+  it('data com hora não confunde a ordenação', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24T22:00:00Z', 3), log('2026-06-24T08:00:00Z', 2)],
+    })
+    expect(s.lastLoggedWeek).toBe(3)
+  })
+
+  it('plano encolhido não oferece semana que não existe mais', () => {
+    // mesociclo reeditado de 8 para 4 semanas depois de a sessão ser gravada
+    const s = suggestedPlanWeek({
+      weeks: 4,
+      sessionsPerWeek: 3,
+      logs: [log('2026-06-24', 7)],
+    })
+    expect(s).toMatchObject({ week: 4, basis: 'continue' })
+  })
+
+  it('sem sessões por semana conhecidas, nunca avança sozinho', () => {
+    // plano sem divisões: não há como saber quando a semana fechou
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 0,
+      logs: [log('2026-06-24', 2), log('2026-06-22', 2)],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue' })
+  })
+})
+
+describe('effectivePlanStart', () => {
+  it('sem data informada, o plano começa no primeiro treino', () => {
+    // o defeito antigo: a conta começava na criação do plano, então quem
+    // demorou dois meses para começar já nascia com adesão arrasada
+    expect(effectivePlanStart(null, '2026-03-02', '2026-01-10T12:00:00Z')).toBe('2026-03-02')
+  })
+
+  it('a data informada pelo profissional vale quando o aluno começou depois', () => {
+    // faltar às semanas combinadas é falta de verdade, e a adesão deve cobrar
+    expect(effectivePlanStart('2026-03-01', '2026-03-20', null)).toBe('2026-03-01')
+  })
+
+  it('treino anterior à data informada antecipa o início', () => {
+    expect(effectivePlanStart('2026-03-01', '2026-02-20', null)).toBe('2026-02-20')
+  })
+
+  it('sem data e sem treino, sobra a criação do plano', () => {
+    expect(effectivePlanStart(null, null, '2026-01-10T12:00:00Z')).toBe('2026-01-10T12:00:00Z')
+    expect(effectivePlanStart(null, null, null)).toBeNull()
+  })
+
+  it('normaliza timestamp para data', () => {
+    expect(effectivePlanStart(null, '2026-03-02T10:00:00Z', null)).toBe('2026-03-02')
   })
 })

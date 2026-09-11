@@ -1179,3 +1179,92 @@ describe('TreinoAluno — troca de exercício', () => {
     expect(screen.queryByLabelText('Trocou algum exercício?')).toBeNull()
   })
 })
+
+// A semana escolhida aqui traz a prescrição da semana e fica gravada no
+// histórico. Vinha do calendário, então errava para quem começou depois de
+// receber o plano, faltou ou está repetindo a semana de propósito.
+describe('TreinoAluno — semana do mesociclo', () => {
+  const tresPorSemana = (log: { performed_at: string; week_number: number | null }[]) =>
+    pacote({
+      plan: { ...pacote().plan!, weekly_schedule: ['A', 'A', 'A'] },
+      current_plan_sessions: log.length,
+      plan_week_log: log,
+    })
+
+  it('continua na semana do último treino, contando o que já foi feito nela', async () => {
+    getWorkoutMock.mockResolvedValue(tresPorSemana([{ performed_at: '2026-09-08', week_number: 3 }]))
+    await abrir()
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('3')
+    expect(screen.getByText('Semana 3 em andamento: 1 de 3 treinos feitos.')).toBeTruthy()
+  })
+
+  it('semana fechada oferece a próxima e deixa repetir em um clique', async () => {
+    getWorkoutMock.mockResolvedValue(
+      tresPorSemana([
+        { performed_at: '2026-09-08', week_number: 3 },
+        { performed_at: '2026-09-06', week_number: 3 },
+        { performed_at: '2026-09-04', week_number: 3 },
+      ])
+    )
+    await abrir()
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('4')
+    expect(screen.getByText(/Você fechou a semana 3 \(3 de 3 treinos\)/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Repetir a semana 3' }))
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('3')
+  })
+
+  it('quem voltou uma semana recomeça a contagem dela', async () => {
+    getWorkoutMock.mockResolvedValue(
+      tresPorSemana([
+        { performed_at: '2026-09-10', week_number: 2 },
+        { performed_at: '2026-09-08', week_number: 3 },
+        { performed_at: '2026-09-06', week_number: 3 },
+        { performed_at: '2026-09-04', week_number: 3 },
+      ])
+    )
+    await abrir()
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('2')
+    expect(screen.getByText('Semana 2 em andamento: 1 de 3 treinos feitos.')).toBeTruthy()
+  })
+
+  it('envia a semana derivada do histórico, e não a do calendário', async () => {
+    getWorkoutMock.mockResolvedValue(tresPorSemana([{ performed_at: '2026-09-08', week_number: 3 }]))
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino concluído! Seu treinador/)
+    expect(submitMock.mock.calls[0][0].weekNumber).toBe(3)
+  })
+
+  it('a sessão concluída já conta para a semana da próxima', async () => {
+    getWorkoutMock.mockResolvedValue(
+      tresPorSemana([
+        { performed_at: '2026-09-08', week_number: 3 },
+        { performed_at: '2026-09-06', week_number: 3 },
+      ])
+    )
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino concluído! Seu treinador/)
+    // o pacote só é rebuscado ao reabrir a página: sem contar a sessão local,
+    // a tela ofereceria a semana 3 de novo
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('4')
+  })
+
+  it('pacote guardado antes da 0037 não inventa semana', async () => {
+    getWorkoutMock.mockResolvedValue(pacote()) // sem plan_week_log, sem starts_on
+    await abrir()
+    expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('')
+    expect(screen.queryByText(/em andamento/)).toBeNull()
+  })
+  it('semana chega com o pacote do servidor, mesmo tendo aberto pelo cache antigo', async () => {
+    // o cache do aparelho e anterior a 0037 e nao tem plan_week_log
+    readCachedWorkoutMock.mockResolvedValue({ at: '2026-09-08T12:00:00Z', data: pacote() })
+    getWorkoutMock.mockResolvedValue(tresPorSemana([{ performed_at: '2026-09-08', week_number: 3 }]))
+    await abrir()
+    await waitFor(() =>
+      expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('3')
+    )
+  })
+})

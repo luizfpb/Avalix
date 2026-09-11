@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import type { WeekLogPoint } from './progress'
 
 // Camada de acesso da página do aluno (/t). Tudo aqui passa pelas RPCs
 // anônimas da 0027, que validam o token por dentro: o cliente do aluno nunca
@@ -89,6 +90,11 @@ export type StudentWorkout = {
   subject_first_name: string
   link_expires_at: string
   current_plan_sessions: number
+  // Últimas sessões do plano ativo (data + semana), da mais recente para a
+  // mais antiga, para a tela derivar em que semana do mesociclo o aluno está
+  // — ver `suggestedPlanWeek`. Opcional: um pacote guardado no aparelho antes
+  // da 0037 não tem o campo, e a tela precisa continuar abrindo com ele.
+  plan_week_log?: WeekLogPoint[]
   plan: StudentPlan | null
   days: StudentDay[]
   exercises: StudentExercise[]

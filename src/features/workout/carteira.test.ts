@@ -13,12 +13,12 @@ const subjects = [
 // Ambos comecaram em 27/05/2026, ou seja, 4 semanas fechadas em 24/06 — o
 // plano inteiro ja decorreu, entao o denominador cobravel e o total.
 const activePlans: ActivePlanSummary[] = [
-  { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 4, sessionsPerWeek: 3, startedOn: '2026-05-27' }, // 12 cobraveis
-  { planId: 'p2', subjectId: 's2', name: 'AB', weeks: 4, sessionsPerWeek: 2, startedOn: '2026-05-27' }, // 8 cobraveis
+  { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 4, sessionsPerWeek: 3, startsOn: '2026-05-27', createdOn: null }, // 12 cobraveis
+  { planId: 'p2', subjectId: 's2', name: 'AB', weeks: 4, sessionsPerWeek: 2, startsOn: '2026-05-27', createdOn: null }, // 8 cobraveis
 ]
 const logSummary: Record<string, LogSummary> = {
-  p1: { count: 10, lastDate: '2026-06-23' }, // aderente, treinou ontem
-  p2: { count: 1, lastDate: '2026-06-01' }, // pouca adesão, sem treino recente (23 dias)
+  p1: { count: 10, lastDate: '2026-06-23', firstDate: '2026-05-27' }, // aderente, treinou ontem
+  p2: { count: 1, lastDate: '2026-06-01', firstDate: '2026-06-01' }, // pouca adesão, sem treino recente (23 dias)
 }
 const lastAssessment: Record<string, string> = {
   s1: '2026-06-10', // recente
@@ -75,9 +75,9 @@ describe('buildCarteira', () => {
       subjects: [{ id: 's1', full_name: 'Ana', is_active: true }],
       lastAssessment: { s1: '2026-06-20' },
       activePlans: [
-        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startedOn: '2026-06-24' },
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startsOn: '2026-06-24', createdOn: null },
       ],
-      logSummary: { p1: { count: 0, lastDate: null } },
+      logSummary: { p1: { count: 0, lastDate: null, firstDate: null } },
       now,
     })[0]
     // Antes: adherencePct 0, quiet true (Infinity >= 10), attention 3.
@@ -90,9 +90,9 @@ describe('buildCarteira', () => {
       lastAssessment: { s1: '2026-06-20' },
       activePlans: [
         // Semana 2 de um plano de 8; 1 semana fechada -> 3 sessoes cobraveis.
-        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startedOn: '2026-06-15' },
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startsOn: '2026-06-15', createdOn: null },
       ],
-      logSummary: { p1: { count: 3, lastDate: '2026-06-22' } },
+      logSummary: { p1: { count: 3, lastDate: '2026-06-22', firstDate: '2026-06-15' } },
       now,
     })[0]
     // Antes: 3/24 = 12,5% e barra laranja para quem nao faltou a nada.
@@ -106,12 +106,49 @@ describe('buildCarteira', () => {
       subjects: [{ id: 's1', full_name: 'Ana', is_active: true }],
       lastAssessment: { s1: '2026-06-20' },
       activePlans: [
-        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startedOn: '2026-05-01' },
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3, startsOn: '2026-05-01', createdOn: null },
       ],
-      logSummary: { p1: { count: 0, lastDate: null } },
+      logSummary: { p1: { count: 0, lastDate: null, firstDate: null } },
       now,
     })[0]
     expect(abandonado.quiet).toBe(true) // 54 dias desde o inicio, nenhum treino
     expect(abandonado.adherencePct).toBe(0)
+  })
+  // Regressao: o inicio era `starts_on ?? created_at`, entao o plano montado
+  // com antecedencia cobrava as semanas em que o aluno ainda nem tinha
+  // comecado — e a barra dele nascia vermelha.
+  it('conta a partir do primeiro treino quando nao ha data de inicio informada', () => {
+    const comecouDepois = buildCarteira({
+      subjects: [{ id: 's1', full_name: 'Ana', is_active: true }],
+      lastAssessment: { s1: '2026-06-20' },
+      activePlans: [
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3,
+          startsOn: null, createdOn: '2026-01-10T12:00:00Z' },
+      ],
+      // plano digitado em janeiro, primeiro treino so em 15/06
+      logSummary: { p1: { count: 3, lastDate: '2026-06-22', firstDate: '2026-06-15' } },
+      now,
+    })[0]
+    // Antes: 3 de 24 cobraveis (plano inteiro, decorrido desde janeiro) = 12,5%.
+    expect(comecouDepois.adherencePct).toBe(1)
+    expect(comecouDepois.attention).toBe(0)
+  })
+
+  it('data informada pelo profissional continua cobrando quem nao apareceu', () => {
+    const faltou = buildCarteira({
+      subjects: [{ id: 's1', full_name: 'Ana', is_active: true }],
+      lastAssessment: { s1: '2026-06-20' },
+      activePlans: [
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3,
+          startsOn: '2026-06-03', createdOn: '2026-06-01T12:00:00Z' },
+      ],
+      // combinado para 03/06, so comecou no dia 17: as semanas perdidas sao
+      // falta de verdade e continuam no denominador
+      logSummary: { p1: { count: 3, lastDate: '2026-06-22', firstDate: '2026-06-17' } },
+      now,
+    })[0]
+    // 3 semanas fechadas desde 03/06 = 9 cobraveis. Se o inicio tivesse sido
+    // puxado para o primeiro treino, apareceria como 100%.
+    expect(faltou.adherencePct).toBeCloseTo(1 / 3)
   })
 })

@@ -438,3 +438,57 @@ describe('Execucao — editar sessão enviada', () => {
     })
   })
 })
+
+// A semana gravada aqui escolhe o override aplicado na tela e segue para o
+// histórico e para o PDF. Derivá-la da data de criação do plano acertava só
+// para o aluno que começa no dia em que o plano foi montado e nunca falta.
+describe('semana do mesociclo', () => {
+  it('primeira sessão do plano começa na semana 1, e diz por quê', () => {
+    abrir()
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('1')
+    expect(screen.getByText(/Primeira sessão registrada neste plano/)).toBeTruthy()
+  })
+
+  it('semana fechada sugere a próxima, sem pular por causa do calendário', () => {
+    carregarSessao() // uma sessão na semana 1, e o plano tem 1 divisão
+    abrir()
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('2')
+    expect(screen.getByText(/A semana 1 fechou \(1 de 1 sessão\)/)).toBeTruthy()
+  })
+
+  it('repetir a semana é um clique, e a escolha manda', () => {
+    carregarSessao()
+    abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Repetir a semana 1' }))
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('1')
+    // e dá para voltar atrás
+    fireEvent.click(screen.getByRole('button', { name: 'Usar a semana 2' }))
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('2')
+  })
+
+  it('grava a semana sugerida sem o educador precisar digitar', async () => {
+    carregarSessao()
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Repetições da série 1 de Supino reto'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(criarMock.mock.calls[0][0].weekNumber).toBe(2)
+  })
+
+  it('sem as sessões carregadas não inventa semana nenhuma', () => {
+    logsMock.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch: vi.fn() })
+    abrir()
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByText(/Primeira sessão registrada/)).toBeNull()
+  })
+
+  it('mostra a defasagem entre o mesociclo e o calendário', () => {
+    const detail = plano()
+    detail.plan!.starts_on = '2026-01-05'
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir()
+    expect(screen.getByText(/Semana do mesociclo:/)).toBeTruthy()
+    expect(screen.getByText(/atrás do calendário/)).toBeTruthy()
+  })
+})

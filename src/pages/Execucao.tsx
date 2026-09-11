@@ -15,10 +15,14 @@ import {
 import type { ExerciseRow, NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
 import {
   adherencePct,
+  completedWeeks,
+  effectivePlanStart,
   exerciseProgression,
   plannedSessions,
   plannedSessionsToDate,
   sessionsPerWeek,
+  suggestedPlanWeek,
+  type PlanWeekSuggestion,
 } from '../features/workout/progress'
 import {
   latestBestByExercise,
@@ -94,7 +98,11 @@ export default function Execucao() {
   const logs = logsQuery.data ?? []
   const sessionsPerWeekCount = sessionsPerWeek(plan.weekly_schedule, detail.days.length)
   const done = logs.length
-  const startedOn = plan.starts_on ?? plan.created_at ?? null
+  // Início efetivo: a data informada, a primeira sessão registrada ou, em
+  // último caso, a criação do plano. Plano entregue em janeiro e começado em
+  // março não pode ser cobrado desde janeiro.
+  const firstSessionOn = logs.length > 0 ? logs[logs.length - 1].performed_at : null
+  const startedOn = effectivePlanStart(plan.starts_on, firstSessionOn, plan.created_at)
   // Cobra apenas as semanas já fechadas: quem está em dia na semana 2 de um
   // plano de 8 não pode aparecer com 25%.
   const plannedToDate = plannedSessionsToDate(plan.weeks, sessionsPerWeekCount, startedOn, new Date())
@@ -108,6 +116,18 @@ export default function Execucao() {
       : `Primeira semana em andamento — a adesão passa a ser calculada quando ela fechar. ` +
         `Plano completo = ${plannedSessions(plan.weeks, sessionsPerWeekCount)} sessões.`
   const progress = exerciseProgression(historyQuery.data ?? [])
+
+  // Semana do mesociclo pelo histórico. Só existe quando as sessões foram
+  // lidas: sem elas a sugestão seria "semana 1" para todo mundo, e o educador
+  // gravaria a sessão na semana errada sem perceber.
+  const weekSuggestion =
+    logsQuery.isPending || logsQuery.isError
+      ? null
+      : suggestedPlanWeek({ weeks: plan.weeks, sessionsPerWeek: sessionsPerWeekCount, logs })
+  // Semana pelo relógio, sem limitar ao tamanho do plano: é a defasagem que
+  // interessa aqui, e ela só aparece se o número puder passar do mesociclo.
+  const calendarWeek = startedOn ? (completedWeeks(startedOn, new Date()) ?? 0) + 1 : null
+  const weekLag = weekSuggestion && calendarWeek ? calendarWeek - weekSuggestion.week : 0
 
   // Só a lista de exercícios é realmente bloqueante: sem ela não há como
   // montar o formulário de registro. Logs e histórico alimentam a adesão e as
@@ -194,6 +214,20 @@ export default function Execucao() {
               </div>
             ) : null}
             <p className="text-xs text-muted-foreground">{adherenceCaption}</p>
+            {weekSuggestion ? (
+              <p className="text-xs text-muted-foreground">
+                Semana do mesociclo: <strong className="font-medium text-foreground">
+                  {weekSuggestion.week} de {plan.weeks}
+                </strong>{' '}
+                (pelas sessões registradas)
+                {calendarWeek != null && startedOn
+                  ? ` · ${calendarWeek}ª semana desde ${formatDate(startedOn)}`
+                  : ''}
+                {weekLag > 0
+                  ? ` — o mesociclo está ${weekLag} ${weekLag === 1 ? 'semana' : 'semanas'} atrás do calendário.`
+                  : ''}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -205,6 +239,7 @@ export default function Execucao() {
         names={names}
         exercises={exercisesQuery.data ?? []}
         history={historyQuery.data ?? []}
+        weekSuggestion={weekSuggestion}
       />
 
       <section className="space-y-3">
@@ -529,6 +564,7 @@ function LogForm({
   names,
   exercises,
   history,
+  weekSuggestion,
 }: {
   detail: WorkoutPlanDetail
   orgId: string
@@ -536,6 +572,9 @@ function LogForm({
   names: Record<string, string>
   exercises: ExerciseRow[]
   history: SetHistoryPoint[]
+  // null enquanto as sessões não foram lidas: aí o campo fica em branco, como
+  // sempre esteve, em vez de sugerir um número sem base.
+  weekSuggestion: PlanWeekSuggestion | null
 }) {
   const planId = detail.plan?.id ?? ''
   const lastByExercise = useMemo(() => latestBestByExercise(history), [history])
@@ -546,7 +585,12 @@ function LogForm({
   const createMut = useCreateWorkoutLog(planId)
   const [dayKey, setDayKey] = useState(days[0]?.id ?? '')
   const [date, setDate] = useState(todayLocal())
-  const [week, setWeek] = useState('')
+  const [week, setWeek] = useState(() => (weekSuggestion ? String(weekSuggestion.week) : ''))
+  // Enquanto o educador não mexer no campo, ele acompanha a sugestão: as
+  // sessões podem chegar depois da primeira renderização, e depois de gravar
+  // uma sessão a sugestão muda para a próxima. Assim que ele digita ou clica
+  // em "repetir", a escolha dele manda até a próxima sessão ser gravada.
+  const [weekTouched, setWeekTouched] = useState(false)
   const [notes, setNotes] = useState('')
   const [sets, setSets] = useState<Record<string, LogRow[]>>({})
   const [extras, setExtras] = useState<ExtraExercise[]>([])
@@ -556,6 +600,12 @@ function LogForm({
   const savingRef = useRef(false)
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
+
+  const suggestedWeek = weekSuggestion?.week ?? null
+  useEffect(() => {
+    if (weekTouched || suggestedWeek == null) return
+    setWeek(String(suggestedWeek))
+  }, [suggestedWeek, weekTouched])
 
   const dayExercises = useMemo(
     () => detail.exercises.filter((e) => e.day_id === dayKey).sort((a, b) => a.position - b.position),
@@ -677,6 +727,9 @@ function LogForm({
       })
       setExtras([])
       setNotes('')
+      // A sessão gravada muda a sugestão (pode ter fechado a semana): o campo
+      // volta a segui-la para a próxima.
+      setWeekTouched(false)
       setOkMsg(true)
     } catch (e) {
       setError(normalizeDbError(e))
@@ -722,10 +775,47 @@ function LogForm({
               max={planWeeks(detail)}
               placeholder="—"
               value={week}
-              onChange={(e) => setWeek(e.target.value)}
+              onChange={(e) => {
+                setWeekTouched(true)
+                setWeek(e.target.value)
+              }}
             />
           </div>
         </div>
+
+        {/* A semana gravada aqui escolhe o override que a tela aplica e segue
+            para o histórico e para o PDF: ela precisa dizer de onde veio e
+            poder ser recusada em um clique. "Fechou a semana" e "vou repetir a
+            semana" são indistinguíveis para qualquer heurística — essa parte é
+            do educador. */}
+        {weekSuggestion ? (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>{weekHint(weekSuggestion)}</span>
+            {week !== String(weekSuggestion.week) ? (
+              <button
+                type="button"
+                className="rounded text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setWeekTouched(true)
+                  setWeek(String(weekSuggestion.week))
+                }}
+              >
+                Usar a semana {weekSuggestion.week}
+              </button>
+            ) : weekSuggestion.basis === 'advance' && weekSuggestion.lastLoggedWeek != null ? (
+              <button
+                type="button"
+                className="rounded text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setWeekTouched(true)
+                  setWeek(String(weekSuggestion.lastLoggedWeek))
+                }}
+              >
+                Repetir a semana {weekSuggestion.lastLoggedWeek}
+              </button>
+            ) : null}
+          </p>
+        ) : null}
 
         <p className="text-xs text-muted-foreground">
           Descanso: informe quantos segundos descansou após cada série. O preenchimento é opcional.
@@ -880,4 +970,24 @@ function LogForm({
 
 function planWeeks(detail: WorkoutPlanDetail): number {
   return detail.plan?.weeks ?? 52
+}
+
+// Explica o número que está no campo Semana. Frases separadas da tela do
+// aluno de propósito: mesma regra (suggestedPlanWeek), públicos diferentes.
+function weekHint(s: PlanWeekSuggestion): string {
+  const feitas =
+    `${s.sessionsInCurrentPass} de ${s.sessionsPerWeek} ` +
+    `${s.sessionsPerWeek === 1 ? 'sessão' : 'sessões'}`
+  switch (s.basis) {
+    case 'first':
+      return 'Primeira sessão registrada neste plano: começa na semana 1.'
+    case 'continue':
+      return s.sessionsPerWeek > 0
+        ? `Semana ${s.lastLoggedWeek} em andamento (${feitas}).`
+        : `Continuando na semana ${s.lastLoggedWeek}, a do último treino.`
+    case 'advance':
+      return `A semana ${s.lastLoggedWeek} fechou (${feitas}) — sugerindo a próxima.`
+    case 'end':
+      return `A semana ${s.lastLoggedWeek} era a última do mesociclo e já fechou (${feitas}).`
+  }
 }

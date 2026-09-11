@@ -611,10 +611,11 @@ export type ActivePlanSummary = {
   name: string
   weeks: number
   sessionsPerWeek: number // weekly_schedule.length, ou nº de divisoes se vazio
-  // Inicio efetivo do plano: starts_on quando o profissional informou, senao a
-  // criacao. Necessario para medir adesao pelas semanas ja decorridas em vez
-  // de pelo plano inteiro (ver plannedSessionsToDate).
-  startedOn: string | null
+  // As duas datas entram cruas, e nao ja resolvidas numa so: o inicio efetivo
+  // depende tambem da primeira sessao registrada, que mora no resumo de logs.
+  // Quem cruza os tres e effectivePlanStart, dentro de buildCarteira.
+  startsOn: string | null
+  createdOn: string | null
 }
 
 // Planos ativos da org com sessoes/semana (embed do count de divisoes). RLS vale.
@@ -645,26 +646,40 @@ export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSumma
       name: p.name,
       weeks: p.weeks,
       sessionsPerWeek: ws.length > 0 ? ws.length : dayCount,
-      startedOn: p.starts_on ?? p.created_at ?? null,
+      startsOn: p.starts_on ?? null,
+      createdOn: p.created_at ?? null,
     }
   })
 }
 
-export type LogSummary = { count: number; lastDate: string | null }
+export type LogSummary = { count: number; lastDate: string | null; firstDate: string | null }
 
-// Resumo de execucao por plano da org (qtde de sessoes + ultima data). A view
-// workout_log_summary (0016) agrega no banco em vez de baixar todos os logs;
-// security_invoker mantem a RLS valendo.
+// Resumo de execucao por plano da org (qtde de sessoes + primeira e ultima
+// data). A view workout_log_summary (0016) agrega no banco em vez de baixar
+// todos os logs; security_invoker mantem a RLS valendo.
 export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<string, LogSummary>> {
+  // `select('*')` e o cast: first_date chega com a 0037, e o database.types so
+  // conhece a coluna depois que o banco e atualizado e os tipos regenerados.
+  // Ate la o campo vem ausente e o inicio efetivo cai no fallback de sempre.
   const { data, error } = await supabase
     .from('workout_log_summary')
-    .select('plan_id, log_count, last_date')
+    .select('*')
     .eq('org_id', orgId)
   if (error) throw error
+  const rows = (data ?? []) as unknown as Array<{
+    plan_id: string | null
+    log_count: number | null
+    last_date: string | null
+    first_date?: string | null
+  }>
   const map: Record<string, LogSummary> = {}
-  for (const r of data ?? []) {
+  for (const r of rows) {
     if (!r.plan_id) continue
-    map[r.plan_id] = { count: r.log_count ?? 0, lastDate: r.last_date }
+    map[r.plan_id] = {
+      count: r.log_count ?? 0,
+      lastDate: r.last_date,
+      firstDate: r.first_date ?? null,
+    }
   }
   return map
 }

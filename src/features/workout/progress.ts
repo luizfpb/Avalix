@@ -55,14 +55,20 @@ export function completedWeeks(startedOn: string | null, now: Date): number | nu
   return Math.floor(dias / 7)
 }
 
-// Semana do mesociclo que está correndo agora, limitada ao tamanho do plano.
-// É a semana que a página do aluno pré-seleciona, e o complemento natural de
-// completedWeeks: a primeira semana é a 1, não a 0. Plano sem data de início
-// não tem semana corrente — aí quem escolhe é o aluno.
+// Semana de CALENDÁRIO do plano, limitada ao tamanho do mesociclo. Complemento
+// natural de completedWeeks: a primeira semana é a 1, não a 0. Plano sem data
+// de início não tem semana de calendário.
 //
 // Depois do fim do mesociclo devolve a última semana, em vez de um número que
-// não existe no plano: quem continua treinando o plano vencido está repetindo
-// a última semana, e é isso que a tela deve mostrar.
+// não existe no plano.
+//
+// Atenção: isto NÃO é a semana do mesociclo em que o aluno está — é só onde o
+// relógio diz que ele deveria estar. As duas divergem o tempo todo (começou
+// depois de receber o plano, faltou uma semana, repetiu a semana de propósito),
+// e confundi-las gravava `workout_logs.week_number` errado, o que por sua vez
+// escolhia o override errado na tela. Quem pré-seleciona a semana da sessão é
+// `suggestedPlanWeek`, que olha o histórico. Esta função serve para adesão e
+// para medir a defasagem entre o plano no papel e o plano na vida real.
 export function currentWeek(
   weeks: number,
   startedOn: string | null,
@@ -72,6 +78,133 @@ export function currentWeek(
   if (fechadas == null) return null
   const total = Math.max(1, Math.floor(weeks))
   return Math.min(fechadas + 1, total)
+}
+
+// =====================================================================
+// SEMANA DO MESOCICLO (a que o aluno está vivendo, não a do calendário)
+// =====================================================================
+
+// Uma sessão já registrada, vista só pelo que ela diz sobre a posição no
+// mesociclo. Serve tanto para `workout_logs` (tela do profissional) quanto
+// para o resumo que a RPC do link devolve ao aluno — as duas telas precisam
+// chegar ao MESMO número, senão professor e aluno gravam semanas diferentes
+// no mesmo plano.
+export type WeekLogPoint = { performed_at: string; week_number: number | null }
+
+// De onde saiu a sugestão. A tela usa isto para explicar o número em vez de
+// apenas exibi-lo: semana errada gravada em silêncio foi justamente o defeito.
+//   first    — nenhuma sessão registrada ainda; começa na 1
+//   continue — a semana do último treino ainda não fechou
+//   advance  — a semana fechou; sugere a próxima
+//   end      — a última semana do mesociclo fechou; não há próxima
+export type PlanWeekBasis = 'first' | 'continue' | 'advance' | 'end'
+
+export type PlanWeekSuggestion = {
+  week: number
+  basis: PlanWeekBasis
+  // Semana do treino mais recente (null quando não há histórico).
+  lastLoggedWeek: number | null
+  // Sessões já feitas na passada atual por essa semana. "Passada", e não
+  // "total": quem voltou para a semana 2 depois de ter ido para a 3 está
+  // começando a semana 2 de novo, e a contagem tem que reiniciar junto.
+  sessionsInCurrentPass: number
+  sessionsPerWeek: number
+}
+
+// A semana do mesociclo em que o aluno está, derivada do que ele REALMENTE
+// registrou — não da data.
+//
+// O app derivava isso do calendário (`currentWeek`), o que só acerta quando o
+// aluno começa no dia em que o plano foi criado e nunca falta. Na prática ele
+// recebe o plano numa segunda e começa duas semanas depois; falta uma semana
+// inteira e volta; ou repete a semana 2 porque não foi bem. Em todos esses
+// casos a tela oferecia uma semana que não existia na vida do aluno, e era
+// esse número que ia para `workout_logs.week_number` — e daí para o override
+// aplicado na tela, para o histórico e para o PDF.
+//
+// A regra aqui é a mesma que o app já usa para sugerir a DIVISÃO do dia
+// (`suggestedWorkoutDayId`, que conta sessões feitas): continue de onde parou;
+// só avance quando a semana fechar. A escolha continua editável, e quando a
+// semana fecha a tela pergunta em vez de decidir sozinha — "fechou a semana"
+// e "vou repetir a semana" são indistinguíveis para qualquer heurística, então
+// essa é a única parte que cabe ao humano.
+//
+// `logs` deve vir do mais recente para o mais antigo; a função reordena por
+// data por garantia, preservando a ordem recebida nos empates (várias sessões
+// no mesmo dia).
+export function suggestedPlanWeek(input: {
+  weeks: number
+  sessionsPerWeek: number
+  logs: WeekLogPoint[]
+}): PlanWeekSuggestion {
+  const total = Math.max(1, Math.floor(input.weeks))
+  const porSemana = Math.max(0, Math.floor(input.sessionsPerWeek))
+
+  // Sessão sem semana anotada (registro antigo, ou quem deixou o campo vazio)
+  // não diz nada sobre a posição no mesociclo: é ignorada em vez de zerar a
+  // conta ou de interromper a passada atual.
+  const comSemana = input.logs
+    .filter((l): l is WeekLogPoint & { week_number: number } => l.week_number != null)
+    .sort((a, b) => dataDoLog(b).localeCompare(dataDoLog(a)))
+
+  if (comSemana.length === 0) {
+    return {
+      week: 1,
+      basis: 'first',
+      lastLoggedWeek: null,
+      sessionsInCurrentPass: 0,
+      sessionsPerWeek: porSemana,
+    }
+  }
+
+  const ultima = comSemana[0].week_number
+  // Passada atual = sessões consecutivas, a partir da mais recente, na mesma
+  // semana. Para na primeira sessão de outra semana.
+  let naPassada = 0
+  for (const log of comSemana) {
+    if (log.week_number !== ultima) break
+    naPassada += 1
+  }
+
+  const fechou = porSemana > 0 && naPassada >= porSemana
+  const comum = {
+    lastLoggedWeek: ultima,
+    sessionsInCurrentPass: naPassada,
+    sessionsPerWeek: porSemana,
+  }
+  // O mesociclo pode ter encolhido depois que a sessão foi gravada (plano
+  // reeditado de 8 para 6 semanas): o clamp evita oferecer uma semana que o
+  // plano não tem mais.
+  if (!fechou) return { ...comum, week: Math.min(ultima, total), basis: 'continue' }
+  if (ultima >= total) return { ...comum, week: total, basis: 'end' }
+  return { ...comum, week: Math.min(ultima + 1, total), basis: 'advance' }
+}
+
+function dataDoLog(log: WeekLogPoint): string {
+  return log.performed_at.slice(0, 10)
+}
+
+// Início EFETIVO do plano, para medir adesão e defasagem.
+//
+// Antes era `starts_on ?? created_at`, ou seja: quem montou o plano em janeiro
+// e viu o aluno começar em março já nascia com semanas de atraso e adesão
+// arrasada, porque a conta começava no dia em que o plano foi digitado.
+//
+// A data informada pelo profissional continua valendo — é uma intenção
+// explícita, e quem não apareceu na semana prevista realmente faltou. Mas a
+// primeira sessão registrada vence quando é ANTERIOR a ela (o aluno começou
+// antes do combinado) e é o que vale quando não há data informada. A criação
+// do plano fica só como último recurso, para plano sem data e sem treino.
+export function effectivePlanStart(
+  startsOn: string | null | undefined,
+  firstSessionOn: string | null | undefined,
+  createdOn: string | null | undefined
+): string | null {
+  const candidatos = [startsOn, firstSessionOn]
+    .filter((d): d is string => !!d)
+    .map((d) => d.slice(0, 10))
+  if (candidatos.length === 0) return createdOn ?? null
+  return candidatos.reduce((menor, d) => (d < menor ? d : menor))
 }
 
 // Sessões esperadas ATÉ AGORA, e não no plano inteiro.

@@ -68,7 +68,13 @@ import { SessionSets } from '../features/workout/SessionSets'
 import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type SessionEditValues } from '../features/workout/SessionEditForm'
-import { currentWeek } from '../features/workout/progress'
+import {
+  currentWeek,
+  sessionsPerWeek,
+  suggestedPlanWeek,
+  type PlanWeekSuggestion,
+  type WeekLogPoint,
+} from '../features/workout/progress'
 import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from '../features/workout/api'
 import { BrandMark } from '../components/BrandLogo'
 import { Button } from '@/components/ui/button'
@@ -695,6 +701,26 @@ function StatusBar({
 type Linha = LogRow
 const studentDraftOperations = new Map<string, Promise<unknown>>()
 
+// Explica na língua do aluno de onde saiu a semana pré-selecionada. A regra é
+// a mesma da tela do profissional (`suggestedPlanWeek`); só o texto muda.
+function dicaSemanaAluno(s: PlanWeekSuggestion): string {
+  const feitos =
+    `${s.sessionsInCurrentPass} de ${s.sessionsPerWeek} ` +
+    `${s.sessionsPerWeek === 1 ? 'treino' : 'treinos'}`
+  switch (s.basis) {
+    case 'first':
+      return 'Primeiro treino deste plano: você começa pela semana 1.'
+    case 'continue':
+      return s.sessionsPerWeek > 0
+        ? `Semana ${s.lastLoggedWeek} em andamento: ${feitos} feitos.`
+        : `Continuando na semana ${s.lastLoggedWeek}, a do seu último treino.`
+    case 'advance':
+      return `Você fechou a semana ${s.lastLoggedWeek} (${feitos}). Agora começa a semana ${s.week}.`
+    case 'end':
+      return `A semana ${s.lastLoggedWeek} era a última do plano e já fechou — fale com seu treinador sobre o próximo.`
+  }
+}
+
 function TreinoDoDia({
   token,
   scope,
@@ -719,12 +745,50 @@ function TreinoDoDia({
     () => pacote.days.slice().sort((a, b) => a.position - b.position),
     [pacote.days]
   )
-  const semanaSugerida = currentWeek(plano.weeks, plano.starts_on, new Date())
   const divisaoSugerida = suggestedWorkoutDayId(
     plano.weekly_schedule,
     dias,
     pacote.current_plan_sessions
   )
+
+  // Treinos concluídos nesta tela que o pacote ainda não conhece: ele só é
+  // rebuscado ao reabrir a página, então sem isto a semana sugerida ficaria
+  // parada até lá — o aluno que fecha a semana de manhã e volta à tarde
+  // continuaria vendo a semana anterior.
+  const [logsLocais, setLogsLocais] = useState<WeekLogPoint[]>([])
+  const sessoesNoPacote = useRef(pacote.current_plan_sessions)
+  useEffect(() => {
+    const antes = sessoesNoPacote.current
+    const agora = pacote.current_plan_sessions
+    sessoesNoPacote.current = agora
+    // Pacote novo já contabilizou parte do que estava aqui: as mais antigas
+    // saem da lista local para não contarem duas vezes.
+    if (agora > antes) {
+      const contabilizadas = agora - antes
+      setLogsLocais((atuais) => atuais.slice(0, Math.max(0, atuais.length - contabilizadas)))
+    }
+  }, [pacote.current_plan_sessions])
+
+  const sessoesPorSemana = sessionsPerWeek(plano.weekly_schedule, dias.length)
+  // A semana vem do que o aluno REALMENTE registrou, não da data: ele pode ter
+  // recebido o plano semanas antes de começar, faltado, ou estar repetindo a
+  // semana de propósito. `plan_week_log` é opcional porque um pacote guardado
+  // no aparelho antes da 0037 não tem o campo — aí não há o que derivar, e a
+  // tela volta ao palpite antigo pelo calendário em vez de ficar sem semana.
+  const sugerirSemana = useCallback(
+    (locais: WeekLogPoint[]): PlanWeekSuggestion | null => {
+      const doServidor = pacote.plan_week_log
+      if (!doServidor) return null
+      return suggestedPlanWeek({
+        weeks: plano.weeks,
+        sessionsPerWeek: sessoesPorSemana,
+        logs: [...locais, ...doServidor],
+      })
+    },
+    [pacote.plan_week_log, plano.weeks, sessoesPorSemana]
+  )
+  const sugestao = useMemo(() => sugerirSemana(logsLocais), [sugerirSemana, logsLocais])
+  const semanaSugerida = sugestao?.week ?? currentWeek(plano.weeks, plano.starts_on, new Date())
 
   const [dayId, setDayId] = useState(divisaoSugerida)
   const [semana, setSemana] = useState<number | null>(semanaSugerida)
@@ -842,6 +906,15 @@ function TreinoDoDia({
       invalidateStudentStorageAccess(readAccess)
     }
   }, [plano.id, scope, access])
+
+  // O pacote guardado no aparelho é exibido primeiro e o do servidor chega
+  // depois: se o aluno ainda não escolheu semana nenhuma, o campo passa a
+  // acompanhar a sugestão em vez de ficar em "—" com a explicação ao lado.
+  // Só age sobre campo vazio e sem rascunho recuperado — escolha dele manda.
+  useEffect(() => {
+    if (semana != null || dirty || !rascunhoLido || sugestao == null) return
+    setSemana(sugestao.week)
+  }, [semana, dirty, rascunhoLido, sugestao])
 
   // Garante uma linha por série prescrita ao trocar de divisão/semana.
   useEffect(() => {
@@ -1126,9 +1199,14 @@ function TreinoDoDia({
       dias,
       pacote.current_plan_sessions + localConclusions.current
     )
+    // A sessão que acabou de ser concluída conta para a semana da próxima:
+    // pode ter sido ela que fechou a semana.
+    const proximosLogs =
+      semana != null ? [{ performed_at: data, week_number: semana }, ...logsLocais] : logsLocais
+    setLogsLocais(proximosLogs)
     setDayId(nextDayId)
     setData(hoje())
-    setSemana(semanaSugerida)
+    setSemana(sugerirSemana(proximosLogs)?.week ?? semanaSugerida)
     setClientRef(crypto.randomUUID())
     revision.current = 0
     setNotas('')
@@ -1232,6 +1310,41 @@ function TreinoDoDia({
           </select>
         </div>
       </div>
+
+      {/* A semana escolhida aqui é a que traz a prescrição da semana (o que
+          muda em séries, carga e descanso) e a que fica gravada no histórico.
+          Derivar do calendário errava sempre que a vida real saía do papel —
+          e errava calado. Agora o número se explica, e trocar é um clique. */}
+      {sugestao ? (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span>{dicaSemanaAluno(sugestao)}</span>
+          {semana !== sugestao.week ? (
+            <button
+              type="button"
+              disabled={switchingSession || salvando !== null}
+              className="rounded text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              onClick={() => {
+                setDirty(true)
+                setSemana(sugestao.week)
+              }}
+            >
+              Usar a semana {sugestao.week}
+            </button>
+          ) : sugestao.basis === 'advance' && sugestao.lastLoggedWeek != null ? (
+            <button
+              type="button"
+              disabled={switchingSession || salvando !== null}
+              className="rounded text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              onClick={() => {
+                setDirty(true)
+                setSemana(sugestao.lastLoggedWeek)
+              }}
+            >
+              Repetir a semana {sugestao.lastLoggedWeek}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
 
       <p className="text-xs text-muted-foreground">
         Descanso (s): anote o tempo após cada série. É opcional; 0 significa sem descanso.

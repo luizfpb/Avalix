@@ -105,12 +105,13 @@ describe('Dashboard', () => {
           name: 'Plano força',
           weeks: 16,
           sessionsPerWeek: 3,
-          startedOn: '2026-06-01',
+          startsOn: '2026-06-01',
+          createdOn: '2026-05-20T10:00:00Z',
         },
       ])
     )
     useOrgWorkoutLogSummaryMock.mockReturnValue(
-      query({ 'plan-1': { count: 1, lastDate: '2026-07-01' } })
+      query({ 'plan-1': { count: 1, lastDate: '2026-07-01', firstDate: '2026-06-02' } })
     )
 
     renderDashboard()

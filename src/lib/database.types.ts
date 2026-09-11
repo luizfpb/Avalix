@@ -1720,6 +1720,7 @@ export type Database = {
       }
       workout_log_summary: {
         Row: {
+          first_date: string | null
           last_date: string | null
           log_count: number | null
           org_id: string | null
