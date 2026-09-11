@@ -23,10 +23,16 @@ no meio da academia. Na correção de uma sessão já enviada o número volta a 
 só número — marcar "feita" ali não significaria nada.
 
 **Cronômetro de descanso, só na tela do profissional.** Quem fica com o celular
-na mão entre as séries é quem conduz a sessão. Marcar a série inicia a
-contagem; uma faixa fixa mostra `mm:ss`, o descanso prescrito e avisa quando
-ele é cumprido. O botão **Começou a série** grava o tempo medido no campo de
-descanso daquela série — um toque, no momento em que o aluno volta ao aparelho.
+na mão entre as séries é quem conduz a sessão.
+
+Onde fica: **Alunos → o aluno → Execução** (o mesmo botão aparece no detalhe do
+plano). No cartão "Registrar treino", **toque no número da série** quando ela
+terminar — o número vira um ✓ e o cronômetro aparece numa faixa fixa no rodapé
+da tela, com `mm:ss`, o descanso prescrito e o aviso de alvo cumprido. Ele não
+aparece antes disso: sem série marcada não há descanso para contar.
+
+O botão **Começou a série** grava o tempo medido no campo de descanso daquela
+série — um toque, no momento em que o aluno volta ao aparelho.
 
 Duas decisões que valem explicar:
 
@@ -68,6 +74,19 @@ abaixo, e o helper interno continua fechado para `anon`.
 passam a devolver `feel` — sem isso a carinha sumiria da tela depois de uma
 correção, mesmo continuando gravada.
 
+## Correção de largura no celular (11/09)
+
+Depois da primeira publicação, o detalhe do treino aparecia com metade da tela
+em branco e exigia zoom: a fileira de ações do cabeçalho era `shrink-0` e
+fixava a página em **767 px** num aparelho de 390. O mesmo idioma engolia o
+nome do aluno no detalhe dele. As duas telas passaram a empilhar cabeçalho e
+ações no celular, e a faixa do cronômetro — que era `sticky` no fim do
+formulário e ficava fora da vista durante a sessão — passou a ser fixa acima
+da barra de navegação.
+
+Treze telas foram medidas num Chromium headless em 390 e 360 px; todas fecham
+sem rolagem horizontal.
+
 ## Validação feita aqui
 
 `npm run lint`, `npm run test` (**935 testes em 116 arquivos**) e `npm run build`
@@ -80,8 +99,11 @@ mas não ao envio online — corrigido antes da entrega.
 
 A suíte pgTAP da 0038 (`supabase/tests/0038_sensacao_da_sessao.test.sql`, 14
 verificações) **não foi executada**: depende de um PostgreSQL descartável.
-Nada foi conferido por captura de tela — as duas telas exigem sessão real e
-token de aluno.
+
+O layout foi conferido em navegador: as telas renderizadas com dados falsos,
+servidas com o CSS do build e medidas num Chromium headless a 390 e 360 px,
+com captura de cada uma. O que não foi exercitado é o app ligado ao Supabase
+real — login, token de aluno e dados de verdade.
 
 ## Como aplicar
 
@@ -113,14 +135,15 @@ O resultado esperado é `schema gate ok: 0038`. O gate deste frontend já exige 
 npm run check
 ```
 
-5. Publicar (o push é sempre seu):
+5. Publicar esta correção de layout (o push é sempre seu; a entrega da 0038 já
+   está commitada):
 
 ```cmd
-git add docs/DECISIONS.md docs/EXECUCAO_DO_TREINO_2026-09-11.md docs/SEMANA_MESOCICLO_2026-09-11.md scripts/check-schema-version.mjs src/features/workout/SessionEditForm.tsx src/features/workout/SessionFeel.tsx src/features/workout/SetRowFields.tsx src/features/workout/feel.ts src/features/workout/logRows.ts src/features/workout/logRows.test.ts src/features/workout/studentApi.ts src/features/workout/studentSession.ts src/features/workout/studentStore.ts src/lib/database.types.ts src/pages/Execucao.tsx src/pages/Execucao.test.tsx src/pages/TreinoAluno.tsx src/pages/TreinoAluno.test.tsx supabase/migrations/0038_sensacao_da_sessao.sql supabase/tests/0038_sensacao_da_sessao.test.sql
+git add docs/DECISIONS.md docs/EXECUCAO_DO_TREINO_2026-09-11.md src/features/workout/SessionEditForm.tsx src/features/workout/SetRowFields.tsx src/lib/database.types.ts src/pages/AvaliacaoDetalhe.tsx src/pages/AvaliadoDetalhe.tsx src/pages/Evolucao.tsx src/pages/Execucao.tsx src/pages/Execucao.test.tsx src/pages/TreinoAluno.tsx src/pages/TreinoDetalhe.tsx
 ```
 
 ```cmd
-git commit -m "Melhora a marcacao do treino com serie feita, cronometro e resumo"
+git commit -m "Ajusta o layout do celular e deixa o cronometro visivel"
 ```
 
 ```cmd

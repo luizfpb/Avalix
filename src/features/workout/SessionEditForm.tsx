@@ -147,7 +147,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             {exercises.map((ex) => (
               <div key={ex.id} className="rounded-md border bg-muted/20 p-2.5">
                 <p className="mb-2 text-sm font-medium">{ex.name}</p>
-                <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
                   <span /><span>carga (kg)</span><span>reps</span><span>RIR</span><span>desc. (s)</span>
                 </div>
                 {ex.rows.map((row, index) => (

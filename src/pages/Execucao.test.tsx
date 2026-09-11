@@ -536,7 +536,7 @@ describe('cronômetro de descanso', () => {
       // nada foi gravado na série 1: o intervalo entre duas séries concluídas
       // inclui a execução da segunda, e não é descanso
       expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
-      expect(screen.getByText(/descanso desde a série 2 de Supino reto/)).toBeTruthy()
+      expect(screen.getByText(/descanso · série 2 de Supino reto/)).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }

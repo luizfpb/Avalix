@@ -302,8 +302,12 @@ export default function TreinoDetalhe() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      {/* No celular o título e as ações não cabem lado a lado: a fileira de
+          botões é `shrink-0`, então ela empurrava a página para ~770 px de
+          largura e o nome do plano ficava espremido numa coluna de uma
+          palavra. Empilha até sm e só então volta a dividir a linha. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
             ← Voltar
           </Link>
@@ -351,7 +355,7 @@ export default function TreinoDetalhe() {
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
           <Button asChild size="sm">
             <Link to={`/avaliados/${id}/treinos/${plan.id}/execucao`}>
               <ClipboardList /> Execução

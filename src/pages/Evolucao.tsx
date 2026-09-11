@@ -210,7 +210,7 @@ export default function Evolucao() {
             {assessments.length === 1 ? 'avaliação' : 'avaliações'}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap gap-2 sm:shrink-0">
           {assessments.length >= 2 ? (
             <>
               <Button asChild variant="outline" size="sm">

@@ -529,7 +529,7 @@ function SetGrid({
 }) {
   return (
     <div className="mt-2 max-w-md space-y-1">
-      <div className="grid grid-cols-[2.75rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+      <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
         <span />
         <span>carga (kg)</span>
         <span>reps</span>
@@ -1034,29 +1034,42 @@ function LogForm({
         </fieldset>
 
         {/* Fora do fieldset: o cronômetro não pode congelar enquanto a sessão
-            anterior está sendo gravada — o aluno já está descansando. */}
+            anterior está sendo gravada — o aluno já está descansando.
+            Fixo na tela, e não no fim do formulário: durante a sessão o
+            educador está no meio da lista de exercícios, e um cronômetro que
+            só aparece rolando até o rodapé não serve para nada. Fica acima da
+            barra de navegação do celular (que é `fixed bottom-0`). */}
         {restTimer ? (
           <div
-            className={`sticky bottom-2 z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2 shadow-sm backdrop-blur ${
-              restDone ? 'border-success bg-success/10' : 'bg-background/95'
+            className={`fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur sm:gap-3 lg:bottom-4 ${
+              restDone ? 'border-success bg-success/15' : 'border-border bg-background/95'
             }`}
           >
             <span
-              className={`text-lg font-semibold tabular-nums ${restDone ? 'text-success' : ''}`}
+              className={`shrink-0 text-xl font-semibold tabular-nums ${restDone ? 'text-success' : ''}`}
               role="timer"
               aria-live="off"
             >
               {formatRest(restSeconds)}
             </span>
-            <span className="min-w-0 flex-1 text-xs text-muted-foreground">
-              descanso desde a série {restTimer.index + 1} de {restTimer.name}
-              {restTimer.targetSeconds != null
-                ? restDone
-                  ? ` · alvo de ${restTimer.targetSeconds}s cumprido`
-                  : ` · alvo ${restTimer.targetSeconds}s`
-                : ''}
+            <span className="min-w-0 flex-1 text-xs leading-tight text-muted-foreground">
+              <span className="block truncate">
+                descanso · série {restTimer.index + 1} de {restTimer.name}
+              </span>
+              {restTimer.targetSeconds != null ? (
+                <span className={`block ${restDone ? 'font-medium text-success' : ''}`}>
+                  {restDone
+                    ? `alvo de ${restTimer.targetSeconds}s cumprido`
+                    : `alvo ${restTimer.targetSeconds}s`}
+                </span>
+              ) : null}
             </span>
-            <Button size="sm" variant={restDone ? 'default' : 'outline'} onClick={registrarDescanso}>
+            <Button
+              size="sm"
+              className="shrink-0"
+              variant={restDone ? 'default' : 'outline'}
+              onClick={registrarDescanso}
+            >
               Começou a série
             </Button>
             <button

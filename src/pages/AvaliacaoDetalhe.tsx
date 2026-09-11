@@ -173,7 +173,7 @@ export default function AvaliacaoDetalhe() {
             {assessment.height_cm} cm
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
           <Button asChild variant="outline" size="sm">
             <Link to={`/avaliados/${id}/avaliacoes/${assessment.id}/editar`}>
               <Pencil /> Editar

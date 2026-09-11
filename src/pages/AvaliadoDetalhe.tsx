@@ -142,7 +142,9 @@ function AvaliadoDetalheContent() {
         <Link to="/avaliados" className="text-sm text-muted-foreground hover:text-foreground">
           ← {labels.pluralCap}
         </Link>
-        <div className="mt-2 flex items-start justify-between gap-3">
+        {/* Empilhado no celular: com as ações em `shrink-0` na mesma linha, o
+            `truncate` do nome engolia o nome inteiro — sobrava o avatar. */}
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
               {initials(s.full_name)}
@@ -155,7 +157,7 @@ function AvaliadoDetalheContent() {
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
             <Button
               type="button"
               variant="outline"
@@ -358,21 +360,24 @@ function WorkoutSection({
         <ul className="divide-y rounded-md border bg-card">
           {plans.map((p) => (
             <li key={p.id} className="flex items-center gap-1 pr-2">
+              {/* Duas linhas no celular: com nome, objetivo, duração e status
+                  na mesma linha, sobrava meia dúzia de letras para o nome do
+                  plano ("Mesociclo 3 — hip...") e o objetivo sumia cortado. */}
               <Link
                 to={`/avaliados/${subjectId}/treinos/${p.id}`}
-                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+                className="flex min-w-0 flex-1 flex-col gap-0.5 px-4 py-2.5 text-sm hover:bg-accent sm:flex-row sm:items-center sm:justify-between sm:gap-3"
               >
-                <span className="min-w-0 truncate">
-                  {p.name}{' '}
-                  <span className="text-muted-foreground">
-                    · {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'sem' : 'sems'}
+                <span className="min-w-0 truncate">{p.name}</span>
+                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+                  <span>
+                    {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'sem' : 'sems'}
                   </span>
+                  {p.status === 'active' ? (
+                    <Badge variant="secondary">Vigente</Badge>
+                  ) : (
+                    <Badge variant="secondary">{p.status === 'draft' ? 'Rascunho' : 'Arquivado'}</Badge>
+                  )}
                 </span>
-                {p.status === 'active' ? (
-                  <Badge variant="secondary">Vigente</Badge>
-                ) : (
-                  <Badge variant="secondary">{p.status === 'draft' ? 'Rascunho' : 'Arquivado'}</Badge>
-                )}
               </Link>
               {/* Atalho para o treino vigente: ver como foi o treino era o
                   caminho mais percorrido do app e custava quatro cliques
