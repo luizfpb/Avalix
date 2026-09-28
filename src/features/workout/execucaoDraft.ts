@@ -25,6 +25,12 @@ export type ExecucaoRestTimer = {
 
 export type ExecucaoExtra = { rowId: string; exerciseId: string }
 
+// Sessão salva no servidor com "Salvar e continuar depois" (0041) que esta
+// tela está continuando. A versão é a que o servidor devolveu no último
+// salvamento: outro aparelho que salve antes faz o próximo salvamento ser
+// recusado, em vez de um sobrescrever o outro.
+export type ExecucaoContinuing = { logId: string; updatedAt: string; savedAt: string }
+
 export type ExecucaoDraft = {
   version: 1
   dayKey: string
@@ -39,6 +45,8 @@ export type ExecucaoDraft = {
   rowExercises: Record<string, string>
   extras: ExecucaoExtra[]
   restTimer: ExecucaoRestTimer | null
+  // opcional: rascunho gravado antes da 0041 não tem o campo
+  continuing?: ExecucaoContinuing | null
 }
 
 // O cronômetro restaurado só faz sentido dentro do teto do descanso (3600 s).
@@ -54,6 +62,34 @@ export function execucaoHasContent(
   )
 }
 
+// O que a sessão tem, sem o que não muda o registro: linhas vazias (a tela
+// completa a grade até o número prescrito), cronômetro e ordem das chaves. Dois
+// estados com a mesma chave gravariam a mesma sessão — é o que diz se houve
+// mudança desde o último "Salvar e continuar depois".
+export function execucaoContentKey(
+  value: Pick<ExecucaoDraft, 'dayKey' | 'date' | 'week' | 'notes' | 'sets' | 'extras'>
+): string {
+  const sets = Object.keys(value.sets)
+    .sort()
+    .flatMap((rowId) => {
+      const linhas = value.sets[rowId].flatMap((row, index) =>
+        isEmptyLogRow(row)
+          ? []
+          : [[index, row.weight.trim(), row.reps.trim(), row.rir.trim(), (row.rest ?? '').trim(),
+              row.failure === true, row.done === true]]
+      )
+      return linhas.length > 0 ? [[rowId, linhas]] : []
+    })
+  return JSON.stringify({
+    dayKey: value.dayKey,
+    date: value.date,
+    week: value.week.trim(),
+    notes: value.notes.trim(),
+    extras: value.extras.map((x) => x.rowId).sort(),
+    sets,
+  })
+}
+
 export function isExecucaoDraft(value: unknown): value is ExecucaoDraft {
   if (!value || typeof value !== 'object') return false
   const v = value as Partial<ExecucaoDraft>
@@ -66,6 +102,53 @@ export function isExecucaoDraft(value: unknown): value is ExecucaoDraft {
     !!v.sets && typeof v.sets === 'object' &&
     Array.isArray(v.extras)
   )
+}
+
+export type SavedSessionSet = {
+  exercise_id: string
+  set_number: number
+  weight_kg: number | null
+  reps: number | null
+  rir: number | null
+  rest_seconds?: number | null
+  reached_failure?: boolean | null
+}
+
+// Sessão salva no servidor -> formulário da Execução, para continuar de onde
+// parou. As séries vão para a linha do mesmo exercício do catálogo na divisão
+// da sessão, na posição do número da série; exercício que não está na divisão
+// volta como avulso. Tudo o que foi gravado volta marcado como feito.
+export function sessionToForm(
+  session: { day_label: string | null },
+  sets: SavedSessionSet[],
+  plano: PlanoAtual
+): { dayKey: string; sets: Record<string, LogRow[]>; extras: ExecucaoExtra[] } {
+  const dia = plano.days.find((d) => d.label === session.day_label) ?? plano.days[0] ?? null
+  const rows: Record<string, LogRow[]> = {}
+  const extras: ExecucaoExtra[] = []
+  const vazia = (): LogRow => ({ weight: '', reps: '', rir: '', rest: '', failure: false })
+  for (const set of [...sets].sort((a, b) => a.set_number - b.set_number)) {
+    const doDia = dia
+      ? plano.exercises.find((e) => e.day_id === dia.id && e.exercise_id === set.exercise_id)
+      : undefined
+    let rowId = doDia?.id
+    if (!rowId) {
+      rowId = `extra:${set.exercise_id}`
+      if (!extras.some((x) => x.rowId === rowId)) extras.push({ rowId, exerciseId: set.exercise_id })
+    }
+    const linhas = (rows[rowId] ??= [])
+    const index = Math.max(0, set.set_number - 1)
+    while (linhas.length <= index) linhas.push(vazia())
+    linhas[index] = {
+      weight: set.weight_kg != null ? String(set.weight_kg) : '',
+      reps: set.reps != null ? String(set.reps) : '',
+      rir: set.rir != null ? String(set.rir) : '',
+      rest: set.rest_seconds != null ? String(set.rest_seconds) : '',
+      failure: set.reached_failure === true,
+      done: true,
+    }
+  }
+  return { dayKey: dia?.id ?? '', sets: rows, extras }
 }
 
 type PlanoAtual = {

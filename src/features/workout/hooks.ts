@@ -14,12 +14,14 @@ import {
   listWorkoutLogSets,
   listWorkoutLogs,
   listWorkoutPlans,
+  saveTrainerSession,
   setWorkoutPlanStatus,
   updateCustomExercise,
   updateWorkoutPlan,
   updateWorkoutLog,
   type CreateExerciseInput,
   type CreateWorkoutLogInput,
+  type SaveTrainerSessionInput,
   type SaveWorkoutPlanInput,
   type UpdateExerciseInput,
   type UpdateWorkoutLogInput,
@@ -183,6 +185,21 @@ export function useCreateWorkoutLog(planId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
+    },
+  })
+}
+
+export function useSaveTrainerSession(planId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SaveTrainerSessionInput) => saveTrainerSession(input),
+    onSuccess: async (log) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['workout-logs', planId] }),
+        qc.invalidateQueries({ queryKey: ['workout-log-sets', log.id] }),
+        qc.invalidateQueries({ queryKey: ['workout-set-history', planId] }),
+        qc.invalidateQueries({ queryKey: ['org-log-summary'] }),
+      ])
     },
   })
 }

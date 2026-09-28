@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  execucaoContentKey,
   execucaoHasContent,
   isExecucaoDraft,
   reconcileExecucaoDraft,
+  sessionToForm,
   type ExecucaoDraft,
 } from './execucaoDraft'
 
@@ -42,6 +44,37 @@ describe('execucaoHasContent', () => {
     expect(execucaoHasContent({ sets: { x: [{ ...linha(), done: true }] }, extras: [], notes: '' })).toBe(true)
     expect(execucaoHasContent({ sets: {}, extras: [], notes: 'dor no ombro' })).toBe(true)
     expect(execucaoHasContent({ sets: {}, extras: [{ rowId: 'extra:1', exerciseId: 'c' }], notes: '' })).toBe(true)
+  })
+})
+
+describe('sessionToForm', () => {
+  it('põe cada série na linha do exercício, na posição do número, marcada como feita', () => {
+    const form = sessionToForm({ day_label: 'A' }, [
+      { exercise_id: 'cat-supino', set_number: 2, weight_kg: 42.5, reps: 8, rir: 0, reached_failure: true },
+      { exercise_id: 'cat-supino', set_number: 1, weight_kg: 40, reps: 10, rir: 2, rest_seconds: 90 },
+      { exercise_id: 'cat-crucifixo', set_number: 1, weight_kg: 14, reps: 12, rir: null },
+    ], plano)
+    expect(form.dayKey).toBe('dia-a')
+    expect(form.sets['we-supino']).toEqual([
+      { weight: '40', reps: '10', rir: '2', rest: '90', failure: false, done: true },
+      { weight: '42.5', reps: '8', rir: '0', rest: '', failure: true, done: true },
+    ])
+    // fora da divisão, volta como avulso
+    expect(form.extras).toEqual([{ rowId: 'extra:cat-crucifixo', exerciseId: 'cat-crucifixo' }])
+    expect(form.sets['extra:cat-crucifixo'][0].weight).toBe('14')
+  })
+})
+
+describe('execucaoContentKey', () => {
+  it('ignora linhas vazias e a ordem: mesma sessão, mesma chave', () => {
+    const base = rascunho()
+    const comLinhasVazias = rascunho({ sets: { 'we-supino': [linha('40', '10'), linha(), linha()] } })
+    expect(execucaoContentKey(comLinhasVazias)).toBe(execucaoContentKey(base))
+  })
+
+  it('muda quando uma série muda', () => {
+    const outra = rascunho({ sets: { 'we-supino': [linha('42', '10')] } })
+    expect(execucaoContentKey(outra)).not.toBe(execucaoContentKey(rascunho()))
   })
 })
 

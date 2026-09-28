@@ -7,6 +7,7 @@ import {
   useDeleteWorkoutLog,
   useExercises,
   usePlanSetHistory,
+  useSaveTrainerSession,
   useWorkoutLogs,
   useWorkoutLogSets,
   useWorkoutPlan,
@@ -47,7 +48,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
-import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
+import { UnsavedBadge } from '../components/UnsavedChanges'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
@@ -58,12 +59,16 @@ import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/
 import { reconcileSetRows } from '../features/workout/logRows'
 import {
   RESTORE_TIMER_MAX_MS,
+  execucaoContentKey,
   execucaoHasContent,
   isExecucaoDraft,
   reconcileExecucaoDraft,
+  sessionToForm,
+  type ExecucaoContinuing,
   type ExecucaoDraft,
   type ExecucaoRestTimer,
 } from '../features/workout/execucaoDraft'
+import { listWorkoutLogSets } from '../features/workout/api'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
@@ -289,6 +294,9 @@ export default function Execucao() {
         exercises={exercisesQuery.data ?? []}
         history={historyQuery.data ?? []}
         weekSuggestion={weekSuggestion}
+        pendingSession={
+          logs.find((log) => log.in_progress === true && log.source === 'trainer') ?? null
+        }
       />
 
       <section className="space-y-3">
@@ -628,6 +636,7 @@ function LogForm({
   exercises,
   history,
   weekSuggestion,
+  pendingSession,
 }: {
   detail: WorkoutPlanDetail
   orgId: string
@@ -638,6 +647,8 @@ function LogForm({
   // null enquanto as sessões não foram lidas: aí o campo fica em branco, como
   // sempre esteve, em vez de sugerir um número sem base.
   weekSuggestion: PlanWeekSuggestion | null
+  // a sessão mais recente do profissional salva para continuar depois (0041)
+  pendingSession: WorkoutLogRow | null
 }) {
   const planId = detail.plan?.id ?? ''
   const lastByExercise = useMemo(() => latestBestByExercise(history), [history])
@@ -688,6 +699,15 @@ function LogForm({
   // formulário inteiro, com todas as séries, enquanto o educador digitava.
   const [restTimer, setRestTimer] = useState<ExecucaoRestTimer | null>(null)
   const [restored, setRestored] = useState<{ lostRows: number } | null>(null)
+  // Sessão salva no servidor com "Salvar e continuar depois" que esta tela
+  // está continuando, e o conteúdo dela no último salvamento (para saber se há
+  // o que perder ao sair).
+  const saveSessionMut = useSaveTrainerSession(planId)
+  const [continuing, setContinuing] = useState<ExecucaoContinuing | null>(null)
+  const [serverKey, setServerKey] = useState<string | null>(null)
+  const [progressMsg, setProgressMsg] = useState<string | null>(null)
+  const [loadingPending, setLoadingPending] = useState(false)
+  const syncKeyAfterLoad = useRef(false)
 
   const dayExercises = useMemo(
     () => detail.exercises.filter((e) => e.day_id === dayKey).sort((a, b) => a.position - b.position),
@@ -724,9 +744,20 @@ function LogForm({
       rowExercises,
       extras,
       restTimer,
+      continuing,
     }
-  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer])
-  const dirty = execucaoHasContent(draftValue)
+  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer, continuing])
+  const contentKey = execucaoContentKey(draftValue)
+  // Tem o que perder: conteúdo que ainda não foi salvo no servidor como está.
+  const dirty = execucaoHasContent(draftValue) && contentKey !== serverKey
+
+  // Depois de carregar uma sessão do servidor, o que está na tela É o que está
+  // salvo: a chave é tirada já com o estado aplicado.
+  useEffect(() => {
+    if (!syncKeyAfterLoad.current) return
+    syncKeyAfterLoad.current = false
+    setServerKey(contentKey)
+  }, [contentKey])
 
   function restaurarRascunho(value: ExecucaoDraft) {
     if (!isExecucaoDraft(value)) return
@@ -747,12 +778,43 @@ function LogForm({
         ? draft.restTimer
         : null
     )
+    setContinuing(draft.continuing ?? null)
     setRestored({ lostRows })
   }
   useFormDraft<ExecucaoDraft>(planId ? `execucao:${planId}` : null, draftValue, restaurarRascunho)
   // Sair pela navegação do app, recarregar ou tocar em "Atualizar" no aviso de
-  // versão nova pergunta antes; o rascunho continua no aparelho de todo jeito.
+  // versão nova pergunta antes, com a opção de salvar no servidor e sair; o
+  // rascunho continua no aparelho de todo jeito.
   const guard = useUnsavedChanges(dirty)
+
+  // Continuar a sessão salva para depois: traz as séries do servidor para a
+  // tela, na divisão, semana e data em que ela foi feita.
+  async function continuarSessao(session: WorkoutLogRow) {
+    setError(null)
+    setLoadingPending(true)
+    try {
+      const salvas = await listWorkoutLogSets(session.id)
+      const form = sessionToForm(session, salvas, detail)
+      if (form.dayKey) setDayKey(form.dayKey)
+      setSets((previous) => ({ ...previous, ...form.sets }))
+      setExtras(form.extras)
+      setWeek(session.week_number != null ? String(session.week_number) : '')
+      setWeekTouched(true)
+      setDate(session.performed_at)
+      setDateTouched(true)
+      setNotes(session.notes ?? '')
+      setRestTimer(null)
+      setRestored(null)
+      setContinuing({ logId: session.id, updatedAt: session.updated_at, savedAt: session.updated_at })
+      syncKeyAfterLoad.current = true
+    } catch (e) {
+      setError(normalizeDbError(e))
+    } finally {
+      setLoadingPending(false)
+    }
+  }
+  const sessaoParaContinuar =
+    pendingSession && pendingSession.id !== continuing?.logId && !dirty ? pendingSession : null
 
   useEffect(() => {
     setSets((previous) => {
@@ -850,21 +912,27 @@ function LogForm({
     [dayExercises, extras]
   )
 
-  async function save() {
-    if (savingRef.current) return
-    setError(null)
-    setOkMsg(false)
-    if (!orgId) return setError('Organização não carregada.')
+  // Validação e montagem comuns a registrar e a salvar para continuar depois.
+  // Devolve null (e mostra o motivo) quando não há o que gravar.
+  function montarSessao(): { weekValue: number | null; finalSets: NewLogSet[] } | null {
+    if (!orgId) {
+      setError('Organização não carregada.')
+      return null
+    }
     const weekValue = parseWeekInput(week, totalWeeks)
     if (weekValue === 'invalid') {
-      return setError(`Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
+      setError(`Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
+      return null
     }
 
     const flat: Omit<NewLogSet, 'setNumber'>[] = []
     const rowError = validateLogRows(Object.fromEntries(
       fontes.map((ex) => [ex.rowId, sets[ex.rowId] ?? []])
     ))
-    if (rowError) return setError(rowError)
+    if (rowError) {
+      setError(rowError)
+      return null
+    }
     for (const ex of fontes) {
       for (const row of sets[ex.rowId] ?? []) {
         const w = row.weight.trim() === '' ? null : Number(row.weight)
@@ -875,7 +943,10 @@ function LogForm({
         flat.push({ exerciseId: ex.exerciseId, weightKg: w, reps: r, rir, restSeconds, reachedFailure: row.failure ?? null })
       }
     }
-    if (flat.length === 0) return setError('Registre ao menos uma série com carga ou repetições.')
+    if (flat.length === 0) {
+      setError('Registre ao menos uma série com carga ou repetições.')
+      return null
+    }
 
     // numera as séries por exercício (a unique é por log+exercício+set_number)
     const counter = new Map<string, number>()
@@ -884,20 +955,91 @@ function LogForm({
       counter.set(s.exerciseId, n)
       return { ...s, setNumber: n }
     })
+    return { weekValue, finalSets }
+  }
+
+  // "Salvar e continuar depois": grava no servidor como sessão em andamento
+  // (0041), que não conta na adesão nem fecha a semana, e pode ser continuada
+  // de qualquer aparelho. Devolve se deu certo, para o "Salvar e sair".
+  async function salvarProgresso(): Promise<boolean> {
+    if (savingRef.current) return false
+    setError(null)
+    setOkMsg(false)
+    setProgressMsg(null)
+    const sessao = montarSessao()
+    if (!sessao) return false
+    const chave = execucaoContentKey(draftValue)
+    savingRef.current = true
+    setSaving(true)
+    try {
+      const salvo = await saveSessionMut.mutateAsync({
+        planId,
+        logId: continuing?.logId ?? null,
+        expectedUpdatedAt: continuing?.updatedAt ?? null,
+        inProgress: true,
+        dayLabel: day?.label ?? null,
+        weekNumber: sessao.weekValue,
+        performedAt: date,
+        notes: notes.trim() || null,
+        sets: sessao.finalSets,
+      })
+      const agora = new Date()
+      setContinuing({ logId: salvo.id, updatedAt: salvo.updated_at, savedAt: agora.toISOString() })
+      setServerKey(chave)
+      setProgressMsg(
+        `Progresso salvo às ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. ` +
+          'Dá para continuar depois, neste ou em outro aparelho; o treino só conta como feito ao registrar.'
+      )
+      return true
+    } catch (e) {
+      setError(normalizeDbError(e))
+      return false
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
+
+  async function save() {
+    if (savingRef.current) return
+    setError(null)
+    setOkMsg(false)
+    setProgressMsg(null)
+    const sessao = montarSessao()
+    if (!sessao) return
+    const { weekValue, finalSets } = sessao
 
     savingRef.current = true
     setSaving(true)
     try {
-      await createMut.mutateAsync({
-        orgId,
-        subjectId,
-        planId,
-        dayLabel: day?.label ?? null,
-        weekNumber: weekValue,
-        performedAt: date,
-        notes: notes.trim() || null,
-        sets: finalSets,
-      })
+      if (continuing) {
+        // Conclui a MESMA sessão que estava salva em andamento, em vez de
+        // criar outra e deixar a parcial sobrando.
+        await saveSessionMut.mutateAsync({
+          planId,
+          logId: continuing.logId,
+          expectedUpdatedAt: continuing.updatedAt,
+          inProgress: false,
+          dayLabel: day?.label ?? null,
+          weekNumber: weekValue,
+          performedAt: date,
+          notes: notes.trim() || null,
+          sets: finalSets,
+        })
+      } else {
+        await createMut.mutateAsync({
+          orgId,
+          subjectId,
+          planId,
+          dayLabel: day?.label ?? null,
+          weekNumber: weekValue,
+          performedAt: date,
+          notes: notes.trim() || null,
+          sets: finalSets,
+        })
+      }
+      setContinuing(null)
+      setServerKey(null)
       // limpa pra registrar a próxima
       const init: Record<string, LogRow[]> = {}
       for (const ex of dayExercises) {
@@ -937,7 +1079,51 @@ function LogForm({
         <CardTitle className="text-base">Registrar treino</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <UnsavedChangesPrompt guard={guard} what="nesta sessão" />
+        <ConfirmDialog
+          open={guard.blocked}
+          title="Sair do registro?"
+          description={
+            <>
+              O treino ainda não foi registrado. O que você preencheu fica guardado neste aparelho e
+              volta quando você abrir esta tela de novo. Para continuar em outro aparelho, ou para não
+              depender deste, salve no servidor antes de sair.
+            </>
+          }
+          cancelLabel="Ficar"
+          confirmLabel="Sair"
+          onCancel={guard.stay}
+          onConfirm={guard.leave}
+          extraAction={{
+            label: saving ? 'Salvando...' : 'Salvar e sair',
+            disabled: saving,
+            onClick: () => {
+              void salvarProgresso().then((ok) => (ok ? guard.leave() : guard.stay()))
+            },
+          }}
+        />
+        {sessaoParaContinuar ? (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <span>
+              Há um treino de {formatDate(sessaoParaContinuar.performed_at)}
+              {sessaoParaContinuar.day_label ? ` (Treino ${sessaoParaContinuar.day_label})` : ''} salvo
+              para continuar.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={loadingPending || saving}
+              onClick={() => void continuarSessao(sessaoParaContinuar)}
+            >
+              {loadingPending ? 'Abrindo...' : 'Continuar esse treino'}
+            </Button>
+          </div>
+        ) : null}
+        {continuing ? (
+          <p className="text-xs text-muted-foreground">
+            Continuando o treino salvo de {formatDate(date)}. "Registrar treino" conclui essa mesma sessão.
+          </p>
+        ) : null}
         {restored ? (
           <div role="status" className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
             <span>
@@ -1183,10 +1369,16 @@ function LogForm({
 
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {okMsg ? <p role="status" className="text-sm text-primary">Treino registrado!</p> : null}
+        {progressMsg ? <p role="status" className="text-sm text-primary">{progressMsg}</p> : null}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={save} disabled={createMut.isPending}>
-            {createMut.isPending ? 'Salvando...' : 'Registrar treino'}
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? 'Salvando...' : 'Registrar treino'}
+          </Button>
+          {/* Parar no meio sem perder nada e sem contar o treino como feito:
+              a sessão fica no servidor como não concluída (0041). */}
+          <Button size="sm" variant="outline" onClick={() => void salvarProgresso()} disabled={saving}>
+            Salvar e continuar depois
           </Button>
           {dirty ? <UnsavedBadge /> : null}
         </div>

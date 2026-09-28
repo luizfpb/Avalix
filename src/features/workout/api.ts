@@ -550,6 +550,43 @@ export async function updateWorkoutLog(input: UpdateWorkoutLogInput): Promise<Wo
   return data
 }
 
+export type SaveTrainerSessionInput = {
+  planId: string
+  // sessão em andamento que está sendo continuada; ausente = cria uma nova
+  logId: string | null
+  expectedUpdatedAt: string | null
+  inProgress: boolean
+  dayLabel: string | null
+  weekNumber: number | null
+  performedAt: string
+  notes: string | null
+  sets: NewLogSet[]
+}
+
+// "Salvar e continuar depois" da Execução (0041): grava a sessão no servidor
+// como em andamento — ela não conta na adesão nem fecha a semana — e depois
+// continua (ou conclui) a MESMA sessão, de qualquer aparelho. Contrato restrito
+// até regenerar database.types após a 0041.
+export async function saveTrainerSession(input: SaveTrainerSessionInput): Promise<WorkoutLogRow> {
+  const client = supabase as unknown as {
+    rpc(name: 'save_trainer_workout_session', args: Record<string, unknown>):
+      PromiseLike<{ data: WorkoutLogRow | null; error: unknown }>
+  }
+  const { data, error } = await client.rpc('save_trainer_workout_session', {
+    p_plan: input.planId,
+    p_sets: logSetsPayload(input.sets),
+    p_in_progress: input.inProgress,
+    ...(input.logId ? { p_log: input.logId, p_expected_updated_at: input.expectedUpdatedAt } : {}),
+    ...(input.dayLabel != null ? { p_day_label: input.dayLabel } : {}),
+    ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
+    p_performed_at: input.performedAt,
+    ...(input.notes != null ? { p_notes: input.notes } : {}),
+  })
+  if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar o salvamento do treino.')
+  return data
+}
+
 export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> {
   const rows: WorkoutLogRow[] = []
   const pageSize = 500

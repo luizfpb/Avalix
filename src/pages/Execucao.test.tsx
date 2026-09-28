@@ -11,12 +11,19 @@ import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/work
 // sempre permitiu (workout_log_sets aponta para o catálogo, não para o
 // exercício do plano — 0009); estes testes fixam o caminho na tela.
 
-const { criarMock, planoMock, logsMock, setsMock, updateMock } = vi.hoisted(() => ({
+const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock } = vi.hoisted(() => ({
   criarMock: vi.fn(),
   planoMock: vi.fn(),
   logsMock: vi.fn(),
   setsMock: vi.fn(),
   updateMock: vi.fn(),
+  salvarMock: vi.fn(),
+  listarSeriesMock: vi.fn(),
+}))
+
+vi.mock('../features/workout/api', async (original) => ({
+  ...(await original<typeof import('../features/workout/api')>()),
+  listWorkoutLogSets: (id: string) => listarSeriesMock(id),
 }))
 
 vi.mock('../features/organization/context', () => ({
@@ -50,6 +57,7 @@ vi.mock('../features/workout/hooks', () => ({
   useWorkoutLogSets: () => setsMock(),
   useCreateWorkoutLog: () => ({ mutateAsync: criarMock, isPending: false }),
   useUpdateWorkoutLog: () => ({ mutateAsync: updateMock, isPending: false }),
+  useSaveTrainerSession: () => ({ mutateAsync: salvarMock, isPending: false }),
   useDeleteWorkoutLog: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
 }))
 
@@ -112,6 +120,8 @@ beforeEach(() => {
   logsMock.mockReset().mockReturnValue({ data: [], isPending: false, isError: false, refetch: vi.fn() })
   setsMock.mockReset().mockReturnValue({ data: [], isPending: false, isError: false })
   updateMock.mockReset().mockResolvedValue({ id: 'log-1' })
+  salvarMock.mockReset().mockResolvedValue({ id: 'log-parcial', updated_at: '2026-09-20T10:00:00Z' })
+  listarSeriesMock.mockReset().mockResolvedValue([])
 })
 afterEach(cleanup)
 
@@ -606,6 +616,80 @@ describe('sessão não concluída pelo aluno', () => {
   })
 })
 
+// Parar no meio e continuar depois, de qualquer aparelho (0041). O rascunho no
+// aparelho não servia para quem troca de aparelho, e nada na tela dizia que ele
+// existia: quem precisava sair no meio perdia a sessão.
+describe('salvar e continuar depois', () => {
+  it('salva a sessão como não concluída e, ao registrar, conclui a mesma sessão', async () => {
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+    expect(await screen.findByText(/Progresso salvo às/)).toBeTruthy()
+    expect(salvarMock.mock.calls[0][0]).toMatchObject({
+      planId: 'plan-1', logId: null, inProgress: true,
+      sets: [expect.objectContaining({ exerciseId: 'ex-1', setNumber: 1, weightKg: 40 })],
+    })
+
+    fireEvent.change(screen.getByLabelText('Carga da série 2 de Supino reto'), { target: { value: '42' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(salvarMock.mock.calls[1][0]).toMatchObject({
+      logId: 'log-parcial', expectedUpdatedAt: '2026-09-20T10:00:00Z', inProgress: false,
+    })
+    expect(salvarMock.mock.calls[1][0].sets).toHaveLength(2)
+    expect(criarMock).not.toHaveBeenCalled()
+  })
+
+  it('sem nenhuma série preenchida, explica em vez de salvar vazio', async () => {
+    abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent',
+      'Registre ao menos uma série com carga ou repetições.')
+    expect(salvarMock).not.toHaveBeenCalled()
+  })
+
+  it('oferece continuar o treino salvo, traz as séries e conclui a mesma sessão', async () => {
+    logsMock.mockReturnValue({
+      data: [{ ...sessao(), id: 'log-9', source: 'trainer', in_progress: true, week_number: 2,
+        performed_at: '2026-09-20', notes: 'parou no supino', updated_at: '2026-09-20T09:00:00Z' }],
+      isPending: false, isError: false, refetch: vi.fn(),
+    })
+    listarSeriesMock.mockResolvedValue([
+      { id: 's1', exercise_id: 'ex-1', set_number: 1, weight_kg: 40, reps: 10, rir: 2, rest_seconds: 90, reached_failure: false },
+      { id: 's2', exercise_id: 'ex-2', set_number: 1, weight_kg: 14, reps: 12, rir: null, rest_seconds: null, reached_failure: null },
+    ])
+    abrir()
+    expect(screen.getByText(/Há um treino de 20\/09\/2026 \(Treino A\) salvo/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar esse treino' }))
+
+    await waitFor(() =>
+      expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40'))
+    expect((screen.getByLabelText('Carga da série 1 de Crucifixo') as HTMLInputElement).value).toBe('14')
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('2')
+    expect((screen.getByLabelText('Data') as HTMLInputElement).value).toBe('2026-09-20')
+    expect((screen.getByLabelText('Observações (opcional)') as HTMLTextAreaElement).value).toBe('parou no supino')
+    expect(screen.queryByText(/Há um treino de/)).toBeNull()
+    expect(listarSeriesMock).toHaveBeenCalledWith('log-9')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(salvarMock.mock.calls[0][0]).toMatchObject({
+      logId: 'log-9', expectedUpdatedAt: '2026-09-20T09:00:00Z', inProgress: false, weekNumber: 2,
+      performedAt: '2026-09-20',
+    })
+    expect(salvarMock.mock.calls[0][0].sets).toHaveLength(2)
+  })
+
+  it('sessão salva pelo aluno não é oferecida para continuar aqui', () => {
+    logsMock.mockReturnValue({
+      data: [{ ...sessao(), id: 'log-9', source: 'student', in_progress: true }],
+      isPending: false, isError: false, refetch: vi.fn(),
+    })
+    abrir()
+    expect(screen.queryByText(/salvo para continuar/)).toBeNull()
+  })
+})
+
 describe('rota e registro', () => {
   it('recusa o plano de outro avaliado em vez de misturar os dois na tela', () => {
     abrir('outro-avaliado')
@@ -681,10 +765,29 @@ describe('rascunho da sessão', () => {
     const router = abrir()
     fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
     await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
-    expect(await screen.findByText('Sair sem salvar?')).toBeTruthy()
+    expect(await screen.findByText('Sair do registro?')).toBeTruthy()
     expect(screen.queryByText('detalhe do plano')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ficar' }))
     expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  it('"Salvar e sair" grava a sessão como não concluída e sai', async () => {
+    const router = abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvar e sair' }))
+    expect(await screen.findByText('detalhe do plano')).toBeTruthy()
+    expect(salvarMock.mock.calls[0][0]).toMatchObject({ inProgress: true, logId: null })
+    expect(criarMock).not.toHaveBeenCalled()
+  })
+
+  it('depois de salvar no servidor, sair não pergunta nada', async () => {
+    const router = abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+    await screen.findByText(/Progresso salvo às/)
+    await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
+    expect(await screen.findByText('detalhe do plano')).toBeTruthy()
   })
 
   it('sem nada preenchido, sai sem perguntar', async () => {

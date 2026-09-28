@@ -2030,6 +2030,43 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_trainer_workout_session: {
+        Args: {
+          p_day_label?: string
+          p_expected_updated_at?: string
+          p_in_progress: boolean
+          p_log?: string
+          p_notes?: string
+          p_performed_at?: string
+          p_plan: string
+          p_sets: Json
+          p_week_number?: number
+        }
+        Returns: {
+          client_ref: string | null
+          client_revision: number
+          corrected_at: string | null
+          created_at: string
+          day_label: string | null
+          feel: number | null
+          id: string
+          in_progress: boolean
+          notes: string | null
+          org_id: string
+          performed_at: string
+          plan_id: string
+          source: string
+          subject_id: string
+          updated_at: string
+          week_number: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workout_logs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       save_workout_plan: {
         Args: {
           p_days: Json

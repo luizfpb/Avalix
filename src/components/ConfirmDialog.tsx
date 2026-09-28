@@ -12,6 +12,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancelar',
   onConfirm,
   onCancel,
+  extraAction,
 }: {
   open: boolean
   title: string
@@ -20,6 +21,8 @@ export function ConfirmDialog({
   cancelLabel?: string
   onConfirm: () => void
   onCancel: () => void
+  // terceira saída, não destrutiva (ex.: "Salvar e sair")
+  extraAction?: { label: string; onClick: () => void; disabled?: boolean }
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -57,10 +60,15 @@ export function ConfirmDialog({
       <div className="space-y-3 p-5">
         <h2 id={titleId} className="text-base font-semibold">{title}</h2>
         {description ? <div id={descriptionId} className="text-sm text-muted-foreground">{description}</div> : null}
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="flex flex-wrap justify-end gap-2 pt-1">
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             {cancelLabel}
           </Button>
+          {extraAction ? (
+            <Button type="button" size="sm" onClick={extraAction.onClick} disabled={extraAction.disabled}>
+              {extraAction.label}
+            </Button>
+          ) : null}
           <Button type="button" variant="destructive" size="sm" onClick={onConfirm}>
             {confirmLabel}
           </Button>
