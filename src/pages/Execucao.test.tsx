@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import Execucao from './Execucao'
+import { setPrivateDraftScope } from '../lib/draft'
 import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/workout/api'
 
 // Registrar o treino que ACONTECEU, e não só o que estava no papel: aparelho
@@ -88,13 +89,13 @@ function plano(): WorkoutPlanDetail {
   } as unknown as WorkoutPlanDetail
 }
 
-function abrir() {
+function abrir(subjectId = 'subject-1') {
   const router = createMemoryRouter(
         [
           { path: '/avaliados/:id/treinos/:planId/execucao', element: <Execucao /> },
           { path: '/avaliados/:id/treinos/:planId', element: <div>detalhe do plano</div> },
         ],
-        { initialEntries: ['/avaliados/subject-1/treinos/plan-1/execucao'] }
+        { initialEntries: [`/avaliados/${subjectId}/treinos/plan-1/execucao`] }
       )
   render(<RouterProvider router={router} />)
   return router
@@ -553,5 +554,142 @@ describe('cronômetro de descanso', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // O descanso de uma série que saiu da sessão ia parar numa linha escondida.
+  it('remover o avulso que está cronometrando cancela a contagem', () => {
+    abrir()
+    adicionarCrucifixo()
+    fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Crucifixo feita' }))
+    expect(screen.getByText(/descanso · série 1 de Crucifixo/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Remover Crucifixo da sessão' }))
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+})
+
+// A semana gravada escolhe o override e segue para o histórico e o PDF.
+describe('semana digitada', () => {
+  it.each(['9', '0', '2.5'])('recusa semana fora do mesociclo (%s) sem apagar o preenchido', async (valor) => {
+    abrir() // plano de 4 semanas
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: valor } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent',
+      'Informe a semana com um número inteiro de 1 a 4, ou deixe em branco.')
+    expect(criarMock).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  it('semana em branco continua permitida', async () => {
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(criarMock.mock.calls[0][0].weekNumber).toBeNull()
+  })
+})
+
+// "Parar por aqui e continuar depois" do aluno cria o registro no servidor,
+// mas não é treino feito (0039).
+describe('sessão não concluída pelo aluno', () => {
+  it('aparece marcada, fora da adesão e da semana do mesociclo', () => {
+    logsMock.mockReturnValue({
+      data: [{ ...sessao(), id: 'log-2', in_progress: true, performed_at: '2026-09-09' }, sessao()],
+      isPending: false, isError: false, refetch: vi.fn(),
+    })
+    abrir()
+    expect(screen.getByText('não concluído')).toBeTruthy()
+    expect(screen.getByText(/1 sessão não concluída pelo aluno fica fora da conta/)).toBeTruthy()
+    // só a sessão concluída da semana 1 conta: a semana 1 fechou (1 de 1)
+    expect(screen.getByText(/A semana 1 fechou \(1 de 1 sessão\)/)).toBeTruthy()
+  })
+})
+
+describe('rota e registro', () => {
+  it('recusa o plano de outro avaliado em vez de misturar os dois na tela', () => {
+    abrir('outro-avaliado')
+    expect(screen.getByRole('alert').textContent).toMatch(/Este plano não pertence a este avaliado/)
+    expect(screen.queryByRole('button', { name: 'Registrar treino' })).toBeNull()
+  })
+})
+
+// A data ficava presa no dia em que a tela abriu.
+describe('data da sessão', () => {
+  it('acompanha o dia enquanto o educador não escolhe outra', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-09-20T23:50:00'))
+      abrir()
+      const data = screen.getByLabelText('Data') as HTMLInputElement
+      expect(data.value).toBe('2026-09-20')
+      vi.setSystemTime(new Date('2026-09-21T07:00:00'))
+      act(() => { window.dispatchEvent(new Event('focus')) })
+      expect(data.value).toBe('2026-09-21')
+
+      // escolhida à mão, ela manda
+      fireEvent.change(data, { target: { value: '2026-09-19' } })
+      vi.setSystemTime(new Date('2026-09-22T07:00:00'))
+      act(() => { window.dispatchEvent(new Event('focus')) })
+      expect(data.value).toBe('2026-09-19')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// Uma hora de séries vivia só na memória: "Início" na barra do celular, a
+// aba descartada pelo Android ou o "Atualizar" do PWA levavam tudo.
+describe('rascunho da sessão', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setPrivateDraftScope('user-1', 'org-1')
+  })
+  afterEach(() => {
+    setPrivateDraftScope(null, null)
+    localStorage.clear()
+  })
+
+  it('sobrevive a fechar e reabrir a tela, com o avulso e a observação', async () => {
+    abrir()
+    adicionarCrucifixo()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Crucifixo'), { target: { value: '14' } })
+    fireEvent.change(screen.getByLabelText('Observações (opcional)'), { target: { value: 'ombro ok' } })
+    cleanup() // desmontar grava o que estava pendente
+
+    abrir()
+    expect(await screen.findByText(/Sessão não registrada recuperada/)).toBeTruthy()
+    expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+    expect((screen.getByLabelText('Carga da série 1 de Crucifixo') as HTMLInputElement).value).toBe('14')
+    expect((screen.getByLabelText('Observações (opcional)') as HTMLTextAreaElement).value).toBe('ombro ok')
+  })
+
+  it('depois de registrar, reabrir começa uma sessão nova', async () => {
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    cleanup()
+
+    abrir()
+    expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByText(/Sessão não registrada recuperada/)).toBeNull()
+  })
+
+  it('pergunta antes de sair com séries preenchidas', async () => {
+    const router = abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
+    expect(await screen.findByText('Sair sem salvar?')).toBeTruthy()
+    expect(screen.queryByText('detalhe do plano')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  it('sem nada preenchido, sai sem perguntar', async () => {
+    const router = abrir()
+    await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
+    expect(await screen.findByText('detalhe do plano')).toBeTruthy()
   })
 })

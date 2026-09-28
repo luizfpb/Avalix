@@ -49,6 +49,30 @@ describe('configuracao do Cloudflare Pages', () => {
     expect(manifest).toMatchObject({ id: '/t', start_url: '/t', scope: '/t' })
   })
 
+  // O MediaPipe junta tres pecas que precisam da MESMA versao: o JS do npm, o
+  // WASM baixado do jsdelivr e o caminho liberado na CSP. Com "^" no
+  // package.json um npm update trocava o JS sozinho; com o dominio inteiro na
+  // CSP, qualquer pacote do jsdelivr podia rodar como script.
+  it('fixa a versao do MediaPipe no package, no carregador e na CSP', async () => {
+    const { MEDIAPIPE_VERSION } = await import('../features/posture/poseDetect')
+    const pkg = JSON.parse(
+      await readFile(new URL('../../package.json', import.meta.url), 'utf8')
+    ) as { dependencies: Record<string, string> }
+    const headers = await readFile(new URL('../../public/_headers', import.meta.url), 'utf8')
+    const csp = /Content-Security-Policy: (.+)/.exec(headers)?.[1] ?? ''
+    const directive = (name: string) =>
+      csp.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? ''
+    const liberado = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/`
+
+    expect(pkg.dependencies['@mediapipe/tasks-vision']).toBe(MEDIAPIPE_VERSION)
+    for (const name of ['script-src', 'connect-src']) {
+      const sources = directive(name).split(/\s+/)
+      expect(sources).toContain(liberado)
+      expect(sources.filter((s) => s.startsWith('https://cdn.jsdelivr.net'))).toEqual([liberado])
+    }
+    expect(directive('connect-src').split(/\s+/)).not.toContain('https://storage.googleapis.com')
+  })
+
   it('mantem 404 real para caminhos que nao pertencem a SPA', async () => {
     const rules = await readRedirectRules()
     const notFound = await readFile(new URL('../../public/404.html', import.meta.url), 'utf8')

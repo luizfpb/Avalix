@@ -5,7 +5,10 @@ import { estimateOneRm } from './oneRm'
 // cerebro — isto NUNCA altera o plano sozinho, so sugere. Metodo: dupla
 // progressao (progride reps dentro da faixa ate o topo, ai sobe carga) com
 // autorregulacao por RIR. Versionado e com motivo explicito (transparencia).
-export const PROGRESSION_ENGINE_VERSION = 'progression-engine@1'
+// @2: incremento proporcional à carga (defaultLoadStep), sugestão sem arredondar
+// para a grade de 2,5 kg e "manter" quando o topo da faixa veio com RIR abaixo
+// do alvo.
+export const PROGRESSION_ENGINE_VERSION = 'progression-engine@2'
 
 export type RepRange = { min: number; max: number }
 
@@ -41,19 +44,36 @@ export type ProgressionSuggestion = {
   reason: string
 }
 
-function roundLoad(v: number, step: number): number {
-  return Math.max(0, Math.round(v / step) * step)
+// Incremento padrão pela faixa de carga. Os 2,5 kg fixos da v1 vinham da
+// barra com anilhas de 1,25 kg, e em carga leve eram desproporcionais: num
+// halter de 4 kg a sugestão saltava para 7,5 kg (+87%), e num de 2 kg a
+// redução sugeria 0 kg. Abaixo de 10 kg os halteres vão de 1 em 1 kg; até 20 kg,
+// de 2 em 2.
+export function defaultLoadStep(weightKg: number): number {
+  if (weightKg < 10) return 1
+  if (weightKg < 20) return 2
+  return 2.5
+}
+
+// Só tira o ruído de ponto flutuante. A v1 arredondava para a grade de 2,5 kg,
+// o que movia a carga usada de verdade (17 kg + 2,5 virava 20 kg) e fazia o
+// motivo ("+2,5 kg") contradizer o número sugerido.
+function roundKg(v: number): number {
+  return Math.round(v * 100) / 100
+}
+
+function fmtKg(v: number): string {
+  return String(roundKg(v)).replace('.', ',')
 }
 
 // Sugere a proxima sessao a partir da melhor serie da ultima + faixa de reps
-// prescrita + RIR alvo. loadStep = incremento de carga (default 2,5 kg).
+// prescrita + RIR alvo. loadStep = incremento de carga (default: defaultLoadStep).
 export function suggestProgression(input: {
   last: LastSetPerf
   repRange: RepRange | null
   targetRir: number | null
   loadStep?: number
 }): ProgressionSuggestion {
-  const step = input.loadStep ?? 2.5
   const { last, repRange, targetRir } = input
 
   if (last.weightKg == null || last.reps == null || repRange == null) {
@@ -68,26 +88,49 @@ export function suggestProgression(input: {
   const w = last.weightKg
   const r = last.reps
   const rir = last.rir
+  const step = input.loadStep ?? defaultLoadStep(w)
 
   // muito dificil: abaixo do minimo da faixa, ou RIR bem abaixo do alvo
   if (r < repRange.min || (targetRir != null && rir != null && rir < targetRir - 1)) {
+    const menor = roundKg(w - step)
+    if (menor <= 0) {
+      // Não há carga menor para oferecer: sugerir 0 kg seria tirar o exercício.
+      return {
+        kind: 'hold',
+        suggestedWeightKg: w,
+        suggestedReps: repRange.min,
+        reason: `Ficou abaixo da faixa/RIR, mas a carga já é a menor — manter e reconstruir a partir de ${repRange.min} reps.`,
+      }
+    }
     return {
       kind: 'reduce',
-      suggestedWeightKg: roundLoad(w - step, step),
+      suggestedWeightKg: menor,
       suggestedReps: repRange.min,
-      reason: 'Ficou abaixo da faixa/RIR — reduzir um pouco a carga e reconstruir.',
+      reason: `Ficou abaixo da faixa/RIR — reduzir ${fmtKg(step)} kg e reconstruir.`,
     }
   }
 
-  // bateu o topo da faixa com folga (RIR >= alvo): sobe carga, volta ao fundo
   const hitTop = r >= repRange.max
   const easyEnough = targetRir == null || rir == null || rir >= targetRir
+  // bateu o topo da faixa com folga (RIR >= alvo): sobe carga, volta ao fundo
   if (hitTop && easyEnough) {
     return {
       kind: 'increase_load',
-      suggestedWeightKg: roundLoad(w + step, step),
+      suggestedWeightKg: roundKg(w + step),
       suggestedReps: repRange.min,
-      reason: `Bateu ${repRange.max} reps com RIR ≥ alvo — +${step} kg e voltar a ${repRange.min} reps.`,
+      reason: `Bateu ${repRange.max} reps com RIR ≥ alvo — +${fmtKg(step)} kg e voltar a ${repRange.min} reps.`,
+    }
+  }
+
+  // Chegou ao topo, mas mais perto da falha do que o prescrito: não há rep a
+  // somar nem folga para subir carga. A v1 caía no "+1 rep" com o mesmo número
+  // de repetições.
+  if (hitTop) {
+    return {
+      kind: 'hold',
+      suggestedWeightKg: w,
+      suggestedReps: r,
+      reason: `Chegou a ${r} reps, mas com RIR abaixo do alvo — manter carga e repetições até sobrar folga.`,
     }
   }
 
@@ -103,7 +146,12 @@ export function suggestProgression(input: {
 
 // Deload: carga ~60% e series reduzidas, pra uma semana mais leve.
 export function suggestDeload(weightKg: number, sets: number): { weightKg: number; sets: number } {
-  return { weightKg: roundLoad(weightKg * 0.6, 2.5), sets: Math.max(1, Math.round(sets * 0.6)) }
+  const alvo = weightKg * 0.6
+  const step = defaultLoadStep(alvo)
+  return {
+    weightKg: Math.max(0, Math.round(alvo / step) * step),
+    sets: Math.max(1, Math.round(sets * 0.6)),
+  }
 }
 
 // Melhor serie (por e1RM) da sessao mais recente de cada exercicio — entrada do

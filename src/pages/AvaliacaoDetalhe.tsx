@@ -13,6 +13,7 @@ import { sortAssessmentsChronologically } from '../features/assessment/timeline'
 import { protocolLabel } from '../features/assessment/protocols'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
+import { adultReferenceApplies, assessmentAgeYears } from '../features/assessment/adultReference'
 import { SKINFOLD_LABELS, circumferenceLabel } from '../features/assessment/sites'
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import type { SkinfoldSite } from '../features/assessment/protocols'
@@ -85,7 +86,10 @@ export default function AvaliacaoDetalhe() {
   // IMC vem das colunas peso/altura da própria avaliação, então existe mesmo
   // nas avaliações sem protocolo de composição corporal.
   const bmi = computeBmi(assessment.weight_kg, assessment.height_cm)
-  const bmiCat = bmiCategory(bmi)
+  const ageYears = assessmentAgeYears(
+    result?.inputs?.ageYears, subjectQuery.data.birth_date, assessment.assessed_at
+  )
+  const bmiCat = bmiCategory(bmi, ageYears)
 
   async function handlePdf() {
     setPdfBusy(true)
@@ -127,6 +131,7 @@ export default function AvaliacaoDetalhe() {
         circumferences,
         history,
         circumferenceHistory,
+        ageYears,
       })
       downloadBlob(blob, `avaliacao-${assessment.assessed_at}.pdf`)
       if (organization && user) {
@@ -271,14 +276,26 @@ export default function AvaliacaoDetalhe() {
             <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1)} kg`} />
             <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1)} kg`} />
             {(() => {
-              const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct)
+              const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct, ageYears)
               return (
                 <p className="col-span-2 text-xs sm:col-span-4">
                   <span className="text-muted-foreground">Classificação: </span>
-                  <span className={cat.tone === 'normal' ? 'font-medium' : 'font-medium text-amber-600'}>
+                  <span
+                    className={
+                      cat.tone === 'none'
+                        ? 'text-muted-foreground'
+                        : cat.tone === 'normal'
+                          ? 'font-medium'
+                          : 'font-medium text-amber-600'
+                    }
+                  >
                     {cat.label}
                   </span>
-                  <span className="text-muted-foreground"> · referência ACE por sexo</span>
+                  <span className="text-muted-foreground">
+                    {adultReferenceApplies(ageYears)
+                      ? ' · referência ACE por sexo'
+                      : ' · as faixas ACE são para adultos'}
+                  </span>
                 </p>
               )
             })()}
@@ -301,9 +318,9 @@ export default function AvaliacaoDetalhe() {
           <span className="text-2xl font-semibold">{bmi.toFixed(1)}</span>
           <span
             className={
-              bmiCat.tone === 'normal'
-                ? 'text-sm text-muted-foreground'
-                : 'text-sm font-medium text-amber-600'
+              bmiCat.tone === 'warn'
+                ? 'text-sm font-medium text-amber-600'
+                : 'text-sm text-muted-foreground'
             }
           >
             {bmiCat.label}

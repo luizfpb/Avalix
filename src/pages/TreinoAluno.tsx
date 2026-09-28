@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, CloudOff, RefreshCw, TriangleAlert, X } from 'lucide-react'
+import { CheckCircle2, CloudOff, Copy, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import {
   getHistoryPageForLink,
   getPlanForLink,
@@ -21,6 +21,7 @@ import {
   isTransientStudentError,
   isStudentLinkExpired,
   queuedSessionLabel,
+  queuedSessionText,
   reconcileSetRows,
   resolveStudentToken,
   studentScope,
@@ -85,11 +86,13 @@ import {
 } from '../features/workout/progress'
 import type { WorkoutExerciseRow, WorkoutWeekOverrideRow } from '../features/workout/api'
 import { BrandMark } from '../components/BrandLogo'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
+import { useClock } from '../lib/useClock'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -112,8 +115,7 @@ function Aviso({ titulo, texto, acao }: { titulo: string; texto: string; acao?: 
   )
 }
 
-function hoje(): string {
-  const d = new Date()
+function hoje(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -464,6 +466,7 @@ export default function TreinoAluno() {
         sincronizadoEm={sincronizadoEm}
         fila={fila}
         erro={erroFila}
+        nomes={Object.fromEntries(pacote.exercises.map((ex) => [ex.exercise_id, ex.name]))}
         onEnviar={() => void enviarFila(true)}
         onDescartar={(clientRef) => {
           if (!scope) return
@@ -624,6 +627,7 @@ function StatusBar({
   sincronizadoEm,
   fila,
   erro,
+  nomes,
   onEnviar,
   onDescartar,
 }: {
@@ -631,9 +635,26 @@ function StatusBar({
   sincronizadoEm: string | null
   fila: QueuedSession[]
   erro: string | null
+  // exercício do catálogo -> nome, para o texto copiado
+  nomes: Record<string, string>
   onEnviar: () => void
   onDescartar: (clientRef: string) => void
 }) {
+  // Treino recusado em definitivo (data fora da janela de 7 dias, limite da
+  // data...) só tinha "Descartar", que apagava o que a pessoa fez, num toque e
+  // sem pergunta. Agora dá para copiar os dados e mandar ao treinador — que
+  // registra a sessão pela tela dele, na data certa — e descartar pede
+  // confirmação.
+  const [descartar, setDescartar] = useState<QueuedSession | null>(null)
+  const [copia, setCopia] = useState<{ clientRef: string; ok: boolean } | null>(null)
+  async function copiar(item: QueuedSession) {
+    try {
+      await navigator.clipboard.writeText(queuedSessionText(item, nomes))
+      setCopia({ clientRef: item.clientRef, ok: true })
+    } catch {
+      setCopia({ clientRef: item.clientRef, ok: false })
+    }
+  }
   const pendentes = fila.filter((item) => !item.error)
   const rejeitados = fila.filter((item) => item.error)
 
@@ -691,17 +712,49 @@ function StatusBar({
           <div className="min-w-0 flex-1">
             <p className="font-medium">{queuedSessionLabel(item)} não foi enviado.</p>
             <p className="mt-0.5 break-words opacity-90">{item.error}</p>
+            {item.sets.length > 0 ? (
+              <p className="mt-1 opacity-90">
+                Copie os dados e mande ao seu treinador: ele consegue registrar o treino na data certa.
+              </p>
+            ) : null}
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {item.sets.length > 0 ? (
+                <Button size="xs" variant="outline" onClick={() => void copiar(item)}>
+                  <Copy /> {copia?.clientRef === item.clientRef && copia.ok ? 'Copiado' : 'Copiar dados'}
+                </Button>
+              ) : null}
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => setDescartar(item)}
+                aria-label={`Descartar ${queuedSessionLabel(item)}`}
+              >
+                Descartar
+              </Button>
+            </div>
+            {copia?.clientRef === item.clientRef && !copia.ok ? (
+              <p className="mt-1">Não foi possível copiar neste aparelho. Anote os números antes de descartar.</p>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => onDescartar(item.clientRef)}
-            aria-label={`Descartar aviso de ${queuedSessionLabel(item)}`}
-            className="rounded p-1 hover:bg-destructive/10"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
         </div>
       ))}
+
+      <ConfirmDialog
+        open={descartar != null}
+        title="Descartar este treino?"
+        description={
+          descartar
+            ? `${queuedSessionLabel(descartar)} sai deste aparelho e não poderá ser recuperado. Se ainda não copiou os dados para o seu treinador, volte e copie antes.`
+            : undefined
+        }
+        confirmLabel="Descartar treino"
+        cancelLabel="Voltar"
+        onConfirm={() => {
+          if (descartar) onDescartar(descartar.clientRef)
+          setDescartar(null)
+        }}
+        onCancel={() => setDescartar(null)}
+      />
     </div>
   )
 }
@@ -761,22 +814,48 @@ function TreinoDoDia({
   )
 
   // Treinos concluídos nesta tela que o pacote ainda não conhece: ele só é
-  // rebuscado ao reabrir a página, então sem isto a semana sugerida ficaria
-  // parada até lá — o aluno que fecha a semana de manhã e volta à tarde
-  // continuaria vendo a semana anterior.
-  const [logsLocais, setLogsLocais] = useState<WeekLogPoint[]>([])
+  // rebuscado ao reabrir a página ou voltar ao app, então sem isto a semana
+  // sugerida ficaria parada até lá — o aluno que fecha a semana de manhã e
+  // volta à tarde continuaria vendo a semana anterior.
+  //
+  // Cada conclusão local leva o client_ref da sessão. A partir da 0039 o pacote
+  // traz o client_ref de cada sessão concluída, e a que já aparece lá deixa de
+  // ser contada aqui. Antes a tela descontava pela quantidade
+  // (`current_plan_sessions` crescendo), e contava duas vezes a sessão que o
+  // pacote já trazia — a salva com "continuar depois" e concluída ao voltar, ou
+  // a concluída depois de o pacote ser rebuscado: a tela anunciava a semana
+  // fechada e a divisão seguinte um treino antes da hora.
+  const [logsLocais, setLogsLocais] = useState<(WeekLogPoint & { client_ref: string })[]>([])
+  const doServidor = pacote.plan_week_log
+  // Pacote da 0039: cada item traz a chave client_ref (nula nos registros do
+  // profissional). Lista vazia não tem o que deduplicar.
+  const pacoteComIdentidade = !!doServidor &&
+    (doServidor.length === 0 || doServidor.some((log) => 'client_ref' in log))
   const sessoesNoPacote = useRef(pacote.current_plan_sessions)
   useEffect(() => {
     const antes = sessoesNoPacote.current
     const agora = pacote.current_plan_sessions
     sessoesNoPacote.current = agora
-    // Pacote novo já contabilizou parte do que estava aqui: as mais antigas
-    // saem da lista local para não contarem duas vezes.
+    if (pacoteComIdentidade) return
+    // Pacote anterior à 0039, sem identidade: o melhor que dá é descontar
+    // pela quantidade que o pacote novo já contabilizou.
     if (agora > antes) {
       const contabilizadas = agora - antes
       setLogsLocais((atuais) => atuais.slice(0, Math.max(0, atuais.length - contabilizadas)))
     }
-  }, [pacote.current_plan_sessions])
+  }, [pacote.current_plan_sessions, pacoteComIdentidade])
+  const refsNoServidor = useMemo(
+    () => pacoteComIdentidade && doServidor
+      ? new Set(doServidor.flatMap((log) => (log.client_ref ? [log.client_ref] : [])))
+      : null,
+    [doServidor, pacoteComIdentidade]
+  )
+  const pendentesDe = useCallback(
+    <T extends { client_ref: string }>(locais: T[]): T[] =>
+      refsNoServidor ? locais.filter((log) => !refsNoServidor.has(log.client_ref)) : locais,
+    [refsNoServidor]
+  )
+  const locaisPendentes = useMemo(() => pendentesDe(logsLocais), [pendentesDe, logsLocais])
 
   const sessoesPorSemana = sessionsPerWeek(plano.weekly_schedule, dias.length)
   // A semana vem do que o aluno REALMENTE registrou, não da data: ele pode ter
@@ -786,7 +865,6 @@ function TreinoDoDia({
   // tela volta ao palpite antigo pelo calendário em vez de ficar sem semana.
   const sugerirSemana = useCallback(
     (locais: WeekLogPoint[]): PlanWeekSuggestion | null => {
-      const doServidor = pacote.plan_week_log
       if (!doServidor) return null
       return suggestedPlanWeek({
         weeks: plano.weeks,
@@ -794,14 +872,18 @@ function TreinoDoDia({
         logs: [...locais, ...doServidor],
       })
     },
-    [pacote.plan_week_log, plano.weeks, sessoesPorSemana]
+    [doServidor, plano.weeks, sessoesPorSemana]
   )
-  const sugestao = useMemo(() => sugerirSemana(logsLocais), [sugerirSemana, logsLocais])
+  const sugestao = useMemo(() => sugerirSemana(locaisPendentes), [sugerirSemana, locaisPendentes])
   const semanaSugerida = sugestao?.week ?? currentWeek(plano.weeks, plano.starts_on, new Date())
 
   const [dayId, setDayId] = useState(divisaoSugerida)
   const [semana, setSemana] = useState<number | null>(semanaSugerida)
   const [data, setData] = useState(hoje())
+  // O aluno escolheu a data de propósito (registrar um treino de ontem). Sem
+  // isso, a data acompanha o dia de hoje — ver o efeito junto de trocarSessao.
+  const [dataEscolhida, setDataEscolhida] = useState(false)
+  const hojeNoRelogio = hoje(useClock())
   const [notas, setNotas] = useState('')
   // Como foi o treino, em um toque: 1 difícil, 2 normal, 3 bem. O texto livre
   // continua do lado, para quem tem algo a contar.
@@ -837,7 +919,6 @@ function TreinoDoDia({
   draftPlan.current = { days: dias, exercises: pacote.exercises }
   const switchGeneration = useRef(0)
   const switchAccess = useRef<StudentStorageAccess | null>(null)
-  const localConclusions = useRef(0)
 
   const exerciciosDoDia = useMemo(
     () =>
@@ -899,6 +980,10 @@ function TreinoDoDia({
         setSemana(d.weekNumber)
         setData(d.performedAt)
         setNotas(d.notes)
+        // A sensação mora no rascunho desde a 0038, mas só a troca de sessão a
+        // restaurava: reabrir a página perdia a carinha, e o autosave seguinte
+        // gravava `feel: null` por cima dela.
+        setSensacao(d.feel ?? null)
         setLinhas(d.rows)
         setExtras(d.extras ?? [])
         setClientRef(d.clientRef)
@@ -1113,6 +1198,23 @@ function TreinoDoDia({
     }
   }
 
+  // A data de uma sessão nova acompanha o dia. Ela ficava presa no dia em que
+  // a tela abriu (ou em que o último treino foi concluído): com o app
+  // instalado voltando do segundo plano dias depois, o treino de hoje era
+  // gravado com a data antiga — e o servidor aceita até 7 dias para trás.
+  // Sessão em andamento (rascunho) e data escolhida pelo aluno não mudam.
+  const trocarSessaoRef = useRef(trocarSessao)
+  trocarSessaoRef.current = trocarSessao
+  // Uma tentativa por dia novo: se o aparelho não deixar ler o rascunho, o
+  // erro aparece uma vez em vez de o efeito tentar de novo a cada render.
+  const virouPara = useRef<string | null>(null)
+  useEffect(() => {
+    if (!rascunhoLido || dirty || dataEscolhida || switchingSession || salvando !== null) return
+    if (data === hojeNoRelogio || virouPara.current === hojeNoRelogio) return
+    virouPara.current = hojeNoRelogio
+    void trocarSessaoRef.current(dayId, hojeNoRelogio)
+  }, [rascunhoLido, dirty, dataEscolhida, switchingSession, salvando, data, dayId, hojeNoRelogio])
+
   async function salvar(concluir: boolean) {
     if (switchingSession || !rascunhoLido || saving.current) return
     setErro(null)
@@ -1149,6 +1251,9 @@ function TreinoDoDia({
         performedAt: data,
         notes: notas.trim() || null,
         feel: sensacao,
+        // "Continuar depois" guarda a sessão no servidor sem contá-la como
+        // treino feito; concluir a marca como concluída (0039).
+        inProgress: !concluir,
         sets,
         queuedAt: new Date().toISOString(),
       }
@@ -1175,6 +1280,7 @@ function TreinoDoDia({
             performedAt: sessao.performedAt,
             notes: sessao.notes,
             feel: sessao.feel,
+            inProgress: sessao.inProgress,
             sets,
           })
           if (enviado.stale) {
@@ -1238,20 +1344,24 @@ function TreinoDoDia({
   }
 
   function reiniciar() {
-    localConclusions.current += 1
+    // A sessão que acabou de ser concluída conta para a próxima — pode ter sido
+    // ela que fechou a semana — até o pacote refleti-la. Entra mesmo sem
+    // semana anotada: a divisão sugerida também depende dela.
+    const proximosLogs = [
+      { performed_at: data, week_number: semana, client_ref: clientRef },
+      ...logsLocais.filter((log) => log.client_ref !== clientRef),
+    ]
+    const pendentes = pendentesDe(proximosLogs)
     const nextDayId = suggestedWorkoutDayId(
       plano.weekly_schedule,
       dias,
-      pacote.current_plan_sessions + localConclusions.current
+      pacote.current_plan_sessions + pendentes.length
     )
-    // A sessão que acabou de ser concluída conta para a semana da próxima:
-    // pode ter sido ela que fechou a semana.
-    const proximosLogs =
-      semana != null ? [{ performed_at: data, week_number: semana }, ...logsLocais] : logsLocais
     setLogsLocais(proximosLogs)
     setDayId(nextDayId)
     setData(hoje())
-    setSemana(sugerirSemana(proximosLogs)?.week ?? semanaSugerida)
+    setDataEscolhida(false)
+    setSemana(sugerirSemana(pendentes)?.week ?? semanaSugerida)
     setClientRef(crypto.randomUUID())
     revision.current = 0
     setNotas('')
@@ -1329,7 +1439,10 @@ function TreinoDoDia({
             type="date"
             value={data}
             disabled={switchingSession || salvando !== null}
-            onChange={(e) => void trocarSessao(dayId, e.target.value)}
+            onChange={(e) => {
+              setDataEscolhida(true)
+              void trocarSessao(dayId, e.target.value)
+            }}
           />
         </div>
         <div className="space-y-1.5">
@@ -1944,7 +2057,11 @@ function Historico({
               {s.day_label ? `Treino ${s.day_label}` : 'Treino'} · {dataBr(s.performed_at)}
             </span>
             <span className="text-[11px] text-muted-foreground">
-              {s.source === 'trainer' ? 'registrado pelo treinador' : null}
+              {s.source === 'trainer'
+                ? 'registrado pelo treinador'
+                : s.in_progress === true
+                  ? 'não concluído'
+                  : null}
             </span>
           </div>
           <p className="flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground">

@@ -89,7 +89,22 @@ export function currentWeek(
 // para o resumo que a RPC do link devolve ao aluno — as duas telas precisam
 // chegar ao MESMO número, senão professor e aluno gravam semanas diferentes
 // no mesmo plano.
-export type WeekLogPoint = { performed_at: string; week_number: number | null }
+export type WeekLogPoint = {
+  performed_at: string
+  week_number: number | null
+  // Sessão salva com "continuar depois" e ainda não concluída (0039): não
+  // fecha semana nem avança divisão. Ausente nas linhas anteriores à 0039.
+  in_progress?: boolean | null
+  // Identidade da sessão do aluno (0039). É o que impede a tela do aluno de
+  // contar duas vezes a sessão que ela concluiu e que o pacote já traz.
+  client_ref?: string | null
+}
+
+// Sessão concluída: tudo que não foi salvo explicitamente como em andamento.
+// Registro anterior à 0039 e registro do profissional são sempre concluídos.
+export function isCompletedLog(log: { in_progress?: boolean | null }): boolean {
+  return log.in_progress !== true
+}
 
 // De onde saiu a sugestão. A tela usa isto para explicar o número em vez de
 // apenas exibi-lo: semana errada gravada em silêncio foi justamente o defeito.
@@ -142,9 +157,11 @@ export function suggestedPlanWeek(input: {
 
   // Sessão sem semana anotada (registro antigo, ou quem deixou o campo vazio)
   // não diz nada sobre a posição no mesociclo: é ignorada em vez de zerar a
-  // conta ou de interromper a passada atual.
+  // conta ou de interromper a passada atual. Sessão em andamento também: ela
+  // não fecha semana enquanto não for concluída.
   const comSemana = input.logs
-    .filter((l): l is WeekLogPoint & { week_number: number } => l.week_number != null)
+    .filter((l): l is WeekLogPoint & { week_number: number } =>
+      l.week_number != null && isCompletedLog(l))
     .sort((a, b) => dataDoLog(b).localeCompare(dataDoLog(a)))
 
   if (comSemana.length === 0) {
@@ -230,6 +247,48 @@ export function plannedSessionsToDate(
   const cobraveis = Math.min(fechadas, Math.max(0, Math.floor(weeks)))
   if (cobraveis <= 0) return null
   return cobraveis * Math.max(0, Math.floor(dayCount))
+}
+
+function inicioLocal(startedOn: string): Date | null {
+  const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(startedOn) ? `${startedOn}T00:00:00` : startedOn)
+  if (!Number.isFinite(t)) return null
+  const d = new Date(t)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+function dataIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Primeiro dia que ainda NÃO é cobrado: início + semanas fechadas (limitadas
+// ao mesociclo). É a régua do numerador da adesão.
+//
+// O denominador (`plannedSessionsToDate`) só cobra semanas fechadas, mas o
+// numerador contava todas as sessões — inclusive as da semana em curso. Quem
+// fez 3 treinos na semana 1, nenhum na 2 e 3 na semana 3 (ainda aberta)
+// aparecia com 100%: a semana inteira de falta sumia. Com a mesma régua nos
+// dois lados, as sessões da semana em curso entram quando ela fechar, e as
+// feitas depois do fim do mesociclo não inflam a adesão do plano.
+//
+// Devolve null quando não há semana fechada (ou não dá para saber o início).
+export function closedWeeksCutoff(
+  startedOn: string | null,
+  weeks: number,
+  now: Date
+): string | null {
+  const fechadas = completedWeeks(startedOn, now)
+  if (fechadas == null || !startedOn) return null
+  const cobraveis = Math.min(fechadas, Math.max(0, Math.floor(weeks)))
+  if (cobraveis <= 0) return null
+  const inicio = inicioLocal(startedOn)
+  if (!inicio) return null
+  return dataIso(new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + cobraveis * 7))
+}
+
+// Sessões com data dentro das semanas já cobradas.
+export function sessionsInClosedWeeks(dates: string[], cutoff: string | null): number {
+  if (cutoff == null) return 0
+  return dates.filter((d) => d.slice(0, 10) < cutoff).length
 }
 
 export type ExerciseProgress = {

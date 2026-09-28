@@ -47,6 +47,7 @@ import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
+import { RecordMismatch } from '../components/RecordMismatch'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -144,6 +145,10 @@ export default function TreinoDetalhe() {
         ])}
       />
     )
+  }
+
+  if (query.data.plan.subject_id !== subjectQuery.data.id) {
+    return <RecordMismatch what="Este plano" backTo={`/avaliados/${id}`} />
   }
 
   const { plan, days, exercises, overrides, weeks } = query.data

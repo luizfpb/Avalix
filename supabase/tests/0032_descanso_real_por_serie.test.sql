@@ -17,11 +17,16 @@ select col_type_is('public', 'workout_log_sets', 'rest_seconds', 'integer',
   'descanso realizado é inteiro em segundos');
 select col_is_null('public', 'workout_log_sets', 'rest_seconds',
   'descanso não informado continua NULL');
+-- Pelo nome, e não pela assinatura: migrations posteriores (0038, 0039)
+-- recriam o helper com mais argumentos, e a garantia vale para todas as versões.
 select ok(
-  not has_function_privilege('anon',
-    'public.submit_workout_session_0027_internal(text,uuid,jsonb,text,int,date,text,uuid)', 'execute')
-  and not has_function_privilege('authenticated',
-    'public.submit_workout_session_0027_internal(text,uuid,jsonb,text,int,date,text,uuid)', 'execute'),
+  exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'submit_workout_session_0027_internal')
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'submit_workout_session_0027_internal'
+       and (has_function_privilege('anon', p.oid, 'execute')
+            or has_function_privilege('authenticated', p.oid, 'execute'))),
   'implementação interna continua inacessível aos clientes'
 );
 select ok(

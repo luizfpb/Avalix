@@ -176,6 +176,7 @@ export async function flushQueue(token: string, scope: string, access?: StudentS
         notes: item.notes,
         planId: item.planId,
         feel: item.feel ?? null,
+        inProgress: item.inProgress === true,
       })
     } catch (error) {
       if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()
@@ -278,4 +279,44 @@ export function suggestedWorkoutDayId(
 export function queuedSessionLabel(item: QueuedSession): string {
   const data = item.performedAt.split('-').reverse().join('/')
   return item.dayLabel ? `Treino ${item.dayLabel} · ${data}` : data
+}
+
+function numeroBr(n: number): string {
+  return String(n).replace('.', ',')
+}
+
+// O treino recusado em definitivo (data fora da janela de 7 dias, limite de
+// sessões na data...) só tinha "Descartar" — que apagava o que a pessoa fez.
+// Este texto é o que ela copia e manda ao treinador, que registra a sessão
+// pela tela dele, na data certa. Os nomes vêm do plano; exercício que não está
+// mais nele aparece como "Exercício".
+export function queuedSessionText(item: QueuedSession, names: Record<string, string>): string {
+  const cabecalho = [
+    queuedSessionLabel(item),
+    item.weekNumber != null ? `semana ${item.weekNumber}` : null,
+  ].filter(Boolean).join(' · ')
+  const porExercicio = new Map<string, SubmitSet[]>()
+  for (const set of item.sets) {
+    const lista = porExercicio.get(set.exercise_id) ?? []
+    lista.push(set)
+    porExercicio.set(set.exercise_id, lista)
+  }
+  const linhas = [...porExercicio].map(([exerciseId, sets]) => {
+    const series = sets
+      .slice()
+      .sort((a, b) => a.set_number - b.set_number)
+      .map((s) => {
+        const carga = s.weight_kg != null ? `${numeroBr(s.weight_kg)} kg` : null
+        const reps = s.reps != null ? `${s.reps} reps` : null
+        const extras = [
+          s.rir != null ? `RIR ${numeroBr(s.rir)}` : null,
+          s.reached_failure === true ? 'falha' : null,
+          s.rest_seconds != null ? `descanso ${s.rest_seconds} s` : null,
+        ].filter(Boolean)
+        const base = [carga, reps].filter(Boolean).join(' × ')
+        return extras.length > 0 ? `${base} (${extras.join(', ')})` : base
+      })
+    return `${names[exerciseId] ?? 'Exercício'}: ${series.join(' · ')}`
+  })
+  return [cabecalho, ...linhas, ...(item.notes ? [`Observações: ${item.notes}`] : [])].join('\n')
 }

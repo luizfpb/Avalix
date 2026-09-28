@@ -346,3 +346,16 @@ describe('TreinoNovo - nao perder o que foi editado', () => {
     expect(screen.queryByText(/Rascunho não salvo recuperado/)).toBeNull()
   })
 })
+
+// Com o plano de outro avaliado, o editor mostraria as restrições da anamnese
+// do avaliado da URL sobre a prescrição de outra pessoa.
+describe('TreinoNovo — plano de outro avaliado', () => {
+  it('não abre o editor', () => {
+    const deOutro = planoSalvo()
+    deOutro.plan = { ...deOutro.plan!, subject_id: 'outro-avaliado' }
+    planoMock.mockReturnValue({ data: deOutro, isPending: false, isError: false })
+    abrir('/avaliados/subject-1/treinos/plan-1/editar')
+    expect(screen.getByRole('alert').textContent).toMatch(/Este plano não pertence a este avaliado/)
+    expect(screen.queryByLabelText('Nome do plano')).toBeNull()
+  })
+})

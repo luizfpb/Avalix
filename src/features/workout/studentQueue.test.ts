@@ -20,7 +20,7 @@ vi.mock('./studentStore', async (original) => ({
   saveStudentToken: vi.fn(),
 }))
 
-import { flushQueue } from './studentSession'
+import { flushQueue, queuedSessionText } from './studentSession'
 
 const ITEM: QueuedSession = {
   clientRef: 'ref-1',
@@ -108,5 +108,37 @@ describe('sincronização da fila', () => {
     })
     expect(mocks.reject).not.toHaveBeenCalled()
     expect(mocks.dequeue).not.toHaveBeenCalled()
+  })
+
+  // A sessão salva para continuar depois vai à fila marcada; sem a marca, o
+  // servidor a contaria como treino feito (0039).
+  it('envia a marca de sessão em andamento, e fila antiga sem a marca vale como concluída', async () => {
+    mocks.readQueue.mockResolvedValue([{ ...ITEM, inProgress: true }, { ...ITEM, clientRef: 'ref-2' }])
+    mocks.submit.mockResolvedValue({ logId: 'log1', stale: false })
+    await flushQueue('token', 'escopo')
+    expect(mocks.submit.mock.calls[0][0].inProgress).toBe(true)
+    expect(mocks.submit.mock.calls[1][0].inProgress).toBe(false)
+  })
+})
+
+// Treino recusado em definitivo: o texto que o aluno copia para o treinador.
+describe('queuedSessionText', () => {
+  it('resume a sessão por exercício, com os números de cada série', () => {
+    const texto = queuedSessionText({
+      ...ITEM,
+      weekNumber: 2,
+      notes: 'ombro incomodou',
+      sets: [
+        { exercise_id: 'ex-1', set_number: 2, weight_kg: 42.5, reps: 8, rir: 0, reached_failure: true },
+        { exercise_id: 'ex-1', set_number: 1, weight_kg: 40, reps: 10, rir: 2, rest_seconds: 90 },
+        { exercise_id: 'ex-9', set_number: 1, weight_kg: null, reps: 15, rir: null },
+      ],
+    }, { 'ex-1': 'Supino reto' })
+    expect(texto).toBe([
+      'Treino A · 26/08/2026 · semana 2',
+      'Supino reto: 40 kg × 10 reps (RIR 2, descanso 90 s) · 42,5 kg × 8 reps (RIR 0, falha)',
+      'Exercício: 15 reps',
+      'Observações: ombro incomodou',
+    ].join('\n'))
   })
 })

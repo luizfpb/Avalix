@@ -32,6 +32,7 @@ import { sortAssessmentsChronologically } from '../assessment/timeline'
 import type { SkinfoldSite } from '../assessment/protocols'
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
+import { adultReferenceApplies } from '../assessment/adultReference'
 import { axisDomain, donutSlices } from './charts'
 import {
   InfoCard,
@@ -88,6 +89,9 @@ export type AssessmentPdfData = {
   // todas as circunferências do avaliado ao longo das avaliações (opcional),
   // pra evolução dos perímetros mais medidos
   circumferenceHistory?: SubjectCircumference[]
+  // idade na data da coleta. Decide se as faixas adultas de IMC e gordura se
+  // aplicam; a avaliação sem protocolo não tem snapshot com a idade.
+  ageYears?: number | null
 }
 
 type TrendPoint = { value: number | null; date: string }
@@ -641,11 +645,13 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   const { assessment, skinfolds, circumferences } = data
   const r = assessment.results as AssessmentResultSnapshot | null
   const bmi = computeBmi(assessment.weight_kg, assessment.height_cm)
+  const ageYears = r?.inputs?.ageYears ?? data.ageYears ?? null
+  const adulto = adultReferenceApplies(ageYears)
 
   const info: InfoItem[] = [
     { label: 'Avaliado', value: data.subjectName, wide: true },
     { label: 'Data', value: fmtDate(assessment.assessed_at) ?? '—' },
-    ...(r?.inputs.ageYears != null ? [{ label: 'Idade na avaliação', value: `${r.inputs.ageYears} anos` }] : []),
+    ...(ageYears != null ? [{ label: 'Idade na avaliação', value: `${ageYears} anos` }] : []),
   ]
 
   return (
@@ -669,7 +675,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
               <Text style={styles.compositionTitle}>Sua composição corporal</Text>
               <MassValue color={LEAN} label="Massa magra" mass={r.leanMassKg} share={100 - r.bodyFatPct} />
               <MassValue color={FAT} label="Massa gorda" mass={r.fatMassKg} share={r.bodyFatPct} />
-              <Text style={styles.compositionNote}>Gordura corporal: {classifyBodyFat(r.inputs.sex, r.bodyFatPct).label}.</Text>
+              <Text style={styles.compositionNote}>Gordura corporal: {classifyBodyFat(r.inputs.sex, r.bodyFatPct, ageYears).label}.</Text>
               <Text style={styles.compositionNote}>Estimativa pelo protocolo registrado.</Text>
             </View>
           </View>
@@ -684,9 +690,16 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
 
         <View style={styles.statsRow} wrap={false}>
           <Stat label="Peso corporal" value={fmtNum(assessment.weight_kg)} unit="kg" />
-          <Stat label="IMC" value={fixed(bmi)} unit="kg/m²" detail={bmiCategory(bmi).label} />
+          <Stat label="IMC" value={fixed(bmi)} unit="kg/m²" detail={bmiCategory(bmi, ageYears).label} />
           <Stat label="Altura" value={fmtNum(assessment.height_cm)} unit="cm" />
         </View>
+
+        {!adulto && ageYears != null ? (
+          <Text style={styles.reproNote}>
+            Abaixo de 18 anos, IMC e gordura corporal são interpretados por curvas de crescimento
+            por idade e sexo (OMS, IMC-para-idade), e não pelas faixas de adulto.
+          </Text>
+        ) : null}
 
         {!r ? <Text style={styles.reproNote}>Esta avaliação registra peso, altura e IMC, sem estimativa de composição corporal.</Text> : null}
 

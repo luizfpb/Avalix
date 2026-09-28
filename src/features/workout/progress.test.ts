@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
   adherencePct,
+  closedWeeksCutoff,
   completedWeeks,
   currentWeek,
   effectivePlanStart,
   exerciseProgression,
+  isCompletedLog,
   plannedSessions,
   plannedSessionsToDate,
+  sessionsInClosedWeeks,
   sessionsPerWeek,
   suggestedPlanWeek,
   weekSessionLabels,
@@ -264,6 +267,60 @@ describe('suggestedPlanWeek — a semana vem do histórico, não do relógio', (
       logs: [log('2026-06-24', 2), log('2026-06-22', 2)],
     })
     expect(s).toMatchObject({ week: 2, basis: 'continue' })
+  })
+
+  // Sessão salva com "continuar depois" e nunca concluída (0039) não fecha a
+  // semana: o aluno que largou o treino pela metade não avança o mesociclo.
+  it('ignora sessão em andamento', () => {
+    const s = suggestedPlanWeek({
+      weeks: 8,
+      sessionsPerWeek: 3,
+      logs: [
+        { performed_at: '2026-06-24', week_number: 2, in_progress: true },
+        log('2026-06-22', 2),
+        log('2026-06-20', 2),
+      ],
+    })
+    expect(s).toMatchObject({ week: 2, basis: 'continue', sessionsInCurrentPass: 2 })
+  })
+})
+
+describe('isCompletedLog', () => {
+  it('só a sessão salva como em andamento deixa de contar', () => {
+    expect(isCompletedLog({ in_progress: true })).toBe(false)
+    expect(isCompletedLog({ in_progress: false })).toBe(true)
+    // registros anteriores à 0039 e do profissional
+    expect(isCompletedLog({})).toBe(true)
+    expect(isCompletedLog({ in_progress: null })).toBe(true)
+  })
+})
+
+// A régua do numerador da adesão: o denominador só cobra semanas fechadas, e
+// o numerador passa a contar só as sessões dessas semanas.
+describe('closedWeeksCutoff / sessionsInClosedWeeks', () => {
+  it('é o primeiro dia depois das semanas fechadas', () => {
+    // início 03/06; em 19/06 fecharam 03-09 e 10-16
+    expect(closedWeeksCutoff('2026-06-03', 8, new Date('2026-06-19T10:00:00'))).toBe('2026-06-17')
+  })
+
+  it('sem semana fechada não há régua', () => {
+    expect(closedWeeksCutoff('2026-06-15', 8, new Date('2026-06-19T10:00:00'))).toBeNull()
+    expect(closedWeeksCutoff(null, 8, new Date('2026-06-19T10:00:00'))).toBeNull()
+  })
+
+  it('para no fim do mesociclo', () => {
+    // plano de 2 semanas começado em 01/05: sessões depois de 15/05 não entram
+    expect(closedWeeksCutoff('2026-05-01', 2, new Date('2026-06-19T10:00:00'))).toBe('2026-05-15')
+  })
+
+  it('aceita a criação do plano como início (timestamp)', () => {
+    expect(closedWeeksCutoff('2026-06-03T12:00:00', 8, new Date('2026-06-19T13:00:00'))).toBe('2026-06-17')
+  })
+
+  it('conta só as sessões com data anterior à régua', () => {
+    const datas = ['2026-06-19', '2026-06-17', '2026-06-16', '2026-06-03']
+    expect(sessionsInClosedWeeks(datas, '2026-06-17')).toBe(2)
+    expect(sessionsInClosedWeeks(datas, null)).toBe(0)
   })
 })
 

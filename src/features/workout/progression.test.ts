@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   PROGRESSION_ENGINE_VERSION,
+  defaultLoadStep,
   latestBestByExercise,
   parseRepRange,
   suggestDeload,
@@ -63,11 +64,63 @@ describe('suggestProgression (dupla progressão + RIR)', () => {
     expect(s.kind).toBe('increase_load')
     expect(s.suggestedWeightKg).toBe(82.5)
   })
+
+  // v1: com o topo da faixa atingido e RIR abaixo do alvo, a sugestão era
+  // "+1 rep" com o mesmo número de repetições.
+  it('topo da faixa com RIR abaixo do alvo -> manter carga e repetições', () => {
+    const s = suggestProgression({ last: { weightKg: 20, reps: 12, rir: 1 }, repRange: { min: 8, max: 12 }, targetRir: 2 })
+    expect(s.kind).toBe('hold')
+    expect(s.suggestedWeightKg).toBe(20)
+    expect(s.suggestedReps).toBe(12)
+  })
+})
+
+// O passo fixo de 2,5 kg da v1 era desproporcional em carga leve.
+describe('incremento pela faixa de carga', () => {
+  it('halter leve sobe de 1 em 1 kg, e não 87%', () => {
+    const s = suggestProgression({ last: { weightKg: 4, reps: 15, rir: 2 }, repRange: { min: 12, max: 15 }, targetRir: 2 })
+    expect(s.kind).toBe('increase_load')
+    expect(s.suggestedWeightKg).toBe(5) // v1: 7,5 kg
+    expect(s.reason).toContain('+1 kg')
+  })
+
+  it('carga média sobe de 2 em 2 kg, sem arredondar para a grade de 2,5', () => {
+    const s = suggestProgression({ last: { weightKg: 17, reps: 12, rir: 2 }, repRange: { min: 8, max: 12 }, targetRir: 2 })
+    expect(s.suggestedWeightKg).toBe(19) // v1: 20 (17 + 2,5 arredondado)
+  })
+
+  it('nunca sugere 0 kg: na menor carga, mantém e reconstrói as repetições', () => {
+    const s = suggestProgression({ last: { weightKg: 1, reps: 6, rir: 0 }, repRange: { min: 8, max: 12 }, targetRir: 2 })
+    expect(s.kind).toBe('hold')
+    expect(s.suggestedWeightKg).toBe(1) // v1: 0 kg
+    expect(s.suggestedReps).toBe(8)
+  })
+
+  it('reduz pelo mesmo incremento', () => {
+    const s = suggestProgression({ last: { weightKg: 6, reps: 6, rir: 0 }, repRange: { min: 8, max: 12 }, targetRir: 2 })
+    expect(s.kind).toBe('reduce')
+    expect(s.suggestedWeightKg).toBe(5)
+  })
+
+  it('o incremento pode ser informado', () => {
+    const s = suggestProgression({ last: { weightKg: 100, reps: 12, rir: 2 }, repRange: { min: 8, max: 12 }, targetRir: 2, loadStep: 5 })
+    expect(s.suggestedWeightKg).toBe(105)
+  })
+
+  it('defaultLoadStep por faixa', () => {
+    expect(defaultLoadStep(4)).toBe(1)
+    expect(defaultLoadStep(12)).toBe(2)
+    expect(defaultLoadStep(20)).toBe(2.5)
+  })
 })
 
 describe('suggestDeload', () => {
   it('reduz carga (~60%) e séries', () => {
     expect(suggestDeload(100, 4)).toEqual({ weightKg: 60, sets: 2 })
+  })
+
+  it('em carga leve arredonda pelo incremento do halter', () => {
+    expect(suggestDeload(8, 3)).toEqual({ weightKg: 5, sets: 2 }) // 4,8 kg -> 5
   })
 })
 

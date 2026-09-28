@@ -151,4 +151,31 @@ describe('buildCarteira', () => {
     // puxado para o primeiro treino, apareceria como 100%.
     expect(faltou.adherencePct).toBeCloseTo(1 / 3)
   })
+
+  // Regressao: o numerador contava a semana em curso, o denominador nao. Tres
+  // treinos na semana 1, nenhum na 2 e tres na 3 (aberta) davam 100%.
+  it('a semana em curso nao esconde uma semana inteira de falta', () => {
+    const base = {
+      subjects: [{ id: 's1', full_name: 'Ana', is_active: true }],
+      lastAssessment: { s1: '2026-06-18' },
+      activePlans: [
+        { planId: 'p1', subjectId: 's1', name: 'ABC', weeks: 8, sessionsPerWeek: 3,
+          startsOn: '2026-06-03', createdOn: null },
+      ],
+      now: new Date('2026-06-19T10:00:00'), // 2 semanas fechadas: 03-09 e 10-16
+    }
+    const recentDates = ['2026-06-19', '2026-06-18', '2026-06-17', '2026-06-07', '2026-06-05', '2026-06-03']
+    const comDatas = buildCarteira({
+      ...base,
+      logSummary: { p1: { count: 6, lastDate: '2026-06-19', firstDate: '2026-06-03', recentDates } },
+    })[0]
+    expect(comDatas.adherencePct).toBeCloseTo(3 / 6)
+
+    // Banco anterior a 0039, sem as datas: fica a contagem total de antes.
+    const semDatas = buildCarteira({
+      ...base,
+      logSummary: { p1: { count: 6, lastDate: '2026-06-19', firstDate: '2026-06-03' } },
+    })[0]
+    expect(semDatas.adherencePct).toBe(1)
+  })
 })

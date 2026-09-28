@@ -20,7 +20,11 @@ select ok(
 );
 select ok(
   has_function_privilege('anon', 'public.update_workout_session_for_link(text,uuid,timestamptz,jsonb,date,text)', 'execute')
-  and not has_function_privilege('anon', 'public.submit_workout_session_0027_internal(text,uuid,jsonb,text,int,date,text,uuid)', 'execute'),
+  -- pelo nome: 0038 e 0039 recriam o helper com mais argumentos
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'submit_workout_session_0027_internal'
+       and has_function_privilege('anon', p.oid, 'execute')),
   'aluno usa apenas as fachadas autorizadas'
 );
 

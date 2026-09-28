@@ -14,17 +14,20 @@ export type LogRow = {
   done?: boolean
 }
 
+// Linha sem nada do usuário. Série marcada como feita conta como conteúdo
+// mesmo sem números: quem tocou nela está no meio da sessão, e descartá-la
+// (porque o plano encolheu, ou num rascunho) seria perder trabalho.
+export function isEmptyLogRow(row: LogRow): boolean {
+  return !row.weight.trim() && !row.reps.trim() && !row.rir.trim()
+    && !(row.rest ?? '').trim() && row.failure !== true && row.done !== true
+}
+
 // Os limites são os mesmos da prescrição (1–20). Ao reduzir ou pular um
 // exercício, só removemos linhas vazias ao final: registro real permanece.
 export function reconcileSetRows(rows: LogRow[], prescribedSets: number): LogRow[] {
   const target = Math.max(0, Math.min(Math.trunc(prescribedSets), 20))
   const next = rows.slice()
-  // Série marcada como feita conta como conteúdo mesmo sem números: quem
-  // tocou nela está no meio da sessão, e apagar a marcação porque o plano
-  // encolheu seria perder trabalho do usuário.
-  const empty = (row: LogRow) => !row.weight.trim() && !row.reps.trim() && !row.rir.trim()
-    && !(row.rest ?? '').trim() && row.failure !== true && row.done !== true
-  while (next.length > target && empty(next[next.length - 1])) next.pop()
+  while (next.length > target && isEmptyLogRow(next[next.length - 1])) next.pop()
   while (next.length < target) next.push({ weight: '', reps: '', rir: '', rest: '', failure: false })
   return next
 }

@@ -12,13 +12,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
-import { usePhoto, useAnnotation, useSaveAnnotation, useSignedUrls } from '../features/posture/hooks'
+import { usePhoto, useAnnotation, useSaveAnnotation, useSession, useSignedUrls } from '../features/posture/hooks'
 import { categoryLabel } from '../features/posture/api'
 import type { Shape } from '../features/posture/annotations'
 import { AnnotationCanvas, type Tool } from '../components/AnnotationCanvas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { QueryError } from '../components/QueryError'
+import { RecordMismatch } from '../components/RecordMismatch'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
@@ -44,6 +45,7 @@ function PosturaFotoEditor() {
   const { id, sessionId, photoId } = useParams()
   const { organization } = useOrganization()
   const photoQuery = usePhoto(photoId)
+  const sessionQuery = useSession(sessionId)
   const annotationQuery = useAnnotation(photoId)
   const saveMut = useSaveAnnotation(photoId, sessionId)
 
@@ -149,6 +151,14 @@ function PosturaFotoEditor() {
 
   const backTo = `/avaliados/${id}/postural/${sessionId}`
   const saveError = saveMut.error as Error | null
+
+  // A foto precisa ser da sessão da URL, e a sessão, do avaliado da URL.
+  if (
+    (photo && sessionId && photo.session_id !== sessionId) ||
+    (sessionQuery.data && id && sessionQuery.data.subject_id !== id)
+  ) {
+    return <RecordMismatch what="Esta foto" backTo={`/avaliados/${id}`} />
+  }
 
   return (
     <div className="space-y-4">

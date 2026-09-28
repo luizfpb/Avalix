@@ -1392,6 +1392,7 @@ export type Database = {
           day_label: string | null
           feel: number | null
           id: string
+          in_progress: boolean
           notes: string | null
           org_id: string
           performed_at: string
@@ -1409,6 +1410,7 @@ export type Database = {
           day_label?: string | null
           feel?: number | null
           id?: string
+          in_progress?: boolean
           notes?: string | null
           org_id: string
           performed_at?: string
@@ -1426,6 +1428,7 @@ export type Database = {
           day_label?: string | null
           feel?: number | null
           id?: string
+          in_progress?: boolean
           notes?: string | null
           org_id?: string
           performed_at?: string
@@ -1728,6 +1731,7 @@ export type Database = {
           log_count: number | null
           org_id: string | null
           plan_id: string | null
+          recent_dates: string[] | null
         }
         Relationships: [
           {
@@ -1818,6 +1822,7 @@ export type Database = {
           day_label: string | null
           feel: number | null
           id: string
+          in_progress: boolean
           notes: string | null
           org_id: string
           performed_at: string
@@ -2086,6 +2091,7 @@ export type Database = {
           p_client_revision?: number
           p_day_label?: string
           p_feel?: number
+          p_in_progress?: boolean
           p_notes?: string
           p_performed_at?: string
           p_plan?: string
@@ -2100,6 +2106,7 @@ export type Database = {
           p_client_ref: string
           p_day_label?: string
           p_feel?: number
+          p_in_progress?: boolean
           p_notes?: string
           p_performed_at?: string
           p_plan?: string
@@ -2125,6 +2132,7 @@ export type Database = {
           day_label: string | null
           feel: number | null
           id: string
+          in_progress: boolean
           notes: string | null
           org_id: string
           performed_at: string

@@ -90,6 +90,7 @@ beforeEach(() => {
   mocks.useSession.mockReturnValue({
     data: {
       id: 'session-1',
+      subject_id: 'subject-1',
       taken_at: '2026-08-20',
       notes: null,
     },
@@ -208,5 +209,18 @@ describe('PosturaSessaoDetalhe', () => {
     renderPage()
 
     expect(screen.getByRole('alert').textContent).toContain('falha ao excluir foto')
+  })
+
+  it('recusa a sessão de outro avaliado em vez de misturar os dois na tela', () => {
+    mocks.useSession.mockReturnValue({
+      data: { id: 'session-1', subject_id: 'outro-avaliado', taken_at: '2026-08-20', notes: null },
+      isPending: false,
+      isError: false,
+    })
+
+    renderPage()
+
+    expect(screen.getByRole('alert').textContent).toContain('Esta sessão postural não pertence a este avaliado')
+    expect(screen.queryByRole('button', { name: /Excluir sessão/ })).toBeNull()
   })
 })

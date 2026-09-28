@@ -75,7 +75,10 @@ select ok(
   has_function_privilege('anon', 'public.get_workout_for_link(text)', 'execute')
   and has_function_privilege('anon', 'public.get_workout_plan_for_link(text, uuid)', 'execute')
   and has_function_privilege('anon', 'public.get_workout_history_for_link(text, int, date)', 'execute')
-  and has_function_privilege('anon', 'public.submit_workout_session(text, uuid, jsonb, text, int, date, text, uuid, int)', 'execute'),
+  -- pelo nome: 0028, 0038 e 0039 recriam o envio com mais argumentos
+  and (select bool_and(has_function_privilege('anon', p.oid, 'execute'))
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'submit_workout_session'),
   'as quatro RPCs do aluno tem grant para anon'
 );
 

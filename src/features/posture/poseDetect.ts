@@ -9,7 +9,12 @@ import type { Shape } from './annotations'
 //
 // Requer estar online (o app já é online-only para dados do Supabase).
 
-const MEDIAPIPE_VERSION = '0.10.35' // manter em sincronia com package.json
+// Fixada nos três lugares que precisam concordar: aqui (o WASM do CDN), a
+// dependência EXATA do package.json (o JS que carrega esse WASM) e o caminho
+// liberado na CSP de public/_headers. pagesConfig.test.ts reprova o build se
+// um dos três divergir — com "^" no package.json, um npm update trocava o JS
+// e deixava o WASM para trás.
+export const MEDIAPIPE_VERSION = '0.10.35'
 const WASM_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'

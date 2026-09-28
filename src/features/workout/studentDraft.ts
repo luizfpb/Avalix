@@ -1,5 +1,6 @@
 import type { StudentDay, StudentExercise } from './studentApi'
 import type { DraftSession, DraftRow } from './studentStore'
+import { isEmptyLogRow } from './logRows'
 
 // Reconciliação do rascunho do aluno com a prescrição vigente.
 //
@@ -36,12 +37,15 @@ export type RascunhoReconciliado = {
   perdidas: number
 }
 
+// Mesma noção de "linha com conteúdo" da tela (isEmptyLogRow): série marcada
+// como feita conta, mesmo sem números. Antes ela não contava, e uma troca de
+// exercício só marcada sumia na reconciliação sem entrar no aviso de perdidas.
 function temConteudo(rows: DraftRow[] | undefined): boolean {
-  return (rows ?? []).some((r) => r.weight.trim() || r.reps.trim() || r.rir.trim() || r.rest?.trim() || r.failure === true)
+  return (rows ?? []).some((r) => !isEmptyLogRow(r))
 }
 
 function preenchidas(rows: DraftRow[] | undefined): number {
-  return (rows ?? []).filter((r) => r.weight.trim() || r.reps.trim() || r.rir.trim() || r.rest?.trim() || r.failure === true).length
+  return (rows ?? []).filter((r) => !isEmptyLogRow(r)).length
 }
 
 /**

@@ -89,7 +89,7 @@ export function SourceCard({
                 <span className="text-muted-foreground">% gordura </span>
                 <b>{r.bodyFatPct.toFixed(1)}%</b>{' '}
                 <span className="text-muted-foreground">
-                  ({classifyBodyFat(r.inputs.sex, r.bodyFatPct).label})
+                  ({classifyBodyFat(r.inputs.sex, r.bodyFatPct, r.inputs.ageYears).label})
                 </span>
               </span>
               <span>

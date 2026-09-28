@@ -9,7 +9,12 @@ export type WorkoutDayRow = Database['public']['Tables']['workout_days']['Row']
 export type WorkoutExerciseRow = Database['public']['Tables']['workout_exercises']['Row']
 export type WorkoutWeekOverrideRow = Database['public']['Tables']['workout_week_overrides']['Row']
 export type WorkoutWeekRow = Database['public']['Tables']['workout_weeks']['Row']
-export type WorkoutLogRow = Database['public']['Tables']['workout_logs']['Row']
+// A 0038 acrescenta a sensação e a 0039, a sessão em andamento. Os campos
+// opcionais preservam a leitura até regenerar os tipos do banco.
+export type WorkoutLogRow = Database['public']['Tables']['workout_logs']['Row'] & {
+  feel?: number | null
+  in_progress?: boolean | null
+}
 // A 0032 acrescenta o descanso e a 0033, a marcação de falha. Os campos
 // opcionais preservam a leitura legada até regenerar os tipos do banco.
 export type WorkoutLogSetRow = Database['public']['Tables']['workout_log_sets']['Row'] & {
@@ -532,11 +537,15 @@ export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> 
       .from('workout_logs')
       .select('*')
       .eq('plan_id', planId)
+      // Mesma ordem do pacote do aluno (0037/0039): sessões na mesma data se
+      // desempatam pela criação. Com o desempate por id (UUID aleatório), a
+      // semana sugerida podia sair diferente nas duas telas.
       .order('performed_at', { ascending: false })
-      .order('id', { ascending: true })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, from + pageSize - 1)
     if (error) throw error
-    rows.push(...(data ?? []))
+    rows.push(...((data ?? []) as WorkoutLogRow[]))
     if ((data?.length ?? 0) < pageSize) return rows
   }
 }
@@ -652,7 +661,15 @@ export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSumma
   })
 }
 
-export type LogSummary = { count: number; lastDate: string | null; firstDate: string | null }
+export type LogSummary = {
+  // sessões concluídas (a partir da 0039; antes, todas)
+  count: number
+  lastDate: string | null
+  firstDate: string | null
+  // datas das últimas sessões concluídas (0039), para descontar da adesão as
+  // da semana ainda aberta. Ausente antes da 0039.
+  recentDates?: string[] | null
+}
 
 // Resumo de execucao por plano da org (qtde de sessoes + primeira e ultima
 // data). A view workout_log_summary (0016) agrega no banco em vez de baixar
@@ -671,6 +688,7 @@ export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<st
     log_count: number | null
     last_date: string | null
     first_date?: string | null
+    recent_dates?: string[] | null
   }>
   const map: Record<string, LogSummary> = {}
   for (const r of rows) {
@@ -679,6 +697,7 @@ export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<st
       count: r.log_count ?? 0,
       lastDate: r.last_date,
       firstDate: r.first_date ?? null,
+      recentDates: Array.isArray(r.recent_dates) ? r.recent_dates : null,
     }
   }
   return map

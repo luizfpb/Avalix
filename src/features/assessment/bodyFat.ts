@@ -1,13 +1,16 @@
 import type { Sex } from './protocols'
+import { adultReferenceApplies, noAdultReferenceLabel } from './adultReference'
 
 // Classificação de % de gordura corporal pelas faixas do ACE (American Council
 // on Exercise), por sexo e independente de idade — referência geral e
 // amplamente publicada. É contexto clínico, não diagnóstico.
 //
+// As faixas são de adulto: abaixo de 18 anos não há classificação (ver
+// adultReference.ts).
+//
 // Decisão de produto em aberto (ver V1.1.md): trocar por tabela etária
 // (ex.: ACSM/Pollock por sexo e idade) é possível, mas exige fonte verificada
-// antes de entrar; por isso a função recebe a faixa etária no futuro sem
-// quebrar a assinatura atual ficaria mais simples mantê-la separada.
+// antes de entrar.
 //
 // Faixas ACE:
 //   Homens  — essencial 2–5 · atleta 6–13 · fitness 14–17 · aceitável 18–24 · obesidade 25+
@@ -16,11 +19,16 @@ import type { Sex } from './protocols'
 export type BodyFatCategory = {
   label: string
   // 'low' = gordura essencial (abaixo do mínimo saudável); 'normal' = faixas
-  // atleta/fitness/aceitável; 'warn' = obesidade
-  tone: 'low' | 'normal' | 'warn'
+  // atleta/fitness/aceitável; 'warn' = obesidade; 'none' = sem classificação
+  tone: 'low' | 'normal' | 'warn' | 'none'
 }
 
-export function classifyBodyFat(sex: Sex, bodyFatPct: number): BodyFatCategory {
+export function classifyBodyFat(
+  sex: Sex,
+  bodyFatPct: number,
+  ageYears: number | null | undefined
+): BodyFatCategory {
+  if (!adultReferenceApplies(ageYears)) return { label: noAdultReferenceLabel(ageYears), tone: 'none' }
   if (sex === 'M') {
     if (bodyFatPct < 6) return { label: 'Gordura essencial', tone: 'low' }
     if (bodyFatPct < 14) return { label: 'Atleta', tone: 'normal' }

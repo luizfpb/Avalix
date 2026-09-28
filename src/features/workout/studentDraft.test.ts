@@ -130,6 +130,18 @@ describe('reconciliarRascunho', () => {
     expect(r.perdidas).toBe(1)
   })
 
+  // Mesma noção de conteúdo da tela: série marcada como feita conta, mesmo
+  // sem números. Antes ela sumia na reconciliação sem entrar no aviso.
+  it('série só marcada como feita conta como conteúdo', () => {
+    const draft = rascunho({ rows: { we1: [{ weight: '', reps: '', rir: '', done: true }] } })
+    expect(reconciliarRascunho(draft, { days: [DIA_A], exercises: [] })!.perdidas).toBe(1)
+    const trocado = reconciliarRascunho(draft, {
+      days: [DIA_A, DIA_B],
+      exercises: [ex({ id: 'we1-novo', day_id: 'd2', exercise_id: 'cat-supino' })],
+    })!
+    expect(trocado.draft.extras).toEqual(['we1-novo'])
+  })
+
   it('mantém a marcação de falha mesmo antes de preencher carga e repetições', () => {
     const draft = rascunho({ rows: { we1: [{ weight: '', reps: '', rir: '', failure: true }] } })
     const plano: PlanoVigente = {

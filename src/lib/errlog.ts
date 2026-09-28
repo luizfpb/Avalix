@@ -16,11 +16,12 @@ let sent = 0
 const seen = new Set<string>()
 
 // Capability tokens nunca podem sair do dispositivo por observabilidade.
-// Cobre o path legado, o fragmento novo caso apareca numa mensagem/stack e
-// parametros comuns adicionados por clientes externos.
+// Cobre a anamnese (/a/<token> legado e /a#<token>), o treino do aluno
+// (/t#<token>) caso apareca numa mensagem/stack e parametros comuns
+// adicionados por clientes externos.
 export function sanitizeClientErrorText(value: unknown, maxLength: number): string {
   return String(value ?? '')
-    .replace(/(\/a(?:\/|#|%23))[A-Za-z0-9_-]{20,}/gi, '$1[redacted]')
+    .replace(/(\/[at](?:\/|#|%23))[A-Za-z0-9_-]{20,}/gi, '$1[redacted]')
     .replace(
       /([?&#](?:token|access_token|refresh_token|provider_token|id_token|apikey|code)=)[^&#\s]+/gi,
       '$1[redacted]',

@@ -342,6 +342,9 @@ export type QueuedSession = {
   // Sensação relatada ao concluir. Vai junto na fila: quem treinou sem sinal
   // respondeu na hora, e a resposta não pode ficar para trás no envio.
   feel?: number | null
+  // Salvo para continuar depois (0039). Fila anterior não tem o campo: vale
+  // como concluída, que era o que o servidor gravava.
+  inProgress?: boolean
   sets: SubmitSet[]
   queuedAt: string
   // motivo da última recusa definitiva, quando houver

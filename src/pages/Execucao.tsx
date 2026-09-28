@@ -15,11 +15,14 @@ import {
 import type { ExerciseRow, NewLogSet, SetHistoryPoint, WorkoutPlanDetail } from '../features/workout/api'
 import {
   adherencePct,
+  closedWeeksCutoff,
   completedWeeks,
   effectivePlanStart,
   exerciseProgression,
+  isCompletedLog,
   plannedSessions,
   plannedSessionsToDate,
+  sessionsInClosedWeeks,
   sessionsPerWeek,
   suggestedPlanWeek,
   type PlanWeekSuggestion,
@@ -43,19 +46,41 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
+import { RecordMismatch } from '../components/RecordMismatch'
+import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
+import { useFormDraft } from '../lib/draft'
+import { useUnsavedChanges } from '../lib/unsavedChanges'
+import { useClock } from '../lib/useClock'
 import { updateLogRow, validateLogRows, type LogRow } from '../features/workout/logRows'
 import { reconcileSetRows } from '../features/workout/logRows'
+import {
+  RESTORE_TIMER_MAX_MS,
+  execucaoHasContent,
+  isExecucaoDraft,
+  reconcileExecucaoDraft,
+  type ExecucaoDraft,
+  type ExecucaoRestTimer,
+} from '../features/workout/execucaoDraft'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
 import type { WorkoutLogRow } from '../features/workout/api'
 
-function todayLocal(): string {
-  const d = new Date()
+function dateIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Semana digitada: vazio é "sem semana"; o resto precisa ser inteiro dentro do
+// mesociclo. O campo tem min/max no HTML, mas não há envio de formulário para
+// o navegador aplicar: "80" era gravado e "2.5" voltava como erro cru do banco.
+function parseWeekInput(text: string, max: number): number | null | 'invalid' {
+  const t = text.trim()
+  if (!t) return null
+  const n = Number(t)
+  return Number.isInteger(n) && n >= 1 && n <= max ? n : 'invalid'
 }
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -72,6 +97,7 @@ export default function Execucao() {
   const deleteMut = useDeleteWorkoutLog(planId)
   const [confirmLogId, setConfirmLogId] = useState<string | null>(null)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
+  const now = useClock()
 
   const names = useMemo(() => {
     const m: Record<string, string> = {}
@@ -96,26 +122,48 @@ export default function Execucao() {
   }
 
   const plan = detail.plan
+  if (id && plan.subject_id !== id) {
+    return <RecordMismatch what="Este plano" backTo={`/avaliados/${id}`} />
+  }
   const logs = logsQuery.data ?? []
   const sessionsPerWeekCount = sessionsPerWeek(plan.weekly_schedule, detail.days.length)
-  const done = logs.length
+  // Sessão que o aluno salvou para continuar depois e não concluiu (0039) não
+  // é treino feito: fica fora da adesão e da semana do mesociclo.
+  const completos = logs.filter(isCompletedLog)
+  const emAndamento = logs.length - completos.length
   // Início efetivo: a data informada, a primeira sessão registrada ou, em
   // último caso, a criação do plano. Plano entregue em janeiro e começado em
   // março não pode ser cobrado desde janeiro.
   const firstSessionOn = logs.length > 0 ? logs[logs.length - 1].performed_at : null
   const startedOn = effectivePlanStart(plan.starts_on, firstSessionOn, plan.created_at)
   // Cobra apenas as semanas já fechadas: quem está em dia na semana 2 de um
-  // plano de 8 não pode aparecer com 25%.
-  const plannedToDate = plannedSessionsToDate(plan.weeks, sessionsPerWeekCount, startedOn, new Date())
+  // plano de 8 não pode aparecer com 25%. E conta só as sessões DESSAS semanas:
+  // as da semana em curso escondiam uma semana inteira de falta.
+  const plannedToDate = plannedSessionsToDate(plan.weeks, sessionsPerWeekCount, startedOn, now)
+  const cutoff = closedWeeksCutoff(startedOn, plan.weeks, now)
+  const doneToDate = sessionsInClosedWeeks(completos.map((l) => l.performed_at), cutoff)
+  const foraDaConta = completos.length - doneToDate
+  const mesocicloEncerrado = (completedWeeks(startedOn, now) ?? 0) >= plan.weeks
   const planned = plannedToDate ?? 0
-  const pct = plannedToDate != null ? adherencePct(done, plannedToDate) : 0
+  const pct = plannedToDate != null ? adherencePct(doneToDate, plannedToDate) : 0
+  const notaEmAndamento =
+    emAndamento > 0
+      ? ` ${emAndamento} ${emAndamento === 1 ? 'sessão não concluída pelo aluno fica' : 'sessões não concluídas pelo aluno ficam'} fora da conta.`
+      : ''
   const adherenceCaption =
     plannedToDate != null
       ? `Cobrado até aqui: ${plannedToDate} ${plannedToDate === 1 ? 'sessão' : 'sessões'} (semanas já concluídas). ` +
+        (foraDaConta > 0
+          ? mesocicloEncerrado
+            ? `${foraDaConta} ${foraDaConta === 1 ? 'sessão feita depois do fim do mesociclo não entra' : 'sessões feitas depois do fim do mesociclo não entram'} na adesão. `
+            : `${foraDaConta} ${foraDaConta === 1 ? 'sessão da semana em curso entra' : 'sessões da semana em curso entram'} quando ela fechar. `
+          : '') +
         `Plano completo = ${plan.weeks} ${plan.weeks === 1 ? 'semana' : 'semanas'} × ${sessionsPerWeekCount} ` +
-        `${sessionsPerWeekCount === 1 ? 'sessão' : 'sessões'} por semana.`
+        `${sessionsPerWeekCount === 1 ? 'sessão' : 'sessões'} por semana.` +
+        notaEmAndamento
       : `Primeira semana em andamento — a adesão passa a ser calculada quando ela fechar. ` +
-        `Plano completo = ${plannedSessions(plan.weeks, sessionsPerWeekCount)} sessões.`
+        `Plano completo = ${plannedSessions(plan.weeks, sessionsPerWeekCount)} sessões.` +
+        notaEmAndamento
   const progress = exerciseProgression(historyQuery.data ?? [])
 
   // Semana do mesociclo pelo histórico. Só existe quando as sessões foram
@@ -127,7 +175,7 @@ export default function Execucao() {
       : suggestedPlanWeek({ weeks: plan.weeks, sessionsPerWeek: sessionsPerWeekCount, logs })
   // Semana pelo relógio, sem limitar ao tamanho do plano: é a defasagem que
   // interessa aqui, e ela só aparece se o número puder passar do mesociclo.
-  const calendarWeek = startedOn ? (completedWeeks(startedOn, new Date()) ?? 0) + 1 : null
+  const calendarWeek = startedOn ? (completedWeeks(startedOn, now) ?? 0) + 1 : null
   const weekLag = weekSuggestion && calendarWeek ? calendarWeek - weekSuggestion.week : 0
 
   // Só a lista de exercícios é realmente bloqueante: sem ela não há como
@@ -198,11 +246,11 @@ export default function Execucao() {
           <CardContent className="space-y-2">
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-semibold">
-                {done}
+                {plannedToDate != null ? doneToDate : completos.length}
                 <span className="text-base font-normal text-muted-foreground">
                   {plannedToDate != null
                     ? ` de ${planned} ${planned === 1 ? 'sessão' : 'sessões'}`
-                    : ` ${done === 1 ? 'sessão registrada' : 'sessões registradas'}`}
+                    : ` ${completos.length === 1 ? 'sessão registrada' : 'sessões registradas'}`}
                 </span>
               </span>
               {plannedToDate != null ? (
@@ -419,14 +467,19 @@ function LogRowItem({
             {log.week_number ? (
               <span className="text-muted-foreground"> · semana {log.week_number}</span>
             ) : null}
-            {/* Sensação relatada pelo aluno (0038). O tipo gerado só conhece a
-                coluna depois de regenerar database.types; até lá ela chega no
-                select('*') sem estar declarada. */}
-            {(log as WorkoutLogRow & { feel?: number | null }).feel != null ? (
+            {/* Sensação relatada pelo aluno (0038). */}
+            {log.feel != null ? (
               <>
                 <span className="text-muted-foreground"> · </span>
-                <SessionFeel feel={(log as WorkoutLogRow & { feel?: number | null }).feel} />
+                <SessionFeel feel={log.feel} />
               </>
+            ) : null}
+            {/* O aluno salvou para continuar depois e não concluiu (0039): o
+                registro existe, mas não conta na adesão nem fecha a semana. */}
+            {log.in_progress === true ? (
+              <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                não concluído
+              </span>
             ) : null}
             {/* Quem digitou. O acesso do aluno é anônimo, então
                 audit_logs.user_id fica nulo: sem esta marca ninguém distingue
@@ -593,8 +646,14 @@ function LogForm({
     [detail.days]
   )
   const createMut = useCreateWorkoutLog(planId)
+  const totalWeeks = planWeeks(detail)
+  const today = dateIso(useClock())
   const [dayKey, setDayKey] = useState(days[0]?.id ?? '')
-  const [date, setDate] = useState(todayLocal())
+  const [date, setDate] = useState(today)
+  // A data acompanha o dia de hoje até o educador escolher outra. Antes ela
+  // ficava presa no dia em que a tela abriu: a aba deixada aberta de um dia
+  // para o outro registrava a sessão com a data de ontem.
+  const [dateTouched, setDateTouched] = useState(false)
   const [week, setWeek] = useState(() => (weekSuggestion ? String(weekSuggestion.week) : ''))
   // Enquanto o educador não mexer no campo, ele acompanha a sugestão: as
   // sessões podem chegar depois da primeira renderização, e depois de gravar
@@ -617,33 +676,83 @@ function LogForm({
     setWeek(String(suggestedWeek))
   }, [suggestedWeek, weekTouched])
 
+  useEffect(() => {
+    if (!dateTouched && date !== today) setDate(today)
+  }, [date, dateTouched, today])
+
   // Cronômetro de descanso. Existe só aqui, e não na tela do aluno: quem fica
   // com o celular na mão entre as séries é o profissional que conduz. Guarda
   // o INSTANTE do início, não um contador — a tela pode apagar, o app pode ir
-  // para segundo plano, e o tempo continua certo quando ele volta.
-  const [restTimer, setRestTimer] = useState<{
-    rowId: string
-    index: number
-    name: string
-    targetSeconds: number | null
-    startedAt: number
-  } | null>(null)
-  const [restNow, setRestNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!restTimer) return
-    setRestNow(Date.now())
-    const id = window.setInterval(() => setRestNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [restTimer])
-  const restSeconds = restTimer
-    ? Math.max(0, Math.floor((restNow - restTimer.startedAt) / 1000))
-    : 0
-  const restDone = restTimer?.targetSeconds != null && restSeconds >= restTimer.targetSeconds
+  // para segundo plano, e o tempo continua certo quando ele volta. A contagem
+  // na tela mora em RestTimerBar: o tique de cada segundo re-renderizava o
+  // formulário inteiro, com todas as séries, enquanto o educador digitava.
+  const [restTimer, setRestTimer] = useState<ExecucaoRestTimer | null>(null)
+  const [restored, setRestored] = useState<{ lostRows: number } | null>(null)
 
   const dayExercises = useMemo(
     () => detail.exercises.filter((e) => e.day_id === dayKey).sort((a, b) => a.position - b.position),
     [detail.exercises, dayKey]
   )
+  const day = days.find((d) => d.id === dayKey)
+
+  // O que será registrado: as linhas da divisão escolhida e dos avulsos.
+  const fontes = useMemo(
+    () => [
+      ...dayExercises.map((ex) => ({ rowId: ex.id, exerciseId: ex.exercise_id })),
+      ...extras,
+    ],
+    [dayExercises, extras]
+  )
+
+  // Rascunho no aparelho (ver features/workout/execucaoDraft.ts).
+  const draftValue = useMemo<ExecucaoDraft>(() => {
+    const visiveis: Record<string, LogRow[]> = {}
+    const rowExercises: Record<string, string> = {}
+    for (const ex of dayExercises) rowExercises[ex.id] = ex.exercise_id
+    for (const fonte of fontes) {
+      if (sets[fonte.rowId]) visiveis[fonte.rowId] = sets[fonte.rowId]
+    }
+    return {
+      version: 1,
+      dayKey,
+      dayLabel: day?.label ?? null,
+      date,
+      week,
+      weekTouched,
+      notes,
+      sets: visiveis,
+      rowExercises,
+      extras,
+      restTimer,
+    }
+  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer])
+  const dirty = execucaoHasContent(draftValue)
+
+  function restaurarRascunho(value: ExecucaoDraft) {
+    if (!isExecucaoDraft(value)) return
+    const { draft, lostRows } = reconcileExecucaoDraft(value, detail)
+    // Depois de registrar, o rascunho gravado é a sessão vazia seguinte: não
+    // há o que restaurar, e a data dele não pode prender a tela num dia antigo.
+    if (!execucaoHasContent(draft) && lostRows === 0) return
+    setDayKey(draft.dayKey)
+    setDate(draft.date)
+    setDateTouched(true)
+    setWeek(draft.week)
+    setWeekTouched(draft.weekTouched)
+    setNotes(draft.notes)
+    setSets((previous) => ({ ...previous, ...draft.sets }))
+    setExtras(draft.extras)
+    setRestTimer(
+      draft.restTimer && Date.now() - draft.restTimer.startedAt < RESTORE_TIMER_MAX_MS
+        ? draft.restTimer
+        : null
+    )
+    setRestored({ lostRows })
+  }
+  useFormDraft<ExecucaoDraft>(planId ? `execucao:${planId}` : null, draftValue, restaurarRascunho)
+  // Sair pela navegação do app, recarregar ou tocar em "Atualizar" no aviso de
+  // versão nova pergunta antes; o rascunho continua no aparelho de todo jeito.
+  const guard = useUnsavedChanges(dirty)
 
   useEffect(() => {
     setSets((previous) => {
@@ -693,9 +802,18 @@ function LogForm({
   // contagem. É um toque só, no momento em que o aluno volta ao aparelho — e
   // é por isso que o número gravado é descanso de verdade, e não o intervalo
   // entre duas séries concluídas (que inclui a execução da segunda).
+  //
+  // Só grava numa série que ainda está na tela: se o exercício saiu da sessão
+  // (avulso removido, divisão trocada), o descanso ia parar numa linha
+  // escondida, que nunca seria registrada.
   function registrarDescanso() {
     if (!restTimer) return
-    setCell(restTimer.rowId, restTimer.index, 'rest', String(Math.min(3600, restSeconds)))
+    const visivel = fontes.some((f) => f.rowId === restTimer.rowId)
+      && (sets[restTimer.rowId]?.length ?? 0) > restTimer.index
+    if (visivel) {
+      const segundos = Math.floor((Date.now() - restTimer.startedAt) / 1000)
+      setCell(restTimer.rowId, restTimer.index, 'rest', String(Math.max(0, Math.min(3600, segundos))))
+    }
     setRestTimer(null)
   }
   function addRow(exRowId: string) {
@@ -720,6 +838,8 @@ function LogForm({
       delete next[rowId]
       return next
     })
+    // o cronômetro de uma série que saiu da sessão não tem onde gravar
+    setRestTimer((atual) => (atual?.rowId === rowId ? null : atual))
   }
 
   // Fora da lista o mesmo exercício duas vezes na sessão: o planejado e o
@@ -730,19 +850,17 @@ function LogForm({
     [dayExercises, extras]
   )
 
-  const day = days.find((d) => d.id === dayKey)
-
   async function save() {
     if (savingRef.current) return
     setError(null)
     setOkMsg(false)
     if (!orgId) return setError('Organização não carregada.')
+    const weekValue = parseWeekInput(week, totalWeeks)
+    if (weekValue === 'invalid') {
+      return setError(`Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
+    }
 
     const flat: Omit<NewLogSet, 'setNumber'>[] = []
-    const fontes = [
-      ...dayExercises.map((ex) => ({ rowId: ex.id, exerciseId: ex.exercise_id })),
-      ...extras,
-    ]
     const rowError = validateLogRows(Object.fromEntries(
       fontes.map((ex) => [ex.rowId, sets[ex.rowId] ?? []])
     ))
@@ -775,7 +893,7 @@ function LogForm({
         subjectId,
         planId,
         dayLabel: day?.label ?? null,
-        weekNumber: week.trim() ? Number(week) : null,
+        weekNumber: weekValue,
         performedAt: date,
         notes: notes.trim() || null,
         sets: finalSets,
@@ -796,6 +914,7 @@ function LogForm({
       setExtras([])
       setNotes('')
       setRestTimer(null)
+      setRestored(null)
       // A sessão gravada muda a sugestão (pode ter fechado a semana): o campo
       // volta a segui-la para a próxima.
       setWeekTouched(false)
@@ -818,11 +937,39 @@ function LogForm({
         <CardTitle className="text-base">Registrar treino</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <UnsavedChangesPrompt guard={guard} what="nesta sessão" />
+        {restored ? (
+          <div role="status" className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+            <span>
+              Sessão não registrada recuperada deste aparelho — continue de onde parou.
+              {restored.lostRows > 0
+                ? ` ${restored.lostRows} ${restored.lostRows === 1 ? 'série ficou de fora porque o exercício saiu' : 'séries ficaram de fora porque os exercícios saíram'} do plano.`
+                : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRestored(null)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Fechar aviso de sessão recuperada"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         <fieldset disabled={saving || createMut.isPending} className="min-w-0 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="workout-day" className="text-xs">Divisão</Label>
-            <select id="workout-day" className={controlClass} value={dayKey} onChange={(e) => setDayKey(e.target.value)}>
+            <select
+              id="workout-day"
+              className={controlClass}
+              value={dayKey}
+              onChange={(e) => {
+                setDayKey(e.target.value)
+                // a série que estava cronometrando ficou em outra divisão
+                setRestTimer(null)
+              }}
+            >
               {days.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
@@ -833,7 +980,15 @@ function LogForm({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="workout-date" className="text-xs">Data</Label>
-            <Input id="workout-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input
+              id="workout-date"
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDateTouched(true)
+                setDate(e.target.value)
+              }}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="workout-week" className="text-xs">Semana</Label>
@@ -841,7 +996,7 @@ function LogForm({
               id="workout-week"
               type="number"
               min={1}
-              max={planWeeks(detail)}
+              max={totalWeeks}
               placeholder="—"
               value={week}
               onChange={(e) => {
@@ -930,9 +1085,10 @@ function LogForm({
                   <p className="mt-1 text-xs text-primary" title={s.reason}>
                     última {last.weightKg}×{last.reps}
                     {last.rir != null ? ` (RIR ${last.rir})` : ''} → sugestão{' '}
-                    {s.suggestedWeightKg != null
-                      ? `${roundToIncrement(s.suggestedWeightKg).toFixed(1)} kg`
-                      : ''}
+                    {/* Sem arredondar para a grade de 2,5 kg: o motor já
+                        escolhe o incremento pela faixa de carga (halter leve
+                        vai de 1 em 1 kg), e arredondar aqui desfazia isso. */}
+                    {s.suggestedWeightKg != null ? `${formatKg(s.suggestedWeightKg)} kg` : ''}
                     {s.suggestedReps != null ? ` × ${s.suggestedReps}` : ''} · {KIND_LABEL[s.kind]}
                   </p>
                 )
@@ -1028,62 +1184,93 @@ function LogForm({
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {okMsg ? <p role="status" className="text-sm text-primary">Treino registrado!</p> : null}
 
-        <Button size="sm" onClick={save} disabled={createMut.isPending}>
-          {createMut.isPending ? 'Salvando...' : 'Registrar treino'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={save} disabled={createMut.isPending}>
+            {createMut.isPending ? 'Salvando...' : 'Registrar treino'}
+          </Button>
+          {dirty ? <UnsavedBadge /> : null}
+        </div>
         </fieldset>
 
         {/* Fora do fieldset: o cronômetro não pode congelar enquanto a sessão
             anterior está sendo gravada — o aluno já está descansando.
-            Fixo na tela, e não no fim do formulário: durante a sessão o
-            educador está no meio da lista de exercícios, e um cronômetro que
-            só aparece rolando até o rodapé não serve para nada. Fica acima da
-            barra de navegação do celular (que é `fixed bottom-0`). */}
+            A key reinicia a contagem na tela quando uma nova série começa. */}
         {restTimer ? (
-          <div
-            className={`fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur sm:gap-3 lg:bottom-4 ${
-              restDone ? 'border-success bg-success/15' : 'border-border bg-background/95'
-            }`}
-          >
-            <span
-              className={`shrink-0 text-xl font-semibold tabular-nums ${restDone ? 'text-success' : ''}`}
-              role="timer"
-              aria-live="off"
-            >
-              {formatRest(restSeconds)}
-            </span>
-            <span className="min-w-0 flex-1 text-xs leading-tight text-muted-foreground">
-              <span className="block truncate">
-                descanso · série {restTimer.index + 1} de {restTimer.name}
-              </span>
-              {restTimer.targetSeconds != null ? (
-                <span className={`block ${restDone ? 'font-medium text-success' : ''}`}>
-                  {restDone
-                    ? `alvo de ${restTimer.targetSeconds}s cumprido`
-                    : `alvo ${restTimer.targetSeconds}s`}
-                </span>
-              ) : null}
-            </span>
-            <Button
-              size="sm"
-              className="shrink-0"
-              variant={restDone ? 'default' : 'outline'}
-              onClick={registrarDescanso}
-            >
-              Começou a série
-            </Button>
-            <button
-              type="button"
-              onClick={() => setRestTimer(null)}
-              aria-label="Descartar o cronômetro sem registrar o descanso"
-              className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          </div>
+          <RestTimerBar
+            key={restTimer.startedAt}
+            timer={restTimer}
+            onRegister={registrarDescanso}
+            onDiscard={() => setRestTimer(null)}
+          />
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+// A faixa do cronômetro, com o próprio tique de 1 s: só ela re-renderiza a
+// cada segundo, e não o formulário com todas as séries.
+//
+// Fixa na tela, e não no fim do formulário: durante a sessão o educador está
+// no meio da lista de exercícios, e um cronômetro que só aparece rolando até o
+// rodapé não serve para nada. Fica acima da barra de navegação do celular
+// (que é `fixed bottom-0`).
+function RestTimerBar({
+  timer,
+  onRegister,
+  onDiscard,
+}: {
+  timer: ExecucaoRestTimer
+  onRegister: () => void
+  onDiscard: () => void
+}) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const seconds = Math.max(0, Math.floor((now - timer.startedAt) / 1000))
+  const done = timer.targetSeconds != null && seconds >= timer.targetSeconds
+  return (
+    <div
+      className={`fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur sm:gap-3 lg:bottom-4 ${
+        done ? 'border-success bg-success/15' : 'border-border bg-background/95'
+      }`}
+    >
+      <span
+        className={`shrink-0 text-xl font-semibold tabular-nums ${done ? 'text-success' : ''}`}
+        role="timer"
+        aria-live="off"
+      >
+        {formatRest(seconds)}
+      </span>
+      <span className="min-w-0 flex-1 text-xs leading-tight text-muted-foreground">
+        <span className="block truncate">
+          descanso · série {timer.index + 1} de {timer.name}
+        </span>
+        {timer.targetSeconds != null ? (
+          <span className={`block ${done ? 'font-medium text-success' : ''}`}>
+            {done ? `alvo de ${timer.targetSeconds}s cumprido` : `alvo ${timer.targetSeconds}s`}
+          </span>
+        ) : null}
+      </span>
+      <Button
+        size="sm"
+        className="shrink-0"
+        variant={done ? 'default' : 'outline'}
+        onClick={onRegister}
+      >
+        Começou a série
+      </Button>
+      <button
+        type="button"
+        onClick={onDiscard}
+        aria-label="Descartar o cronômetro sem registrar o descanso"
+        className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-4" aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 
@@ -1093,6 +1280,12 @@ function formatRest(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// Carga sugerida: uma casa decimal só quando existe (22.5 kg; 5 kg), no mesmo
+// formato da "última" carga ao lado.
+function formatKg(kg: number): string {
+  return Number.isInteger(kg) ? String(kg) : kg.toFixed(1)
 }
 
 function planWeeks(detail: WorkoutPlanDetail): number {

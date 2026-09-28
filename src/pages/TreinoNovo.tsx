@@ -79,6 +79,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { QueryError } from '../components/QueryError'
+import { RecordMismatch } from '../components/RecordMismatch'
 
 function newKey(): string {
   const c = globalThis.crypto as Crypto | undefined
@@ -151,6 +152,12 @@ export default function TreinoNovo() {
         </Button>
       </div>
     )
+  }
+
+  // Com o plano de outro avaliado, o editor mostraria as restrições da anamnese
+  // do avaliado da URL sobre a prescrição de outra pessoa.
+  if (isEdit && planQuery.data?.plan && planQuery.data.plan.subject_id !== subjectQuery.data.id) {
+    return <RecordMismatch what="Este plano" backTo={`/avaliados/${id}`} />
   }
 
   const initial =

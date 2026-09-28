@@ -445,6 +445,9 @@ describe('TreinoAluno', () => {
 
     expect(submitMock.mock.calls[0][0].clientRef).toBe(submitMock.mock.calls[1][0].clientRef)
     expect(submitMock.mock.calls.map(([input]) => input.revision)).toEqual([1, 2])
+    // "continuar depois" não é treino feito; concluir é (0039)
+    expect(submitMock.mock.calls.map(([input]) => input.inProgress)).toEqual([true, false])
+    expect(enqueueMock.mock.calls[0][1]).toMatchObject({ inProgress: true })
     expect(reserveDraftRevisionMock).toHaveBeenCalledWith(
       'escopo-de-teste',
       expect.objectContaining({ revision: 0, clientRef: submitMock.mock.calls[0][0].clientRef }),
@@ -635,6 +638,32 @@ describe('TreinoAluno', () => {
 
     expect(await screen.findByText(/Treino A.*não foi enviado/i)).toBeTruthy()
     expect(screen.getByText(/fora da janela permitida/i)).toBeTruthy()
+  })
+
+  // "Descartar" era um X que apagava o treino recusado num toque. Agora o
+  // aluno copia os dados para o treinador e confirma antes de descartar.
+  it('copia o treino recusado e só descarta depois de confirmar', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    readQueueMock.mockResolvedValue([{
+      clientRef: 'ref-rejeitada', revision: 1, planId: 'p1', dayLabel: 'A', weekNumber: 1,
+      performedAt: '2026-08-26', notes: null, queuedAt: '2026-08-26T12:00:00.000Z',
+      sets: [{ exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: 2 }],
+      error: 'data de execucao fora da janela permitida',
+    }])
+    await abrir()
+    await screen.findByText(/Treino A.*não foi enviado/i)
+
+    fireEvent.click(screen.getByRole('button', { name: /Copiar dados/ }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toContain('Supino reto: 40 kg × 10 reps (RIR 2)')
+    expect(await screen.findByRole('button', { name: /Copiado/ })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar Treino A · 26/08/2026' }))
+    expect(screen.getByText('Descartar este treino?')).toBeTruthy()
+    expect(dequeueMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar treino' }))
+    await waitFor(() => expect(dequeueMock).toHaveBeenCalledWith('escopo-de-teste', 'ref-rejeitada'))
   })
 
   it('sugere a próxima divisão pela sequência e sessões concluídas', async () => {
@@ -1252,6 +1281,81 @@ describe('TreinoAluno — semana do mesociclo', () => {
     expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('4')
   })
 
+  // A sessão salva com "continuar depois" e concluída ao voltar, ou concluída
+  // depois de o pacote ser rebuscado, era contada duas vezes: a tela anunciava
+  // a semana fechada e a divisão seguinte um treino antes da hora.
+  describe('sem contar duas vezes a mesma sessão', () => {
+    const tresDivisoes = (over: Partial<StudentWorkout>) => {
+      const base = pacote()
+      return pacote({
+        plan: { ...base.plan!, weekly_schedule: ['A', 'B', 'C'] },
+        days: [
+          { id: 'd1', label: 'A', name: null, position: 0 },
+          { id: 'd2', label: 'B', name: null, position: 1 },
+          { id: 'd3', label: 'C', name: null, position: 2 },
+        ],
+        exercises: [
+          { ...base.exercises[0] },
+          { ...base.exercises[0], id: 'we2', day_id: 'd2', exercise_id: 'x2', name: 'Agachamento' },
+          { ...base.exercises[0], id: 'we3', day_id: 'd3', exercise_id: 'x3', name: 'Remada' },
+        ],
+        ...over,
+      })
+    }
+    // Semana 1 completa e o A da semana 2 no servidor (0039: com client_ref).
+    const semana1eA = (ontem: string) => [
+      { performed_at: ontem, week_number: 2, client_ref: 'r4' },
+      { performed_at: '2026-01-05', week_number: 1, client_ref: 'r3' },
+      { performed_at: '2026-01-04', week_number: 1, client_ref: 'r2' },
+      { performed_at: '2026-01-03', week_number: 1, client_ref: null },
+    ]
+    const divisaoMarcada = () =>
+      screen.getAllByRole('button', { pressed: true }).map((b) => b.textContent).filter((t) => /^[ABC]$/.test(t ?? ''))
+
+    it('concluir a sessão salva para continuar depois conta uma vez só', async () => {
+      const hoje = hojeLocal()
+      const ontem = diaAnteriorLocal(hoje)
+      // O B de hoje foi salvo com "continuar depois": em andamento, fora do
+      // pacote (0039). O rascunho dele volta ao abrir.
+      getWorkoutMock.mockResolvedValue(tresDivisoes({
+        current_plan_sessions: 4,
+        plan_week_log: semana1eA(ontem),
+      }))
+      readDraftMock.mockResolvedValue({
+        clientRef: 'ref-parcial', revision: 1, planId: 'p1', dayId: 'd2', weekNumber: 2,
+        performedAt: hoje, notes: '', feel: null,
+        rows: { we2: [{ weight: '100', reps: '8', rir: '', rest: '', failure: false }] },
+        extras: [], identity: { dayLabel: 'B', rowExercises: { we2: 'x2' } },
+      })
+      await abrir()
+      await screen.findByLabelText(/Carga da série 1 de Agachamento/)
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+      await screen.findByText(/Treino concluído! Seu treinador/)
+
+      expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('2')
+      expect(screen.getByText('Semana 2 em andamento: 2 de 3 treinos feitos.')).toBeTruthy()
+      expect(divisaoMarcada()).toEqual(['C'])
+
+      // O pacote rebuscado (voltar ao app) já traz o B concluído: nada muda.
+      getWorkoutMock.mockResolvedValue(tresDivisoes({
+        current_plan_sessions: 5,
+        plan_week_log: [{ performed_at: hoje, week_number: 2, client_ref: 'ref-parcial' }, ...semana1eA(ontem)],
+      }))
+      await act(async () => { window.dispatchEvent(new Event('online')) })
+      await waitFor(() => expect(getWorkoutMock).toHaveBeenCalledTimes(2))
+      expect(screen.getByText('Semana 2 em andamento: 2 de 3 treinos feitos.')).toBeTruthy()
+
+      // E o C, concluído em seguida, fecha a semana: próxima é a A da semana 3.
+      fireEvent.change(await screen.findByLabelText(/Carga da série 1 de Remada/), { target: { value: '30' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+      await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2))
+      await waitFor(() =>
+        expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('3'))
+      expect(screen.getByText(/Você fechou a semana 2 \(3 de 3 treinos\)/)).toBeTruthy()
+      expect(divisaoMarcada()).toEqual(['A'])
+    })
+  })
+
   it('pacote guardado antes da 0037 não inventa semana', async () => {
     getWorkoutMock.mockResolvedValue(pacote()) // sem plan_week_log, sem starts_on
     await abrir()
@@ -1311,6 +1415,49 @@ describe('TreinoAluno — execução da sessão', () => {
     await abrir()
     fireEvent.change(await campoCarga(), { target: { value: '40' } })
     fireEvent.click(screen.getByRole('button', { name: 'Foi difícil' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino A concluído/)
+    expect(submitMock.mock.calls[0][0].feel).toBe(1)
+  })
+
+  // A data ficava presa no dia em que a tela abriu (ou do último treino): o
+  // app instalado, voltando do segundo plano dias depois, gravava o treino de
+  // hoje com a data antiga.
+  it('a data de uma sessão nova acompanha o dia; a sessão em andamento não muda', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-09-20T23:50:00'))
+      await abrir()
+      await campoCarga()
+      const data = screen.getByLabelText('Data') as HTMLInputElement
+      expect(data.value).toBe('2026-09-20')
+
+      vi.setSystemTime(new Date('2026-09-21T07:00:00'))
+      await act(async () => { window.dispatchEvent(new Event('focus')) })
+      await waitFor(() => expect(data.value).toBe('2026-09-21'))
+
+      // com séries digitadas, a sessão é a de hoje e continua sendo
+      fireEvent.change(await campoCarga(), { target: { value: '40' } })
+      vi.setSystemTime(new Date('2026-09-22T07:00:00'))
+      await act(async () => { window.dispatchEvent(new Event('focus')) })
+      expect(data.value).toBe('2026-09-21')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // A sensação morava no rascunho, mas só a troca de sessão a restaurava:
+  // reabrir a página perdia a carinha e o autosave gravava null por cima.
+  it('a sensação volta com o rascunho ao reabrir a página', async () => {
+    readDraftMock.mockResolvedValue({
+      clientRef: 'ref-1', revision: 1, planId: 'p1', dayId: 'd1', weekNumber: 1,
+      performedAt: hojeLocal(), notes: '', feel: 1,
+      rows: { we1: [{ weight: '40', reps: '10', rir: '', rest: '', failure: false }] },
+      extras: [], identity: { dayLabel: 'A', rowExercises: { we1: 'x1' } },
+    })
+    await abrir()
+    await campoCarga()
+    expect(screen.getByRole('button', { name: 'Foi difícil' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
     await screen.findByText(/Treino A concluído/)
     expect(submitMock.mock.calls[0][0].feel).toBe(1)

@@ -1,5 +1,5 @@
 import type { ActivePlanSummary, LogSummary } from './api'
-import { adherencePct, effectivePlanStart, plannedSessionsToDate } from './progress'
+import { adherencePct, closedWeeksCutoff, effectivePlanStart, plannedSessionsToDate } from './progress'
 import { daysSince, dueForReassessment } from '../../lib/reminders'
 
 // dias sem treino registrado (com plano ativo) que pedem atenção do profissional
@@ -61,7 +61,15 @@ export function buildCarteira(input: {
         startedOn,
         input.now
       )
-      adherence = planned != null && planned > 0 ? adherencePct(summary.count, planned) : null
+      // Numerador na mesma régua do denominador: as sessões da semana ainda
+      // aberta (e as feitas depois do fim do mesociclo) saem da conta. Sem as
+      // datas recentes (banco anterior à 0039), fica a contagem total.
+      const cutoff = closedWeeksCutoff(startedOn, plan.weeks, input.now)
+      const recentes = summary.recentDates
+      const feitas = recentes && cutoff
+        ? Math.max(0, summary.count - recentes.filter((d) => d.slice(0, 10) >= cutoff).length)
+        : summary.count
+      adherence = planned != null && planned > 0 ? adherencePct(feitas, planned) : null
       lastLogAt = summary.lastDate
       // Sem log nenhum, o silêncio conta a partir do início do plano — antes
       // era Infinity, então um plano criado no mesmo dia já entrava como "sem

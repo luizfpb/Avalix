@@ -14,6 +14,12 @@ describe('higienizacao do log do cliente', () => {
     expect(output).toContain('[redacted]')
   })
 
+  it('remove o token do link de treino do aluno (/t#token)', () => {
+    const output = sanitizeClientErrorText(`falhou em https://avalixfit.com.br/t#${token}`, 600)
+    expect(output).not.toContain(token)
+    expect(output).toContain('/t#[redacted]')
+  })
+
   it('reduz qualquer rota publica ao path sem segredo', () => {
     expect(sanitizedClientPath(`/a/${token}`)).toBe('/a')
     expect(sanitizedClientPath('/agenda')).toBe('/agenda')

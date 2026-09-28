@@ -18,17 +18,28 @@ select is(
     where n.nspname = 'public' and p.proname = 'submit_workout_session'),
   1,
   'envio do aluno não virou sobrecarga: o PostgREST continua sem ambiguidade');
+-- Pela função única com esse nome (checada acima), e não pela assinatura da
+-- 0038: a 0039 acrescenta p_in_progress e a garantia continua valendo.
 select ok(
-  (select prosecdef and proconfig @> array['search_path=""'] from pg_proc
-    where oid = 'public.submit_workout_session(text,uuid,jsonb,text,int,date,text,uuid,int,int)'::regprocedure),
+  (select bool_and(p.prosecdef and p.proconfig @> array['search_path=""'])
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'submit_workout_session'),
   'envio continua security definer com search_path vazio');
 select ok(
-  has_function_privilege('anon',
-    'public.submit_workout_session(text,uuid,jsonb,text,int,date,text,uuid,int,int)', 'execute')
-  and not has_function_privilege('anon',
-    'public.submit_workout_session_0027_internal(text,uuid,jsonb,text,int,date,text,uuid,int)', 'execute'),
+  (select bool_and(has_function_privilege('anon', p.oid, 'execute'))
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'submit_workout_session')
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'submit_workout_session_0027_internal'
+       and has_function_privilege('anon', p.oid, 'execute')),
   'grants: o aluno chama o wrapper, nunca o helper interno');
 
+-- O cadastro do avaliado exige um avaliador autenticado (trigger b2): sem as
+-- claims, a fixture parava antes de chegar ao que este arquivo testa.
+select set_config('request.jwt.claim.sub', '38000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims',
+  '{"sub":"38000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal2"}', true);
 insert into auth.users(id, raw_user_meta_data) values
  ('38000000-0000-0000-0000-000000000001', '{"full_name":"Owner teste"}');
 insert into public.organizations(id, name) values
@@ -67,6 +78,8 @@ create temporary table _payload (sets jsonb not null);
 insert into _payload values (
   '[{"exercise_id":"38000000-0000-0000-0000-000000000005","set_number":1,"weight_kg":40,"reps":10,"rir":2}]'
 );
+-- A tabela temporária pertence a quem a criou; o papel anônimo precisa ler.
+grant select on _payload to anon, authenticated;
 
 set local role anon;
 select lives_ok(
@@ -117,11 +130,18 @@ select lives_ok(
        'A', 1, current_date, null, null, 1, 3
      ) from _payload $$,
   'nova sessão registrada com sensação boa');
-select is(
-  public.get_workout_history_page_for_link('pgtap-token-0038', 30) #>> '{items,0,feel}',
-  '3',
-  'histórico do aluno devolve a sensação da sessão mais recente');
 reset role;
+-- Pelo id, e não pela posição: as sessões desta transação têm o mesmo
+-- created_at (now() é fixo), e o desempate por UUID aleatório tornava a
+-- "mais recente" uma loteria.
+select is(
+  (select item ->> 'feel'
+     from jsonb_array_elements(
+            public.get_workout_history_page_for_link('pgtap-token-0038', 30) -> 'items') item
+    where (item ->> 'id')::uuid = (select id from public.workout_logs
+                                    where client_ref = '38000000-0000-0000-0000-000000000103')),
+  '3',
+  'histórico do aluno devolve a sensação da sessão');
 
 select is(
   (select public.update_workout_session_for_link(

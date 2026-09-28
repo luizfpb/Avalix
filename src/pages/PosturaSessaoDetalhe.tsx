@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
+import { RecordMismatch } from '../components/RecordMismatch'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -144,6 +145,9 @@ export default function PosturaSessaoDetalhe() {
         </Button>
       </div>
     )
+  }
+  if (id && sessionQuery.data.subject_id !== id) {
+    return <RecordMismatch what="Esta sessão postural" backTo={`/avaliados/${id}`} />
   }
   if (photosQuery.isError || thumbUrlsQuery.isError || annotatedQuery.isError) {
     return (

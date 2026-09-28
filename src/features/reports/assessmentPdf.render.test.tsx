@@ -98,6 +98,30 @@ describe('render do PDF de avaliação', () => {
     15_000
   )
 
+  // Menor de idade: sem classificação adulta e com a nota das curvas por
+  // idade, com e sem snapshot de composição (a idade vem de fora no segundo).
+  it(
+    'gera o laudo de menor de idade, com e sem protocolo',
+    async () => {
+      const comProtocolo = await generateAssessmentPdf({
+        ...data,
+        assessment: {
+          ...assessment,
+          results: { ...(assessment.results as object), inputs: { sex: 'M', ageYears: 15 } },
+        } as unknown as AssessmentRow,
+      })
+      expect(comProtocolo.size).toBeGreaterThan(1000)
+      const semProtocolo = await generateAssessmentPdf({
+        ...data,
+        ageYears: 15,
+        history: [],
+        assessment: { ...assessment, protocol_id: null, results: null } as unknown as AssessmentRow,
+      })
+      expect(semProtocolo.size).toBeGreaterThan(1000)
+    },
+    15_000
+  )
+
   // Observações e medicamentos são texto livre do profissional: o bloco é
   // atômico enquanto cabe numa folha e ganha `break` quando não cabe. Os dois
   // caminhos passam por aqui, que é onde um `break` mal colocado ou uma conta

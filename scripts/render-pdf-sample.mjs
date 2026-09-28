@@ -56,7 +56,9 @@ const initialCircumferences = {
 }
 const normalDates = ['2026-06-05', '2026-07-03', '2026-08-07', '2026-09-04']
 
-function assessmentData(stress = false) {
+// ageYears: idade na coleta. A amostra de menor de idade confere que o laudo não
+// aplica as faixas adultas de IMC e gordura (ver adultReference.ts).
+function assessmentData(stress = false, ageYears = null) {
   const dates = stress
     ? Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2024, 3 + i, 4)).toISOString().slice(0, 10))
     : normalDates
@@ -76,7 +78,7 @@ function assessmentData(stress = false) {
     // comparabilidade; o último usa JP7 aos 70 anos para mostrar a ressalva real.
     const protocolId = stress && index === 9 ? null : stress && index % 6 === 2 ? 'usNavy' : stress && index % 6 === 4 ? 'jpWard' : 'jp7'
     const result = protocolId ? buildAssessmentResult(protocolId, {
-      sex: 'F', ageYears: stress ? 70 : 32, heightCm: 168, skinfoldsMm, circumferencesCm,
+      sex: 'F', ageYears: ageYears ?? (stress ? 70 : 32), heightCm: 168, skinfoldsMm, circumferencesCm,
     }, weightKg) : null
     return {
       id, org_id: 'sample-org', subject_id: 'sample-subject', evaluator_id: 'sample-evaluator',
@@ -228,12 +230,22 @@ for (const stress of [false, true]) {
 }
 
 const minimal = assessmentData()
+// Sem snapshot de composição, a idade vem da tela (nascimento + data da coleta).
+const minimalAssessment = {
+  ...minimal.assessment, protocol_id: null, results: null, engine_version: null,
+  medications: null, notes: null,
+}
 await save('avaliacao-minima.pdf', generateAssessmentPdf, {
-  ...identity, evaluatorName: null,
-  assessment: {
-    ...minimal.assessment, protocol_id: null, results: null, engine_version: null,
-    medications: null, notes: null,
-  },
+  ...identity, evaluatorName: null, ageYears: 32,
+  assessment: minimalAssessment,
+  skinfolds: [], circumferences: [], history: [], circumferenceHistory: [],
+})
+
+// Menor de idade: com protocolo (idade no snapshot) e sem protocolo.
+await save('avaliacao-menor.pdf', generateAssessmentPdf, assessmentData(false, 15))
+await save('avaliacao-minima-menor.pdf', generateAssessmentPdf, {
+  ...identity, evaluatorName: null, ageYears: 15,
+  assessment: minimalAssessment,
   skinfolds: [], circumferences: [], history: [], circumferenceHistory: [],
 })
 console.log(`Amostras ficticias salvas em: ${outDir}`)

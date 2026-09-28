@@ -28,6 +28,19 @@ describe('buildAssessmentPrompt — avaliação isolada', () => {
     expect(p).toContain('22.3% — Aceitável (faixas ACE por sexo, sem ajuste por idade)')
   })
 
+  // As faixas OMS/ACE são de adulto; abaixo de 18 anos o prompt não pode
+  // mandar a IA ler o IMC de um adolescente com o corte de adulto.
+  it('não classifica pelas faixas adultas abaixo de 18 anos', () => {
+    const base = point('2026-08-20')
+    const menor = point('2026-08-20', {
+      results: { ...base.results!, inputs: { ...base.results!.inputs, ageYears: 15 } },
+    })
+    const p = buildAssessmentPrompt({ subject: { ...SUBJECT, birthDate: '2011-02-01' }, point: menor, skinfolds: [] })
+    expect(p).toContain('IMC: 27.8 — sem classificação: as faixas da OMS para adultos não valem abaixo de 18 anos')
+    expect(p).toContain('22.3% — sem classificação adulta (menor de 18 anos): as faixas ACE são para adultos')
+    expect(p).not.toContain('Sobrepeso')
+  })
+
   it('mostra as duas conversões e diz qual o app usa', () => {
     const p = isolada()
     expect(p).toContain('Siri 22.3% · Brozek 22.0% (o app usa Siri como principal)')

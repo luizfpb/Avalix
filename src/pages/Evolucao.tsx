@@ -27,6 +27,7 @@ import {
 import type { AssessmentResultSnapshot } from '../features/assessment/result'
 import { computeBmi, bmiCategory } from '../features/assessment/bmi'
 import { classifyBodyFat } from '../features/assessment/bodyFat'
+import { assessmentAgeYears } from '../features/assessment/adultReference'
 import { circumferenceLabel } from '../features/assessment/sites'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
@@ -182,6 +183,7 @@ export default function Evolucao() {
   const last = assessments[assessments.length - 1]
   const lastRes = last.results as AssessmentResultSnapshot | null
   const sex = subject.sex === 'F' ? 'F' : 'M'
+  const lastAge = assessmentAgeYears(lastRes?.inputs?.ageYears, subject.birth_date, last.assessed_at)
 
   // séries por métrica (uma por gráfico)
   const dates = assessments.map((a) => dateShort(a.assessed_at))
@@ -282,7 +284,7 @@ export default function Evolucao() {
                 <Stat
                   label="% Gordura"
                   value={`${lastRes.bodyFatPct.toFixed(1)}%`}
-                  hint={classifyBodyFat(sex, lastRes.bodyFatPct).label}
+                  hint={classifyBodyFat(sex, lastRes.bodyFatPct, lastAge).label}
                 />
                 <Stat label="Massa magra" value={`${lastRes.leanMassKg.toFixed(1)} kg`} />
                 <Stat label="Massa gorda" value={`${lastRes.fatMassKg.toFixed(1)} kg`} />
@@ -291,7 +293,7 @@ export default function Evolucao() {
             <Stat
               label="IMC"
               value={computeBmi(last.weight_kg, last.height_cm).toFixed(1)}
-              hint={bmiCategory(computeBmi(last.weight_kg, last.height_cm)).label}
+              hint={bmiCategory(computeBmi(last.weight_kg, last.height_cm), lastAge).label}
             />
             <Stat label="Peso" value={`${last.weight_kg} kg`} />
           </div>

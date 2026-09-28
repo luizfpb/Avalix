@@ -16,6 +16,7 @@
 
 import { computeBmi, bmiCategory } from '../assessment/bmi'
 import { classifyBodyFat } from '../assessment/bodyFat'
+import { adultReferenceApplies } from '../assessment/adultReference'
 import { protocolLabel, type Sex } from '../assessment/protocols'
 import type { AssessmentResultSnapshot } from '../assessment/result'
 import { CIRCUMFERENCE_CATALOG, circumferenceLabel, SKINFOLD_LABELS } from '../assessment/sites'
@@ -119,18 +120,34 @@ export function resultadoBlock(point: AssessmentPromptPoint, subject: PromptSubj
   const r = point.results
   const bmi = computeBmi(point.weightKg, point.heightCm)
   const sex = subjectSex(point, subject)
-  const bfCat = r && sex ? classifyBodyFat(sex, r.bodyFatPct) : null
+  // Idade na data da coleta: decide se as faixas adultas se aplicam.
+  const idade = r?.inputs?.ageYears ?? ageAt(subject.birthDate, point.assessedAt)
+  const adulto = adultReferenceApplies(idade)
+  const bfCat = r && sex ? classifyBodyFat(sex, r.bodyFatPct, idade) : null
 
   return block(`RESULTADO DA AVALIAÇÃO DE ${fmtDate(point.assessedAt)}`, [
     line('Protocolo', protocolLabel(point.protocolId)),
     line('Versão do motor de cálculo', point.engineVersion),
     line('Peso', `${fmtNum(point.weightKg, 1)} kg`),
     line('Altura', `${fmtNum(point.heightCm, 1)} cm`),
-    line('IMC', `${fmtNum(bmi, 1)} — ${bmiCategory(bmi).label} (faixas OMS para adultos)`),
+    line(
+      'IMC',
+      adulto
+        ? `${fmtNum(bmi, 1)} — ${bmiCategory(bmi, idade).label} (faixas OMS para adultos)`
+        : idade == null
+          ? `${fmtNum(bmi, 1)} — sem classificação (idade não informada)`
+          : `${fmtNum(bmi, 1)} — sem classificação: as faixas da OMS para adultos não valem abaixo de 18 anos (a referência é o IMC-para-idade)`
+    ),
     r
       ? line(
           'Percentual de gordura (estimado)',
-          `${fmtNum(r.bodyFatPct, 1)}%${bfCat ? ` — ${bfCat.label} (faixas ACE por sexo, sem ajuste por idade)` : ''}`
+          `${fmtNum(r.bodyFatPct, 1)}%${
+            bfCat && adulto
+              ? ` — ${bfCat.label} (faixas ACE por sexo, sem ajuste por idade)`
+              : bfCat
+                ? ` — ${bfCat.label.toLowerCase()}: as faixas ACE são para adultos`
+                : ''
+          }`
         )
       : '- Percentual de gordura: não calculado (avaliação sem protocolo de composição corporal)',
     r?.bodyDensity != null ? line('Densidade corporal', `${r.bodyDensity.toFixed(4)} g/cc`) : null,

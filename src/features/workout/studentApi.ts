@@ -136,6 +136,8 @@ export type StudentHistorySession = {
   // Sensação relatada ao concluir (1 difícil, 2 normal, 3 bem). Ausente no
   // cache anterior à 0038 e em toda sessão lançada pelo profissional.
   feel?: number | null
+  // Salva com "continuar depois" e ainda não concluída (0039).
+  in_progress?: boolean | null
   sets: StudentHistorySet[]
 }
 
@@ -239,6 +241,9 @@ export type SubmitSessionInput = {
   // Como o aluno disse que foi o treino: 1 dificil, 2 normal, 3 bem. Opcional
   // em todo o caminho — ninguem precisa responder para concluir.
   feel?: number | null
+  // "Parar por aqui e continuar depois" (0039): a sessao fica no servidor,
+  // mas nao conta como treino feito ate ser concluida.
+  inProgress?: boolean
 }
 
 export async function submitSession(
@@ -247,8 +252,9 @@ export async function submitSession(
   // Argumento com default na RPC é opcional no tipo gerado (string | undefined,
   // não null): valor ausente se OMITE, e o banco aplica o default. Mandar null
   // explícito não compila — e, se compilasse, sobrescreveria o default.
-  // Contrato restrito ate regenerar database.types apos a 0038: p_feel e um
-  // argumento com default, entao a chamada sem ele continua valendo.
+  // Contrato restrito ate regenerar database.types apos a 0039: p_feel e
+  // p_in_progress sao argumentos com default, entao a chamada sem eles continua
+  // valendo (e sem p_in_progress a sessao e gravada como concluida).
   const client = supabase as unknown as {
     rpc(
       name: 'submit_workout_session',
@@ -266,6 +272,7 @@ export async function submitSession(
     ...(input.notes ? { p_notes: input.notes } : {}),
     ...(input.planId ? { p_plan: input.planId } : {}),
     ...(input.feel != null ? { p_feel: input.feel } : {}),
+    ...(input.inProgress ? { p_in_progress: true } : {}),
   })
   if (error) throw Object.assign(error, { status })
   const row = data as unknown as { log_id?: string; stale?: boolean; corrected?: boolean } | null
