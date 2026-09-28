@@ -180,6 +180,21 @@ export const RED_FLAGS: Option[] = [
   { value: 'trauma', label: 'Trauma significativo recente' },
 ]
 
+// Os sinais marcados pelo nome, para entrar no meio de uma frase. É a lista
+// clássica de triagem de causa grave, mas a pergunta é genérica ("você percebe
+// algum destes sinais?") e não se prende à coluna: febre, perda de peso ou
+// história de câncer não dizem nada sobre a coluna por si. O texto antigo
+// ("red flag de coluna") rotulava qualquer um deles assim, e o prompt da IA
+// repetia o rótulo.
+export function redFlagNames(values: string[]): string {
+  return values
+    .map((value) => {
+      const label = RED_FLAGS.find((option) => option.value === value)?.label ?? value
+      return label.charAt(0).toLowerCase() + label.slice(1)
+    })
+    .join('; ')
+}
+
 export const TABAGISMO: Option[] = [
   { value: 'nunca', label: 'Nunca' },
   { value: 'ex', label: 'Ex-fumante' },

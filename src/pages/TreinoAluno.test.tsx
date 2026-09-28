@@ -1098,14 +1098,17 @@ describe('TreinoAluno — editar sessão enviada', () => {
     fireEvent.change(editor.getByLabelText('Descanso da série 1 de Supino reto'), { target: { value: '90' } })
     fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
     await waitFor(() => expect(updateSessionMock).toHaveBeenCalled())
-    const writes = vi.mocked(writeCachedHistory).mock.calls.length
     window.dispatchEvent(new StorageEvent('storage', { key: 'avalix:treino:token', newValue: 'D'.repeat(43) }))
     expect(await screen.findByText(/Link inválido ou expirado/)).toBeTruthy()
     await act(async () => {
-      reply.resolve(historicalSession())
+      reply.resolve(historicalSession({ notes: 'resposta tardia' }))
       await reply.promise
     })
-    expect(vi.mocked(writeCachedHistory).mock.calls).toHaveLength(writes)
+    // Pelo conteúdo, e não pela contagem de chamadas: uma gravação atrasada de
+    // outro teste, sob carga, mudava a contagem e deixava o teste intermitente.
+    const gravadas = vi.mocked(writeCachedHistory).mock.calls
+      .flatMap((call) => ((call as unknown[])[1] as StudentHistorySession[] | undefined) ?? [])
+    expect(gravadas.some((sessao) => sessao.notes === 'resposta tardia')).toBe(false)
   })
 
   it('histórico legado sem carimbo não habilita gravação sem controle de versão', async () => {

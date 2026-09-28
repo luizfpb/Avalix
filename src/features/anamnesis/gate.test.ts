@@ -78,10 +78,22 @@ describe('computeGate — matriz ACSM', () => {
 })
 
 describe('computeGate — red flags e gestação levantam flag', () => {
-  it('red flag de coluna', () => {
+  it('red flag levanta flag', () => {
     const a = base()
     a.red_flags = ['deficit_neuro']
     expect(computeGate(a).flagEncaminhamento).toBe(true)
+  })
+
+  // A pergunta é genérica: febre ou perda de peso não são "de coluna". O
+  // rótulo antigo ia para o prompt da IA com qualquer sinal marcado.
+  it('o motivo nomeia os sinais marcados, sem chamar tudo de coluna', () => {
+    const a = base()
+    a.red_flags = ['febre', 'perda_peso']
+    const motivo = computeGate(a).motivos.find((m) => m.startsWith('Sinais de alerta'))
+    expect(motivo).toBe(
+      'Sinais de alerta (red flags): febre associada; perda de peso inexplicada — indicam avaliação médica antes de treinar.'
+    )
+    expect(computeGate(a).motivos.join(' ')).not.toMatch(/coluna/)
   })
   it('gestante', () => {
     const a = base()

@@ -1,4 +1,4 @@
-import { PARQ_ITEMS, type AnamnesisAnswers } from './spec'
+import { PARQ_ITEMS, redFlagNames, type AnamnesisAnswers } from './spec'
 
 // Gate de prontidão — lógica pura e testável (spec: "calcule num único módulo
 // puro, separado da UI"). Inspirado no PAR-Q+ (triagem) e nas diretrizes ACSM
@@ -69,7 +69,9 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
     motivos.push('Doença cardiovascular, metabólica ou renal referida.')
   }
   if (redFlags) {
-    motivos.push('Red flag(s) de coluna — indica avaliação médica, não é caso de treino.')
+    motivos.push(
+      `Sinais de alerta (red flags): ${redFlagNames(a.red_flags)} — indicam avaliação médica antes de treinar.`
+    )
   }
   if (gestante) {
     motivos.push('Gestante — exige protocolo próprio e acompanhamento.')
