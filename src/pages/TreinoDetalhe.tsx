@@ -30,6 +30,7 @@ import {
 } from '../features/workout/builder'
 import { VolumeLandmarkPanel } from '../features/workout/VolumeLandmarkPanel'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
+import { resolveExerciseVideo, videoOrSearch, type ExerciseVideo } from '../features/workout/demo'
 import { GroupBlock } from '../features/workout/GroupBlock'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { formatSetsReps } from '../features/workout/effective'
@@ -96,6 +97,14 @@ export default function TreinoDetalhe() {
   const exerciseNames = useMemo(() => {
     const m: Record<string, string> = {}
     for (const e of exercisesQuery.data ?? []) m[e.id] = e.name
+    return m
+  }, [exercisesQuery.data])
+
+  // exercise_id -> vídeo (o da organização, o do catálogo ou a busca): a mesma
+  // resolução vai para a tela e para o PDF do aluno.
+  const exerciseVideos = useMemo(() => {
+    const m: Record<string, ExerciseVideo> = {}
+    for (const e of exercisesQuery.data ?? []) m[e.id] = resolveExerciseVideo(e)
     return m
   }, [exercisesQuery.data])
 
@@ -224,6 +233,7 @@ export default function TreinoDetalhe() {
       weeks,
       overrides,
       exerciseNames,
+      exerciseVideos,
       source:
         srcAssessment || srcSession
           ? {
@@ -557,7 +567,11 @@ export default function TreinoDetalhe() {
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
-                          <ExerciseDemoLink name={exName} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" />
+                          <ExerciseDemoLink
+                            name={exName}
+                            video={exerciseVideos[ex.exercise_id] ?? videoOrSearch(null, exName)}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          />
                         </div>
                       </div>
                     )

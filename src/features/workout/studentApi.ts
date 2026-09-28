@@ -45,6 +45,10 @@ export type StudentExercise = {
   group_key?: string | null
   group_kind?: string | null
   technique?: string | null
+  // Vídeo já resolvido pelo servidor (0042): o escolhido pela organização ou o
+  // curado do catálogo. Nulo ou ausente (pacote em cache de antes da 0042) =
+  // a tela oferece a busca pelo nome.
+  video_url?: string | null
 }
 
 export type StudentWeek = {

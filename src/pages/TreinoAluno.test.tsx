@@ -338,6 +338,22 @@ describe('TreinoAluno', () => {
     expect(screen.getByText(/3×8-12/)).toBeTruthy()
   })
 
+  it('abre o vídeo escolhido para o exercício; sem vídeo, oferece a busca', async () => {
+    const base = pacote()
+    getWorkoutMock.mockResolvedValue(
+      pacote({ exercises: [{ ...base.exercises[0], video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }] })
+    )
+    await abrir()
+    expect(screen.getByRole('link', { name: /Ver vídeo/ }).getAttribute('href'))
+      .toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  })
+
+  it('pacote sem vídeo (ou de antes da 0042) cai na busca pelo nome', async () => {
+    await abrir()
+    const link = screen.getByRole('link', { name: /Buscar vídeo/ })
+    expect(link.getAttribute('href')).toContain('youtube.com/results?search_query=Supino')
+  })
+
   it('explica RIR quando a prescrição do dia usa RIR', async () => {
     await abrir()
     expect(screen.getByText(/O que significa RIR/)).toBeTruthy()

@@ -3,6 +3,7 @@ import {
   createCustomExercise,
   createWorkoutLog,
   createWorkoutPlan,
+  clearExerciseVideo,
   deleteCustomExercise,
   deleteWorkoutLog,
   deleteWorkoutPlan,
@@ -15,6 +16,7 @@ import {
   listWorkoutLogs,
   listWorkoutPlans,
   saveTrainerSession,
+  setExerciseVideo,
   setWorkoutPlanStatus,
   updateCustomExercise,
   updateWorkoutPlan,
@@ -63,6 +65,21 @@ export function useDeleteCustomExercise(orgId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => deleteCustomExercise(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['exercises', orgId] })
+    },
+  })
+}
+
+// Escolher ou tirar o vídeo de um exercício: a lista de exercícios traz o
+// vídeo junto (listExercises), então é ela que se atualiza.
+export function useSetExerciseVideo(orgId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ exerciseId, videoUrl }: { exerciseId: string; videoUrl: string | null }) =>
+      videoUrl
+        ? setExerciseVideo(orgId as string, exerciseId, videoUrl)
+        : clearExerciseVideo(orgId as string, exerciseId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['exercises', orgId] })
     },

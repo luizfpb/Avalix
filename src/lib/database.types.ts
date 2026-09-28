@@ -608,9 +608,59 @@ export type Database = {
           },
         ]
       }
+      exercise_videos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          exercise_id: string
+          org_id: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          exercise_id: string
+          org_id: string
+          updated_at?: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          exercise_id?: string
+          org_id?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_videos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_videos_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_videos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           additional_primary_muscles: string[]
+          catalog_video_url: string | null
           created_at: string
           created_by: string | null
           cues: string | null
@@ -626,6 +676,7 @@ export type Database = {
         }
         Insert: {
           additional_primary_muscles?: string[]
+          catalog_video_url?: string | null
           created_at?: string
           created_by?: string | null
           cues?: string | null
@@ -641,6 +692,7 @@ export type Database = {
         }
         Update: {
           additional_primary_muscles?: string[]
+          catalog_video_url?: string | null
           created_at?: string
           created_by?: string | null
           cues?: string | null

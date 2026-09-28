@@ -185,6 +185,31 @@ describe('generateWorkoutPdf', () => {
     expect((await blob.arrayBuffer()).byteLength).toBeGreaterThan(1000)
   })
 
+  // Link e o triângulo em SVG só existem no caminho de render.
+  it('gera o PDF com os links de vídeo, e cada um vira um link clicável', async () => {
+    const blob = await generateWorkoutPdf({
+      orgName: 'Estúdio Teste',
+      subjectName: 'Fulano de Tal',
+      plan,
+      days: DIAS,
+      exercises: EXERCICIOS,
+      weeks: [semana(1)],
+      overrides: [],
+      exerciseNames: NOMES,
+      exerciseVideos: Object.fromEntries(
+        EXERCICIOS.map((ex, i) => [
+          ex.exercise_id,
+          i === 0
+            ? { url: 'https://www.youtube.com/results?search_query=supino', kind: 'search' as const }
+            : { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', kind: 'own' as const },
+        ])
+      ),
+    })
+    const bytes = new TextDecoder('latin1').decode(await blob.arrayBuffer())
+    expect(bytes).toContain('watch?v=dQw4w9WgXcQ')
+    expect(bytes).toContain('results?search_query=supino')
+  })
+
   // A faixa de bloco e o travessão de "sem faixa de reps" só existem no
   // caminho de render: um estilo inválido ou um `undefined` numa célula derruba
   // a geração inteira, e nenhum teste de função pura pegaria isso.
@@ -281,6 +306,8 @@ describe('paginação de exercícios', () => {
     const short = estimateWorkoutExerciseHeight(base, 'Supino')
     expect(estimateWorkoutExerciseHeight(base, 'Supino com ajuste de amplitude '.repeat(30))).toBeGreaterThan(short)
     expect(estimateWorkoutExerciseHeight({ ...base, notes: LONGA }, 'Supino')).toBeGreaterThan(440)
+    // a linha do link de vídeo entra na conta de paginação
+    expect(estimateWorkoutExerciseHeight(base, 'Supino', null, true)).toBeGreaterThan(short)
   })
 })
 

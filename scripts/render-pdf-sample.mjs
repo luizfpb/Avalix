@@ -207,8 +207,16 @@ function workoutData(stress = false, assessment) {
       created_at: createdAt,
     }))
   })
+  // Os três níveis de vídeo (0042): escolhido pela organização, curado do
+  // catálogo e, no resto, a busca pelo nome. Ids fictícios.
+  const exerciseVideos = Object.fromEntries(exercises.map((exercise, index) => [
+    exercise.exercise_id,
+    index % 3 === 2
+      ? { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(exerciseNames[exercise.exercise_id])}`, kind: 'search' }
+      : { url: `https://www.youtube.com/watch?v=exemplo${String(index).padStart(4, '0')}`, kind: index % 3 === 0 ? 'own' : 'catalog' },
+  ]))
   return {
-    ...(stress ? longIdentity : identity), plan, days, exercises, weeks, overrides, exerciseNames,
+    ...(stress ? longIdentity : identity), plan, days, exercises, weeks, overrides, exerciseNames, exerciseVideos,
     source: { assessmentDate: assessment.assessed_at, bodyFatPct: assessment.results.bodyFatPct },
   }
 }

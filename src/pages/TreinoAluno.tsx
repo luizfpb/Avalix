@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, CloudOff, Copy, RefreshCw, TriangleAlert, X } from 'lucide-react'
+import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
+import { videoOrSearch } from '../features/workout/demo'
 import {
   getHistoryPageForLink,
   getPlanForLink,
@@ -1572,6 +1574,11 @@ function TreinoDoDia({
               {efetiva.notes ? (
                 <p className="mt-1 text-[11px] text-muted-foreground">{efetiva.notes}</p>
               ) : null}
+              <ExerciseDemoLink
+                name={ex.name}
+                video={videoOrSearch(ex.video_url, ex.name)}
+                className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              />
 
               {efetiva.skipped ? (
                 <p className="mt-2 rounded bg-muted px-2 py-1 text-xs text-muted-foreground">

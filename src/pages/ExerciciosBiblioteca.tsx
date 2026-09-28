@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Clapperboard } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useExercises, useDeleteCustomExercise } from '../features/workout/hooks'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
+import { ExerciseVideoEditor } from '../features/workout/ExerciseVideoEditor'
+import { resolveExerciseVideo, type ExerciseVideoKind } from '../features/workout/demo'
 import { equipmentLabel, type Equipment } from '../features/workout/volume'
 import { primaryMusclesLabel, worksMuscle } from '../features/workout/exerciseMuscles'
 import { MUSCLE_OPTIONS } from '../features/workout/schema'
@@ -25,6 +27,8 @@ export default function ExerciciosBiblioteca() {
   const deleteMut = useDeleteCustomExercise(orgId)
   const [search, setSearch] = useState('')
   const [muscle, setMuscle] = useState('')
+  const [videoFilter, setVideoFilter] = useState<'' | ExerciseVideoKind>('')
+  const [videoId, setVideoId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const canDelete = role === 'owner' || role === 'admin'
@@ -36,10 +40,11 @@ export default function ExerciciosBiblioteca() {
     const q = search.trim().toLowerCase()
     return exercises.filter((e) => {
       if (muscle && !worksMuscle(e, muscle)) return false
+      if (videoFilter && resolveExerciseVideo(e).kind !== videoFilter) return false
       if (q && !e.name.toLowerCase().includes(q)) return false
       return true
     })
-  }, [exercises, search, muscle])
+  }, [exercises, search, muscle, videoFilter])
 
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -67,7 +72,8 @@ export default function ExerciciosBiblioteca() {
           <h1 className="mt-2 text-xl font-semibold">Biblioteca de exercícios</h1>
           <p className="text-sm text-muted-foreground">
             Catálogo global + {customCount} {customCount === 1 ? 'exercício seu' : 'exercícios seus'}.
-            Os globais são fixos; os seus você edita e exclui.
+            Os globais são fixos; os seus você edita e exclui. Em qualquer um você escolhe o vídeo
+            que o aluno vê no plano.
           </p>
         </div>
         <Button size="sm" onClick={() => setCreating((s) => !s)}>
@@ -83,7 +89,7 @@ export default function ExerciciosBiblioteca() {
         />
       ) : null}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem_11rem]">
         <div>
           <label htmlFor="exercise-search" className="sr-only">Buscar exercício</label>
           <Input id="exercise-search" placeholder="Buscar exercício..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -97,6 +103,20 @@ export default function ExerciciosBiblioteca() {
               {m.label}
             </option>
           ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="exercise-video" className="sr-only">Filtrar por vídeo</label>
+          <select
+            id="exercise-video"
+            className={controlClass}
+            value={videoFilter}
+            onChange={(e) => setVideoFilter(e.target.value as '' | ExerciseVideoKind)}
+          >
+            <option value="">Todos os vídeos</option>
+            <option value="own">Com vídeo seu</option>
+            <option value="catalog">Com vídeo do catálogo</option>
+            <option value="search">Só busca no YouTube</option>
           </select>
         </div>
       </div>
@@ -114,6 +134,7 @@ export default function ExerciciosBiblioteca() {
         <ul className="divide-y rounded-md border bg-card">
           {filtered.map((e) => {
             const custom = !!e.org_id
+            const video = resolveExerciseVideo(e)
             if (editingId === e.id && orgId) {
               return (
                 <li key={e.id} className="p-3">
@@ -127,47 +148,74 @@ export default function ExerciciosBiblioteca() {
               )
             }
             return (
-              <li key={e.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 truncate text-sm">
-                    {e.name}
-                    {custom ? (
-                      <Badge variant="secondary" className="shrink-0">
-                        seu
-                      </Badge>
-                    ) : null}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {primaryMusclesLabel(e)} · {equipmentLabel(e.equipment as Equipment)}
-                    {e.secondary_muscles.length > 0
-                      ? ` · +${e.secondary_muscles.length} secundário${e.secondary_muscles.length > 1 ? 's' : ''}`
-                      : ''}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-1 text-xs sm:justify-end">
-                  <ExerciseDemoLink name={e.name} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground" />
-                  {custom ? (
-                    <>
+              <li key={e.id} className="px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 truncate text-sm">
+                      {e.name}
+                      {custom ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          seu
+                        </Badge>
+                      ) : null}
+                      {video.kind === 'own' ? (
+                        <Badge variant="outline" className="shrink-0">
+                          vídeo seu
+                        </Badge>
+                      ) : null}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {primaryMusclesLabel(e)} · {equipmentLabel(e.equipment as Equipment)}
+                      {e.secondary_muscles.length > 0
+                        ? ` · +${e.secondary_muscles.length} secundário${e.secondary_muscles.length > 1 ? 's' : ''}`
+                        : ''}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1 text-xs sm:justify-end">
+                    <ExerciseDemoLink name={e.name} video={video} className="inline-flex min-h-10 items-center gap-1 px-2 text-muted-foreground hover:text-foreground" />
+                    {orgId ? (
                       <button
-                        onClick={() => setEditingId(e.id)}
+                        onClick={() => setVideoId(videoId === e.id ? null : e.id)}
+                        aria-expanded={videoId === e.id}
                         className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <Pencil className="size-3.5" /> Editar
+                        <Clapperboard className="size-3.5" /> {video.kind === 'own' ? 'Trocar vídeo' : 'Escolher vídeo'}
                       </button>
-                      {canDelete ? (
+                    ) : null}
+                    {custom ? (
+                      <>
                         <button
-                          onClick={() => setConfirmId(e.id)}
-                          disabled={deleteMut.isPending}
-                          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-destructive hover:bg-destructive/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => setEditingId(e.id)}
+                          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          <Trash2 className="size-3.5" /> Excluir
+                          <Pencil className="size-3.5" /> Editar
                         </button>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">global</span>
-                  )}
+                        {canDelete ? (
+                          <button
+                            onClick={() => setConfirmId(e.id)}
+                            disabled={deleteMut.isPending}
+                            className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-destructive hover:bg-destructive/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Trash2 className="size-3.5" /> Excluir
+                          </button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="px-2 text-muted-foreground">global</span>
+                    )}
+                  </div>
                 </div>
+                {videoId === e.id && orgId ? (
+                  <div className="mt-3">
+                    <ExerciseVideoEditor
+                      orgId={orgId}
+                      exerciseId={e.id}
+                      exerciseName={e.name}
+                      current={e.own_video_url ?? null}
+                      onDone={() => setVideoId(null)}
+                    />
+                  </div>
+                ) : null}
               </li>
             )
           })}

@@ -3,10 +3,14 @@ import type { Database, Json } from '../../lib/database.types'
 import type { GroupKind, Technique } from './groups'
 import type { VolumeSnapshot } from './volume'
 
-// A 0040 acrescenta os outros músculos principais; opcional até regenerar os
-// tipos do banco.
+// A 0040 acrescenta os outros músculos principais e a 0042, o vídeo curado do
+// catálogo; opcionais até regenerar os tipos do banco. `own_video_url` não é
+// coluna: é o vídeo que a organização escolheu (exercise_videos), juntado por
+// listExercises.
 export type ExerciseRow = Database['public']['Tables']['exercises']['Row'] & {
   additional_primary_muscles?: string[] | null
+  catalog_video_url?: string | null
+  own_video_url?: string | null
 }
 export type WorkoutPlanRow = Database['public']['Tables']['workout_plans']['Row']
 export type WorkoutDayRow = Database['public']['Tables']['workout_days']['Row']
@@ -32,15 +36,62 @@ export type WorkoutLogSetRow = Database['public']['Tables']['workout_log_sets'][
 
 // Catalogo visivel: global (org_id null) + custom da org. A RLS ja garante isso;
 // o filtro explicito usa o indice e deixa claro. Ordena por grupo e nome.
+// Junto vem o vídeo que a organização escolheu para cada exercício: toda tela
+// que lista exercícios já usa esta consulta, e o link de demonstração sai
+// resolvido sem uma segunda busca por tela.
 export async function listExercises(orgId: string): Promise<ExerciseRow[]> {
-  const { data, error } = await supabase
-    .from('exercises')
-    .select('*')
-    .or(`org_id.is.null,org_id.eq.${orgId}`)
-    .order('primary_muscle', { ascending: true })
-    .order('name', { ascending: true })
+  const [exercises, videos] = await Promise.all([
+    supabase
+      .from('exercises')
+      .select('*')
+      .or(`org_id.is.null,org_id.eq.${orgId}`)
+      .order('primary_muscle', { ascending: true })
+      .order('name', { ascending: true }),
+    exerciseVideosTable.from('exercise_videos').select('exercise_id, video_url').eq('org_id', orgId),
+  ])
+  if (exercises.error) throw exercises.error
+  if (videos.error) throw videos.error
+  const own = new Map((videos.data ?? []).map((v) => [v.exercise_id, v.video_url]))
+  return (exercises.data ?? []).map((e) => ({ ...e, own_video_url: own.get(e.id) ?? null }))
+}
+
+// Contrato da tabela da 0042, até regenerar database.types.
+type ExerciseVideoRow = { exercise_id: string; video_url: string }
+type ExerciseVideosTable = {
+  from(table: 'exercise_videos'): {
+    select(columns: 'exercise_id, video_url'): {
+      eq(column: 'org_id', value: string): PromiseLike<{ data: ExerciseVideoRow[] | null; error: unknown }>
+    }
+    upsert(
+      values: { org_id: string; exercise_id: string; video_url: string },
+      options: { onConflict: 'org_id,exercise_id' }
+    ): PromiseLike<{ error: unknown }>
+    delete(): {
+      eq(column: 'org_id', value: string): {
+        eq(column: 'exercise_id', value: string): PromiseLike<{ error: unknown }>
+      }
+    }
+  }
+}
+const exerciseVideosTable = supabase as unknown as ExerciseVideosTable
+
+// Vídeo escolhido pela organização para um exercício (global ou dela). O link
+// chega já na forma canônica (demo.ts); o banco confere de novo.
+export async function setExerciseVideo(orgId: string, exerciseId: string, videoUrl: string): Promise<void> {
+  const { error } = await exerciseVideosTable
+    .from('exercise_videos')
+    .upsert({ org_id: orgId, exercise_id: exerciseId, video_url: videoUrl }, { onConflict: 'org_id,exercise_id' })
   if (error) throw error
-  return data ?? []
+}
+
+// Sem escolha, o exercício volta ao vídeo do catálogo ou à busca.
+export async function clearExerciseVideo(orgId: string, exerciseId: string): Promise<void> {
+  const { error } = await exerciseVideosTable
+    .from('exercise_videos')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('exercise_id', exerciseId)
+  if (error) throw error
 }
 
 export type CreateExerciseInput = {

@@ -7,6 +7,7 @@ import { equipmentLabel } from './volume'
 import { primaryMusclesLabel, worksMuscle } from './exerciseMuscles'
 import { ExerciseForm } from './ExerciseForm'
 import { ExerciseDemoLink } from './ExerciseDemoLink'
+import { resolveExerciseVideo } from './demo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { controlClass } from '@/lib/ui'
@@ -97,7 +98,7 @@ export function ExercisePicker({
                 {primaryMusclesLabel(e)} · {equipmentLabel(e.equipment as never)}
               </span>
             </button>
-            <ExerciseDemoLink name={e.name} label="" className="shrink-0 px-2 text-muted-foreground hover:text-foreground" />
+            <ExerciseDemoLink name={e.name} video={resolveExerciseVideo(e)} label="" className="shrink-0 px-2 text-muted-foreground hover:text-foreground" />
           </li>
         ))}
         {filtered.length === 0 ? (

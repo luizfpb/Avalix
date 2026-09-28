@@ -1,4 +1,4 @@
-import { Document, Page, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Link, Page, Polygon, StyleSheet, Svg, View, pdf } from '@react-pdf/renderer'
 // Text saneado: a fonte padrão é WinAnsi e trocaria glifo em silêncio para
 // qualquer caractere fora do CP1252 digitado pelo profissional. Ver pdfText.tsx.
 import { Text } from './pdfText'
@@ -14,6 +14,7 @@ import { groupHint, groupLabel, techniqueLabel, toRowBlocks } from '../workout/g
 import { registerReportFonts } from './pdfFonts'
 import { LIMITE_BLOCO_ATOMICO, estimateTextHeight } from './pdfLayout'
 import { goalLabel } from '../workout/volume'
+import type { ExerciseVideo } from '../workout/demo'
 import {
   InfoCard,
   MethodNote,
@@ -39,6 +40,9 @@ export type WorkoutPdfData = {
   overrides: WorkoutWeekOverrideRow[]
   // exercise_id -> nome (montado na página a partir do catálogo)
   exerciseNames: Record<string, string>
+  // exercise_id -> vídeo de demonstração (o da organização, o curado do
+  // catálogo ou a busca pelo nome). Ausente = PDF sem links.
+  exerciseVideos?: Record<string, ExerciseVideo>
   // avaliação/postura de origem (a ponte avaliação->prescrição), se vinculadas
   source?: {
     assessmentDate?: string | null
@@ -114,6 +118,13 @@ const styles = StyleSheet.create({
   tdNum: { fontSize: 7.8, color: palette.muted, paddingTop: 1 },
   tdName: { fontSize: 9, fontWeight: 700, color: palette.ink, lineHeight: 1.35 },
   tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 2, lineHeight: 1.45 },
+  // Link do vídeo: o PDF vai para o celular do aluno, onde o toque abre o
+  // YouTube. Sem sublinhado azul padrão do renderer; a cor da marca e o
+  // triângulo de "play" já dizem que é tocável.
+  nameLink: { textDecoration: 'none', color: palette.ink },
+  videoLink: { flexDirection: 'row', alignItems: 'center', marginTop: 3, textDecoration: 'none' },
+  videoText: { fontSize: 7, fontWeight: 700, color: palette.violet, lineHeight: 1.4 },
+  videoTextSearch: { color: palette.muted },
   tdStrong: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, paddingTop: 1 },
   tdCell: { fontSize: 8.5, color: palette.ink, paddingTop: 1 },
 
@@ -231,18 +242,37 @@ function exerciseSub(ex: WorkoutExerciseRow, hoisted: string | null): string {
 const LIMITE_CARTAO_ATOMICO = 440
 const LARGURA_NOME_EXERCICIO = 595 - 34 * 2 - 9 * 2 - 24 - 35 - 50 - 29 - 46 - 8
 
+// Linha do link de vídeo: margem + uma linha de 7 pt.
+const ALTURA_LINK_VIDEO = 3 + 7 * 1.4
+
 export function estimateWorkoutExerciseHeight(
   ex: WorkoutExerciseRow,
   name: string,
-  tempo: string | null = null
+  tempo: string | null = null,
+  withVideo = false
 ): number {
   const sub = exerciseSub(ex, tempo)
   const nameHeight = estimateTextHeight({ text: name, fontSize: 9, lineHeight: 1.35, width: LARGURA_NOME_EXERCICIO })
   const detailHeight = sub
     ? 2 + estimateTextHeight({ text: sub, fontSize: 7, lineHeight: 1.45, width: LARGURA_NOME_EXERCICIO })
     : 0
+  const videoHeight = withVideo ? ALTURA_LINK_VIDEO : 0
   const repsHeight = estimateTextHeight({ text: ex.reps ?? '—', fontSize: 8.5, lineHeight: 1.4, width: 50 })
-  return 18 + Math.max(nameHeight + detailHeight, repsHeight)
+  return 18 + Math.max(nameHeight + detailHeight + videoHeight, repsHeight)
+}
+
+function VideoLink({ video }: { video: ExerciseVideo }) {
+  const busca = video.kind === 'search'
+  return (
+    <Link src={video.url} style={styles.videoLink}>
+      <Svg width={6} height={6} viewBox="0 0 6 6" style={{ marginRight: 3 }}>
+        <Polygon points="0.5,0 6,3 0.5,6" fill={busca ? palette.muted : palette.violet} />
+      </Svg>
+      <Text style={[styles.videoText, ...(busca ? [styles.videoTextSearch] : [])]}>
+        {busca ? 'Buscar vídeo no YouTube' : 'Ver vídeo da execução'}
+      </Text>
+    </Link>
+  )
 }
 
 // O mesmo cálculo governa linha, grupo e divisão. Contar só exercícios
@@ -251,10 +281,12 @@ function DayCard({
   day,
   exercises,
   names,
+  videos,
 }: {
   day: WorkoutDayRow
   exercises: WorkoutExerciseRow[]
   names: Record<string, string>
+  videos?: Record<string, ExerciseVideo>
 }) {
   const rows = exercises
     .filter((e) => e.day_id === day.id)
@@ -263,7 +295,8 @@ function DayCard({
   const tempo = commonTempo(rows)
   const name = day.name || `Treino ${day.label}`
   const blocks = toRowBlocks(rows)
-  const rowHeight = (ex: WorkoutExerciseRow) => estimateWorkoutExerciseHeight(ex, names[ex.exercise_id] ?? 'Exercício', tempo)
+  const rowHeight = (ex: WorkoutExerciseRow) =>
+    estimateWorkoutExerciseHeight(ex, names[ex.exercise_id] ?? 'Exercício', tempo, !!videos?.[ex.exercise_id])
   const headerHeight = 26 + estimateTextHeight({ text: name, fontSize: 14, lineHeight: 1.25, width: 470 })
   const parte = headerHeight + 35 + rows.reduce((h, ex) => h + rowHeight(ex), 0) + blocks.filter((b) => b.kind).length * 28 > LIMITE_CARTAO_ATOMICO
 
@@ -299,6 +332,8 @@ function DayCard({
         const linhas = block.items.map((ex, j) => {
           const i = block.start + j
           const sub = exerciseSub(ex, tempo)
+          const video = videos?.[ex.exercise_id]
+          const nome = <Text style={styles.tdName}>{names[ex.exercise_id] ?? 'Exercício'}</Text>
           return (
             // Linhas usuais ficam juntas; texto livre maior que uma folha
             // precisa poder continuar, preservando o conteúdo completo.
@@ -312,8 +347,10 @@ function DayCard({
             >
               <Text style={[styles.tdNum, styles.colNum]}>{String(i + 1).padStart(2, '0')}</Text>
               <View style={styles.colName}>
-                <Text style={styles.tdName}>{names[ex.exercise_id] ?? 'Exercício'}</Text>
+                {/* o nome também abre o vídeo: alvo de toque maior que a linha de 7 pt */}
+                {video ? <Link src={video.url} style={styles.nameLink}>{nome}</Link> : nome}
                 {sub ? <Text style={styles.tdNameSub}>{sub}</Text> : null}
+                {video ? <VideoLink video={video} /> : null}
               </View>
               <Text style={[styles.tdStrong, styles.colSets]}>{fmtSets(ex.sets)}</Text>
               {/* sem faixa prescrita (aquecimento, mobilidade, até a falha): o
@@ -633,7 +670,8 @@ function NotesSection({ notes }: { notes: string }) {
 }
 
 function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
-  const { plan, days, exercises, exerciseNames } = data
+  const { plan, days, exercises, exerciseNames, exerciseVideos } = data
+  const hasVideos = !!exerciseVideos && exercises.some((ex) => exerciseVideos[ex.exercise_id])
   const orderedDays = days.slice().sort((a, b) => a.position - b.position)
   const startsOn = fmtDate(plan.starts_on)
   const schedule =
@@ -693,8 +731,13 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
         ) : null}
 
         <View style={styles.section}>
+          {hasVideos ? (
+            <Text style={styles.intro}>
+              Toque no nome do exercício ou em “Ver vídeo da execução” para assistir à demonstração no YouTube.
+            </Text>
+          ) : null}
           {orderedDays.map((day) => (
-            <DayCard key={day.id} day={day} exercises={exercises} names={exerciseNames} />
+            <DayCard key={day.id} day={day} exercises={exercises} names={exerciseNames} videos={exerciseVideos} />
           ))}
         </View>
 
