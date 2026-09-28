@@ -69,6 +69,7 @@ import { SourceCard } from '../features/workout/SourceCard'
 import { ExercisePicker } from '../features/workout/ExercisePicker'
 import { WeeksCard } from '../features/workout/WeeksCard'
 import { exerciseCautions, posturalEmphasis } from '../features/workout/contraindications'
+import { additionalPrimaryMuscles } from '../features/workout/exerciseMuscles'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { Button } from '@/components/ui/button'
@@ -261,6 +262,7 @@ function Builder({
           e.id,
           {
             primaryMuscle: e.primary_muscle as MuscleGroup,
+            additionalPrimaryMuscles: additionalPrimaryMuscles(e),
             secondaryMuscles: e.secondary_muscles as MuscleGroup[],
             movementPattern: e.movement_pattern as MovementPattern,
           },
@@ -301,6 +303,7 @@ function Builder({
     if (!e) return []
     return exerciseCautions(anamneseAnswers, {
       primaryMuscle: e.primary_muscle as MuscleGroup,
+      additionalPrimaryMuscles: additionalPrimaryMuscles(e),
       secondaryMuscles: e.secondary_muscles as MuscleGroup[],
       movementPattern: e.movement_pattern as MovementPattern,
     })

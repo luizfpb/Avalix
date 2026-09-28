@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { loadEnv } from 'vite'
 
-const EXPECTED_SCHEMA_VERSION = '0039'
+const EXPECTED_SCHEMA_VERSION = '0040'
 const REQUEST_TIMEOUT_MS = 15_000
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url))
 

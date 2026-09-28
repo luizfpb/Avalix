@@ -90,6 +90,8 @@ export type EditorPlan = {
 // metadados de musculo necessarios pro volume, indexados por exercise_id
 export type ExerciseMeta = {
   primaryMuscle: MuscleGroup
+  // outros músculos principais (0040); opcional pelo mesmo motivo do padrão
+  additionalPrimaryMuscles?: MuscleGroup[]
   secondaryMuscles: MuscleGroup[]
   // usado só pelo método refinado (composto vs isolado); opcional pra não
   // quebrar chamadas/testes que só ligam no volume padrão
@@ -155,6 +157,7 @@ export function editorToVolumePlan(
           {
             key: ex.key,
             primaryMuscle: meta.primaryMuscle,
+            additionalPrimaryMuscles: meta.additionalPrimaryMuscles,
             secondaryMuscles: meta.secondaryMuscles,
             movementPattern: meta.movementPattern,
             sets: ex.sets,

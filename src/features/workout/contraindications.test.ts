@@ -43,10 +43,21 @@ describe('exerciseCautions', () => {
     expect(exerciseCautions(withPain('joelho_d', 1, true), agacho).length).toBe(1)
   })
 
-  it('red flag de coluna poupa carga axial (hinge/squat/lombar)', () => {
-    const a = { ...emptyAnamnesis(), red_flags: ['deficit_neuro'] }
-    expect(exerciseCautions(a, terra).some((r) => /coluna/.test(r))).toBe(true)
+  it('red flag poupa carga axial (hinge/squat/lombar) e diz qual é o sinal', () => {
+    const a = { ...emptyAnamnesis(), red_flags: ['febre'] }
+    expect(exerciseCautions(a, terra)).toEqual([
+      'sinais de alerta (febre associada) — evitar carga axial até avaliação médica',
+    ])
     expect(exerciseCautions(a, rosca)).toEqual([]) // isolamento de bíceps não é axial
+  })
+
+  // 0040: um principal adicional também cruza com a anamnese.
+  it('músculo principal adicional entra no cruzamento', () => {
+    const a = withPain('lombar', 6)
+    const levantamento: ExerciseLite = {
+      primaryMuscle: 'glutes', additionalPrimaryMuscles: ['lower_back'], secondaryMuscles: [], movementPattern: 'isolation',
+    }
+    expect(exerciseCautions(a, levantamento).length).toBe(1)
   })
 
   it('sem queixas -> nenhum sinal', () => {

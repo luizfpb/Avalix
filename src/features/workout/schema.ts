@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { CreateExerciseInput, ExerciseRow, UpdateExerciseInput } from './api'
 import type { Equipment, MovementPattern, MuscleGroup } from './volume'
+import { additionalPrimaryMuscles, MAX_ADDITIONAL_PRIMARY } from './exerciseMuscles'
 import {
   EQUIPMENT_LABELS,
   GOAL_LABELS,
@@ -40,6 +41,8 @@ export const exerciseFormSchema = z
   .object({
     name: z.string().trim().min(1, 'Informe o nome').max(120, 'Máximo de 120 caracteres'),
     primary_muscle: z.string().min(1, 'Selecione o músculo principal'),
+    // outros principais (0040): até 2, além do principal
+    additional_primary_muscles: z.array(muscleEnum).default([]),
     secondary_muscles: z.array(muscleEnum).default([]),
     equipment: z.string().min(1, 'Selecione o equipamento'),
     movement_pattern: z.string().min(1, 'Selecione o padrão de movimento'),
@@ -64,6 +67,30 @@ export const exerciseFormSchema = z
         message: 'O músculo principal não deve aparecer nos secundários',
       })
     }
+    // Mesmas regras do CHECK da 0040: no máximo 3 principais no total, sem
+    // repetição, e um músculo não é principal e secundário ao mesmo tempo.
+    const adicionais = v.additional_primary_muscles
+    if (adicionais.length > MAX_ADDITIONAL_PRIMARY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['additional_primary_muscles'],
+        message: 'Escolha no máximo 3 músculos principais',
+      })
+    }
+    if (new Set(adicionais).size !== adicionais.length || adicionais.includes(v.primary_muscle as MuscleGroup)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['additional_primary_muscles'],
+        message: 'Um músculo principal não pode se repetir',
+      })
+    }
+    if (adicionais.some((m) => v.secondary_muscles.includes(m))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['secondary_muscles'],
+        message: 'Um músculo principal não deve aparecer nos secundários',
+      })
+    }
   })
 
 export type ExerciseFormValues = z.infer<typeof exerciseFormSchema>
@@ -72,6 +99,7 @@ export function emptyExerciseForm(): ExerciseFormValues {
   return {
     name: '',
     primary_muscle: '',
+    additional_primary_muscles: [],
     secondary_muscles: [],
     equipment: '',
     movement_pattern: '',
@@ -89,6 +117,7 @@ export function exerciseFormToInput(
     orgId,
     name: v.name.trim(),
     primaryMuscle: v.primary_muscle,
+    additionalPrimaryMuscles: v.additional_primary_muscles,
     secondaryMuscles: v.secondary_muscles,
     equipment: v.equipment,
     movementPattern: v.movement_pattern,
@@ -102,6 +131,7 @@ export function exerciseFormToUpdate(v: ExerciseFormValues): UpdateExerciseInput
   return {
     name: v.name.trim(),
     primaryMuscle: v.primary_muscle,
+    additionalPrimaryMuscles: v.additional_primary_muscles,
     secondaryMuscles: v.secondary_muscles,
     equipment: v.equipment,
     movementPattern: v.movement_pattern,
@@ -114,6 +144,7 @@ export function exerciseRowToForm(r: ExerciseRow): ExerciseFormValues {
   return {
     name: r.name,
     primary_muscle: r.primary_muscle,
+    additional_primary_muscles: additionalPrimaryMuscles(r),
     secondary_muscles: r.secondary_muscles as MuscleGroup[],
     equipment: r.equipment,
     movement_pattern: r.movement_pattern,

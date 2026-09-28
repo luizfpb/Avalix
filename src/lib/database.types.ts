@@ -610,6 +610,7 @@ export type Database = {
       }
       exercises: {
         Row: {
+          additional_primary_muscles: string[]
           created_at: string
           created_by: string | null
           cues: string | null
@@ -624,6 +625,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          additional_primary_muscles?: string[]
           created_at?: string
           created_by?: string | null
           cues?: string | null
@@ -638,6 +640,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          additional_primary_muscles?: string[]
           created_at?: string
           created_by?: string | null
           cues?: string | null

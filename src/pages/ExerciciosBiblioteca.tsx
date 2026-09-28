@@ -5,7 +5,8 @@ import { useOrganization } from '../features/organization/context'
 import { useExercises, useDeleteCustomExercise } from '../features/workout/hooks'
 import { ExerciseForm } from '../features/workout/ExerciseForm'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
-import { equipmentLabel, muscleLabel, type Equipment, type MuscleGroup } from '../features/workout/volume'
+import { equipmentLabel, type Equipment } from '../features/workout/volume'
+import { primaryMusclesLabel, worksMuscle } from '../features/workout/exerciseMuscles'
 import { MUSCLE_OPTIONS } from '../features/workout/schema'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,7 +35,7 @@ export default function ExerciciosBiblioteca() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return exercises.filter((e) => {
-      if (muscle && e.primary_muscle !== muscle && !e.secondary_muscles.includes(muscle)) return false
+      if (muscle && !worksMuscle(e, muscle)) return false
       if (q && !e.name.toLowerCase().includes(q)) return false
       return true
     })
@@ -137,7 +138,7 @@ export default function ExerciciosBiblioteca() {
                     ) : null}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {muscleLabel(e.primary_muscle as MuscleGroup)} · {equipmentLabel(e.equipment as Equipment)}
+                    {primaryMusclesLabel(e)} · {equipmentLabel(e.equipment as Equipment)}
                     {e.secondary_muscles.length > 0
                       ? ` · +${e.secondary_muscles.length} secundário${e.secondary_muscles.length > 1 ? 's' : ''}`
                       : ''}

@@ -12,7 +12,9 @@ import type {
 
 // Versao do motor de volume. Gravada em workout_plans.volume_engine_version pra
 // um plano emitido continuar reproduzivel mesmo se a contagem mudar depois.
-export const VOLUME_ENGINE_VERSION = 'volume-engine@1'
+// @2 (0040): os músculos principais adicionais contam com peso cheio, como o
+// principal. Exercício sem adicional conta exatamente como na @1.
+export const VOLUME_ENGINE_VERSION = 'volume-engine@2'
 
 // PADRAO — contagem fracionada: musculo primario conta 1 serie cheia, secundario
 // 0.5. Nao e palpite: e o metodo 'fractional' das meta-regressoes dose-resposta,
@@ -42,7 +44,7 @@ export function secondaryWeight(method: VolumeMethod, pattern?: MovementPattern)
 // Texto curto do metodo padrao, exibido na UI e no PDF (transparencia, igual a
 // divulgacao Siri/Brozek na avaliacao).
 export const VOLUME_METHOD_NOTE =
-  `Volume fracionado (${VOLUME_ENGINE_VERSION}): músculo primário conta ` +
+  `Volume fracionado (${VOLUME_ENGINE_VERSION}): cada músculo principal conta ` +
   `${VOLUME_WEIGHTS.primary.toFixed(1)} série e secundário ${VOLUME_WEIGHTS.secondary.toFixed(1)}, ` +
   `somando séries por grupo muscular na semana.`
 
@@ -80,7 +82,10 @@ function effectiveSets(ex: VolumeExercise, override?: VolumeOverride): number {
 // Conta o volume de UMA semana com os sets ja resolvidos. method='fractional'
 // (padrao) usa 0.5 fixo; 'refined' usa o peso por padrao de movimento.
 export function countWeekVolume(
-  exercises: Pick<VolumeExercise, 'primaryMuscle' | 'secondaryMuscles' | 'sets' | 'movementPattern'>[],
+  exercises: Pick<
+    VolumeExercise,
+    'primaryMuscle' | 'additionalPrimaryMuscles' | 'secondaryMuscles' | 'sets' | 'movementPattern'
+  >[],
   method: VolumeMethod = 'fractional'
 ): { byMuscle: MuscleVolume; totalSets: number } {
   const byMuscle: MuscleVolume = {}
@@ -88,9 +93,14 @@ export function countWeekVolume(
   for (const ex of exercises) {
     if (!(ex.sets > 0)) continue
     totalSets += ex.sets
-    addTo(byMuscle, ex.primaryMuscle, ex.sets * VOLUME_WEIGHTS.primary)
+    // Cada músculo conta uma vez por exercício, e a condição de principal
+    // vence a de secundário (o banco já recusa a sobreposição; aqui é defesa).
+    const principais = new Set<MuscleGroup>([ex.primaryMuscle, ...(ex.additionalPrimaryMuscles ?? [])])
+    for (const m of principais) addTo(byMuscle, m, ex.sets * VOLUME_WEIGHTS.primary)
     const w = secondaryWeight(method, ex.movementPattern)
-    for (const m of ex.secondaryMuscles) addTo(byMuscle, m, ex.sets * w)
+    for (const m of new Set(ex.secondaryMuscles)) {
+      if (!principais.has(m)) addTo(byMuscle, m, ex.sets * w)
+    }
   }
   return { byMuscle, totalSets }
 }
@@ -121,6 +131,7 @@ export function buildVolumeSnapshot(
       if (!day) return []
       return day.exercises.map((ex) => ({
         primaryMuscle: ex.primaryMuscle,
+        additionalPrimaryMuscles: ex.additionalPrimaryMuscles,
         secondaryMuscles: ex.secondaryMuscles,
         movementPattern: ex.movementPattern,
         sets: effectiveSets(ex, weekOverrides[ex.key]),

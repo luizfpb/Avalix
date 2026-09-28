@@ -3,7 +3,11 @@ import type { Database, Json } from '../../lib/database.types'
 import type { GroupKind, Technique } from './groups'
 import type { VolumeSnapshot } from './volume'
 
-export type ExerciseRow = Database['public']['Tables']['exercises']['Row']
+// A 0040 acrescenta os outros músculos principais; opcional até regenerar os
+// tipos do banco.
+export type ExerciseRow = Database['public']['Tables']['exercises']['Row'] & {
+  additional_primary_muscles?: string[] | null
+}
 export type WorkoutPlanRow = Database['public']['Tables']['workout_plans']['Row']
 export type WorkoutDayRow = Database['public']['Tables']['workout_days']['Row']
 export type WorkoutExerciseRow = Database['public']['Tables']['workout_exercises']['Row']
@@ -43,6 +47,7 @@ export type CreateExerciseInput = {
   orgId: string
   name: string
   primaryMuscle: string
+  additionalPrimaryMuscles: string[]
   secondaryMuscles: string[]
   equipment: string
   movementPattern: string
@@ -51,16 +56,28 @@ export type CreateExerciseInput = {
   createdBy?: string | null
 }
 
+// Contrato da tabela com a coluna da 0040, até regenerar database.types.
+type ExercisesWrite = {
+  from(table: 'exercises'): {
+    insert(values: Record<string, unknown>): { select(columns: '*'): { single(): PromiseLike<{ data: ExerciseRow | null; error: unknown }> } }
+    update(values: Record<string, unknown>): {
+      eq(column: 'id', value: string): { select(columns: '*'): { single(): PromiseLike<{ data: ExerciseRow | null; error: unknown }> } }
+    }
+  }
+}
+const exercisesWrite = supabase as unknown as ExercisesWrite
+
 // Cria exercicio custom da org ("esta faltando, adiciona"). org_id obrigatorio
 // (a RLS so deixa escrever linha custom); metadados de musculo/equipamento sao
 // exigidos pelo schema — sem eles o volume nao significa nada.
 export async function createCustomExercise(input: CreateExerciseInput): Promise<ExerciseRow> {
-  const { data, error } = await supabase
+  const { data, error } = await exercisesWrite
     .from('exercises')
     .insert({
       org_id: input.orgId,
       name: input.name,
       primary_muscle: input.primaryMuscle,
+      additional_primary_muscles: input.additionalPrimaryMuscles,
       secondary_muscles: input.secondaryMuscles,
       equipment: input.equipment,
       movement_pattern: input.movementPattern,
@@ -71,12 +88,14 @@ export async function createCustomExercise(input: CreateExerciseInput): Promise<
     .select('*')
     .single()
   if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar o exercício criado.')
   return data
 }
 
 export type UpdateExerciseInput = {
   name: string
   primaryMuscle: string
+  additionalPrimaryMuscles: string[]
   secondaryMuscles: string[]
   equipment: string
   movementPattern: string
@@ -90,11 +109,12 @@ export async function updateCustomExercise(
   id: string,
   input: UpdateExerciseInput
 ): Promise<ExerciseRow> {
-  const { data, error } = await supabase
+  const { data, error } = await exercisesWrite
     .from('exercises')
     .update({
       name: input.name,
       primary_muscle: input.primaryMuscle,
+      additional_primary_muscles: input.additionalPrimaryMuscles,
       secondary_muscles: input.secondaryMuscles,
       equipment: input.equipment,
       movement_pattern: input.movementPattern,
@@ -105,6 +125,7 @@ export async function updateCustomExercise(
     .select('*')
     .single()
   if (error) throw error
+  if (!data) throw new Error('Não foi possível confirmar a edição do exercício.')
   return data
 }
 

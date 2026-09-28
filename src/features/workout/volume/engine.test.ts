@@ -38,6 +38,34 @@ describe('countWeekVolume', () => {
     expect(byMuscle.chest).toBe(4)
   })
 
+  // 0040: agachamento com quadríceps E glúteos como principais — os dois
+  // contam a série inteira; antes o glúteo ia como secundário (0,5).
+  it('outros músculos principais contam com peso cheio', () => {
+    const { byMuscle, totalSets } = countWeekVolume([
+      { primaryMuscle: 'quads', additionalPrimaryMuscles: ['glutes'], secondaryMuscles: ['hamstrings'], sets: 4 },
+    ])
+    expect(byMuscle.quads).toBe(4)
+    expect(byMuscle.glutes).toBe(4)
+    expect(byMuscle.hamstrings).toBe(2)
+    expect(totalSets).toBe(4) // as séries reais não se multiplicam
+  })
+
+  it('o mesmo músculo não conta duas vezes no mesmo exercício', () => {
+    const { byMuscle } = countWeekVolume([
+      { primaryMuscle: 'quads', additionalPrimaryMuscles: ['glutes', 'quads'], secondaryMuscles: ['glutes'], sets: 4 },
+    ])
+    expect(byMuscle.quads).toBe(4)
+    expect(byMuscle.glutes).toBe(4) // principal vence secundário
+  })
+
+  it('o snapshot leva os principais adicionais adiante', () => {
+    const snap = buildVolumeSnapshot({
+      weeks: 1,
+      days: [{ label: 'A', exercises: [ex({ primaryMuscle: 'quads', additionalPrimaryMuscles: ['glutes'], sets: 3 })] }],
+    })
+    expect(snap.typicalByMuscle).toEqual({ quads: 3, glutes: 3 })
+  })
+
   it('ignora exercicio com 0 series', () => {
     const { byMuscle, totalSets } = countWeekVolume([
       { primaryMuscle: 'chest', secondaryMuscles: ['triceps'], sets: 0 },

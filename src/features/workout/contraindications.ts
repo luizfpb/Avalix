@@ -1,11 +1,12 @@
-import type { AnamnesisAnswers } from '../anamnesis/spec'
+import { redFlagNames, type AnamnesisAnswers } from '../anamnesis/spec'
 import type { MovementPattern, MuscleGroup } from './volume'
 
 // Inteligência avaliação→prescrição: cruza a anamnese (dados estruturados) com os
 // exercícios do plano. NÃO é contraindicação médica nem diagnóstico — é um SINAL
 // pra o profissional REVISAR o exercício diante da queixa/achado. Conservador,
 // versionado e transparente (cada sinal traz o motivo). O treinador decide.
-export const CONTRA_RULES_VERSION = 'contra-rules@2'
+// @3: o sinal de red flag nomeia os sinais marcados em vez de "de coluna".
+export const CONTRA_RULES_VERSION = 'contra-rules@3'
 
 type Caution = { muscles: MuscleGroup[]; patterns: MovementPattern[] }
 
@@ -58,6 +59,8 @@ const LESION_CAUTION: Record<string, { caution: Caution; label: string }> = {
 
 export type ExerciseLite = {
   primaryMuscle: MuscleGroup
+  // outros principais (0040): também entram no cruzamento com a anamnese
+  additionalPrimaryMuscles?: MuscleGroup[]
   secondaryMuscles: MuscleGroup[]
   movementPattern: MovementPattern
 }
@@ -78,7 +81,11 @@ function relevantRegions(answers: AnamnesisAnswers): { region: string; reason: s
 // Motivos para REVISAR este exercício diante da anamnese. Vazio = sem sinal.
 export function exerciseCautions(answers: AnamnesisAnswers, ex: ExerciseLite): string[] {
   const reasons: string[] = []
-  const muscles = new Set<MuscleGroup>([ex.primaryMuscle, ...ex.secondaryMuscles])
+  const muscles = new Set<MuscleGroup>([
+    ex.primaryMuscle,
+    ...(ex.additionalPrimaryMuscles ?? []),
+    ...ex.secondaryMuscles,
+  ])
 
   for (const { region, reason } of relevantRegions(answers)) {
     const c = REGION_CAUTION[region]
@@ -97,12 +104,14 @@ export function exerciseCautions(answers: AnamnesisAnswers, ex: ExerciseLite): s
     }
   }
 
-  // red flags de coluna: poupar carga axial pesada até avaliação
+  // Sinais de alerta (red flags): poupar carga axial pesada até a avaliação
+  // médica. O motivo diz QUAIS sinais — ver redFlagNames sobre o rótulo antigo.
+  const redFlags = answers.red_flags ?? []
   if (
-    (answers.red_flags ?? []).length > 0 &&
+    redFlags.length > 0 &&
     (ex.movementPattern === 'hinge' || ex.movementPattern === 'squat' || muscles.has('lower_back'))
   ) {
-    reasons.push('sinais de alerta de coluna — evitar carga axial até avaliação médica')
+    reasons.push(`sinais de alerta (${redFlagNames(redFlags)}) — evitar carga axial até avaliação médica`)
   }
 
   return [...new Set(reasons)]

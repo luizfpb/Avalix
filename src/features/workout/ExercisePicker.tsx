@@ -3,7 +3,8 @@ import { Link } from 'react-router'
 import { Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ExerciseRow } from './api'
 import { MUSCLE_OPTIONS } from './schema'
-import { equipmentLabel, muscleLabel, type MuscleGroup } from './volume'
+import { equipmentLabel } from './volume'
+import { primaryMusclesLabel, worksMuscle } from './exerciseMuscles'
 import { ExerciseForm } from './ExerciseForm'
 import { ExerciseDemoLink } from './ExerciseDemoLink'
 import { Button } from '@/components/ui/button'
@@ -34,7 +35,7 @@ export function ExercisePicker({
     return exercises
       .filter((e) => {
         if (excludedExerciseIds?.has(e.id)) return false
-        if (muscle && e.primary_muscle !== muscle && !e.secondary_muscles.includes(muscle)) return false
+        if (muscle && !worksMuscle(e, muscle)) return false
         if (q && !e.name.toLowerCase().includes(q)) return false
         return true
       })
@@ -93,7 +94,7 @@ export function ExercisePicker({
                 {e.org_id ? <span className="ml-1 text-xs text-primary">(custom)</span> : null}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">
-                {muscleLabel(e.primary_muscle as MuscleGroup)} · {equipmentLabel(e.equipment as never)}
+                {primaryMusclesLabel(e)} · {equipmentLabel(e.equipment as never)}
               </span>
             </button>
             <ExerciseDemoLink name={e.name} label="" className="shrink-0 px-2 text-muted-foreground hover:text-foreground" />

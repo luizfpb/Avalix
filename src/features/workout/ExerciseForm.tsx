@@ -13,6 +13,7 @@ import {
   exerciseRowToForm,
   type ExerciseFormValues,
 } from './schema'
+import { MAX_ADDITIONAL_PRIMARY } from './exerciseMuscles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +42,7 @@ export function ExerciseForm({
   const equipmentId = `${formId}-equipment`
   const movementId = `${formId}-movement`
   const secondaryLabelId = `${formId}-secondary-label`
+  const additionalLabelId = `${formId}-additional-primary-label`
   const cuesId = `${formId}-cues`
   const { user } = useAuth()
   const createMut = useCreateCustomExercise(orgId)
@@ -61,6 +63,27 @@ export function ExerciseForm({
       secondary_muscles: p.secondary_muscles.includes(m as never)
         ? p.secondary_muscles.filter((x) => x !== m)
         : [...p.secondary_muscles, m as never],
+    }))
+  }
+  // Promover a principal tira o músculo dos secundários: o mesmo músculo não
+  // conta volume duas vezes no mesmo exercício.
+  function toggleAdditionalPrimary(m: string) {
+    setV((p) => {
+      const on = p.additional_primary_muscles.includes(m as never)
+      return {
+        ...p,
+        additional_primary_muscles: on
+          ? p.additional_primary_muscles.filter((x) => x !== m)
+          : [...p.additional_primary_muscles, m as never],
+        secondary_muscles: on ? p.secondary_muscles : p.secondary_muscles.filter((x) => x !== m),
+      }
+    })
+  }
+  function setPrimary(m: string) {
+    setV((p) => ({
+      ...p,
+      primary_muscle: m,
+      additional_primary_muscles: p.additional_primary_muscles.filter((x) => x !== m),
     }))
   }
 
@@ -95,7 +118,7 @@ export function ExerciseForm({
       />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Label htmlFor={primaryMuscleId} className="sr-only">Músculo principal</Label>
-        <select id={primaryMuscleId} className={controlClass} value={v.primary_muscle} onChange={(e) => set('primary_muscle', e.target.value)}>
+        <select id={primaryMuscleId} className={controlClass} value={v.primary_muscle} onChange={(e) => setPrimary(e.target.value)}>
           <option value="">Músculo principal *</option>
           {MUSCLE_OPTIONS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -131,12 +154,47 @@ export function ExerciseForm({
         </label>
       </div>
 
+      {/* Exercício composto costuma ter mais de um motor principal
+          (agachamento: quadríceps e glúteos). Até 2 além do principal, e cada
+          um conta volume com peso cheio (0040). */}
+      <div className="space-y-1">
+        <Label id={additionalLabelId} className="text-xs">
+          Outros músculos principais (opcional, até {MAX_ADDITIONAL_PRIMARY} — contam no volume com peso 1,0)
+        </Label>
+        <div role="group" aria-labelledby={additionalLabelId} className="flex flex-wrap gap-1">
+          {MUSCLE_OPTIONS.map((m) => {
+            const on = (v.additional_primary_muscles as string[]).includes(m.value)
+            const isMain = v.primary_muscle === m.value
+            const full = !on && v.additional_primary_muscles.length >= MAX_ADDITIONAL_PRIMARY
+            const off = isMain || full || !v.primary_muscle
+            return (
+              <button
+                key={m.value}
+                type="button"
+                disabled={off}
+                aria-pressed={on}
+                aria-label={`${m.label} como músculo principal`}
+                onClick={() => toggleAdditionalPrimary(m.value)}
+                className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  on
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                } ${off ? 'cursor-not-allowed opacity-40' : ''}`}
+              >
+                {m.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="space-y-1">
         <Label id={secondaryLabelId} className="text-xs">Músculos secundários (entram no volume com peso 0,5)</Label>
         <div role="group" aria-labelledby={secondaryLabelId} className="flex flex-wrap gap-1">
           {MUSCLE_OPTIONS.map((m) => {
             const on = (v.secondary_muscles as string[]).includes(m.value)
             const isPrimary = v.primary_muscle === m.value
+              || (v.additional_primary_muscles as string[]).includes(m.value)
             return (
               <button
                 key={m.value}

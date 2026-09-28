@@ -72,6 +72,8 @@ export type VolumeMethod = 'fractional' | 'refined'
 export type VolumeExercise = {
   key: string
   primaryMuscle: MuscleGroup
+  // outros músculos principais (0040), com o mesmo peso do principal
+  additionalPrimaryMuscles?: MuscleGroup[]
   secondaryMuscles: MuscleGroup[]
   movementPattern?: MovementPattern
   sets: number // baseline do template

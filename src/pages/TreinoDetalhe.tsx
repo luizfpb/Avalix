@@ -48,6 +48,7 @@ import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
+import { additionalPrimaryMuscles } from '../features/workout/exerciseMuscles'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -107,6 +108,7 @@ export default function TreinoDetalhe() {
           e.id,
           {
             primaryMuscle: e.primary_muscle as MuscleGroup,
+            additionalPrimaryMuscles: additionalPrimaryMuscles(e),
             secondaryMuscles: e.secondary_muscles as MuscleGroup[],
             movementPattern: e.movement_pattern as MovementPattern,
           },
@@ -648,6 +650,7 @@ function DuplicatePanel({
           e.id,
           {
             primaryMuscle: e.primary_muscle as MuscleGroup,
+            additionalPrimaryMuscles: additionalPrimaryMuscles(e),
             secondaryMuscles: e.secondary_muscles as MuscleGroup[],
           },
         ])
