@@ -259,6 +259,28 @@ describe('Execucao — ordem e exercícios da sessão', () => {
     expect(antes(supino(), crucifixo())).toBe(true)
   })
 
+  it('as setinhas sobem e descem o cartão, e ficam desligadas nas pontas', () => {
+    abrir()
+    adicionarCrucifixo()
+    const supino = () => screen.getByLabelText('Carga da série 1 de Supino reto')
+    const crucifixo = () => screen.getByLabelText('Carga da série 1 de Crucifixo')
+    expect(screen.getByRole('button', { name: 'Subir Supino reto' }).matches(':disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Descer Crucifixo' }).matches(':disabled')).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Subir Crucifixo' }))
+    expect(antes(crucifixo(), supino())).toBe(true)
+    expect(screen.getByRole('button', { name: 'Subir Crucifixo' }).matches(':disabled')).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descer Crucifixo' }))
+    expect(antes(supino(), crucifixo())).toBe(true)
+  })
+
+  it('com um exercício só, não há o que reordenar', () => {
+    abrir()
+    expect(screen.queryByRole('button', { name: 'Subir Supino reto' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mover Supino reto' })).toBeNull()
+  })
+
   it('arrastar pelo puxador leva o exercício para cima do outro', () => {
     abrir()
     adicionarCrucifixo()

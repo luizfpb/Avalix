@@ -78,6 +78,7 @@ import {
   type SessionTally,
 } from '../features/workout/logRows'
 import { SetRowFields } from '../features/workout/SetRowFields'
+import { RestTimerBar, type RestTimer } from '../features/workout/RestTimerBar'
 import { SessionEditForm, type SessionEditValues } from '../features/workout/SessionEditForm'
 import {
   currentWeek,
@@ -917,6 +918,11 @@ function TreinoDoDia({
   const [dirty, setDirty] = useState(false)
   const [switchingSession, setSwitchingSession] = useState(false)
   const [resetEpoch, setResetEpoch] = useState(0)
+  // Cronômetro de descanso, o mesmo da Execução do profissional: quem treina
+  // sozinho é quem está com o celular na mão entre as séries. Fica só na
+  // memória da tela — o rascunho guarda o que vai para o registro, e o tempo
+  // que importa já vai para o campo de descanso ao tocar "Começou a série".
+  const [cronometro, setCronometro] = useState<RestTimer | null>(null)
   const draftPlan = useRef({ days: dias, exercises: pacote.exercises })
   draftPlan.current = { days: dias, exercises: pacote.exercises }
   const switchGeneration = useRef(0)
@@ -1085,6 +1091,42 @@ function TreinoDoDia({
       rows[i] = updateLogRow(rows[i], campo, valor)
       return { ...anterior, [exId]: rows }
     })
+    if (campo !== 'done') return
+    // Marcar a série feita é o instante em que o descanso começa; desmarcar a
+    // série que está cronometrando cancela.
+    if (valor === true) {
+      const doDia = exerciciosDoDia.find((ex) => ex.id === exId)
+      const avulso = doDia ? undefined : exerciciosExtras.find((ex) => ex.id === exId)
+      const alvo = doDia
+        ? effectivePrescription(
+            doDia as unknown as WorkoutExerciseRow,
+            overrideFor(indice, semana, doDia.id)
+          ).restSeconds
+        : avulso?.rest_seconds ?? null
+      setCronometro({
+        rowId: exId,
+        index: i,
+        name: (doDia ?? avulso)?.name ?? 'exercício',
+        targetSeconds: alvo,
+        startedAt: Date.now(),
+      })
+    } else {
+      setCronometro((atual) => (atual?.rowId === exId && atual.index === i ? null : atual))
+    }
+  }
+
+  // Grava o tempo medido no descanso da série que o iniciou. Marcar a série
+  // seguinte sem passar por aqui só reinicia a contagem: o intervalo entre duas
+  // séries feitas inclui a execução da segunda e não é descanso.
+  function registrarDescanso() {
+    if (!cronometro) return
+    const visivel = [...exerciciosDoDia, ...exerciciosExtras].some((ex) => ex.id === cronometro.rowId)
+      && (linhas[cronometro.rowId]?.length ?? 0) > cronometro.index
+    if (visivel) {
+      const segundos = Math.floor((Date.now() - cronometro.startedAt) / 1000)
+      setCelula(cronometro.rowId, cronometro.index, 'rest', String(Math.max(0, Math.min(3600, segundos))))
+    }
+    setCronometro(null)
   }
 
   function addLinha(exId: string) {
@@ -1104,6 +1146,8 @@ function TreinoDoDia({
 
   function removerExtra(exId: string) {
     setDirty(true)
+    // o cronômetro de uma série que saiu da sessão não tem onde gravar
+    setCronometro((atual) => (atual?.rowId === exId ? null : atual))
     setExtras((anterior) => anterior.filter((id) => id !== exId))
     setLinhas((anterior) => {
       const proximo = { ...anterior }
@@ -1189,6 +1233,7 @@ function TreinoDoDia({
       revision.current = target?.revision ?? 0
       if (target) revisions.current.set(target.clientRef, revision.current)
       setDirty(Boolean(target))
+      setCronometro(null)
       setErro(null)
       setOk(null)
       setPlanoMudou(null)
@@ -1372,6 +1417,7 @@ function TreinoDoDia({
     setExtras([])
     setEscolhaExtra('')
     setDirty(false)
+    setCronometro(null)
     setPlanoMudou(null)
     setResetEpoch((value) => value + 1)
   }
@@ -1508,7 +1554,8 @@ function TreinoDoDia({
       ) : null}
 
       <p className="text-xs text-muted-foreground">
-        Descanso (s): anote o tempo após cada série. É opcional; 0 significa sem descanso.
+        Descanso (s): ao marcar a série feita, o cronômetro começa; toque em "Começou a série"
+        para anotar o tempo, ou digite. É opcional; 0 significa sem descanso.
         {' '}Marque Falha quando tentou e não conseguiu completar a repetição; RIR 0 sozinho não marca falha.
       </p>
 
@@ -1857,6 +1904,21 @@ function TreinoDoDia({
         </p>
       </div>
       </fieldset>
+
+      {/* Fora do fieldset: o descanso continua correndo enquanto a sessão é
+          enviada. O espaço reservado evita que a faixa fixa cubra os botões do
+          fim da página. */}
+      {cronometro ? (
+        <>
+          <div className="h-20" aria-hidden="true" />
+          <RestTimerBar
+            key={cronometro.startedAt}
+            timer={cronometro}
+            onRegister={registrarDescanso}
+            onDiscard={() => setCronometro(null)}
+          />
+        </>
+      ) : null}
     </div>
   )
 }

@@ -1391,6 +1391,69 @@ describe('TreinoAluno — semana do mesociclo', () => {
     )
   })
 })
+// Quem treina sozinho também está com o celular na mão entre as séries: o
+// cronômetro da Execução do profissional, com as mesmas regras.
+describe('TreinoAluno — cronômetro de descanso', () => {
+  it('marcar a série começa a contar, e "Começou a série" grava o descanso que vai no envio', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+      expect(screen.getByRole('timer').textContent).toBe('0:00')
+      expect(screen.getByText(/alvo 90s/)).toBeTruthy()
+      act(() => { vi.advanceTimersByTime(75_000) })
+      expect(screen.getByRole('timer').textContent).toBe('1:15')
+      fireEvent.click(screen.getByRole('button', { name: 'Começou a série' }))
+      expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('75')
+      expect(screen.queryByRole('timer')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets[0]).toMatchObject({ weight_kg: 40, rest_seconds: 75 })
+  })
+
+  it('a série seguinte reinicia a contagem sem gravar nada na anterior', async () => {
+    await abrir()
+    await campoCarga()
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+      act(() => { vi.advanceTimersByTime(40_000) })
+      fireEvent.click(screen.getByRole('button', { name: 'Série 2 de Supino reto feita' }))
+      expect(screen.getByRole('timer').textContent).toBe('0:00')
+      expect(screen.getByText(/descanso · série 2 de Supino reto/)).toBeTruthy()
+      expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('desmarcar a série ou descartar cancela a contagem', async () => {
+    await abrir()
+    await campoCarga()
+    const marcar = screen.getByRole('button', { name: 'Série 1 de Supino reto feita' })
+    fireEvent.click(marcar)
+    fireEvent.click(marcar)
+    expect(screen.queryByRole('timer')).toBeNull()
+    fireEvent.click(marcar)
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar o cronômetro sem registrar o descanso' }))
+    expect(screen.queryByRole('timer')).toBeNull()
+    expect((screen.getByLabelText('Descanso da série 1 de Supino reto') as HTMLInputElement).value).toBe('')
+  })
+
+  it('concluir o treino encerra a contagem', async () => {
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await screen.findByText(/Treino A concluído/)
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+})
+
 // A tela era um formulário longo em que nada distinguia "série feita" de
 // "campo ainda vazio", e terminar o treino devolvia uma linha de texto.
 describe('TreinoAluno — execução da sessão', () => {

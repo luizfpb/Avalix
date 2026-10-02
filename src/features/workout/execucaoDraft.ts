@@ -1,4 +1,5 @@
 import { isEmptyLogRow, type LogRow } from './logRows'
+import type { RestTimer } from './RestTimerBar'
 
 // Rascunho da sessão que o profissional registra na Execução.
 //
@@ -14,14 +15,7 @@ import { isEmptyLogRow, type LogRow } from './logRows'
 // o rascunho do aluno usa (studentDraft.ts) — e é remapeado na volta, em vez de
 // perder as séries caladas. O que não tem para onde ir é contado e avisado.
 
-export type ExecucaoRestTimer = {
-  rowId: string
-  index: number
-  name: string
-  targetSeconds: number | null
-  // instante do início (ms): o cronômetro continua certo depois de restaurado
-  startedAt: number
-}
+export type ExecucaoRestTimer = RestTimer
 
 export type ExecucaoExtra = { rowId: string; exerciseId: string }
 

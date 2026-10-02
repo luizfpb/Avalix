@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { Trash2, Plus, X, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import { Trash2, Plus, X, ChevronDown, ChevronRight, ChevronUp, GripVertical } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
   useCreateWorkoutLog,
@@ -72,6 +72,7 @@ import { listWorkoutLogSets } from '../features/workout/api'
 import { moveRow, orderSessionRows } from '../features/workout/sessionOrder'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
+import { RestTimerBar } from '../features/workout/RestTimerBar'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
 import type { WorkoutLogRow } from '../features/workout/api'
 
@@ -1154,8 +1155,20 @@ function LogForm({
   const skippedVisiveis = dayExercises.filter((ex) => skipped.includes(ex.id))
   const podeReordenar = sessao.length > 1
 
-  // Moldura comum aos cartões do plano e aos avulsos: puxador à esquerda,
-  // lixeira à direita. O puxador também responde às setas do teclado.
+  // Um passo para cima ou para baixo, devolvendo o foco ao controle usado: o
+  // cartão pode ser remontado ao entrar ou sair de um bloco.
+  function moverUmPasso(rowId: string, delta: -1 | 1, foco: string) {
+    const i = sessao.findIndex((f) => f.rowId === rowId)
+    moveSessionRow(rowId, i + delta)
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(foco)?.focus()
+    })
+  }
+
+  // Moldura comum aos cartões do plano e aos avulsos: puxador à esquerda;
+  // setas e lixeira à direita. O puxador também responde às setas do teclado.
+  // As setas existem além do arrastar: um toque é mais preciso que arrastar
+  // com a mão suada, e a troca de um lugar só é o caso mais comum.
   function cartao(
     rowId: string,
     nome: string,
@@ -1165,6 +1178,8 @@ function LogForm({
     avulso = false
   ) {
     const arrastando = dragging === rowId
+    const posicao = sessao.findIndex((f) => f.rowId === rowId)
+    const seta = 'grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-30'
     return (
       <div
         key={rowId}
@@ -1186,12 +1201,7 @@ function LogForm({
               onKeyDown={(e) => {
                 if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
                 e.preventDefault()
-                const i = sessao.findIndex((f) => f.rowId === rowId)
-                moveSessionRow(rowId, e.key === 'ArrowUp' ? i - 1 : i + 1)
-                // o cartão pode ser remontado ao entrar ou sair de um bloco
-                requestAnimationFrame(() => {
-                  document.querySelector<HTMLElement>(`[data-grip="${rowId}"]`)?.focus()
-                })
+                moverUmPasso(rowId, e.key === 'ArrowUp' ? -1 : 1, `[data-grip="${rowId}"]`)
               }}
               className="-ml-1 grid size-9 shrink-0 cursor-grab touch-none select-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
               aria-label={`Mover ${nome}`}
@@ -1203,6 +1213,32 @@ function LogForm({
           <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center justify-between gap-x-2">
             {cabecalho}
           </div>
+          {podeReordenar ? (
+            <>
+              <button
+                type="button"
+                data-move-up={rowId}
+                onClick={() => moverUmPasso(rowId, -1, `[data-move-up="${rowId}"]`)}
+                disabled={posicao <= 0}
+                className={seta}
+                aria-label={`Subir ${nome}`}
+                title="Subir"
+              >
+                <ChevronUp className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                data-move-down={rowId}
+                onClick={() => moverUmPasso(rowId, 1, `[data-move-down="${rowId}"]`)}
+                disabled={posicao >= sessao.length - 1}
+                className={seta}
+                aria-label={`Descer ${nome}`}
+                title="Descer"
+              >
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={remover.onClick}
@@ -1587,85 +1623,12 @@ function LogForm({
             timer={restTimer}
             onRegister={registrarDescanso}
             onDiscard={() => setRestTimer(null)}
+            className="bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:bottom-4"
           />
         ) : null}
       </CardContent>
     </Card>
   )
-}
-
-// A faixa do cronômetro, com o próprio tique de 1 s: só ela re-renderiza a
-// cada segundo, e não o formulário com todas as séries.
-//
-// Fixa na tela, e não no fim do formulário: durante a sessão o educador está
-// no meio da lista de exercícios, e um cronômetro que só aparece rolando até o
-// rodapé não serve para nada. Fica acima da barra de navegação do celular
-// (que é `fixed bottom-0`).
-function RestTimerBar({
-  timer,
-  onRegister,
-  onDiscard,
-}: {
-  timer: ExecucaoRestTimer
-  onRegister: () => void
-  onDiscard: () => void
-}) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
-  const seconds = Math.max(0, Math.floor((now - timer.startedAt) / 1000))
-  const done = timer.targetSeconds != null && seconds >= timer.targetSeconds
-  return (
-    <div
-      className={`fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur sm:gap-3 lg:bottom-4 ${
-        done ? 'border-success bg-success/15' : 'border-border bg-background/95'
-      }`}
-    >
-      <span
-        className={`shrink-0 text-xl font-semibold tabular-nums ${done ? 'text-success' : ''}`}
-        role="timer"
-        aria-live="off"
-      >
-        {formatRest(seconds)}
-      </span>
-      <span className="min-w-0 flex-1 text-xs leading-tight text-muted-foreground">
-        <span className="block truncate">
-          descanso · série {timer.index + 1} de {timer.name}
-        </span>
-        {timer.targetSeconds != null ? (
-          <span className={`block ${done ? 'font-medium text-success' : ''}`}>
-            {done ? `alvo de ${timer.targetSeconds}s cumprido` : `alvo ${timer.targetSeconds}s`}
-          </span>
-        ) : null}
-      </span>
-      <Button
-        size="sm"
-        className="shrink-0"
-        variant={done ? 'default' : 'outline'}
-        onClick={onRegister}
-      >
-        Começou a série
-      </Button>
-      <button
-        type="button"
-        onClick={onDiscard}
-        aria-label="Descartar o cronômetro sem registrar o descanso"
-        className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <X className="size-4" aria-hidden="true" />
-      </button>
-    </div>
-  )
-}
-
-// mm:ss a partir dos segundos corridos. Passa de 60 minutos? O treinador tem
-// problema maior que a formatação.
-function formatRest(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 // Carga sugerida: uma casa decimal só quando existe (22.5 kg; 5 kg), no mesmo
