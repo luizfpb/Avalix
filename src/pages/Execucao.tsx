@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { Trash2, Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Trash2, Plus, X, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
   useCreateWorkoutLog,
@@ -69,6 +69,7 @@ import {
   type ExecucaoRestTimer,
 } from '../features/workout/execucaoDraft'
 import { listWorkoutLogSets } from '../features/workout/api'
+import { moveRow, orderSessionRows } from '../features/workout/sessionOrder'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
@@ -674,6 +675,11 @@ function LogForm({
   const [notes, setNotes] = useState('')
   const [sets, setSets] = useState<Record<string, LogRow[]>>({})
   const [extras, setExtras] = useState<ExtraExercise[]>([])
+  // Ordem desta sessão e exercícios do plano que hoje não vão ser feitos
+  // (sessionOrder.ts). O plano não muda; a próxima sessão começa como ele diz.
+  const [order, setOrder] = useState<string[]>([])
+  const [skipped, setSkipped] = useState<string[]>([])
+  const [dragging, setDragging] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [okMsg, setOkMsg] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -723,6 +729,9 @@ function LogForm({
     ],
     [dayExercises, extras]
   )
+  // O que está na sessão, na ordem em que vai ser feito: é o que aparece na
+  // tela e o que é registrado.
+  const sessao = useMemo(() => orderSessionRows(fontes, order, skipped), [fontes, order, skipped])
 
   // Rascunho no aparelho (ver features/workout/execucaoDraft.ts).
   const draftValue = useMemo<ExecucaoDraft>(() => {
@@ -745,8 +754,10 @@ function LogForm({
       extras,
       restTimer,
       continuing,
+      order,
+      skipped,
     }
-  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer, continuing])
+  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer, continuing, order, skipped])
   const contentKey = execucaoContentKey(draftValue)
   // Tem o que perder: conteúdo que ainda não foi salvo no servidor como está.
   const dirty = execucaoHasContent(draftValue) && contentKey !== serverKey
@@ -779,6 +790,8 @@ function LogForm({
         : null
     )
     setContinuing(draft.continuing ?? null)
+    setOrder(draft.order ?? [])
+    setSkipped(draft.skipped ?? [])
     setRestored({ lostRows })
   }
   useFormDraft<ExecucaoDraft>(planId ? `execucao:${planId}` : null, draftValue, restaurarRascunho)
@@ -798,6 +811,9 @@ function LogForm({
       if (form.dayKey) setDayKey(form.dayKey)
       setSets((previous) => ({ ...previous, ...form.sets }))
       setExtras(form.extras)
+      // A ordem não vai para o servidor: a sessão retomada volta na do plano.
+      setOrder([])
+      setSkipped([])
       setWeek(session.week_number != null ? String(session.week_number) : '')
       setWeekTouched(true)
       setDate(session.performed_at)
@@ -870,7 +886,7 @@ function LogForm({
   // escondida, que nunca seria registrada.
   function registrarDescanso() {
     if (!restTimer) return
-    const visivel = fontes.some((f) => f.rowId === restTimer.rowId)
+    const visivel = sessao.some((f) => f.rowId === restTimer.rowId)
       && (sets[restTimer.rowId]?.length ?? 0) > restTimer.index
     if (visivel) {
       const segundos = Math.floor((Date.now() - restTimer.startedAt) / 1000)
@@ -900,9 +916,72 @@ function LogForm({
       delete next[rowId]
       return next
     })
+    setOrder((prev) => prev.filter((id) => id !== rowId))
     // o cronômetro de uma série que saiu da sessão não tem onde gravar
     setRestTimer((atual) => (atual?.rowId === rowId ? null : atual))
   }
+
+  // Exercício do plano que hoje não vai ser feito sai da tela e do registro.
+  // As séries ficam guardadas: "Voltar" traz o cartão como estava.
+  function skipPlanned(rowId: string) {
+    setSkipped((prev) => (prev.includes(rowId) ? prev : [...prev, rowId]))
+    setRestTimer((atual) => (atual?.rowId === rowId ? null : atual))
+  }
+  function unskipPlanned(rowId: string) {
+    setSkipped((prev) => prev.filter((id) => id !== rowId))
+  }
+
+  // Reordenar grava a ordem inteira que está na tela: dali em diante ela
+  // manda, e o avulso adicionado depois entra no fim.
+  function moveSessionRow(rowId: string, to: number) {
+    const ids = sessao.map((f) => f.rowId)
+    const from = ids.indexOf(rowId)
+    if (from < 0 || to < 0 || to >= ids.length || from === to) return
+    setOrder(moveRow(ids, from, to))
+  }
+
+  // Arrastar pelo puxador, com o dedo ou o mouse. Pointer events, e não o
+  // drag-and-drop do HTML: esse não existe no toque, e a Execução é usada no
+  // celular. Os ouvintes ficam na janela porque o cartão pode ser remontado
+  // no meio do gesto (ao entrar ou sair de um bloco de super-série), e com ele
+  // iria embora a captura do ponteiro.
+  const sessaoRef = useRef(sessao)
+  sessaoRef.current = sessao
+  useEffect(() => {
+    if (!dragging) return
+    const rowId = dragging
+    function onMove(e: PointerEvent) {
+      // Perto da borda, rola a página: a lista não cabe na tela do celular, e
+      // o rodapé tem a barra de navegação e o cronômetro por cima.
+      if (e.clientY < 80) window.scrollBy(0, -12)
+      else if (e.clientY > window.innerHeight - 160) window.scrollBy(0, 12)
+      const alvo = document.elementFromPoint?.(e.clientX, e.clientY)
+        ?.closest<HTMLElement>('[data-session-row]')
+      const alvoId = alvo?.dataset.sessionRow
+      if (!alvo || !alvoId || alvoId === rowId) return
+      const ids = sessaoRef.current.map((f) => f.rowId)
+      const from = ids.indexOf(rowId)
+      const to = ids.indexOf(alvoId)
+      if (from < 0 || to < 0) return
+      // Só troca depois de passar do meio do cartão-alvo. Sem isso, um cartão
+      // baixo arrastado sobre um alto trocaria de lugar e voltaria em seguida.
+      const caixa = alvo.getBoundingClientRect()
+      const meio = caixa.top + caixa.height / 2
+      if (to > from ? e.clientY < meio : e.clientY > meio) return
+      setOrder(moveRow(ids, from, to))
+    }
+    function onEnd() {
+      setDragging(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onEnd)
+    window.addEventListener('pointercancel', onEnd)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onEnd)
+      window.removeEventListener('pointercancel', onEnd)
+    }
+  }, [dragging])
 
   // Fora da lista o mesmo exercício duas vezes na sessão: o planejado e o
   // avulso disputariam a numeração das séries e o educador veria dois cartões
@@ -927,13 +1006,13 @@ function LogForm({
 
     const flat: Omit<NewLogSet, 'setNumber'>[] = []
     const rowError = validateLogRows(Object.fromEntries(
-      fontes.map((ex) => [ex.rowId, sets[ex.rowId] ?? []])
+      sessao.map((ex) => [ex.rowId, sets[ex.rowId] ?? []])
     ))
     if (rowError) {
       setError(rowError)
       return null
     }
-    for (const ex of fontes) {
+    for (const ex of sessao) {
       for (const row of sets[ex.rowId] ?? []) {
         const w = row.weight.trim() === '' ? null : Number(row.weight)
         const r = row.reps.trim() === '' ? null : Number(row.reps)
@@ -1054,6 +1133,8 @@ function LogForm({
         return next
       })
       setExtras([])
+      setOrder([])
+      setSkipped([])
       setNotes('')
       setRestTimer(null)
       setRestored(null)
@@ -1067,6 +1148,177 @@ function LogForm({
       savingRef.current = false
       setSaving(false)
     }
+  }
+
+  const planoPorRow = new Map(dayExercises.map((ex) => [ex.id, ex]))
+  const skippedVisiveis = dayExercises.filter((ex) => skipped.includes(ex.id))
+  const podeReordenar = sessao.length > 1
+
+  // Moldura comum aos cartões do plano e aos avulsos: puxador à esquerda,
+  // lixeira à direita. O puxador também responde às setas do teclado.
+  function cartao(
+    rowId: string,
+    nome: string,
+    remover: { label: string; title: string; onClick: () => void },
+    cabecalho: ReactNode,
+    corpo: ReactNode,
+    avulso = false
+  ) {
+    const arrastando = dragging === rowId
+    return (
+      <div
+        key={rowId}
+        data-session-row={rowId}
+        className={`rounded-md border bg-muted/20 p-2 ${avulso ? 'border-dashed' : ''} ${
+          arrastando ? 'relative z-10 bg-card shadow-lg ring-2 ring-primary/60' : ''
+        }`}
+      >
+        <div className="flex items-start gap-1">
+          {podeReordenar ? (
+            <button
+              type="button"
+              data-grip={rowId}
+              onPointerDown={(e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return
+                e.preventDefault()
+                setDragging(rowId)
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+                e.preventDefault()
+                const i = sessao.findIndex((f) => f.rowId === rowId)
+                moveSessionRow(rowId, e.key === 'ArrowUp' ? i - 1 : i + 1)
+                // o cartão pode ser remontado ao entrar ou sair de um bloco
+                requestAnimationFrame(() => {
+                  document.querySelector<HTMLElement>(`[data-grip="${rowId}"]`)?.focus()
+                })
+              }}
+              className="-ml-1 grid size-9 shrink-0 cursor-grab touch-none select-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+              aria-label={`Mover ${nome}`}
+              title="Arraste para mudar a ordem (no teclado, setas para cima e para baixo)"
+            >
+              <GripVertical className="size-4" aria-hidden="true" />
+            </button>
+          ) : null}
+          <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center justify-between gap-x-2">
+            {cabecalho}
+          </div>
+          <button
+            type="button"
+            onClick={remover.onClick}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={remover.label}
+            title={remover.title}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        {corpo}
+      </div>
+    )
+  }
+
+  function renderPlanejado(ex: (typeof dayExercises)[number]) {
+    const effective = effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id))
+    const nome = names[ex.exercise_id] ?? 'Exercício'
+    return cartao(
+      ex.id,
+      nome,
+      {
+        label: `Tirar ${nome} desta sessão`,
+        title: 'Não vai ser feito hoje: tira da sessão, sem mudar o plano',
+        onClick: () => skipPlanned(ex.id),
+      },
+      <>
+        <span className="text-sm font-medium">
+          {nome}
+          {techniqueLabel(ex.technique) ? (
+            <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+              {techniqueLabel(ex.technique)}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          plano: {formatSetsReps(effective.sets, effective.reps)}
+          {effective.rir != null ? ` · RIR ${effective.rir}` : ''}
+        </span>
+      </>,
+      <>
+        {effective.skipped ? (
+          <p className="mt-1 text-xs text-muted-foreground">Nesta semana, não executar. Registre séries somente se o exercício foi realizado.</p>
+        ) : null}
+        {effective.notes ? <p className="mt-1 text-xs text-muted-foreground">{effective.notes}</p> : null}
+        {(() => {
+          if (effective.skipped) return null
+          const last = lastByExercise.get(ex.exercise_id)
+          if (!last) return null
+          const s = suggestProgression({
+            last,
+            repRange: parseRepRange(effective.reps),
+            targetRir: effective.rir,
+          })
+          if (s.kind === 'insufficient') return null
+          return (
+            <p className="mt-1 text-xs text-primary" title={s.reason}>
+              última {last.weightKg}×{last.reps}
+              {last.rir != null ? ` (RIR ${last.rir})` : ''} → sugestão{' '}
+              {/* Sem arredondar para a grade de 2,5 kg: o motor já
+                  escolhe o incremento pela faixa de carga (halter leve
+                  vai de 1 em 1 kg), e arredondar aqui desfazia isso. */}
+              {s.suggestedWeightKg != null ? `${formatKg(s.suggestedWeightKg)} kg` : ''}
+              {s.suggestedReps != null ? ` × ${s.suggestedReps}` : ''} · {KIND_LABEL[s.kind]}
+            </p>
+          )
+        })()}
+        <SetGrid
+          name={names[ex.exercise_id] ?? 'exercício'}
+          rows={sets[ex.id] ?? []}
+          repsPlaceholder={effective.reps ?? '—'}
+          rirPlaceholder={effective.rir != null ? String(effective.rir) : '—'}
+          restPlaceholder={String(effective.restSeconds ?? '—')}
+          onCell={(i, field, value) => setCell(ex.id, i, field, value)}
+          onAddRow={() => addRow(ex.id)}
+        />
+      </>
+    )
+  }
+
+  function renderAvulso(extra: ExtraExercise) {
+    const nome = names[extra.exerciseId] ?? 'Exercício'
+    const last = lastByExercise.get(extra.exerciseId)
+    return cartao(
+      extra.rowId,
+      nome,
+      {
+        label: `Remover ${nome} da sessão`,
+        title: 'Remover da sessão',
+        onClick: () => removeExtra(extra.rowId),
+      },
+      <span className="text-sm font-medium">
+        {nome}
+        <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          fora do plano
+        </span>
+      </span>,
+      <>
+        {last ? (
+          <p className="mt-1 text-xs text-primary">
+            última {last.weightKg}×{last.reps}
+            {last.rir != null ? ` (RIR ${last.rir})` : ''}
+          </p>
+        ) : null}
+        <SetGrid
+          name={nome}
+          rows={sets[extra.rowId] ?? []}
+          repsPlaceholder="—"
+          rirPlaceholder="—"
+          restPlaceholder="—"
+          onCell={(i, field, value) => setCell(extra.rowId, i, field, value)}
+          onAddRow={() => addRow(extra.rowId)}
+        />
+      </>,
+      true
+    )
   }
 
   if (days.length === 0) {
@@ -1154,6 +1406,9 @@ function LogForm({
                 setDayKey(e.target.value)
                 // a série que estava cronometrando ficou em outra divisão
                 setRestTimer(null)
+                // ordem e remoções eram da divisão anterior
+                setOrder([])
+                setSkipped([])
               }}
             >
               {days.map((d) => (
@@ -1233,113 +1488,52 @@ function LogForm({
         </p>
         <div className="space-y-3">
           {/* Super-série e circuito mudam o que se faz ENTRE uma série e outra:
-              a tela que conduz a sessão não pode listar os exercícios soltos. */}
-          {toRowBlocks(dayExercises).map((block) => {
-            const cartoes = block.items.map((ex) => {
-              const effective = effectivePrescription(ex, overrideFor(overrides, weekNumber, ex.id))
-              return (
-            <div key={ex.id} className="rounded-md border bg-muted/20 p-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                  {names[ex.exercise_id] ?? 'Exercício'}
-                  {techniqueLabel(ex.technique) ? (
-                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                      {techniqueLabel(ex.technique)}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  plano: {formatSetsReps(effective.sets, effective.reps)}
-                  {effective.rir != null ? ` · RIR ${effective.rir}` : ''}
-                </span>
-              </div>
-              {effective.skipped ? (
-                <p className="mt-1 text-xs text-muted-foreground">Nesta semana, não executar. Registre séries somente se o exercício foi realizado.</p>
-              ) : null}
-              {effective.notes ? <p className="mt-1 text-xs text-muted-foreground">{effective.notes}</p> : null}
-              {(() => {
-                if (effective.skipped) return null
-                const last = lastByExercise.get(ex.exercise_id)
-                if (!last) return null
-                const s = suggestProgression({
-                  last,
-                  repRange: parseRepRange(effective.reps),
-                  targetRir: effective.rir,
-                })
-                if (s.kind === 'insufficient') return null
-                return (
-                  <p className="mt-1 text-xs text-primary" title={s.reason}>
-                    última {last.weightKg}×{last.reps}
-                    {last.rir != null ? ` (RIR ${last.rir})` : ''} → sugestão{' '}
-                    {/* Sem arredondar para a grade de 2,5 kg: o motor já
-                        escolhe o incremento pela faixa de carga (halter leve
-                        vai de 1 em 1 kg), e arredondar aqui desfazia isso. */}
-                    {s.suggestedWeightKg != null ? `${formatKg(s.suggestedWeightKg)} kg` : ''}
-                    {s.suggestedReps != null ? ` × ${s.suggestedReps}` : ''} · {KIND_LABEL[s.kind]}
-                  </p>
-                )
-              })()}
-              <SetGrid
-                name={names[ex.exercise_id] ?? 'exercício'}
-                rows={sets[ex.id] ?? []}
-                repsPlaceholder={effective.reps ?? '—'}
-                rirPlaceholder={effective.rir != null ? String(effective.rir) : '—'}
-                restPlaceholder={String(effective.restSeconds ?? '—')}
-                onCell={(i, field, value) => setCell(ex.id, i, field, value)}
-                onAddRow={() => addRow(ex.id)}
-              />
-            </div>
-              )
+              a tela que conduz a sessão não pode listar os exercícios soltos.
+              Os blocos saem da ordem DESTA sessão: o avulso arrastado para o
+              meio de um bloco o parte, e o pedaço que ficar com um exercício
+              só deixa de ser bloco. */}
+          {toRowBlocks(
+            sessao.map((fonte) => {
+              const doPlano = planoPorRow.get(fonte.rowId)
+              return { ...fonte, group_key: doPlano?.group_key ?? null, group_kind: doPlano?.group_kind ?? null }
             })
-            return block.kind == null ? (
+          ).map((block) => {
+            const cartoes = block.items.map((fonte) => {
+              const ex = planoPorRow.get(fonte.rowId)
+              return ex ? renderPlanejado(ex) : renderAvulso(fonte)
+            })
+            return block.kind == null || block.items.length < 2 ? (
               cartoes
             ) : (
-              <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
+              <GroupBlock key={`${block.key}:${block.start}`} kind={block.kind} size={block.items.length}>
                 {cartoes}
               </GroupBlock>
             )
           })}
-
-          {extras.map((extra) => {
-            const nome = names[extra.exerciseId] ?? 'Exercício'
-            const last = lastByExercise.get(extra.exerciseId)
-            return (
-              <div key={extra.rowId} className="rounded-md border border-dashed bg-muted/20 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">
-                    {nome}
-                    <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      fora do plano
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeExtra(extra.rowId)}
-                    className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Remover ${nome} da sessão`}
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-                {last ? (
-                  <p className="mt-1 text-xs text-primary">
-                    última {last.weightKg}×{last.reps}
-                    {last.rir != null ? ` (RIR ${last.rir})` : ''}
-                  </p>
-                ) : null}
-                <SetGrid
-                  name={nome}
-                  rows={sets[extra.rowId] ?? []}
-                  repsPlaceholder="—"
-                  rirPlaceholder="—"
-                  restPlaceholder="—"
-                  onCell={(i, field, value) => setCell(extra.rowId, i, field, value)}
-                  onAddRow={() => addRow(extra.rowId)}
-                />
-              </div>
-            )
-          })}
+          {sessao.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum exercício nesta sessão.</p>
+          ) : null}
         </div>
+
+        {/* O que foi tirado da sessão não some sem deixar rastro: um toque
+            traz de volta, com as séries que já estavam preenchidas. */}
+        {skippedVisiveis.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>Fora desta sessão:</span>
+            {skippedVisiveis.map((ex) => (
+              <button
+                key={ex.id}
+                type="button"
+                onClick={() => unskipPlanned(ex.id)}
+                className="inline-flex min-h-8 items-center gap-1 rounded-md border border-dashed px-2 text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Voltar ${names[ex.exercise_id] ?? 'exercício'} para a sessão`}
+              >
+                <Plus className="size-3" aria-hidden="true" />
+                {names[ex.exercise_id] ?? 'Exercício'}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {/* Substituição de última hora (equipamento ocupado, dor no dia) deixa
             de virar série perdida ou linha digitada no exercício errado. */}

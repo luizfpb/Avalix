@@ -140,3 +140,31 @@ describe('reconcileExecucaoDraft', () => {
     expect(draft.extras).toHaveLength(1)
   })
 })
+
+describe('ordem e exercícios tirados da sessão', () => {
+  it('série de exercício tirado da sessão não conta como conteúdo nem muda a chave', () => {
+    const base = { sets: { 'we-supino': [linha('40', '10')] }, extras: [], notes: '' }
+    expect(execucaoHasContent({ ...base, skipped: ['we-supino'] })).toBe(false)
+    const chave = (over: Partial<ExecucaoDraft>) => execucaoContentKey(rascunho(over))
+    expect(chave({ skipped: ['we-supino'] })).toBe(chave({ sets: {} }))
+    // a ordem não é registrada: mudar a ordem não é mudança a salvar
+    expect(chave({ order: ['we-supino'] })).toBe(chave({}))
+  })
+
+  it('acompanham a linha quando o plano foi regravado', () => {
+    const regravado = {
+      days: [{ id: 'dia-a2', label: 'A' }],
+      exercises: [{ id: 'we-supino-2', day_id: 'dia-a2', exercise_id: 'cat-supino' }],
+    }
+    const { draft } = reconcileExecucaoDraft(
+      rascunho({
+        extras: [{ rowId: 'extra:1', exerciseId: 'cat-crucifixo' }],
+        order: ['extra:1', 'we-supino', 'we-sumiu'],
+        skipped: ['we-supino'],
+      }),
+      regravado
+    )
+    expect(draft.order).toEqual(['extra:1', 'we-supino-2'])
+    expect(draft.skipped).toEqual(['we-supino-2'])
+  })
+})

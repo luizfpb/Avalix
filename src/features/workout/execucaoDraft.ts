@@ -47,32 +47,45 @@ export type ExecucaoDraft = {
   restTimer: ExecucaoRestTimer | null
   // opcional: rascunho gravado antes da 0041 não tem o campo
   continuing?: ExecucaoContinuing | null
+  // ordem escolhida para esta sessão e linhas do plano tiradas dela
+  // (sessionOrder.ts); opcionais pelo mesmo motivo
+  order?: string[]
+  skipped?: string[]
 }
 
 // O cronômetro restaurado só faz sentido dentro do teto do descanso (3600 s).
 export const RESTORE_TIMER_MAX_MS = 3_600_000
 
+// Linha tirada da sessão não é registrada: o que estiver nela não conta.
+function linhasDaSessao(
+  value: Pick<ExecucaoDraft, 'sets' | 'skipped'>
+): [string, LogRow[]][] {
+  const fora = new Set(value.skipped ?? [])
+  return Object.entries(value.sets).filter(([rowId]) => !fora.has(rowId))
+}
+
 export function execucaoHasContent(
-  value: Pick<ExecucaoDraft, 'sets' | 'extras' | 'notes'>
+  value: Pick<ExecucaoDraft, 'sets' | 'extras' | 'notes' | 'skipped'>
 ): boolean {
   return (
     value.notes.trim() !== '' ||
     value.extras.length > 0 ||
-    Object.values(value.sets).some((rows) => rows.some((row) => !isEmptyLogRow(row)))
+    linhasDaSessao(value).some(([, rows]) => rows.some((row) => !isEmptyLogRow(row)))
   )
 }
 
 // O que a sessão tem, sem o que não muda o registro: linhas vazias (a tela
-// completa a grade até o número prescrito), cronômetro e ordem das chaves. Dois
+// completa a grade até o número prescrito), cronômetro, ordem das chaves e
+// ordem dos exercícios (o registro não guarda ordem). Dois
 // estados com a mesma chave gravariam a mesma sessão — é o que diz se houve
 // mudança desde o último "Salvar e continuar depois".
 export function execucaoContentKey(
-  value: Pick<ExecucaoDraft, 'dayKey' | 'date' | 'week' | 'notes' | 'sets' | 'extras'>
+  value: Pick<ExecucaoDraft, 'dayKey' | 'date' | 'week' | 'notes' | 'sets' | 'extras' | 'skipped'>
 ): string {
-  const sets = Object.keys(value.sets)
-    .sort()
-    .flatMap((rowId) => {
-      const linhas = value.sets[rowId].flatMap((row, index) =>
+  const sets = linhasDaSessao(value)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .flatMap(([rowId, rows]) => {
+      const linhas = rows.flatMap((row, index) =>
         isEmptyLogRow(row)
           ? []
           : [[index, row.weight.trim(), row.reps.trim(), row.rir.trim(), (row.rest ?? '').trim(),
@@ -177,17 +190,28 @@ export function reconcileExecucaoDraft(
   const rowExercises: Record<string, string> = {}
   let lostRows = 0
 
+  // A linha do plano no plano de agora: mesmo id ou, se ele foi regravado, o
+  // mesmo exercício do catálogo na mesma divisão.
+  const linhaAtual = (rowId: string) => {
+    const catalogo = draft.rowExercises[rowId]
+    return plano.exercises.find((e) => e.id === rowId && e.day_id === dia?.id)
+      ?? (catalogo && dia
+        ? plano.exercises.find((e) => e.day_id === dia.id && e.exercise_id === catalogo)
+        : undefined)
+  }
+  const remapear = (ids: string[] | undefined) =>
+    (ids ?? []).flatMap((rowId) => {
+      if (extrasIds.has(rowId)) return [rowId]
+      const alvo = linhaAtual(rowId)
+      return alvo ? [alvo.id] : []
+    })
+
   for (const [rowId, rows] of Object.entries(draft.sets)) {
     if (extrasIds.has(rowId)) {
       sets[rowId] = rows
       continue
     }
-    const catalogo = draft.rowExercises[rowId]
-    const mesmoId = plano.exercises.find((e) => e.id === rowId && e.day_id === dia?.id)
-    const alvo = mesmoId
-      ?? (catalogo && dia
-        ? plano.exercises.find((e) => e.day_id === dia.id && e.exercise_id === catalogo)
-        : undefined)
+    const alvo = linhaAtual(rowId)
     if (!alvo) {
       lostRows += rows.filter((row) => !isEmptyLogRow(row)).length
       continue
@@ -199,11 +223,7 @@ export function reconcileExecucaoDraft(
   // O cronômetro aponta para uma linha; se ela mudou de id, acompanha.
   let restTimer = draft.restTimer
   if (restTimer && !extrasIds.has(restTimer.rowId)) {
-    const catalogo = draft.rowExercises[restTimer.rowId]
-    const alvo = plano.exercises.find((e) => e.id === restTimer!.rowId && e.day_id === dia?.id)
-      ?? (catalogo && dia
-        ? plano.exercises.find((e) => e.day_id === dia.id && e.exercise_id === catalogo)
-        : undefined)
+    const alvo = linhaAtual(restTimer.rowId)
     restTimer = alvo ? { ...restTimer, rowId: alvo.id } : null
   }
 
@@ -215,6 +235,8 @@ export function reconcileExecucaoDraft(
       sets,
       rowExercises,
       restTimer,
+      order: remapear(draft.order),
+      skipped: remapear(draft.skipped),
     },
     lostRows,
   }

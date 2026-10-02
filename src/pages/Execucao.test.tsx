@@ -240,6 +240,81 @@ describe('Execucao — exercício fora do plano', () => {
   })
 })
 
+// O plano diz uma ordem, a academia impõe outra; e o que não vai ser feito
+// hoje não pode ficar ocupando a tela nem entrar no registro.
+describe('Execucao — ordem e exercícios da sessão', () => {
+  const antes = (a: HTMLElement, b: HTMLElement) =>
+    (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
+  it('as setas no puxador mudam a ordem dos cartões', () => {
+    abrir()
+    adicionarCrucifixo()
+    const supino = () => screen.getByLabelText('Carga da série 1 de Supino reto')
+    const crucifixo = () => screen.getByLabelText('Carga da série 1 de Crucifixo')
+    expect(antes(supino(), crucifixo())).toBe(true)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Mover Crucifixo' }), { key: 'ArrowUp' })
+    expect(antes(crucifixo(), supino())).toBe(true)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Mover Crucifixo' }), { key: 'ArrowDown' })
+    expect(antes(supino(), crucifixo())).toBe(true)
+  })
+
+  it('arrastar pelo puxador leva o exercício para cima do outro', () => {
+    abrir()
+    adicionarCrucifixo()
+    const cartaoSupino = screen.getByLabelText('Carga da série 1 de Supino reto').closest<HTMLElement>('[data-session-row]')!
+    cartaoSupino.getBoundingClientRect = () => ({ top: 100, height: 100, bottom: 200, left: 0, right: 300, width: 300, x: 0, y: 100, toJSON: () => ({}) })
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => cartaoSupino
+    try {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Mover Crucifixo' }), { pointerType: 'touch' })
+      // ainda abaixo do meio do cartão de cima: não troca
+      fireEvent.pointerMove(window, { clientX: 10, clientY: 170 })
+      expect(antes(
+        screen.getByLabelText('Carga da série 1 de Supino reto'),
+        screen.getByLabelText('Carga da série 1 de Crucifixo')
+      )).toBe(true)
+      fireEvent.pointerMove(window, { clientX: 10, clientY: 120 })
+      fireEvent.pointerUp(window)
+    } finally {
+      document.elementFromPoint = original
+    }
+    expect(antes(
+      screen.getByLabelText('Carga da série 1 de Crucifixo'),
+      screen.getByLabelText('Carga da série 1 de Supino reto')
+    )).toBe(true)
+  })
+
+  it('tirar o exercício do plano da sessão tira as séries dele do registro, e dá para voltar', async () => {
+    abrir()
+    adicionarCrucifixo()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Supino reto desta sessão' }))
+    expect(screen.queryByLabelText('Carga da série 1 de Supino reto')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar Supino reto para a sessão' }))
+    expect(screen.getByLabelText('Carga da série 1 de Supino reto')).toHaveProperty('value', '40')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Supino reto desta sessão' }))
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Crucifixo'), { target: { value: '14' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await waitFor(() => expect(criarMock).toHaveBeenCalled())
+    expect(criarMock.mock.calls[0][0].sets).toEqual([
+      { exerciseId: 'ex-2', setNumber: 1, weightKg: 14, reps: null, rir: null, restSeconds: null, reachedFailure: false },
+    ])
+    // a próxima sessão começa como o plano diz
+    expect(await screen.findByLabelText('Carga da série 1 de Supino reto')).toBeTruthy()
+  })
+
+  it('tirar da sessão o exercício que está cronometrando cancela a contagem', () => {
+    abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'Série 1 de Supino reto feita' }))
+    expect(screen.getByRole('timer')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Supino reto desta sessão' }))
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+})
+
 describe('Execucao — descanso realizado', () => {
   it('registra o descanso real do prescrito e do avulso, incluindo zero', async () => {
     abrir()
@@ -747,6 +822,23 @@ describe('rascunho da sessão', () => {
     expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
     expect((screen.getByLabelText('Carga da série 1 de Crucifixo') as HTMLInputElement).value).toBe('14')
     expect((screen.getByLabelText('Observações (opcional)') as HTMLTextAreaElement).value).toBe('ombro ok')
+  })
+
+  it('a ordem e o exercício tirado da sessão sobrevivem a fechar e reabrir', async () => {
+    abrir()
+    adicionarCrucifixo()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Crucifixo'), { target: { value: '14' } })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Mover Crucifixo' }), { key: 'ArrowUp' })
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Supino reto desta sessão' }))
+    cleanup()
+
+    abrir()
+    expect(await screen.findByText(/Sessão não registrada recuperada/)).toBeTruthy()
+    expect(screen.queryByLabelText('Carga da série 1 de Supino reto')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar Supino reto para a sessão' }))
+    const crucifixo = screen.getByLabelText('Carga da série 1 de Crucifixo')
+    const supino = screen.getByLabelText('Carga da série 1 de Supino reto')
+    expect(crucifixo.compareDocumentPosition(supino) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('depois de registrar, reabrir começa uma sessão nova', async () => {
