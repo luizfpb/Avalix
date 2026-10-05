@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { VitePWA } from "vite-plugin-pwa"
 import { defineConfig } from "vitest/config"
+import { navigateNetworkFirst } from "./src/features/pwa/navigationHandler"
 
 export default defineConfig({
   build: {
@@ -65,7 +66,20 @@ export default defineConfig({
           "**/poseDetect-*.js",
           "**/vision_bundle-*.js",
         ],
-        navigateFallback: "/index.html",
+        // Abrir uma página: rede primeiro, shell do pré-cache como reserva
+        // (navigationHandler.ts). O navigateFallback do Workbox entregava só a
+        // cópia guardada e, sem ela, um 308 da Cloudflare: ERR_FAILED em todas
+        // as rotas até apagar os dados do site. directoryIndex vazio tira "/"
+        // da rota do pré-cache, para a raiz passar pelo mesmo caminho.
+        directoryIndex: "",
+        // explícito: o vite-plugin-pwa recoloca "index.html" quando a opção some
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: navigateNetworkFirst,
+          },
+        ],
         // Nenhum chunk grande pode entrar por acidente quando um arquivo for
         // renomeado. O orçamento completo também é conferido no CI.
         maximumFileSizeToCacheInBytes: 750_000,
