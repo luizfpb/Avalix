@@ -209,6 +209,29 @@ describe('Execucao — exercício fora do plano', () => {
     expect(screen.queryByLabelText('Carga da série 1 de Crucifixo')).toBeNull()
   })
 
+  // Conexão que cai depois de o banco gravar: o educador vê "Falha de conexão"
+  // e toca de novo. Com a mesma referência, o banco reconhece a mesma sessão
+  // (0043) em vez de criar outra; a sessão seguinte ganha referência nova.
+  it('nova tentativa depois de uma falha reaproveita a referência; a próxima sessão ganha outra', async () => {
+    criarMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    abrir()
+    const carga = screen.getAllByLabelText(/Carga da série 1 de /)[0]
+    fireEvent.change(carga, { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    expect(await screen.findByText(/Falha de conexão/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    const [primeira, segunda] = criarMock.mock.calls.map(([input]) => input.clientRef)
+    expect(primeira).toBeTruthy()
+    expect(segunda).toBe(primeira)
+
+    fireEvent.change(screen.getAllByLabelText(/Carga da série 1 de /)[0], { target: { value: '42' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await waitFor(() => expect(criarMock).toHaveBeenCalledTimes(3))
+    expect(criarMock.mock.calls[2][0].clientRef).not.toBe(primeira)
+  })
+
   it('não oferece exercício que já está na divisão do dia', () => {
     abrir()
     fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))

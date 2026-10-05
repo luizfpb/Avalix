@@ -11,7 +11,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { rpc: mocks.rpc, from: mocks.from },
 }))
 
-import { createWorkoutLog, createWorkoutPlan, updateWorkoutLog } from './api'
+import { createWorkoutLog, createWorkoutPlan, saveTrainerSession, updateWorkoutLog } from './api'
 import type { SaveWorkoutPlanInput } from './api'
 
 function entrada(patch: Partial<SaveWorkoutPlanInput> = {}): SaveWorkoutPlanInput {
@@ -135,6 +135,29 @@ describe('createWorkoutLog', () => {
     })
     const args = mocks.rpc.mock.calls[0][1]
     expect(args.p_sets.map((set: { reached_failure: boolean | null }) => set.reached_failure)).toEqual([true, false, null, null])
+  })
+})
+
+describe('referência da tentativa (0043)', () => {
+  const base = {
+    planId: 'plan-1', dayLabel: 'A', weekNumber: 1, performedAt: '2026-09-08', notes: null,
+    sets: [{ exerciseId: 'ex-1', setNumber: 1, weightKg: 40, reps: 10, rir: null }],
+  }
+
+  it('registrar leva a referência para a nova tentativa não duplicar a sessão', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { id: 'log-1' }, error: null })
+    await createWorkoutLog({ ...base, orgId: 'org-1', subjectId: 'sub-1', clientRef: 'ref-1' })
+    expect(mocks.rpc).toHaveBeenCalledWith('create_workout_log', expect.objectContaining({ p_client_ref: 'ref-1' }))
+  })
+
+  it('salvar no meio só manda a referência ao criar; continuar usa o id da sessão', async () => {
+    mocks.rpc.mockResolvedValue({ data: { id: 'log-1' }, error: null })
+    await saveTrainerSession({ ...base, logId: null, expectedUpdatedAt: null, inProgress: true, clientRef: 'ref-2' })
+    expect(mocks.rpc.mock.calls.at(-1)?.[1]).toMatchObject({ p_client_ref: 'ref-2' })
+    await saveTrainerSession({
+      ...base, logId: 'log-1', expectedUpdatedAt: '2026-09-08T10:00:00Z', inProgress: false, clientRef: 'ref-2',
+    })
+    expect(mocks.rpc.mock.calls.at(-1)?.[1]).not.toHaveProperty('p_client_ref')
   })
 })
 

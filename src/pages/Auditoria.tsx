@@ -9,7 +9,9 @@ import {
   listAuditLogs,
   listClientErrors,
   listProfileNames,
+  type ClientErrorRow,
 } from '../features/reports/audit'
+import { deviceLabel } from '../features/reports/device'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -44,6 +46,12 @@ const TABLE_LABELS: Record<string, string> = {
   workout_plans: 'plano de treino',
   workout_logs: 'treino registrado',
   appointments: 'agendamento',
+}
+
+function errorSourceLabel(source: ClientErrorRow['source']): string {
+  if (source === 'treino') return 'aluno · treino'
+  if (source === 'anamnese') return 'aluno · anamnese'
+  return 'membro'
 }
 
 function formatDateTime(iso: string): string {
@@ -193,7 +201,8 @@ function ErrorsCard({ orgId }: { orgId: string }) {
           <Bug className="size-4 text-muted-foreground" /> Erros do aplicativo
         </CardTitle>
         <CardDescription>
-          Erros de runtime registrados pelos dispositivos dos membros — útil pra reportar problemas.
+          Erros registrados nos aparelhos dos membros e dos alunos (treino e anamnese pelo
+          link), inclusive os que a tela mostrou à pessoa. Útil pra reportar problemas.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -211,15 +220,19 @@ function ErrorsCard({ orgId }: { orgId: string }) {
         ) : (
           <>
             <ul className="divide-y rounded-md border bg-card text-sm">
-              {rows.map((r) => (
-                <li key={r.id} className="space-y-0.5 px-3 py-2">
-                  <p className="break-words font-medium">{r.message}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(r.at)}
-                    {r.url ? ` · ${r.url}` : ''}
-                  </p>
-                </li>
-              ))}
+              {rows.map((r) => {
+                const aparelho = deviceLabel(r.user_agent)
+                return (
+                  <li key={r.id} className="space-y-0.5 px-3 py-2">
+                    <p className="break-words font-medium">{r.message}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(r.at)} · {errorSourceLabel(r.source)}
+                      {aparelho ? ` · ${aparelho}` : ''}
+                      {r.url ? ` · ${r.url}` : ''}
+                    </p>
+                  </li>
+                )
+              })}
             </ul>
             <Button
               variant="outline"

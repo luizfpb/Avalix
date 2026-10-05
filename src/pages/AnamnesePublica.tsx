@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
 import { intakeSubmitErrorMessage } from '../features/anamnesis/submitErrors'
 import { clearDraft, useFormDraft } from '../lib/draft'
+import { reportHandledError, setErrlogLink } from '../lib/errlog'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -80,6 +81,15 @@ export default function AnamnesePublica() {
     enabled: !!token,
     retry: false,
   })
+
+  // Erros desta página chegam ao profissional em /auditoria pelo token do convite.
+  useEffect(() => {
+    setErrlogLink('anamnese', token)
+    return () => setErrlogLink(null, null)
+  }, [token])
+  useEffect(() => {
+    if (query.error) reportHandledError('anamnese:abrir', query.error)
+  }, [query.error])
 
   if (token && query.isPending) {
     return (
@@ -248,6 +258,7 @@ function Form({
       await submit.mutateAsync(isCadastro ? getValues() : undefined)
       clearDraft(publicDraftKey, { storage: 'session' })
     } catch (e) {
+      reportHandledError('anamnese:enviar', e)
       setError(intakeSubmitErrorMessage(e, { orgName: intake.orgName, subjectFirstName: intake.subjectFirstName }))
     }
   }

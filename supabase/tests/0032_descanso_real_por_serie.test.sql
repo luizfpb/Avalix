@@ -29,11 +29,14 @@ select ok(
             or has_function_privilege('authenticated', p.oid, 'execute'))),
   'implementação interna continua inacessível aos clientes'
 );
+-- Pelo nome, não pela assinatura: a 0043 acrescentou p_client_ref.
 select ok(
-  not (select prosecdef from pg_proc where oid =
-    'public.create_workout_log(uuid,jsonb,text,int,date,text)'::regprocedure)
-  and not has_function_privilege('anon',
-    'public.create_workout_log(uuid,jsonb,text,int,date,text)', 'execute'),
+  exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'create_workout_log')
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'create_workout_log'
+       and (p.prosecdef or has_function_privilege('anon', p.oid, 'execute'))),
   'escrita profissional mantém RLS e bloqueio de anon'
 );
 

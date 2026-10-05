@@ -685,6 +685,16 @@ function LogForm({
   const [okMsg, setOkMsg] = useState(false)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  // Referência da tentativa de gravar ESTA sessão (plano, divisão e data). Se a
+  // conexão cair depois do commit e o educador tocar de novo, o banco
+  // reconhece a mesma sessão (0043) em vez de criar uma segunda. Renasce a
+  // cada gravação aceita e quando a sessão muda de divisão ou de data.
+  const tentativa = useRef<{ chave: string; ref: string } | null>(null)
+  function refDaTentativa(): string {
+    const chave = `${planId}:${dayKey}:${date}`
+    if (tentativa.current?.chave !== chave) tentativa.current = { chave, ref: crypto.randomUUID() }
+    return tentativa.current.ref
+  }
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
 
@@ -1056,6 +1066,7 @@ function LogForm({
         planId,
         logId: continuing?.logId ?? null,
         expectedUpdatedAt: continuing?.updatedAt ?? null,
+        clientRef: continuing ? null : refDaTentativa(),
         inProgress: true,
         dayLabel: day?.label ?? null,
         weekNumber: sessao.weekValue,
@@ -1064,6 +1075,7 @@ function LogForm({
         sets: sessao.finalSets,
       })
       const agora = new Date()
+      tentativa.current = null
       setContinuing({ logId: salvo.id, updatedAt: salvo.updated_at, savedAt: agora.toISOString() })
       setServerKey(chave)
       setProgressMsg(
@@ -1116,8 +1128,10 @@ function LogForm({
           performedAt: date,
           notes: notes.trim() || null,
           sets: finalSets,
+          clientRef: refDaTentativa(),
         })
       }
+      tentativa.current = null
       setContinuing(null)
       setServerKey(null)
       // limpa pra registrar a próxima

@@ -19,6 +19,7 @@ import {
   CORRECTED_SESSION_MESSAGE,
   flushQueue,
   isInvalidStudentLinkError,
+  isNetworkFailure,
   isTransientStudentError,
   isStudentLinkExpired,
   queuedSessionLabel,
@@ -97,6 +98,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
 import { useClock } from '../lib/useClock'
+import { reportHandledError, setErrlogLink } from '../lib/errlog'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -132,6 +134,44 @@ function errorMessage(error: unknown, fallback: string): string {
   return error && typeof error === 'object' && 'message' in error
     ? String((error as { message?: unknown }).message ?? fallback)
     : fallback
+}
+
+// Treinos que o servidor não recebeu antes de o link deixar de valer. A tela
+// os mostra uma vez, só da memória, para o aluno mandar ao treinador — que
+// registra a sessão na data certa pela tela dele.
+function TreinosNaoEnviados({ itens, nomes }: { itens: QueuedSession[]; nomes: Record<string, string> }) {
+  const [copiado, setCopiado] = useState<string | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  async function copiar(item: QueuedSession) {
+    try {
+      await navigator.clipboard.writeText(queuedSessionText(item, nomes))
+      setCopiado(item.clientRef)
+      setFalhou(false)
+    } catch {
+      setFalhou(true)
+    }
+  }
+  return (
+    <div role="status" className="w-full max-w-sm space-y-2 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-left text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+      <p className="font-medium">
+        {itens.length === 1
+          ? 'Um treino seu ainda não tinha chegado ao treinador.'
+          : `${itens.length} treinos seus ainda não tinham chegado ao treinador.`}
+      </p>
+      <p>Copie e mande para ele: ele consegue registrar na data certa. Ao sair desta tela, eles não ficam neste aparelho.</p>
+      <ul className="space-y-1.5">
+        {itens.map((item) => (
+          <li key={item.clientRef} className="flex items-center justify-between gap-2">
+            <span>{queuedSessionLabel(item)}</span>
+            <Button size="xs" variant="outline" onClick={() => void copiar(item)}>
+              <Copy /> {copiado === item.clientRef ? 'Copiado' : 'Copiar dados'}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {falhou ? <p>Não foi possível copiar neste aparelho. Anote os números antes de fechar.</p> : null}
+    </div>
+  )
 }
 
 // Campo para colar o link do treinador. Quem decide o que fazer com o token é a
@@ -200,9 +240,19 @@ export default function TreinoAluno() {
   const [erroLimpeza, setErroLimpeza] = useState(false)
   const [fila, setFila] = useState<QueuedSession[]>([])
   const [erroFila, setErroFila] = useState<string | null>(null)
+  // Treinos que não chegaram ao servidor quando o link deixou de valer. Só em
+  // memória: o aparelho é limpo do mesmo jeito, mas o aluno pode copiá-los.
+  const [filaPerdida, setFilaPerdida] = useState<{ itens: QueuedSession[]; nomes: Record<string, string> } | null>(null)
+  const [confirmarSaida, setConfirmarSaida] = useState(false)
   const [aba, setAba] = useState<Aba>('treino')
   const accessEpoch = useRef(0)
   const storageAccess = useRef<StudentStorageAccess | null>(null)
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
+  const filaRef = useRef(fila)
+  filaRef.current = fila
+  const pacoteRef = useRef(pacote)
+  pacoteRef.current = pacote
   const [registrando, setRegistrando] = useState(false)
   const savingActive = useRef(false)
   const pendingPackage = useRef<StudentWorkout | null>(null)
@@ -224,12 +274,30 @@ export default function TreinoAluno() {
     // executar uma segunda purga depois de outra aba ter aberto um novo link.
     if (accessEpoch.current > 0 || (storageAccess.current && !isStudentStorageAccessCurrent(storageAccess.current))) return
     const epoch = ++accessEpoch.current
+    const filaAntes = filaRef.current
+    const pacoteAntes = pacoteRef.current
     if (storageAccess.current) invalidateStudentStorageAccess(storageAccess.current)
     pendingPackage.current = null
     setPacote(null)
     setFila([])
     setInvalido(true)
     if (!limpar) return
+    // A purga continua (aparelho perdido ou emprestado não pode guardar nada do
+    // link revogado), mas reemitir o link apagava calado o treino feito sem
+    // internet que ainda não tinha subido. Ele fica na tela para ser copiado.
+    const escopo = scopeRef.current
+    const naoEnviados = escopo ? await readQueue(escopo).catch(() => filaAntes) : filaAntes
+    if (epoch === accessEpoch.current && naoEnviados.some((item) => item.sets.length > 0)) {
+      // A revogação pode chegar antes do treino carregar: os nomes vêm do
+      // pacote guardado, lido antes da purga.
+      const exercicios = pacoteAntes?.exercises
+        ?? (escopo ? (await readCachedWorkout(escopo).catch(() => null))?.data.exercises : undefined)
+        ?? []
+      setFilaPerdida({
+        itens: naoEnviados.filter((item) => item.sets.length > 0),
+        nomes: Object.fromEntries(exercicios.map((ex) => [ex.exercise_id, ex.name])),
+      })
+    }
     try {
       await purgeRevokedStudentDevice()
       if (epoch === accessEpoch.current) setErroLimpeza(false)
@@ -266,6 +334,12 @@ export default function TreinoAluno() {
   // manifest próprio enquanto a página do aluno está aberta
   useEffect(() => applyStudentManifest(), [])
 
+  // Erros desta página chegam ao treinador em /auditoria pelo token do link.
+  useEffect(() => {
+    setErrlogLink('treino', token)
+    return () => setErrlogLink(null, null)
+  }, [token])
+
   const recarregarFila = useCallback(async (expectedEpoch = accessEpoch.current) => {
     if (!scope) return
     try {
@@ -275,6 +349,7 @@ export default function TreinoAluno() {
       setErroFila(null)
     } catch (error) {
       if (expectedEpoch !== accessEpoch.current) return
+      reportHandledError('treino:fila-ler', error)
       setErroFila(errorMessage(error, 'Não foi possível ler os treinos salvos neste aparelho.'))
     }
   }, [scope])
@@ -329,7 +404,10 @@ export default function TreinoAluno() {
         // tentar de novo: mandar o aluno pedir outro link por um erro
         // passageiro fazia o treinador revogar um link que ainda valia.
         if (isInvalidStudentLinkError(error)) await invalidarAcesso()
-        else setSemRede(true)
+        else {
+          if (!isNetworkFailure(error)) reportHandledError('treino:abrir', error)
+          setSemRede(true)
+        }
       } finally {
         if (vivo && epoch === accessEpoch.current) setCarregando(false)
       }
@@ -351,11 +429,15 @@ export default function TreinoAluno() {
       const r = await withStudentSyncLock(scope, () => flushQueue(token, scope, access, force))
       if (epoch !== accessEpoch.current) return
       if (r.sent > 0) setSemRede(false)
+      for (const recusa of r.rejected) reportHandledError('treino:fila-recusada', { message: recusa.message })
       await recarregarFila()
     } catch (error) {
       if (epoch !== accessEpoch.current) return
       if (isInvalidStudentLinkError(error)) await invalidarAcesso()
-      else setErroFila(errorMessage(error, 'Não foi possível sincronizar os treinos salvos.'))
+      else {
+        reportHandledError('treino:fila', error)
+        setErroFila(errorMessage(error, 'Não foi possível sincronizar os treinos salvos.'))
+      }
     } finally {
       enviando.current = false
     }
@@ -477,27 +559,30 @@ export default function TreinoAluno() {
             : 'Este link não vale mais. Peça um novo ao seu treinador. Se ele já mandou, toque no link novo ou cole-o abaixo.'
         }
         acao={
-          erroLimpeza ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                void purgeRevokedStudentDevice()
-                  .then(() => window.location.replace('/t'))
-                  .catch(() => setErroLimpeza(true))
-              }}
-            >
-              Limpar dados deste aparelho
-            </Button>
-          ) : (
-            <ColarLink
-              atual={token}
-              onToken={(colado) => {
-                saveStudentToken(colado)
-                window.location.replace(`/t#${colado}`)
-                window.location.reload()
-              }}
-            />
-          )
+          <div className="flex w-full flex-col items-center gap-4">
+            {filaPerdida ? <TreinosNaoEnviados itens={filaPerdida.itens} nomes={filaPerdida.nomes} /> : null}
+            {erroLimpeza ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void purgeRevokedStudentDevice()
+                    .then(() => window.location.replace('/t'))
+                    .catch(() => setErroLimpeza(true))
+                }}
+              >
+                Limpar dados deste aparelho
+              </Button>
+            ) : (
+              <ColarLink
+                atual={token}
+                onToken={(colado) => {
+                  saveStudentToken(colado)
+                  window.location.replace(`/t#${colado}`)
+                  window.location.reload()
+                }}
+              />
+            )}
+          </div>
         }
       />
     )
@@ -636,13 +721,27 @@ export default function TreinoAluno() {
           type="button"
           className="mt-2 text-[11px] text-muted-foreground underline"
           disabled={registrando}
-          onClick={() => {
-            void invalidarAcesso(false).then(() => forgetStudentDevice())
-              .then(() => window.location.replace('/t')).catch(() => setErroLimpeza(true))
-          }}
+          onClick={() => setConfirmarSaida(true)}
         >
           Sair deste aparelho
         </button>
+        <ConfirmDialog
+          open={confirmarSaida}
+          title="Sair deste aparelho?"
+          description={
+            fila.length > 0
+              ? `${fila.length === 1 ? 'Um treino seu ainda não chegou' : `${fila.length} treinos seus ainda não chegaram`} ao treinador e ${fila.length === 1 ? 'será apagado' : 'serão apagados'} deste aparelho. Com internet, toque em Enviar antes de sair.`
+              : 'O treino e o histórico guardados neste aparelho serão apagados. Para voltar, abra de novo o link do seu treinador.'
+          }
+          confirmLabel="Sair deste aparelho"
+          cancelLabel="Voltar"
+          onConfirm={() => {
+            setConfirmarSaida(false)
+            void invalidarAcesso(false).then(() => forgetStudentDevice())
+              .then(() => window.location.replace('/t')).catch(() => setErroLimpeza(true))
+          }}
+          onCancel={() => setConfirmarSaida(false)}
+        />
       </footer>
     </Shell>
   )
@@ -1088,6 +1187,7 @@ function TreinoDoDia({
       // O rascunho é conveniência; treinar e concluir com internet não podem
       // depender dele. Antes, uma leitura que falhava deixava o formulário
       // inteiro desabilitado, inclusive o "Concluir treino", até recarregar.
+      reportHandledError('treino:rascunho-ler', error)
       if (error instanceof StudentStorageError) setAparelhoFalhou(true)
       else setErro('Não foi possível recuperar o rascunho deste aparelho. Você pode registrar o treino normalmente.')
       setRascunhoLido(true)
@@ -1142,6 +1242,7 @@ function TreinoDoDia({
     const id = setTimeout(() => {
       void persistRef.current(draftRef.current()).then(() => setAparelhoFalhou(false), (error) => {
         if (!isStudentStorageAccessCurrent(access)) return
+        reportHandledError('treino:rascunho-gravar', error)
         if (error instanceof StudentStorageError) setAparelhoFalhou(true)
         else setErro(errorMessage(error, 'Não foi possível guardar o rascunho neste aparelho.'))
       })
@@ -1312,7 +1413,15 @@ function TreinoDoDia({
     try {
       if (dirty) await persistDraft(draftAtual(), true)
       else await draftOperations.current
-      const reconciled = await readReconciledDraft(scope, plano.id, draftPlan.current, readAccess, nextDayId, nextDate)
+      let reconciled: Awaited<ReturnType<typeof readReconciledDraft>> = null
+      try {
+        reconciled = await readReconciledDraft(scope, plano.id, draftPlan.current, readAccess, nextDayId, nextDate)
+      } catch (error) {
+        // Sem o aparelho não há rascunho da outra sessão para trazer, mas
+        // trocar de divisão ou de data continua possível: ela começa vazia.
+        if (!(error instanceof StudentStorageError)) throw error
+        setAparelhoFalhou(true)
+      }
       const target = reconciled?.draft
       if (generation !== switchGeneration.current) return
       setDayId(nextDayId)
@@ -1333,7 +1442,13 @@ function TreinoDoDia({
       setPlanoMudou(null)
       setResetEpoch((value) => value + 1)
     } catch (error) {
-      if (generation === switchGeneration.current) setErro(errorMessage(error, 'Não foi possível guardar e trocar a sessão.'))
+      if (generation === switchGeneration.current) {
+        reportHandledError('treino:trocar-sessao', error)
+        if (error instanceof StudentStorageError) {
+          setAparelhoFalhou(true)
+          setErro('Este aparelho não está guardando o rascunho. Conclua este treino antes de trocar de divisão ou de data, ou o que você digitou se perde.')
+        } else setErro(errorMessage(error, 'Não foi possível guardar e trocar a sessão.'))
+      }
     } finally {
       if (generation === switchGeneration.current) setSwitchingSession(false)
     }
@@ -1483,6 +1598,7 @@ function TreinoDoDia({
         reiniciar()
       }
     } catch (error) {
+      if (!isInvalidStudentLinkError(error)) reportHandledError(concluir ? 'treino:concluir' : 'treino:progresso', error)
       if (isInvalidStudentLinkError(error)) await onLinkInvalid()
       else if (error instanceof StudentStorageError) {
         // O aparelho não guardou e não deu para entregar ao servidor. "Libere

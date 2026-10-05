@@ -479,6 +479,8 @@ export type Database = {
           id: number
           message: string
           org_id: string
+          source: string
+          source_ref: string | null
           stack: string | null
           url: string | null
           user_agent: string | null
@@ -489,6 +491,8 @@ export type Database = {
           id?: never
           message: string
           org_id: string
+          source?: string
+          source_ref?: string | null
           stack?: string | null
           url?: string | null
           user_agent?: string | null
@@ -499,6 +503,8 @@ export type Database = {
           id?: never
           message?: string
           org_id?: string
+          source?: string
+          source_ref?: string | null
           stack?: string | null
           url?: string | null
           user_agent?: string | null
@@ -1862,6 +1868,7 @@ export type Database = {
       create_organization: { Args: { p_name: string }; Returns: string }
       create_workout_log: {
         Args: {
+          p_client_ref?: string
           p_day_label?: string
           p_notes?: string
           p_performed_at?: string
@@ -2042,6 +2049,16 @@ export type Database = {
         Args: { p_days: Json; p_overrides: Json; p_plan: string; p_weeks: Json }
         Returns: undefined
       }
+      report_link_error: {
+        Args: {
+          p_kind: string
+          p_message: string
+          p_stack?: string
+          p_token: string
+          p_user_agent?: string
+        }
+        Returns: undefined
+      }
       revoke_consent: { Args: { p_consent: string }; Returns: undefined }
       revoke_workout_link: { Args: { p_link: string }; Returns: undefined }
       save_assessment: {
@@ -2084,6 +2101,7 @@ export type Database = {
       }
       save_trainer_workout_session: {
         Args: {
+          p_client_ref?: string
           p_day_label?: string
           p_expected_updated_at?: string
           p_in_progress: boolean

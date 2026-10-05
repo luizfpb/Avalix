@@ -11,15 +11,20 @@ select plan(13);
 
 select ok(public.app_schema_version() >= '0041',
   'schema inclui o salvamento parcial do profissional');
+-- Pelo nome, não pela assinatura: a 0043 acrescentou p_client_ref.
 select ok(
-  has_function_privilege('authenticated',
-    'public.save_trainer_workout_session(uuid,jsonb,boolean,uuid,timestamptz,text,int,date,text)', 'execute')
-  and not has_function_privilege('anon',
-    'public.save_trainer_workout_session(uuid,jsonb,boolean,uuid,timestamptz,text,int,date,text)', 'execute'),
+  exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'save_trainer_workout_session')
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'save_trainer_workout_session'
+       and (not has_function_privilege('authenticated', p.oid, 'execute')
+            or has_function_privilege('anon', p.oid, 'execute'))),
   'só o profissional autenticado chama; o link do aluno não');
 select ok(
-  not (select prosecdef from pg_proc
-        where oid = 'public.save_trainer_workout_session(uuid,jsonb,boolean,uuid,timestamptz,text,int,date,text)'::regprocedure),
+  not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'save_trainer_workout_session' and p.prosecdef),
   'security invoker: RLS e MFA das tabelas valem');
 
 create function pg_temp.act(p_user uuid, p_aal text) returns void language sql as $$

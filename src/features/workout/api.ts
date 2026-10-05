@@ -536,6 +536,9 @@ export type CreateWorkoutLogInput = {
   performedAt: string
   notes: string | null
   sets: NewLogSet[]
+  // Mesma referência em todas as tentativas de gravar a mesma sessão: se a
+  // resposta se perder depois do commit, a nova tentativa não cria outra (0043).
+  clientRef?: string | null
 }
 
 export type UpdateWorkoutLogInput = {
@@ -562,7 +565,12 @@ function logSetsPayload(sets: NewLogSet[]): Json {
 // 0019). Antes eram duas chamadas: series falhando deixavam sessao vazia que
 // contava na adesao. org_id/subject_id vem do plano pelo trigger b1.
 export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<WorkoutLogRow> {
-  const { data, error } = await supabase.rpc('create_workout_log', {
+  // Contrato restrito até regenerar database.types após a 0043 (p_client_ref).
+  const client = supabase as unknown as {
+    rpc(name: 'create_workout_log', args: Record<string, unknown>):
+      PromiseLike<{ data: WorkoutLogRow | null; error: unknown }>
+  }
+  const { data, error } = await client.rpc('create_workout_log', {
     p_plan: input.planId,
     // args com default null na RPC: omitidos quando não há valor
     ...(input.dayLabel != null ? { p_day_label: input.dayLabel } : {}),
@@ -570,6 +578,7 @@ export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<Wo
     p_performed_at: input.performedAt,
     ...(input.notes != null ? { p_notes: input.notes } : {}),
     p_sets: logSetsPayload(input.sets),
+    ...(input.clientRef ? { p_client_ref: input.clientRef } : {}),
   })
   if (error) throw error
   return data as WorkoutLogRow
@@ -612,6 +621,8 @@ export type SaveTrainerSessionInput = {
   performedAt: string
   notes: string | null
   sets: NewLogSet[]
+  // Só na criação (sem logId): a nova tentativa grava na mesma sessão (0043).
+  clientRef?: string | null
 }
 
 // "Salvar e continuar depois" da Execução (0041): grava a sessão no servidor
@@ -628,6 +639,7 @@ export async function saveTrainerSession(input: SaveTrainerSessionInput): Promis
     p_sets: logSetsPayload(input.sets),
     p_in_progress: input.inProgress,
     ...(input.logId ? { p_log: input.logId, p_expected_updated_at: input.expectedUpdatedAt } : {}),
+    ...(!input.logId && input.clientRef ? { p_client_ref: input.clientRef } : {}),
     ...(input.dayLabel != null ? { p_day_label: input.dayLabel } : {}),
     ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
     p_performed_at: input.performedAt,

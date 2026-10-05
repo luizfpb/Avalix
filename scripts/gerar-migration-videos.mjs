@@ -2,7 +2,8 @@
 // exercises.catalog_video_url (0042) nas linhas globais.
 //
 //   npx vite-node scripts/gerar-migration-videos.mjs <planilha.csv> <saida.sql> <versao>
-//   ex.: npx vite-node scripts/gerar-migration-videos.mjs docs/videos/leandro-twin-candidatos.csv supabase/migrations/0043_videos_do_catalogo.sql 0043
+//   ex.: npx vite-node scripts/gerar-migration-videos.mjs docs/videos/leandro-twin-candidatos.csv supabase/migrations/0044_videos_do_catalogo.sql 0044
+//   (a 0043 já é a da auditoria de aparelho real: use o próximo número livre)
 //
 // Coluna `aprovado` da planilha (separador ";", como sai do Excel pt-BR):
 //   sim / s / ok / x -> usa a coluna `link`
@@ -78,8 +79,10 @@ if (escolhas.length === 0) {
 const sql = (s) => `'${s.replace(/'/g, "''")}'`
 const valores = escolhas.map((e) => `  (${sql(e.nome)}, ${sql(e.url)})`).join(',\n')
 
+const anterior = String(Number(versao) - 1).padStart(4, '0')
+
 writeFileSync(saida, `-- ${versao} — vídeos curados do catálogo global.
--- Aplicar depois da 0042. Gerada por scripts/gerar-migration-videos.mjs a
+-- Aplicar depois da ${anterior}. Gerada por scripts/gerar-migration-videos.mjs a
 -- partir da planilha revisada (${escolhas.length} exercícios). Só toca linhas
 -- globais (org_id null), casando pelo nome; o vídeo escolhido por cada
 -- organização (exercise_videos) continua tendo precedência.

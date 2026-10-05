@@ -566,6 +566,20 @@ describe('TreinoAluno', () => {
     expect(await screen.findByText(/Treino concluído! Seu treinador já consegue ver/)).toBeTruthy()
   })
 
+  it('troca a data mesmo quando o aparelho não lê o rascunho da outra sessão', async () => {
+    // A troca lia o rascunho da sessão de destino como obrigatório: com o
+    // aparelho falhando, não dava nem para mudar de divisão ou de data.
+    readDraftMock.mockResolvedValueOnce(null).mockRejectedValue(new StudentStorageError())
+    await abrir()
+    await campoCarga()
+    const data = screen.getByLabelText('Data') as HTMLInputElement
+    const ontem = diaAnteriorLocal(data.value)
+    fireEvent.change(data, { target: { value: ontem } })
+    await waitFor(() => expect(data.value).toBe(ontem))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText(/Este aparelho não está guardando o que você digita/)).toBeTruthy()
+  })
+
   it('rascunho que deixa de ser guardado vira aviso, não erro no botão', async () => {
     writeDraftMock.mockRejectedValue(new StudentStorageError())
     await abrir()
@@ -746,6 +760,46 @@ describe('TreinoAluno', () => {
     expect(dequeueMock).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Descartar treino' }))
     await waitFor(() => expect(dequeueMock).toHaveBeenCalledWith('escopo-de-teste', 'ref-rejeitada'))
+  })
+
+  // Reemitir o link apagava do aparelho, sem aviso, o treino feito sem
+  // internet que ainda não tinha subido. A purga continua; o treino fica na
+  // tela para ser copiado.
+  it('link revogado com treino na fila: mostra o que não subiu para copiar antes de limpar', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    readQueueMock.mockResolvedValue([{
+      clientRef: 'ref-offline', revision: 1, planId: 'p1', dayLabel: 'A', weekNumber: 1,
+      performedAt: '2026-09-30', notes: null, queuedAt: '2026-09-30T12:00:00.000Z',
+      sets: [{ exercise_id: 'x1', set_number: 1, weight_kg: 42.5, reps: 8, rir: 1 }],
+    }])
+    // Quem treinou sem internet tem o pacote guardado no aparelho.
+    readCachedWorkoutMock.mockResolvedValue({ at: '2026-09-30T10:00:00.000Z', data: pacote() })
+    flushQueueMock.mockRejectedValue(new Error('link invalido ou expirado'))
+    render(<TreinoAluno />)
+
+    expect(await screen.findByText(/Link inválido ou expirado/)).toBeTruthy()
+    expect(await screen.findByText('Um treino seu ainda não tinha chegado ao treinador.')).toBeTruthy()
+    await waitFor(() => expect(purgeRevokedMock).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: /Copiar dados/ }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toContain('Supino reto: 42,5 kg × 8 reps (RIR 1)')
+  })
+
+  it('"Sair deste aparelho" pergunta antes e avisa o treino que ainda não subiu', async () => {
+    readQueueMock.mockResolvedValue([{
+      clientRef: 'ref-offline', revision: 1, planId: 'p1', dayLabel: 'A', weekNumber: 1,
+      performedAt: '2026-09-30', notes: null, queuedAt: '2026-09-30T12:00:00.000Z',
+      sets: [{ exercise_id: 'x1', set_number: 1, weight_kg: 40, reps: 10, rir: null }],
+    }])
+    await abrir()
+    await screen.findByText(/1 treino salvo no aparelho/)
+    fireEvent.click(screen.getByRole('button', { name: 'Sair deste aparelho' }))
+    expect(screen.getByText('Sair deste aparelho?')).toBeTruthy()
+    expect(screen.getByText(/Um treino seu ainda não chegou ao treinador e será apagado/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
+    expect(screen.queryByText(/Link inválido ou expirado/)).toBeNull()
+    expect(screen.getByText(/Olá, Marta/)).toBeTruthy()
   })
 
   it('sugere a próxima divisão pela sequência e sessões concluídas', async () => {

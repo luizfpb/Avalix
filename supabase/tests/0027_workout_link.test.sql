@@ -82,8 +82,14 @@ select ok(
   'as quatro RPCs do aluno tem grant para anon'
 );
 
+-- Pelo nome, não pela assinatura: a 0043 acrescentou p_client_ref.
 select ok(
-  not has_function_privilege('anon', 'public.create_workout_log(uuid, jsonb, text, int, date, text)', 'execute'),
+  exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'create_workout_log')
+  and not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'create_workout_log'
+       and has_function_privilege('anon', p.oid, 'execute')),
   'create_workout_log continua FECHADA para anon'
 );
 

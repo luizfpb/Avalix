@@ -24,8 +24,10 @@ function desde(iso: string | null): string | null {
 // Link do aluno para o treino: emitir, reexibir e revogar.
 //
 // O segredo só existe no aparelho que emitiu (mesma regra do convite de
-// anamnese) — mas aqui perder o link não custa nada, porque as sessões
-// pertencem ao plano e não ao token: reemitir é sempre seguro.
+// anamnese). As sessões pertencem ao plano e não ao token, então o histórico
+// não se perde ao reemitir — mas o link antigo para de funcionar no celular do
+// aluno, e o treino feito sem internet que ainda não subiu sai do aparelho
+// dele (a tela mostra os dados para ele copiar). Por isso reemitir pergunta.
 type WorkoutLinkCardProps = {
   subjectId: string
   subjectName: string
@@ -48,6 +50,7 @@ function WorkoutLinkCardContent({
   const [copiado, setCopiado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [confirmando, setConfirmando] = useState(false)
+  const [confirmandoNovo, setConfirmandoNovo] = useState(false)
 
   const link = linkQuery.data ?? null
   const url = urlRecente ?? (link ? loadWorkoutLinkLocal(subjectId) : null)
@@ -129,12 +132,13 @@ function WorkoutLinkCardContent({
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                O endereço fica salvo só no aparelho onde o link foi gerado. Para enviá-lo daqui,
-                emita um novo — o histórico do aluno não se perde.
+                O endereço fica salvo só no aparelho onde o link foi gerado. Para enviá-lo daqui é
+                preciso emitir um novo: o histórico não se perde, mas o link antigo para de funcionar
+                no celular do aluno.
               </p>
             )}
 
-            <Button size="xs" variant="ghost" onClick={() => void emitir()} disabled={issue.isPending}>
+            <Button size="xs" variant="ghost" onClick={() => setConfirmandoNovo(true)} disabled={issue.isPending}>
               <Link2 /> {issue.isPending ? 'Emitindo...' : 'Emitir novo link'}
             </Button>
           </>
@@ -163,6 +167,23 @@ function WorkoutLinkCardContent({
           }
         }}
         onCancel={() => setConfirmando(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmandoNovo}
+        title="Emitir um link novo?"
+        description={
+          `O link atual para de funcionar no celular de ${primeiroNome}` +
+          (link?.last_seen_at ? `, que abriu o treino ${desde(link.last_seen_at)}` : '') +
+          '. Treinos que ele registrou sem internet e ainda não subiram saem do aparelho dele — a tela mostra os dados para ele copiar e mandar a você. Se o link atual ainda funciona, prefira copiá-lo ou reenviá-lo.'
+        }
+        confirmLabel="Emitir link novo"
+        cancelLabel="Voltar"
+        onConfirm={() => {
+          setConfirmandoNovo(false)
+          void emitir()
+        }}
+        onCancel={() => setConfirmandoNovo(false)}
       />
     </Card>
   )
