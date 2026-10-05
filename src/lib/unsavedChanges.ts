@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useBlocker, type BlockerFunction } from 'react-router'
 
 // Guarda de saída dos formulários longos: sair de um mesociclo ou de uma
@@ -32,14 +32,22 @@ export type UnsavedChangesGuard = {
 
 export function useUnsavedChanges(dirty: boolean): UnsavedChangesGuard {
   const bypass = useRef(false)
+  // A função de bloqueio chega ao router num efeito, depois do commit. Com o
+  // `dirty` capturado nela, quem saía logo depois de salvar ainda via a versão
+  // anterior ("Sair do registro?" com tudo salvo) — num aparelho lento, ou no
+  // CI, que reprovou um deploy por isso. O ref é atualizado no próprio commit.
+  const dirtyRef = useRef(dirty)
+  useLayoutEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
 
   const shouldBlock = useCallback<BlockerFunction>(
     ({ currentLocation, nextLocation }) => {
       if (bypass.current) return false
       // troca de query/hash na mesma tela não é sair do formulário
-      return dirty && currentLocation.pathname !== nextLocation.pathname
+      return dirtyRef.current && currentLocation.pathname !== nextLocation.pathname
     },
-    [dirty]
+    []
   )
   const blocker = useBlocker(shouldBlock)
 

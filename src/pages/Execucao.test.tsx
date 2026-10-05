@@ -11,7 +11,8 @@ import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/work
 // sempre permitiu (workout_log_sets aponta para o catálogo, não para o
 // exercício do plano — 0009); estes testes fixam o caminho na tela.
 
-const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock } = vi.hoisted(() => ({
+const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock, ultimasMock } = vi.hoisted(() => ({
+  ultimasMock: vi.fn(),
   criarMock: vi.fn(),
   planoMock: vi.fn(),
   logsMock: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('../features/workout/hooks', () => ({
   }),
   useWorkoutLogs: () => logsMock(),
   usePlanSetHistory: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
+  useSubjectLastSets: () => ultimasMock(),
   useWorkoutLogSets: () => setsMock(),
   useCreateWorkoutLog: () => ({ mutateAsync: criarMock, isPending: false }),
   useUpdateWorkoutLog: () => ({ mutateAsync: updateMock, isPending: false }),
@@ -122,6 +124,7 @@ beforeEach(() => {
   updateMock.mockReset().mockResolvedValue({ id: 'log-1' })
   salvarMock.mockReset().mockResolvedValue({ id: 'log-parcial', updated_at: '2026-09-20T10:00:00Z' })
   listarSeriesMock.mockReset().mockResolvedValue([])
+  ultimasMock.mockReset().mockReturnValue({ data: undefined })
 })
 afterEach(cleanup)
 
@@ -230,6 +233,17 @@ describe('Execucao — exercício fora do plano', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
     await waitFor(() => expect(criarMock).toHaveBeenCalledTimes(3))
     expect(criarMock.mock.calls[2][0].clientRef).not.toBe(primeira)
+  })
+
+  // A última carga vem da mesma regra que o aluno vê no link (0044): de outro
+  // plano e registrada pelo aluno também conta, e a sugestão sai dela.
+  it('mostra a última carga do aluno, de qualquer plano, com a sugestão', () => {
+    ultimasMock.mockReturnValue({ data: [
+      { exercise_id: 'ex-1', performed_at: '2026-09-30', weight_kg: 42.5, reps: 12, rir: 2, reached_failure: false },
+    ] })
+    abrir()
+    expect(screen.getByText(/última vez: 42,5 kg × 12 \(RIR 2\) em 30\/09/)).toBeTruthy()
+    expect(screen.getByText(/sugestão: 45 kg × 8 \(subir carga\)/)).toBeTruthy()
   })
 
   it('não oferece exercício que já está na divisão do dia', () => {

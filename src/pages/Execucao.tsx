@@ -8,6 +8,7 @@ import {
   useExercises,
   usePlanSetHistory,
   useSaveTrainerSession,
+  useSubjectLastSets,
   useWorkoutLogs,
   useWorkoutLogSets,
   useWorkoutPlan,
@@ -28,12 +29,8 @@ import {
   suggestedPlanWeek,
   type PlanWeekSuggestion,
 } from '../features/workout/progress'
-import {
-  latestBestByExercise,
-  parseRepRange,
-  suggestProgression,
-  type ProgressionKind,
-} from '../features/workout/progression'
+import { latestBestByExercise, parseRepRange } from '../features/workout/progression'
+import { LastLoadLine, type LastLoad } from '../features/workout/LastLoadLine'
 import { roundToIncrement } from '../features/workout/oneRm'
 import { effectivePrescription, formatSetsReps, overrideFor, overrideIndex } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
@@ -562,14 +559,6 @@ function LogRowItem({
   )
 }
 
-const KIND_LABEL: Record<ProgressionKind, string> = {
-  increase_load: 'subir carga',
-  add_reps: '+1 rep',
-  hold: 'manter',
-  reduce: 'reduzir',
-  insufficient: '',
-}
-
 // A grade de séries de um exercício. Vale para o que estava prescrito e para o
 // exercício avulso — as duas coisas são a mesma tabela de carga/reps/RIR, e
 // mantê-las em componentes separados era garantia de divergirem.
@@ -653,7 +642,18 @@ function LogForm({
   pendingSession: WorkoutLogRow | null
 }) {
   const planId = detail.plan?.id ?? ''
-  const lastByExercise = useMemo(() => latestBestByExercise(history), [history])
+  // A última carga vem da mesma regra que o aluno vê no link (0044): sessão
+  // mais recente em qualquer plano, registrada por quem for. O histórico do
+  // plano fica de reserva enquanto ela carrega ou se a leitura falhar.
+  const lastSetsQuery = useSubjectLastSets(subjectId)
+  const lastByExercise = useMemo(() => {
+    if (lastSetsQuery.data) {
+      return new Map<string, LastLoad>(lastSetsQuery.data.map((s) => [s.exercise_id, {
+        weightKg: s.weight_kg, reps: s.reps, rir: s.rir, date: s.performed_at, reachedFailure: s.reached_failure,
+      }]))
+    }
+    return new Map<string, LastLoad>([...latestBestByExercise(history)].map(([id, s]) => [id, { ...s }]))
+  }, [lastSetsQuery.data, history])
   const days = useMemo(
     () => detail.days.slice().sort((a, b) => a.position - b.position),
     [detail.days]
@@ -1298,28 +1298,12 @@ function LogForm({
           <p className="mt-1 text-xs text-muted-foreground">Nesta semana, não executar. Registre séries somente se o exercício foi realizado.</p>
         ) : null}
         {effective.notes ? <p className="mt-1 text-xs text-muted-foreground">{effective.notes}</p> : null}
-        {(() => {
-          if (effective.skipped) return null
-          const last = lastByExercise.get(ex.exercise_id)
-          if (!last) return null
-          const s = suggestProgression({
-            last,
-            repRange: parseRepRange(effective.reps),
-            targetRir: effective.rir,
-          })
-          if (s.kind === 'insufficient') return null
-          return (
-            <p className="mt-1 text-xs text-primary" title={s.reason}>
-              última {last.weightKg}×{last.reps}
-              {last.rir != null ? ` (RIR ${last.rir})` : ''} → sugestão{' '}
-              {/* Sem arredondar para a grade de 2,5 kg: o motor já
-                  escolhe o incremento pela faixa de carga (halter leve
-                  vai de 1 em 1 kg), e arredondar aqui desfazia isso. */}
-              {s.suggestedWeightKg != null ? `${formatKg(s.suggestedWeightKg)} kg` : ''}
-              {s.suggestedReps != null ? ` × ${s.suggestedReps}` : ''} · {KIND_LABEL[s.kind]}
-            </p>
-          )
-        })()}
+        {/* Sem arredondar a sugestão para a grade de 2,5 kg: o motor já escolhe
+            o incremento pela faixa de carga (halter leve vai de 1 em 1 kg). */}
+        {effective.skipped ? null : (
+          <LastLoadLine last={lastByExercise.get(ex.exercise_id)} repRange={parseRepRange(effective.reps)}
+            targetRir={effective.rir} className="mt-1 text-xs text-primary" />
+        )}
         <SetGrid
           name={names[ex.exercise_id] ?? 'exercício'}
           rows={sets[ex.id] ?? []}
@@ -1351,12 +1335,7 @@ function LogForm({
         </span>
       </span>,
       <>
-        {last ? (
-          <p className="mt-1 text-xs text-primary">
-            última {last.weightKg}×{last.reps}
-            {last.rir != null ? ` (RIR ${last.rir})` : ''}
-          </p>
-        ) : null}
+        <LastLoadLine last={last} suggest={false} className="mt-1 text-xs text-primary" />
         <SetGrid
           name={nome}
           rows={sets[extra.rowId] ?? []}
@@ -1643,12 +1622,6 @@ function LogForm({
       </CardContent>
     </Card>
   )
-}
-
-// Carga sugerida: uma casa decimal só quando existe (22.5 kg; 5 kg), no mesmo
-// formato da "última" carga ao lado.
-function formatKg(kg: number): string {
-  return Number.isInteger(kg) ? String(kg) : kg.toFixed(1)
 }
 
 function planWeeks(detail: WorkoutPlanDetail): number {

@@ -540,6 +540,17 @@ describe('TreinoAluno', () => {
     expect(await screen.findByText(/salvo no aparelho/i)).toBeTruthy()
   })
 
+  // A última carga vem do servidor pela mesma regra da Execução (0044), seja
+  // quem for que registrou; o aluno passa a ver também a sugestão.
+  it('mostra a última carga e a mesma sugestão que o profissional vê', async () => {
+    getWorkoutMock.mockResolvedValue(pacote({
+      last_sets: [{ exercise_id: 'x1', performed_at: '2026-09-30', weight_kg: 40, reps: 12, rir: 2 }],
+    }))
+    await abrir()
+    await campoCarga()
+    expect(screen.getByText('última vez: 40 kg × 12 (RIR 2) em 30/09 → sugestão: 42,5 kg × 8 (subir carga)')).toBeTruthy()
+  })
+
   it('carga com vírgula do teclado brasileiro chega com a casa decimal', async () => {
     await abrir()
     const carga = await campoCarga()

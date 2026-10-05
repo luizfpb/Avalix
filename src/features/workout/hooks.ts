@@ -12,6 +12,7 @@ import {
   listOrgActivePlans,
   listOrgWorkoutLogSummary,
   listPlanSetHistory,
+  listSubjectLastSets,
   listWorkoutLogSets,
   listWorkoutLogs,
   listWorkoutPlans,
@@ -195,6 +196,14 @@ export function usePlanSetHistory(planId: string | undefined) {
   })
 }
 
+export function useSubjectLastSets(subjectId: string | undefined) {
+  return useQuery({
+    queryKey: ['subject-last-sets', subjectId],
+    queryFn: () => listSubjectLastSets(subjectId as string),
+    enabled: !!subjectId,
+  })
+}
+
 export function useCreateWorkoutLog(planId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
@@ -202,6 +211,7 @@ export function useCreateWorkoutLog(planId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
+      qc.invalidateQueries({ queryKey: ['subject-last-sets'] })
     },
   })
 }
@@ -215,6 +225,7 @@ export function useSaveTrainerSession(planId: string | undefined) {
         qc.invalidateQueries({ queryKey: ['workout-logs', planId] }),
         qc.invalidateQueries({ queryKey: ['workout-log-sets', log.id] }),
         qc.invalidateQueries({ queryKey: ['workout-set-history', planId] }),
+        qc.invalidateQueries({ queryKey: ['subject-last-sets'] }),
         qc.invalidateQueries({ queryKey: ['org-log-summary'] }),
       ])
     },
@@ -230,6 +241,7 @@ export function useUpdateWorkoutLog(planId: string | undefined) {
         qc.invalidateQueries({ queryKey: ['workout-logs', planId] }),
         qc.invalidateQueries({ queryKey: ['workout-log-sets', input.id] }),
         qc.invalidateQueries({ queryKey: ['workout-set-history', planId] }),
+        qc.invalidateQueries({ queryKey: ['subject-last-sets'] }),
         qc.invalidateQueries({ queryKey: ['org-log-summary'] }),
       ])
     },
@@ -243,6 +255,7 @@ export function useDeleteWorkoutLog(planId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
+      qc.invalidateQueries({ queryKey: ['subject-last-sets'] })
     },
   })
 }

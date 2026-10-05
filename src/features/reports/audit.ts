@@ -44,11 +44,7 @@ export async function logExport(input: {
 // ---- leitura (página /auditoria, owner/admin — a RLS garante) -----------
 
 export type AuditLogRow = Database['public']['Tables']['audit_logs']['Row']
-// source/source_ref chegam com a 0043; opcionais até regenerar database.types.
-export type ClientErrorRow = Database['public']['Tables']['client_errors']['Row'] & {
-  source?: 'app' | 'treino' | 'anamnese' | null
-  source_ref?: string | null
-}
+export type ClientErrorRow = Database['public']['Tables']['client_errors']['Row']
 
 export const AUDIT_PAGE_SIZE = 50
 

@@ -48,6 +48,7 @@ const TABLE_LABELS: Record<string, string> = {
   appointments: 'agendamento',
 }
 
+// source vem da 0043: 'app' (membro), 'treino' ou 'anamnese' (página do aluno).
 function errorSourceLabel(source: ClientErrorRow['source']): string {
   if (source === 'treino') return 'aluno · treino'
   if (source === 'anamnese') return 'aluno · anamnese'

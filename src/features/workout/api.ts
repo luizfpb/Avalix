@@ -687,6 +687,28 @@ export async function deleteWorkoutLog(id: string): Promise<void> {
   if (error) throw error
 }
 
+// Última carga de cada exercício do avaliado, pela mesma regra do pacote do
+// aluno (app.workout_last_sets, 0043): sessão mais recente em qualquer plano,
+// registrada por quem for. Contrato restrito até regenerar database.types.
+export type SubjectLastSet = {
+  exercise_id: string
+  performed_at: string
+  weight_kg: number | null
+  reps: number | null
+  rir: number | null
+  reached_failure?: boolean | null
+}
+
+export async function listSubjectLastSets(subjectId: string): Promise<SubjectLastSet[]> {
+  const client = supabase as unknown as {
+    rpc(name: 'subject_last_sets', args: { p_subject: string }):
+      PromiseLike<{ data: unknown; error: unknown }>
+  }
+  const { data, error } = await client.rpc('subject_last_sets', { p_subject: subjectId })
+  if (error) throw error
+  return Array.isArray(data) ? (data as SubjectLastSet[]) : []
+}
+
 export type SetHistoryPoint = {
   exerciseId: string
   performedAt: string

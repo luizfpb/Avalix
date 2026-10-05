@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, CloudOff, Copy, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
+import { LastLoadLine, type LastLoad } from '../features/workout/LastLoadLine'
+import { parseRepRange } from '../features/workout/progression'
 import { videoOrSearch } from '../features/workout/demo'
 import {
   getHistoryPageForLink,
@@ -1140,7 +1142,9 @@ function TreinoDoDia({
   )
 
   const ultimaPorExercicio = useMemo(
-    () => new Map(pacote.last_sets.map((s) => [s.exercise_id, s])),
+    () => new Map<string, LastLoad>(pacote.last_sets.map((s) => [s.exercise_id, {
+      weightKg: s.weight_kg, reps: s.reps, rir: s.rir, date: s.performed_at, reachedFailure: s.reached_failure,
+    }])),
     [pacote.last_sets]
   )
 
@@ -1859,14 +1863,7 @@ function TreinoDoDia({
                 </p>
               ) : (
                 <>
-                  {ultima ? (
-                    <p className="mt-1 text-[11px] text-primary">
-                      última vez: {ultima.weight_kg ?? '—'} kg × {ultima.reps ?? '—'}
-                      {ultima.rir != null ? ` (RIR ${ultima.rir})` : ''} em{' '}
-                      {dataBr(ultima.performed_at)}
-                      {ultima.reached_failure === true ? ' · Falha' : ''}
-                    </p>
-                  ) : null}
+                  <LastLoadLine last={ultima} repRange={parseRepRange(efetiva.reps)} targetRir={efetiva.rir} />
 
                   <div className="mt-2 max-w-md space-y-1">
                     <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
@@ -1926,13 +1923,7 @@ function TreinoDoDia({
                   <X className="size-4" aria-hidden="true" />
                 </button>
               </div>
-              {ultima ? (
-                <p className="mt-1 text-[11px] text-primary">
-                  última vez: {ultima.weight_kg ?? '—'} kg × {ultima.reps ?? '—'}
-                  {ultima.rir != null ? ` (RIR ${ultima.rir})` : ''} em {dataBr(ultima.performed_at)}
-                  {ultima.reached_failure === true ? ' · Falha' : ''}
-                </p>
-              ) : null}
+              <LastLoadLine last={ultima} suggest={false} />
               <div className="mt-2 max-w-md space-y-1">
                 <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
                   <span />

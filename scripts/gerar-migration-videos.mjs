@@ -2,8 +2,8 @@
 // exercises.catalog_video_url (0042) nas linhas globais.
 //
 //   npx vite-node scripts/gerar-migration-videos.mjs <planilha.csv> <saida.sql> <versao>
-//   ex.: npx vite-node scripts/gerar-migration-videos.mjs docs/videos/leandro-twin-candidatos.csv supabase/migrations/0044_videos_do_catalogo.sql 0044
-//   (a 0043 já é a da auditoria de aparelho real: use o próximo número livre)
+//   ex.: npx vite-node scripts/gerar-migration-videos.mjs docs/videos/leandro-twin-candidatos.csv supabase/migrations/0045_videos_do_catalogo.sql 0045
+//   (use o próximo número livre depois da última migration em supabase/migrations)
 //
 // Coluna `aprovado` da planilha (separador ";", como sai do Excel pt-BR):
 //   sim / s / ok / x -> usa a coluna `link`

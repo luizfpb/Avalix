@@ -2182,6 +2182,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      subject_last_sets: { Args: { p_subject: string }; Returns: Json }
       submit_anamnese_intake: {
         Args: {
           p_consent_text_sha256: string
