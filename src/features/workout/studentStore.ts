@@ -31,6 +31,7 @@ const STORE = 'kv'
 type Key = string
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
+let openedDb: IDBDatabase | null = null
 const ACCESS_GENERATION = '@access-generation'
 let localGeneration = 0
 
@@ -73,7 +74,7 @@ export class StudentStorageError extends Error {
 
 function openDb(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise
-  dbPromise = new Promise((resolve) => {
+  const opening = new Promise<IDBDatabase | null>((resolve) => {
     try {
       if (typeof indexedDB === 'undefined') return resolve(null)
       const req = indexedDB.open(DB_NAME, DB_VERSION)
@@ -81,7 +82,16 @@ function openDb(): Promise<IDBDatabase | null> {
         const db = req.result
         if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
       }
-      req.onsuccess = () => resolve(req.result)
+      req.onsuccess = () => {
+        const db = req.result
+        // O Safari do iPhone derruba a conexão com a página em segundo plano
+        // (tela bloqueada entre as séries). Conexão morta não pode ficar
+        // memorizada: toda gravação falharia até recarregar a página.
+        db.onclose = () => discardDb(db)
+        db.onversionchange = () => discardDb(db)
+        openedDb = db
+        resolve(db)
+      }
       // navegação privada, cota esgotada, storage bloqueado: a página tem de
       // continuar funcionando online, só sem offline
       req.onerror = () => resolve(null)
@@ -89,26 +99,59 @@ function openDb(): Promise<IDBDatabase | null> {
       resolve(null)
     }
   })
-  return dbPromise
+  dbPromise = opening
+  // Falha de abertura também não fica memorizada: a próxima operação tenta de novo.
+  void opening.then((db) => {
+    if (!db && dbPromise === opening) dbPromise = null
+  })
+  return opening
+}
+
+function discardDb(db: IDBDatabase): void {
+  if (openedDb === db) {
+    openedDb = null
+    dbPromise = null
+  }
+  try {
+    db.close()
+  } catch {
+    // já fechada
+  }
+}
+
+// Uma transação que falha sem motivo nosso ganha uma segunda chance numa
+// conexão nova. É seguro: transação abortada não gravou nada.
+async function withDb<T>(
+  run: (db: IDBDatabase) => Promise<{ ok: true; value: T } | { ok: false }>,
+  onDb?: () => void
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  for (let attempt = 0; ; attempt++) {
+    const db = await openDb()
+    onDb?.()
+    if (!db) return { ok: false }
+    const result = await run(db)
+    if (result.ok) return result
+    discardDb(db)
+    if (attempt > 0) return result
+  }
 }
 
 async function idbGet<T>(key: Key, required = false): Promise<T | null> {
-  const db = await openDb()
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return null
-  }
-  return new Promise((resolve, reject) => {
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve(null))
+  const result = await withDb<T | null>((db) => new Promise((resolve) => {
+    const fail = () => resolve({ ok: false })
     try {
       const tx = db.transaction(STORE, 'readonly')
       const req = tx.objectStore(STORE).get(key)
-      req.onsuccess = () => resolve((req.result as T) ?? null)
+      req.onsuccess = () => resolve({ ok: true, value: (req.result as T) ?? null })
       req.onerror = fail
+      tx.onabort = fail
     } catch {
       fail()
     }
-  })
+  }))
+  if (result.ok) return result.value
+  if (required) throw new StudentStorageError()
+  return null
 }
 
 async function idbSet(key: Key, value: unknown, access?: StudentStorageAccess): Promise<void> {
@@ -127,15 +170,9 @@ async function idbUpdate<T>(
 ): Promise<void> {
   const lease = access ?? await captureStudentStorageAccess()
   assertAccess(lease)
-  const db = await openDb()
-  assertAccess(lease)
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return
-  }
-  await new Promise<void>((resolve, reject) => {
+  const result = await withDb<void>((db) => new Promise((resolve, reject) => {
     let cause: unknown
-    const fail = () => (cause ? reject(cause) : required ? reject(new StudentStorageError()) : resolve())
+    const fail = () => (cause ? reject(cause) : resolve({ ok: false }))
     try {
       const tx = db.transaction(STORE, 'readwrite')
       const store = tx.objectStore(STORE)
@@ -170,13 +207,14 @@ async function idbUpdate<T>(
         }
       }
       generation.onerror = fail
-      tx.oncomplete = () => resolve()
+      tx.oncomplete = () => resolve({ ok: true, value: undefined })
       tx.onerror = fail
       tx.onabort = fail
     } catch {
       fail()
     }
-  })
+  }), () => assertAccess(lease))
+  if (!result.ok && required) throw new StudentStorageError()
 }
 
 async function idbDelete(key: Key, required = false, access?: StudentStorageAccess): Promise<void> {
@@ -185,25 +223,21 @@ async function idbDelete(key: Key, required = false, access?: StudentStorageAcce
 
 async function idbClearAll(required = false): Promise<void> {
   localGeneration += 1
-  const db = await openDb()
-  if (!db) {
-    if (required) throw new StudentStorageError()
-    return
-  }
-  await new Promise<void>((resolve, reject) => {
-    const fail = () => (required ? reject(new StudentStorageError()) : resolve())
+  const result = await withDb<void>((db) => new Promise((resolve) => {
+    const fail = () => resolve({ ok: false })
     try {
       const tx = db.transaction(STORE, 'readwrite')
       const store = tx.objectStore(STORE)
       store.clear()
       store.put(crypto.randomUUID(), ACCESS_GENERATION)
-      tx.oncomplete = () => resolve()
+      tx.oncomplete = () => resolve({ ok: true, value: undefined })
       tx.onerror = fail
       tx.onabort = fail
     } catch {
       fail()
     }
-  })
+  }))
+  if (!result.ok && required) throw new StudentStorageError()
 }
 
 // ---------------------------------------------------------------- token local
@@ -569,13 +603,22 @@ export async function writeDraft(
 export async function reserveDraftRevision(
   scope: string, draft: DraftSession, required = false, access?: StudentStorageAccess
 ): Promise<number> {
-  // Sem conexão IndexedDB desde a abertura, não há rascunho recuperado nem
-  // gravação local a confirmar. Só a conclusão online admite revisão efêmera.
-  if (!required && !await openDb()) {
+  // Sem IndexedDB utilizável não há rascunho recuperado nem gravação local a
+  // confirmar. Só a conclusão online admite revisão efêmera.
+  const ephemeral = () => {
     if (access) assertAccess(access)
     return Math.max(0, Math.trunc(draft.revision || 0)) + 1
   }
-  return writeDraft(scope, draft, required, access)
+  if (!required && !await openDb()) return ephemeral()
+  try {
+    return await writeDraft(scope, draft, required, access)
+  } catch (error) {
+    // Armazenamento que abriu mas não grava (cota, conexão perdida de novo)
+    // não pode impedir a conclusão online: é o mesmo caso de não haver banco.
+    // Conflito e acesso encerrado continuam barrando.
+    if (required || !(error instanceof StudentStorageError)) throw error
+    return ephemeral()
+  }
 }
 
 export async function clearDraftSession(

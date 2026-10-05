@@ -4,7 +4,7 @@ import { act, render, screen, cleanup, fireEvent, waitFor, within } from '@testi
 import TreinoAluno from './TreinoAluno'
 import { reconciliarRascunho, type PlanoVigente } from '../features/workout/studentDraft'
 import { writeCachedHistory } from '../features/workout/studentStore'
-import { captureStudentStorageAccess, STUDENT_TOKEN_KEY } from '../features/workout/studentStore'
+import { captureStudentStorageAccess, STUDENT_TOKEN_KEY, StudentStorageError } from '../features/workout/studentStore'
 import type {
   StudentHistorySession,
   StudentPlanDetail,
@@ -552,6 +552,16 @@ describe('TreinoAluno', () => {
     expect((carga as HTMLInputElement).value).toBe('40')
     expect(submitMock).not.toHaveBeenCalled()
     expect(enqueueMock).not.toHaveBeenCalled()
+  })
+
+  it('conclui quando o servidor recebeu, mesmo que o aparelho não apague o rascunho', async () => {
+    clearDraftMock.mockRejectedValue(new StudentStorageError())
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+
+    expect(await screen.findByText(/Treino concluído! Seu treinador já consegue ver/)).toBeTruthy()
+    expect(screen.queryByText(/Libere o armazenamento/)).toBeNull()
   })
 
   it('recusa do servidor não vira "salvo": o aluno precisa saber', async () => {

@@ -159,4 +159,36 @@ describe('rascunhos e acesso com transações IndexedDB reais', () => {
     transaction.mockRestore()
     expect(await store.readDraft('scope', 'p')).toMatchObject({ revision: 1 })
   })
+
+  it('reabre a conexão que o navegador derrubou em vez de falhar até recarregar a página', async () => {
+    await store.writeDraft('scope', draft(), true)
+    const saved = (await store.readDraft('scope', 'p'))!
+    const prototype = (await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open('avalix-treino', 1)
+      request.onsuccess = () => resolve(request.result)
+    })).constructor.prototype
+    // o que o Safari faz depois de a tela ficar bloqueada entre as séries
+    const transaction = vi.spyOn(prototype, 'transaction').mockImplementationOnce(() => {
+      throw new DOMException('The database connection is closing.', 'InvalidStateError')
+    })
+    await expect(store.writeDraft('scope', { ...saved, notes: 'Depois do bloqueio' }, true)).resolves.toBe(2)
+    transaction.mockRestore()
+    expect(await store.readDraft('scope', 'p')).toMatchObject({ revision: 2, notes: 'Depois do bloqueio' })
+  })
+
+  it('armazenamento que não grava não impede concluir online, mas impede salvar progresso', async () => {
+    await store.writeDraft('scope', draft(), true)
+    const saved = (await store.readDraft('scope', 'p'))!
+    const prototype = (await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open('avalix-treino', 1)
+      request.onsuccess = () => resolve(request.result)
+    })).constructor.prototype
+    const transaction = vi.spyOn(prototype, 'transaction').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+    await expect(store.reserveDraftRevision('scope', saved)).resolves.toBe(2)
+    await expect(store.reserveDraftRevision('scope', saved, true)).rejects.toBeInstanceOf(store.StudentStorageError)
+    transaction.mockRestore()
+    expect(await store.readDraft('scope', 'p')).toMatchObject({ revision: 1 })
+  })
 })

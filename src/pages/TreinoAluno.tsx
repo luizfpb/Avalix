@@ -1350,7 +1350,15 @@ function TreinoDoDia({
       })
 
       if (!isStudentStorageAccessCurrent(access)) return
-      if (concluir) await clearDraftSession(scope, plano.id, dayId, data, access, clientRef, allocatedRevision)
+      if (concluir) {
+        try {
+          await clearDraftSession(scope, plano.id, dayId, data, access, clientRef, allocatedRevision)
+        } catch (storageError) {
+          // O treino já está no servidor ou na fila. Um rascunho que o aparelho
+          // não deixou apagar não pode transformar a conclusão em erro.
+          if (!(storageError instanceof StudentStorageError)) throw storageError
+        }
+      }
       if (result.offline) {
         await onFilaMudou()
         onSemRede()
