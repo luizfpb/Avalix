@@ -540,6 +540,62 @@ describe('TreinoAluno', () => {
     expect(await screen.findByText(/salvo no aparelho/i)).toBeTruthy()
   })
 
+  it('carga com vírgula do teclado brasileiro chega com a casa decimal', async () => {
+    await abrir()
+    const carga = await campoCarga()
+    fireEvent.change(carga, { target: { value: '12,5' } })
+    expect((carga as HTMLInputElement).value).toBe('12.5')
+    fireEvent.change(screen.getByLabelText(/Repetições da série 1 de Supino reto/), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText(/RIR da série 1 de Supino reto/), { target: { value: '1,5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets[0]).toMatchObject({ weight_kg: 12.5, reps: 10, rir: 1.5 })
+  })
+
+  it('aparelho que não lê o rascunho não trava o formulário: dá para concluir com internet', async () => {
+    // Antes, a leitura que falhava deixava o fieldset inteiro desabilitado,
+    // inclusive o "Concluir treino", com o aviso em vermelho e sem saída.
+    readDraftMock.mockRejectedValue(new StudentStorageError())
+    await abrir()
+    const carga = await campoCarga()
+    expect((carga as HTMLInputElement).disabled).toBe(false)
+    expect(screen.getByText(/Este aparelho não está guardando o que você digita/)).toBeTruthy()
+    expect(screen.queryByText(/Libere o armazenamento/)).toBeNull()
+    fireEvent.change(carga, { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    expect(await screen.findByText(/Treino concluído! Seu treinador já consegue ver/)).toBeTruthy()
+  })
+
+  it('rascunho que deixa de ser guardado vira aviso, não erro no botão', async () => {
+    writeDraftMock.mockRejectedValue(new StudentStorageError())
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    expect(await screen.findByText(/Este aparelho não está guardando o que você digita/, {}, { timeout: 3000 })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('sem internet e sem armazenamento, pede para manter a tela aberta em vez de liberar espaço', async () => {
+    submitMock.mockRejectedValue(new TypeError('Load failed'))
+    enqueueMock.mockRejectedValue(new StudentStorageError())
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Mantenha esta tela aberta/)
+    expect(screen.queryByText(/Libere o armazenamento/)).toBeNull()
+  })
+
+  it.each([
+    { message: 'upstream connect error or disconnect/reset before headers', status: 503 },
+    { message: 'Could not find the function public.get_workout_for_link(p_token) in the schema cache', code: 'PGRST202' },
+    { message: 'AbortError: The operation was aborted.', code: '' },
+  ])('falha do servidor ao abrir sem cache não manda pedir outro link (%#)', async (falha) => {
+    getWorkoutMock.mockRejectedValue(falha)
+    render(<TreinoAluno />)
+    expect(await screen.findByText('Não foi possível abrir o treino')).toBeTruthy()
+    expect(screen.queryByText(/Link inválido ou expirado/)).toBeNull()
+    expect(purgeRevokedMock).not.toHaveBeenCalled()
+  })
+
   it('não confirma salvamento offline quando o armazenamento falha', async () => {
     reserveDraftRevisionMock.mockRejectedValue(new Error('Não foi possível salvar no aparelho.'))
     await abrir()

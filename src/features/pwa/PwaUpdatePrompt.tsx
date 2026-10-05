@@ -7,6 +7,33 @@ import { isPublicIntakeLocation, verifyPublishedShell } from './updateCheck'
 const UPDATE_INTERVAL_MS = 60 * 60 * 1000
 type UpdateStatus = 'checking' | 'ready' | 'failed' | 'updating'
 
+// Páginas públicas (treino e anamnese do aluno) nunca mostram o aviso de
+// versão nova, e o aluno não visita a área do profissional, onde ele seria
+// aplicado: a correção publicada não chegava ao aparelho dele enquanto houvesse
+// uma aba aberta — no iPhone, semanas. Agora a versão que já está esperando é
+// aplicada ao abrir a página, antes de qualquer toque. Depois que a pessoa
+// começa a mexer, nada recarrega sozinho.
+const PUBLIC_AUTO_UPDATE_WINDOW_MS = 10_000
+const AUTO_UPDATE_KEY = 'avalix:pwa:auto-update-at'
+const AUTO_UPDATE_COOLDOWN_MS = 5 * 60 * 1000
+
+function recentlyAutoUpdated(now = Date.now()): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(AUTO_UPDATE_KEY))
+    return Number.isFinite(last) && now - last < AUTO_UPDATE_COOLDOWN_MS
+  } catch {
+    return false
+  }
+}
+
+function markAutoUpdated(now = Date.now()): void {
+  try {
+    sessionStorage.setItem(AUTO_UPDATE_KEY, String(now))
+  } catch {
+    // sem sessionStorage, o prazo de 10 s ainda impede recarregar em ciclo
+  }
+}
+
 export function PwaUpdatePrompt() {
   const location = useLocation()
   const isPublicIntake = isPublicIntakeLocation(location.pathname)
@@ -18,6 +45,13 @@ export function PwaUpdatePrompt() {
     let active = true
     let registration: ServiceWorkerRegistration | undefined
     let interval: number | undefined
+    const startedAt = Date.now()
+    let touched = false
+    const onTouch = () => {
+      touched = true
+    }
+    window.addEventListener('pointerdown', onTouch, true)
+    window.addEventListener('keydown', onTouch, true)
 
     const check = () => {
       if (document.visibilityState === 'visible') void registration?.update()
@@ -29,8 +63,15 @@ export function PwaUpdatePrompt() {
         if (!active) return
         // As paginas publicas tambem precisam registrar o SW para abrir offline,
         // mas nunca interrompem um formulario ou treino com prompt de update.
-        // O worker novo fica esperando e sera aplicado numa visita profissional.
-        if (isPublicIntake) return
+        if (isPublicIntake) {
+          if (touched || Date.now() - startedAt > PUBLIC_AUTO_UPDATE_WINDOW_MS || recentlyAutoUpdated()) return
+          void verifyPublishedShell().then((valid) => {
+            if (!active || !valid || touched) return
+            markAutoUpdated()
+            void updateRef.current?.(true)
+          })
+          return
+        }
         setNeedRefresh(true)
         setStatus('checking')
         void verifyPublishedShell().then((valid) => {
@@ -49,6 +90,8 @@ export function PwaUpdatePrompt() {
     return () => {
       active = false
       updateRef.current = null
+      window.removeEventListener('pointerdown', onTouch, true)
+      window.removeEventListener('keydown', onTouch, true)
       document.removeEventListener('visibilitychange', check)
       window.removeEventListener('online', check)
       if (interval !== undefined) window.clearInterval(interval)

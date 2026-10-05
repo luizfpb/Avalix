@@ -32,6 +32,7 @@ type Key = string
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 let openedDb: IDBDatabase | null = null
+let everOpened = false
 const ACCESS_GENERATION = '@access-generation'
 let localGeneration = 0
 
@@ -72,11 +73,25 @@ export class StudentStorageError extends Error {
   }
 }
 
+// O Safari já deixou `indexedDB.open` sem resposta nenhuma, nem sucesso nem
+// erro. Sem prazo, a página do aluno ficaria em "Carregando" para sempre;
+// passado o prazo, ela segue online, só sem o aparelho.
+const OPEN_TIMEOUT_MS = 4_000
+
 function openDb(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise
   const opening = new Promise<IDBDatabase | null>((resolve) => {
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      resolve(null)
+    }, OPEN_TIMEOUT_MS)
+    const settle = (db: IDBDatabase | null) => {
+      clearTimeout(timer)
+      resolve(db)
+    }
     try {
-      if (typeof indexedDB === 'undefined') return resolve(null)
+      if (typeof indexedDB === 'undefined') return settle(null)
       const req = indexedDB.open(DB_NAME, DB_VERSION)
       req.onupgradeneeded = () => {
         const db = req.result
@@ -84,25 +99,35 @@ function openDb(): Promise<IDBDatabase | null> {
       }
       req.onsuccess = () => {
         const db = req.result
+        // A resposta chegou depois do prazo: quem pediu já seguiu sem banco.
+        if (timedOut) {
+          db.close()
+          return
+        }
         // O Safari do iPhone derruba a conexão com a página em segundo plano
         // (tela bloqueada entre as séries). Conexão morta não pode ficar
         // memorizada: toda gravação falharia até recarregar a página.
         db.onclose = () => discardDb(db)
         db.onversionchange = () => discardDb(db)
         openedDb = db
-        resolve(db)
+        settle(db)
       }
       // navegação privada, cota esgotada, storage bloqueado: a página tem de
       // continuar funcionando online, só sem offline
-      req.onerror = () => resolve(null)
+      req.onerror = () => settle(null)
     } catch {
-      resolve(null)
+      settle(null)
     }
   })
   dbPromise = opening
-  // Falha de abertura também não fica memorizada: a próxima operação tenta de novo.
+  // Depois de uma conexão boa, falha de reabertura não fica memorizada: a
+  // próxima operação tenta de novo. Sem conexão boa desde o início, a página
+  // segue sem o aparelho até recarregar — a geração de acesso foi lida sem
+  // banco, e reabrir no meio confrontaria escritas com uma geração que ela
+  // nunca viu, recusando tudo como acesso encerrado.
   void opening.then((db) => {
-    if (!db && dbPromise === opening) dbPromise = null
+    if (db) everOpened = true
+    else if (everOpened && dbPromise === opening) dbPromise = null
   })
   return opening
 }
@@ -613,10 +638,10 @@ export async function reserveDraftRevision(
   try {
     return await writeDraft(scope, draft, required, access)
   } catch (error) {
-    // Armazenamento que abriu mas não grava (cota, conexão perdida de novo)
-    // não pode impedir a conclusão online: é o mesmo caso de não haver banco.
-    // Conflito e acesso encerrado continuam barrando.
-    if (required || !(error instanceof StudentStorageError)) throw error
+    // Armazenamento que abriu mas não grava (cota, conexão perdida de novo,
+    // rascunho ilegível) não pode impedir a conclusão online: é o mesmo caso
+    // de não haver banco. Conflito e acesso encerrado continuam barrando.
+    if (required || error instanceof StudentDraftConflictError || error instanceof StudentAccessEndedError) throw error
     return ephemeral()
   }
 }

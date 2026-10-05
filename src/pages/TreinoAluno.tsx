@@ -19,7 +19,6 @@ import {
   CORRECTED_SESSION_MESSAGE,
   flushQueue,
   isInvalidStudentLinkError,
-  isNetworkFailure,
   isTransientStudentError,
   isStudentLinkExpired,
   queuedSessionLabel,
@@ -28,6 +27,7 @@ import {
   resolveStudentToken,
   studentScope,
   suggestedWorkoutDayId,
+  tokenFromPastedLink,
   withStudentSyncLock,
 } from '../features/workout/studentSession'
 import {
@@ -47,6 +47,7 @@ import {
   removeCachedPlan,
   reserveDraftRevision,
   requestPersistentStorage,
+  saveStudentToken,
   writeCachedHistory,
   writeCachedPlan,
   writeCachedWorkout,
@@ -133,6 +134,50 @@ function errorMessage(error: unknown, fallback: string): string {
     : fallback
 }
 
+// Campo para colar o link do treinador. Quem decide o que fazer com o token é a
+// tela: sem link no aparelho ele entra direto; depois de um link revogado a
+// página recarrega, porque a montagem que viu a revogação nunca reativa outro.
+function ColarLink({ atual = null, onToken }: { atual?: string | null; onToken: (token: string) => void }) {
+  const [texto, setTexto] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  return (
+    <form
+      className="flex w-full max-w-sm flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const colado = tokenFromPastedLink(texto)
+        if (!colado) {
+          setErro('Não encontramos o link do treino nesse texto. Copie o link inteiro que seu treinador mandou.')
+          return
+        }
+        if (colado === atual) {
+          setErro('Este é o mesmo link que deixou de valer. Peça um novo ao seu treinador.')
+          return
+        }
+        onToken(colado)
+      }}
+    >
+      <Input
+        aria-label="Link do treino"
+        placeholder="Cole aqui o link do treino"
+        value={texto}
+        onChange={(event) => {
+          setTexto(event.target.value)
+          setErro(null)
+        }}
+        autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+      />
+      {erro ? <p role="alert" className="text-xs text-destructive">{erro}</p> : null}
+      <Button type="submit" variant="outline" disabled={!texto.trim()}>
+        Abrir treino
+      </Button>
+    </form>
+  )
+}
+
 // Captura o token uma vez por carga: o StrictMode monta duas vezes em dev, e a
 // segunda leitura já encontraria a URL limpa. Mesmo cuidado da página pública
 // da anamnese.
@@ -145,7 +190,7 @@ function capturarTokenUmaVez(): string | null {
 type Aba = 'treino' | 'historico' | 'anteriores'
 
 export default function TreinoAluno() {
-  const [token] = useState(capturarTokenUmaVez)
+  const [token, setToken] = useState(capturarTokenUmaVez)
   const [scope, setScope] = useState<string | null>(null)
   const [pacote, setPacote] = useState<StudentWorkout | null>(null)
   const [sincronizadoEm, setSincronizadoEm] = useState<string | null>(null)
@@ -278,9 +323,13 @@ export default function TreinoAluno() {
         }
       } catch (error) {
         if (!vivo || epoch !== accessEpoch.current) return
-        if (isNetworkFailure(error)) setSemRede(true)
-        else if (isInvalidStudentLinkError(error)) await invalidarAcesso()
-        else setInvalido(!cache || Boolean(cacheLegado))
+        // Só o servidor dizendo que o link não vale (nulo ou a recusa explícita)
+        // mostra "inválido". Qualquer outra falha — rede, prazo, instabilidade
+        // do servidor — mantém o cache ou cai em "não foi possível abrir", com
+        // tentar de novo: mandar o aluno pedir outro link por um erro
+        // passageiro fazia o treinador revogar um link que ainda valia.
+        if (isInvalidStudentLinkError(error)) await invalidarAcesso()
+        else setSemRede(true)
       } finally {
         if (vivo && epoch === accessEpoch.current) setCarregando(false)
       }
@@ -396,11 +445,24 @@ export default function TreinoAluno() {
     return () => window.clearInterval(timer)
   }, [fila, enviarFila])
 
+  // Sem token não é link inválido: é este aparelho (ou o app instalado no
+  // iPhone, que não enxerga o que o Safari guardou) que ainda não recebeu o
+  // link. Dizer "inválido" fazia o aluno pedir outro link, e o treinador, ao
+  // reemitir, derrubava o que ainda valia.
   if (!token) {
     return (
       <Aviso
-        titulo="Link inválido ou expirado"
-        texto="Peça um link novo ao seu treinador. Se você abriu pelo atalho salvo, abra pelo link original uma vez."
+        titulo="Abra o seu treino"
+        texto="Este aparelho ainda não tem o link do seu treino. Toque no link que seu treinador mandou ou cole-o abaixo. No iPhone, o app instalado na tela de início precisa receber o link colado uma vez."
+        acao={
+          <ColarLink
+            onToken={(colado) => {
+              saveStudentToken(colado)
+              tokenCapturado = colado
+              setToken(colado)
+            }}
+          />
+        }
       />
     )
   }
@@ -412,7 +474,7 @@ export default function TreinoAluno() {
         texto={
           erroLimpeza
             ? 'Este link não vale mais. Não foi possível apagar o treino salvo neste aparelho; libere o armazenamento e tente limpar novamente.'
-            : 'Este link não vale mais. Peça um novo ao seu treinador.'
+            : 'Este link não vale mais. Peça um novo ao seu treinador. Se ele já mandou, toque no link novo ou cole-o abaixo.'
         }
         acao={
           erroLimpeza ? (
@@ -426,7 +488,16 @@ export default function TreinoAluno() {
             >
               Limpar dados deste aparelho
             </Button>
-          ) : undefined
+          ) : (
+            <ColarLink
+              atual={token}
+              onToken={(colado) => {
+                saveStudentToken(colado)
+                window.location.replace(`/t#${colado}`)
+                window.location.reload()
+              }}
+            />
+          )
         }
       />
     )
@@ -913,6 +984,9 @@ function TreinoDoDia({
   >(null)
   const [salvando, setSalvando] = useState<'progresso' | 'concluir' | null>(null)
   const [rascunhoLido, setRascunhoLido] = useState(false)
+  // O aparelho deixou de guardar o rascunho (cota, armazenamento bloqueado).
+  // Não é erro do treino: vira aviso e muda a promessa do rodapé.
+  const [aparelhoFalhou, setAparelhoFalhou] = useState(false)
   // aviso de "o plano foi regravado e o rascunho foi remapeado"
   const [planoMudou, setPlanoMudou] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -1010,7 +1084,13 @@ function TreinoDoDia({
       }
       setRascunhoLido(true)
     })().catch((error) => {
-      if (vivo && isStudentStorageAccessCurrent(access)) setErro(errorMessage(error, 'Não foi possível recuperar o rascunho. Reabra esta tela.'))
+      if (!vivo || !isStudentStorageAccessCurrent(access)) return
+      // O rascunho é conveniência; treinar e concluir com internet não podem
+      // depender dele. Antes, uma leitura que falhava deixava o formulário
+      // inteiro desabilitado, inclusive o "Concluir treino", até recarregar.
+      if (error instanceof StudentStorageError) setAparelhoFalhou(true)
+      else setErro('Não foi possível recuperar o rascunho deste aparelho. Você pode registrar o treino normalmente.')
+      setRascunhoLido(true)
     })
     return () => {
       vivo = false
@@ -1060,8 +1140,10 @@ function TreinoDoDia({
   useEffect(() => {
     if (!rascunhoLido || !dirty || salvando !== null) return
     const id = setTimeout(() => {
-      void persistRef.current(draftRef.current()).catch((error) => {
-        if (isStudentStorageAccessCurrent(access)) setErro(errorMessage(error, 'Não foi possível guardar o rascunho neste aparelho.'))
+      void persistRef.current(draftRef.current()).then(() => setAparelhoFalhou(false), (error) => {
+        if (!isStudentStorageAccessCurrent(access)) return
+        if (error instanceof StudentStorageError) setAparelhoFalhou(true)
+        else setErro(errorMessage(error, 'Não foi possível guardar o rascunho neste aparelho.'))
       })
     }, 500)
     return () => clearTimeout(id)
@@ -1083,6 +1165,18 @@ function TreinoDoDia({
       }
     }
   }, [scope, access])
+
+  // Celular bloqueado ou troca de app no meio da digitação: o debounce do autosave
+  // só dispararia na volta, e o sistema pode encerrar a página antes disso.
+  useEffect(() => {
+    const aoEsconder = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (!rascunhoLido || !dirtyRef.current || saving.current || !isStudentStorageAccessCurrent(access)) return
+      void persistRef.current(draftRef.current()).catch(() => undefined)
+    }
+    document.addEventListener('visibilitychange', aoEsconder)
+    return () => document.removeEventListener('visibilitychange', aoEsconder)
+  }, [rascunhoLido, access])
 
   function setCelula(exId: string, i: number, campo: keyof Linha, valor: string | boolean) {
     setDirty(true)
@@ -1390,7 +1484,15 @@ function TreinoDoDia({
       }
     } catch (error) {
       if (isInvalidStudentLinkError(error)) await onLinkInvalid()
-      else setErro(errorMessage(error, 'Não foi possível salvar o treino no servidor nem neste aparelho. Mantenha esta tela aberta e tente novamente.'))
+      else if (error instanceof StudentStorageError) {
+        // O aparelho não guardou e não deu para entregar ao servidor. "Libere
+        // o armazenamento" mandava a pessoa mexer no celular quando o que
+        // resolve é tentar de novo com sinal, sem fechar a tela.
+        setAparelhoFalhou(true)
+        setErro(concluir
+          ? 'Sem internet e sem conseguir guardar neste aparelho. Mantenha esta tela aberta e toque em Concluir treino de novo quando a conexão voltar.'
+          : 'Este aparelho não conseguiu guardar o progresso. Para não perder o que você fez, conclua o treino com internet ou mantenha esta tela aberta.')
+      } else setErro(errorMessage(error, 'Não foi possível salvar o treino no servidor nem neste aparelho. Mantenha esta tela aberta e tente novamente.'))
     } finally {
       saving.current = false
       onSavingChange(false)
@@ -1907,9 +2009,15 @@ function TreinoDoDia({
         >
           {salvando === 'progresso' ? 'Salvando...' : 'Parar por aqui e continuar depois'}
         </Button>
-        <p className="text-center text-[11px] text-muted-foreground">
-          O que você digita já fica guardado neste aparelho, mesmo sem internet.
-        </p>
+        {aparelhoFalhou ? (
+          <p role="status" className="rounded-md border border-amber-300/60 bg-amber-50 p-2 text-center text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+            Este aparelho não está guardando o que você digita. Conclua o treino com internet antes de fechar esta tela.
+          </p>
+        ) : (
+          <p className="text-center text-[11px] text-muted-foreground">
+            O que você digita já fica guardado neste aparelho, mesmo sem internet.
+          </p>
+        )}
       </div>
       </fieldset>
 

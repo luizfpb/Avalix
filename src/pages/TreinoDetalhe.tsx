@@ -89,6 +89,8 @@ export default function TreinoDetalhe() {
   const sessionsQ = useSessions(id)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
+  // PDF gerado que o navegador não deixou compartilhar no mesmo toque.
+  const [pdfPronto, setPdfPronto] = useState<File | null>(null)
   const [showDup, setShowDup] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -271,16 +273,44 @@ export default function TreinoDetalhe() {
     }
   }
 
+  async function compartilharArquivo(file: File) {
+    await navigator.share({ files: [file], title: plan.name, text: shareText })
+    logPdf()
+  }
+
   async function handleSharePdf() {
-    setPdfBusy(true)
     setShareError(null)
+    // Segundo toque: o PDF já está pronto e o compartilhamento sai no mesmo
+    // gesto, que é o que o Safari exige.
+    if (pdfPronto) {
+      try {
+        await compartilharArquivo(pdfPronto)
+        setPdfPronto(null)
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          setShareError('Não foi possível compartilhar o PDF. Você ainda pode baixá-lo e anexar manualmente.')
+        }
+      }
+      return
+    }
+    setPdfBusy(true)
     try {
       const blob = await buildPdfBlob()
       const file = new File([blob], pdfFilename, { type: 'application/pdf' })
       const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean }
       if (nav.canShare?.({ files: [file] })) {
-        await nav.share({ files: [file], title: plan.name, text: shareText })
-        logPdf()
+        try {
+          await compartilharArquivo(file)
+        } catch (error) {
+          // O Safari só abre o compartilhamento logo depois do toque, e gerar o
+          // PDF leva alguns segundos: a recusa vinha como erro, e o PDF pronto
+          // era jogado fora. Agora ele espera o próximo toque.
+          if (error instanceof DOMException && error.name === 'NotAllowedError') {
+            setPdfPronto(file)
+            return
+          }
+          throw error
+        }
       } else {
         downloadBlob(blob, pdfFilename)
         logPdf()
@@ -452,8 +482,8 @@ export default function TreinoDetalhe() {
                 </a>
               </Button>
               {canShareFiles ? (
-                <Button size="sm" variant="outline" onClick={handleSharePdf} disabled={pdfBusy}>
-                  {pdfBusy ? 'Gerando...' : 'Compartilhar PDF'}
+                <Button size="sm" variant={pdfPronto ? 'default' : 'outline'} onClick={handleSharePdf} disabled={pdfBusy}>
+                  {pdfBusy ? 'Gerando...' : pdfPronto ? 'Enviar PDF pronto' : 'Compartilhar PDF'}
                 </Button>
               ) : null}
               <Button
@@ -472,6 +502,11 @@ export default function TreinoDetalhe() {
                 <span aria-live="polite">{copied ? 'Copiado!' : 'Copiar texto'}</span>
               </Button>
             </div>
+            {pdfPronto ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                O PDF ficou pronto. Toque em "Enviar PDF pronto" para escolher o app.
+              </p>
+            ) : null}
             {!canShareFiles ? (
               <p className="text-xs text-muted-foreground">
                 O WhatsApp abre com o resumo pronto. Para anexar o PDF, baixe-o e anexe no WhatsApp

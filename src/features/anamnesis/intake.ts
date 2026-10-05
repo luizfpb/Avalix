@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { sha256Hex } from '../../lib/hash'
+import { deadline, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '../../lib/deadline'
 import { isIntakePath } from '../../lib/routing'
 import { clearIntakeLinkLocal, purgeExpiredIntakeLinks, saveIntakeLinkLocal } from './linkStore'
 import type { Database, Json } from '../../lib/database.types'
@@ -229,6 +230,7 @@ export type PublicIntake = {
 
 export async function getIntakeByToken(token: string): Promise<PublicIntake | null> {
   const { data, error } = await supabase.rpc('get_anamnese_intake', { p_token: token })
+    .abortSignal(deadline(READ_TIMEOUT_MS))
   if (error) throw error
   const row = data?.[0]
   if (!row) return null
@@ -270,6 +272,9 @@ export async function submitIntake(input: SubmitIntakeInput): Promise<void> {
     p_consent_text_sha256: consentHash,
     p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     ...(input.registration ? { p_registration: input.registration as unknown as Json } : {}),
-  })
+  // Prazo maior que o das leituras: o envio leva a anamnese inteira. Se a
+  // resposta se perder depois de gravada, o reenvio recebe "já utilizado", que
+  // a tela traduz como "suas respostas já foram recebidas".
+  }).abortSignal(deadline(WRITE_TIMEOUT_MS * 1.5))
   if (error) throw error
 }

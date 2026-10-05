@@ -54,7 +54,15 @@ async function render(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas indisponível')
   ctx.drawImage(bitmap, 0, 0, width, height)
-  return toBlob(canvas, mime, quality)
+  try {
+    return await toBlob(canvas, mime, quality)
+  } finally {
+    // O Safari do iPhone tem teto de memória para canvas somados e demora a
+    // devolver a de um canvas solto; numa sessão com muitas fotos o
+    // getContext passava a voltar nulo. Zerar o tamanho devolve na hora.
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 export async function processImage(file: File): Promise<ProcessedImage> {

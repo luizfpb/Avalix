@@ -1,5 +1,10 @@
 import { supabase } from '../../lib/supabase'
+import { deadline, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '../../lib/deadline'
 import type { WeekLogPoint } from './progress'
+
+// Toda chamada daqui leva prazo (lib/deadline): estourado, o envio vai para a
+// fila do aparelho (é idempotente pelo client_ref) e a leitura cai no que está
+// guardado.
 
 // Camada de acesso da página do aluno (/t). Tudo aqui passa pelas RPCs
 // anônimas da 0027, que validam o token por dentro: o cliente do aluno nunca
@@ -158,6 +163,7 @@ export type StudentHistoryPage = {
 
 export async function getWorkoutForLink(token: string): Promise<StudentWorkout | null> {
   const { data, error } = await supabase.rpc('get_workout_for_link', { p_token: token })
+    .abortSignal(deadline(READ_TIMEOUT_MS))
   if (error) throw error
   return (data as unknown as StudentWorkout | null) ?? null
 }
@@ -169,7 +175,7 @@ export async function getPlanForLink(
   const { data, error } = await supabase.rpc('get_workout_plan_for_link', {
     p_token: token,
     p_plan: planId,
-  })
+  }).abortSignal(deadline(READ_TIMEOUT_MS))
   if (error) throw error
   return (data as unknown as StudentPlanDetail | null) ?? null
 }
@@ -182,7 +188,7 @@ export async function getHistoryForLink(
     p_token: token,
     p_limit: options.limit ?? 30,
     ...(options.before ? { p_before: options.before } : {}),
-  })
+  }).abortSignal(deadline(READ_TIMEOUT_MS))
   if (error) throw error
   return (data as unknown as StudentHistorySession[] | null) ?? []
 }
@@ -202,7 +208,7 @@ export async function getHistoryPageForLink(
           p_before_id: cursor.id,
         }
       : {}),
-  })
+  }).abortSignal(deadline(READ_TIMEOUT_MS))
   if (error) throw error
   const page = data as unknown as StudentHistoryPage | null
   // NULL e o sinal autoritativo de credencial revogada/expirada. Nao o
@@ -263,7 +269,9 @@ export async function submitSession(
     rpc(
       name: 'submit_workout_session',
       args: Record<string, unknown>
-    ): PromiseLike<{ data: unknown; error: { message?: string } | null; status: number }>
+    ): {
+      abortSignal(signal: AbortSignal): PromiseLike<{ data: unknown; error: { message?: string } | null; status: number }>
+    }
   }
   const { data, error, status } = await client.rpc('submit_workout_session', {
     p_token: input.token,
@@ -277,7 +285,7 @@ export async function submitSession(
     ...(input.planId ? { p_plan: input.planId } : {}),
     ...(input.feel != null ? { p_feel: input.feel } : {}),
     ...(input.inProgress ? { p_in_progress: true } : {}),
-  })
+  }).abortSignal(deadline(WRITE_TIMEOUT_MS))
   if (error) throw Object.assign(error, { status })
   const row = data as unknown as { log_id?: string; stale?: boolean; corrected?: boolean } | null
   return {
@@ -309,7 +317,7 @@ export async function updateSessionForLink(
       p_sets: SubmitSet[]
       p_performed_at: string
       p_notes?: string
-    }): PromiseLike<{ data: unknown; error: unknown }>
+    }): { abortSignal(signal: AbortSignal): PromiseLike<{ data: unknown; error: unknown }> }
   }
   const { data, error } = await client.rpc('update_workout_session_for_link', {
     p_token: input.token,
@@ -318,7 +326,7 @@ export async function updateSessionForLink(
     p_sets: input.sets,
     p_performed_at: input.performedAt,
     ...(input.notes != null ? { p_notes: input.notes } : {}),
-  })
+  }).abortSignal(deadline(WRITE_TIMEOUT_MS))
   if (error) throw error
   if (!data) throw new Error('Não foi possível confirmar a edição deste treino.')
   return data as StudentHistorySession

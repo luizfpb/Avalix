@@ -40,6 +40,7 @@ import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges
 import { VersionConflictBanner } from '../components/VersionConflict'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import {
   Card,
@@ -198,11 +199,9 @@ function CircumferencesCard({
             <div className="grid grid-cols-2 gap-3">
               {group.items.map((item) => (
                 <Field key={item.key} label={needed.has(item.key) ? `${item.label} *` : item.label}>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
+                  <DecimalInput
                     value={values[item.key] ?? ''}
-                    onChange={(e) => onChange(item.key, e.target.value)}
+                    onValueChange={(value) => onChange(item.key, value)}
                   />
                 </Field>
               ))}
@@ -232,15 +231,13 @@ function CircumferencesCard({
                   setCustom((p) => p.map((x, idx) => (idx === i ? { ...x, site: e.target.value } : x)))
                 }
               />
-              <Input
+              <DecimalInput
                 aria-label={`Medida da circunferência personalizada ${i + 1} em centímetros`}
                 className="w-24"
-                type="number"
-                inputMode="decimal"
                 placeholder="cm"
                 value={c.value}
-                onChange={(e) =>
-                  setCustom((p) => p.map((x, idx) => (idx === i ? { ...x, value: e.target.value } : x)))
+                onValueChange={(value) =>
+                  setCustom((p) => p.map((x, idx) => (idx === i ? { ...x, value } : x)))
                 }
               />
               <button
@@ -544,20 +541,10 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
           </select>
         </Field>
         <Field label="Peso (kg)">
-          <Input
-            type="number"
-            inputMode="decimal"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-          />
+          <DecimalInput value={weight} onValueChange={setWeight} />
         </Field>
         <Field label="Altura (cm)">
-          <Input
-            type="number"
-            inputMode="decimal"
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-          />
+          <DecimalInput value={height} onValueChange={setHeight} />
         </Field>
       </div>
 
@@ -579,14 +566,12 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
                   <span className="w-28 text-sm">{SKINFOLD_LABELS[site]}</span>
                   <div className="flex items-center gap-2">
                     {[0, 1, 2].map((i) => (
-                      <Input
+                      <DecimalInput
                         key={i}
-                        type="number"
-                        inputMode="decimal"
                         className="w-16"
                         aria-label={`${SKINFOLD_LABELS[site]}, aferição ${i + 1}`}
                         value={trio[i]}
-                        onChange={(e) => setSkinfold(site, i, e.target.value)}
+                        onValueChange={(value) => setSkinfold(site, i, value)}
                       />
                     ))}
                     <span className="w-16 text-right text-xs text-muted-foreground">

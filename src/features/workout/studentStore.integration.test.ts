@@ -176,6 +176,44 @@ describe('rascunhos e acesso com transações IndexedDB reais', () => {
     expect(await store.readDraft('scope', 'p')).toMatchObject({ revision: 2, notes: 'Depois do bloqueio' })
   })
 
+  it('IndexedDB que nunca responde não prende a página em "Carregando"', async () => {
+    vi.useFakeTimers()
+    try {
+      // O pedido de abertura nunca dispara sucesso nem erro (bug já visto no Safari).
+      vi.stubGlobal('indexedDB', { open: () => ({}) })
+      vi.resetModules()
+      const fresh = await import('./studentStore')
+      const capture = fresh.captureStudentStorageAccess()
+      await vi.advanceTimersByTimeAsync(4_000)
+      await expect(capture).resolves.toMatchObject({ generation: '' })
+      // Sem o aparelho, concluir online continua possível; salvar progresso não.
+      await expect(fresh.reserveDraftRevision('scope', draft())).resolves.toBe(1)
+      await expect(fresh.reserveDraftRevision('scope', draft(), true)).rejects.toBeInstanceOf(fresh.StudentStorageError)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('falha ao abrir o banco no carregamento não vira "acesso encerrado" quando ele volta', async () => {
+    // Aparelho que já saiu uma vez: o banco guarda uma geração de acesso.
+    await store.purgeRevokedStudentDevice()
+    const real = indexedDB
+    let primeira = true
+    vi.stubGlobal('indexedDB', {
+      open: (name: string, version?: number) => {
+        if (primeira) {
+          primeira = false
+          throw new Error('Storage blocked')
+        }
+        return real.open(name, version)
+      },
+    })
+    vi.resetModules()
+    const fresh = await import('./studentStore')
+    const access = await fresh.captureStudentStorageAccess()
+    await expect(fresh.reserveDraftRevision('scope', draft(), false, access)).resolves.toBe(1)
+  })
+
   it('armazenamento que não grava não impede concluir online, mas impede salvar progresso', async () => {
     await store.writeDraft('scope', draft(), true)
     const saved = (await store.readDraft('scope', 'p'))!

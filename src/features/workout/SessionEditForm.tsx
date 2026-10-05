@@ -171,7 +171,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             {available.length > 0 ? (
               <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
                 <Label htmlFor={`${id}-exercise`}>Adicionar exercício</Label>
-                <select id={`${id}-exercise`} value={choice} className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+                <select id={`${id}-exercise`} value={choice} className="h-10 w-full rounded-md border bg-background px-2 text-base md:text-sm"
                   onChange={(event) => setChoice(event.target.value)}>
                   <option value="">Escolher exercício...</option>
                   {available.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
@@ -189,7 +189,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             <div className="space-y-1.5">
               <Label htmlFor={`${id}-notes`}>Observações</Label>
               <textarea id={`${id}-notes`} value={text} maxLength={maxNotes} rows={3}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border bg-background px-3 py-2 text-base md:text-sm"
                 onChange={(event) => { setText(event.target.value); setDirty(true) }} />
             </div>
           </fieldset>

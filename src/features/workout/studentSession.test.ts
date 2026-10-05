@@ -160,6 +160,36 @@ describe('serialização do envio', () => {
       'segundo:fim',
     ])
   })
+
+  it('não espera para sempre a trava de uma aba congelada no meio de um envio', async () => {
+    // Trava que nunca é concedida: a aba antiga do Safari, congelada em segundo
+    // plano, continua dona dela. Só o cancelamento por prazo devolve o controle.
+    const request = vi.fn((_name: string, options: { signal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        options.signal?.addEventListener('abort', () =>
+          reject(new DOMException('The request was aborted.', 'AbortError')))
+      }))
+    vi.stubGlobal('navigator', { ...globalThis.navigator, locks: { request } })
+    try {
+      const result = await withStudentSyncLock('escopo-preso', async () => 'enviado', 20)
+      expect(result).toBe('enviado')
+      expect(request).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('erro do próprio envio sobe, sem repetir a tarefa fora da trava', async () => {
+    const request = vi.fn((_name: string, _options: unknown, task: () => Promise<unknown>) => task())
+    vi.stubGlobal('navigator', { ...globalThis.navigator, locks: { request } })
+    const task = vi.fn(async () => { throw new Error('limite de sessoes para esta data') })
+    try {
+      await expect(withStudentSyncLock('escopo', task, 20)).rejects.toThrow('limite de sessoes')
+      expect(task).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('isNetworkFailure', () => {
@@ -170,6 +200,15 @@ describe('isNetworkFailure', () => {
     expect(isNetworkFailure(new TypeError('Failed to fetch'))).toBe(true)
     expect(isNetworkFailure({ message: 'NetworkError when attempting to fetch resource' })).toBe(true)
     expect(isNetworkFailure({ message: 'Load failed' })).toBe(true)
+  })
+
+  it('trata o prazo estourado como falta de rede, para o treino ir para a fila', () => {
+    // Formato do PostgREST quando o abortSignal dispara (Chrome e Safari).
+    expect(isNetworkFailure({ message: 'AbortError: signal is aborted without reason', code: '' })).toBe(true)
+    expect(isNetworkFailure({ message: 'AbortError: The operation was aborted.', code: '' })).toBe(true)
+    expect(isNetworkFailure(new DOMException('The operation timed out.', 'TimeoutError'))).toBe(true)
+    expect(isNetworkFailure(new DOMException('The operation was aborted.', 'AbortError'))).toBe(true)
+    expect(isNetworkFailure({ message: 'TimeoutError: The operation timed out.' })).toBe(true)
   })
 
   it('não confunde recusa do servidor com falta de rede', () => {
@@ -288,9 +327,8 @@ describe('buildSets', () => {
     expect(sets[0].rest_seconds).toBe(60)
   })
 
-  it('texto inválido não vira NaN no payload', () => {
-    const sets = buildSets({ we1: [{ weight: 'abc', reps: '10', rir: '' }] }, exercicios)
-    expect(sets).toEqual([])
+  it('texto inválido não vira NaN no payload: a série é recusada com aviso, não some', () => {
+    expect(() => buildSets({ we1: [{ weight: 'abc', reps: '10', rir: '' }] }, exercicios)).toThrow(/Use só números/)
   })
 
   it('exercício sem linha nenhuma não gera série', () => {

@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import type { LogRow } from './logRows'
 
 // Uma série da sessão em execução. É o componente que a mão suada usa no meio
@@ -50,15 +51,14 @@ export function SetRowFields({
       ) : (
         <span className="text-center text-xs text-muted-foreground">{number}</span>
       )}
-      <Input aria-label={`Carga da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
-        type="number" inputMode="decimal" min={0} max={1000} step="0.01" placeholder="kg"
-        value={row.weight} disabled={disabled} onChange={(e) => onChange('weight', e.target.value)} />
+      <DecimalInput aria-label={`Carga da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
+        placeholder="kg" value={row.weight} disabled={disabled} onValueChange={(value) => onChange('weight', value)} />
       <Input aria-label={`Repetições da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
         type="number" inputMode="numeric" min={0} max={100} step={1} placeholder={repsPlaceholder}
         value={row.reps} disabled={disabled} onChange={(e) => onChange('reps', e.target.value)} />
-      <Input aria-label={`RIR da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
-        type="number" inputMode="decimal" min={0} max={10} step="0.5" placeholder={rirPlaceholder}
-        value={row.rir} disabled={disabled || row.failure === true} onChange={(e) => onChange('rir', e.target.value)} />
+      <DecimalInput aria-label={`RIR da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
+        placeholder={rirPlaceholder} value={row.rir} disabled={disabled || row.failure === true}
+        onValueChange={(value) => onChange('rir', value)} />
       <Input aria-label={`Descanso da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
         type="number" inputMode="numeric" min={0} max={3600} step={1} placeholder={restPlaceholder}
         value={row.rest ?? ''} disabled={disabled} onChange={(e) => onChange('rest', e.target.value)} />

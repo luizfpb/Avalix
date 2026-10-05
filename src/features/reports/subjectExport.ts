@@ -138,6 +138,7 @@ export async function exportSubjectArchive(input: {
   }
 
   const archive = await result
-  const day = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   downloadBlob(archive, `avalix-${safeName(input.subjectName)}-${day}.zip`)
 }

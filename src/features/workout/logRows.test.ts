@@ -43,6 +43,12 @@ describe('falha separada do RIR', () => {
     expect(validateLogRows({ ex: [{ weight: '40', reps: '10', rir: '2', failure: true }] })).toMatch(/RIR 0/)
     expect(validateLogRows({ ex: [{ weight: '40', reps: '10', rir: '0', failure: false }] })).toBeNull()
   })
+  it.each(['.', '-', '-5'])('recusa número ilegível ou negativo em vez de descartar a série: %s', (weight) => {
+    expect(validateLogRows({ ex: [{ weight, reps: '10', rir: '' }] })).toMatch(/Use só números/)
+  })
+  it('aceita carga decimal já normalizada', () => {
+    expect(validateLogRows({ ex: [{ weight: '12.5', reps: '10', rir: '1.5' }] })).toBeNull()
+  })
 })
 
 describe('validateRestRows', () => {

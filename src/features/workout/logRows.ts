@@ -97,6 +97,16 @@ export function tallySession(rows: Record<string, LogRow[]>): SessionTally {
 }
 
 export function validateLogRows(rows: Record<string, LogRow[]>): string | null {
+  // O envio descartava calado a série com número ilegível ("." ou "-" sozinho
+  // num campo de texto). Melhor recusar e dizer o que corrigir.
+  for (const row of Object.values(rows).flat()) {
+    for (const value of [row.weight, row.reps, row.rir]) {
+      const text = value.trim()
+      if (text && !(Number.isFinite(Number(text)) && Number(text) >= 0)) {
+        return 'Use só números nas séries — carga, repetições e RIR —, sem sinal de menos. Ex.: 12,5.'
+      }
+    }
+  }
   const restError = validateRestRows(rows)
   if (restError) return restError
   for (const row of Object.values(rows).flat()) {

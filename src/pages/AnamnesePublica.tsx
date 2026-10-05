@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { controlClass } from '@/lib/ui'
-import { normalizeDbError } from '../lib/errors'
+import { intakeSubmitErrorMessage } from '../features/anamnesis/submitErrors'
 import { clearDraft, useFormDraft } from '../lib/draft'
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -135,6 +135,11 @@ function Form({
   const [a, setA] = useState<AnamnesisAnswers>(emptyAnamnesis)
   const [signerKind, setSignerKind] = useState<SignerKind>('titular')
   const [signerName, setSignerName] = useState('')
+  // O servidor exige que o nome de quem aceita seja o do cadastro (titular ou
+  // responsável). No link de cadastro esse nome acabou de ser digitado acima:
+  // o campo acompanha até a pessoa mexer nele, em vez de pedir de novo e
+  // recusar por um acento diferente.
+  const [signerEdited, setSignerEdited] = useState(false)
   const [accepted, setAccepted] = useState(false)
   const [showTerm, setShowTerm] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -165,6 +170,13 @@ function Form({
   useEffect(() => {
     if (isMinor) setSignerKind('responsavel')
   }, [isMinor])
+
+  const watchedFullName = watch('full_name') ?? ''
+  const watchedGuardian = watch('guardian_name') ?? ''
+  useEffect(() => {
+    if (!isCadastro || signerEdited) return
+    setSignerName(signerKind === 'responsavel' ? watchedGuardian : watchedFullName)
+  }, [isCadastro, signerEdited, signerKind, watchedFullName, watchedGuardian])
 
   const term = useMemo(() => consentText(intake.orgName), [intake.orgName])
 
@@ -208,6 +220,7 @@ function Form({
       setA({ ...emptyAnamnesis(), ...d.a })
       setSignerKind(d.signerKind === 'responsavel' ? 'responsavel' : 'titular')
       setSignerName(typeof d.signerName === 'string' ? d.signerName : '')
+      if (typeof d.signerName === 'string' && d.signerName.trim()) setSignerEdited(true)
       if (isCadastro && d.registration) reset({ ...emptySubjectForm(), ...d.registration })
     },
     { storage: 'session' }
@@ -235,7 +248,7 @@ function Form({
       await submit.mutateAsync(isCadastro ? getValues() : undefined)
       clearDraft(publicDraftKey, { storage: 'session' })
     } catch (e) {
-      setError(normalizeDbError(e))
+      setError(intakeSubmitErrorMessage(e, { orgName: intake.orgName, subjectFirstName: intake.subjectFirstName }))
     }
   }
 
@@ -412,9 +425,20 @@ function Form({
                 <Input
                   id="public-signer-name"
                   value={signerName}
-                  onChange={(e) => setSignerName(e.target.value)}
+                  onChange={(e) => {
+                    setSignerEdited(true)
+                    setSignerName(e.target.value)
+                  }}
                   placeholder="Nome completo"
+                  aria-describedby="public-signer-name-hint"
                 />
+                <p id="public-signer-name-hint" className="text-xs text-muted-foreground">
+                  {signerKind === 'responsavel'
+                    ? 'Igual ao nome do responsável no cadastro, com acentos e sobrenomes.'
+                    : isCadastro
+                      ? 'Igual ao nome completo informado acima.'
+                      : `Igual ao seu nome completo no cadastro de ${intake.orgName}, com acentos e sobrenomes.`}
+                </p>
               </div>
             </div>
 

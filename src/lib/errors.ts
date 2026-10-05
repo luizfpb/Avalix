@@ -83,7 +83,10 @@ export function normalizeDbError(error: unknown): string {
     text.includes('failed to fetch') ||
     text.includes('networkerror') ||
     text.includes('fetch failed') ||
-    text.includes('load failed')
+    text.includes('load failed') ||
+    // prazo das chamadas públicas (lib/deadline) estourado
+    text.includes('aborterror') ||
+    text.includes('aborted')
   ) {
     return 'Falha de conexão. Verifique sua internet e tente de novo.'
   }

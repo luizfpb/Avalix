@@ -7,6 +7,7 @@ import {
   type OneRmFormula,
 } from './oneRm'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 
 import { controlClass } from '@/lib/ui'
@@ -34,14 +35,7 @@ export function OneRmCalculator() {
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
         <Field id="one-rm-weight" label="Carga (kg)">
-          <Input
-            id="one-rm-weight"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-          />
+          <DecimalInput id="one-rm-weight" value={weight} onValueChange={setWeight} />
         </Field>
         <Field id="one-rm-reps" label="Repetições">
           <Input

@@ -1,7 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }))
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: mocks.rpc } }))
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), signals: [] as AbortSignal[] }))
+// O builder do PostgREST é "thenable" e recebe o prazo por abortSignal().
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    rpc: (...args: unknown[]) => {
+      const result = Promise.resolve(mocks.rpc(...args))
+      return Object.assign(result, {
+        abortSignal: (signal: AbortSignal) => {
+          mocks.signals.push(signal)
+          return result
+        },
+      })
+    },
+  },
+}))
 
 import {
   getHistoryPageForLink,
@@ -13,6 +26,26 @@ import {
 
 beforeEach(() => {
   mocks.rpc.mockReset().mockResolvedValue({ data: { log_id: 'log-1', stale: false }, error: null })
+  mocks.signals.length = 0
+})
+
+describe('prazo das chamadas do aluno', () => {
+  it('toda chamada leva um prazo, para a tela não ficar presa numa rede pendurada', async () => {
+    vi.useFakeTimers()
+    try {
+      await submitSession({
+        token: 'A'.repeat(43), clientRef: 'ref-1', revision: 1, sets: [], dayLabel: 'A',
+        weekNumber: 1, performedAt: '2026-09-08', notes: null, planId: 'plan-1',
+      })
+      await getHistoryPageForLink('A'.repeat(43))
+      expect(mocks.signals).toHaveLength(2)
+      expect(mocks.signals.every((signal) => !signal.aborted)).toBe(true)
+      vi.advanceTimersByTime(20_000)
+      expect(mocks.signals.every((signal) => signal.aborted)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('descanso registrado pelo aluno', () => {

@@ -4,6 +4,7 @@ import { useIntake, useAcceptIntake, useRejectIntake } from '../features/anamnes
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { computeGate } from '../features/anamnesis/gate'
+import { todayIso } from '../features/anamnesis/clearance'
 import { subjectFormSchema, formToInsert, type SubjectFormValues } from '../features/subjects/schema'
 import { useSubject, useSubjects } from '../features/subjects/hooks'
 import { useOrganization } from '../features/organization/context'
@@ -223,7 +224,9 @@ export default function AnamneseRevisar() {
           build={() =>
             buildAnamnesePrompt({
               subject: promptSubject,
-              assessedAt: intake.submitted_at?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+              // Dia do envio no calendário local: o carimbo vem em UTC, e cortar
+              // o texto dava o dia seguinte para quem respondeu depois das 21h.
+              assessedAt: todayIso(intake.submitted_at ? new Date(intake.submitted_at) : new Date()),
               answers: answers!,
             })
           }

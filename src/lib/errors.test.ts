@@ -39,6 +39,10 @@ describe('normalizeDbError', () => {
   it('traduz falha de rede', () => {
     expect(normalizeDbError({ message: 'Failed to fetch' })).toMatch(/conexão/i)
   })
+  it('traduz o prazo estourado como falha de conexão, sem mostrar o erro cru', () => {
+    expect(normalizeDbError({ message: 'AbortError: signal is aborted without reason' })).toMatch(/conexão/i)
+    expect(normalizeDbError({ message: 'AbortError: The operation was aborted.' })).toMatch(/conexão/i)
+  })
   it('deixa passar exceção pt-BR dos nossos triggers', () => {
     const msg = 'registro de consentimento e imutavel; apenas revoked_at pode ser alterado'
     expect(normalizeDbError({ message: msg })).toBe(msg)

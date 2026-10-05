@@ -34,15 +34,37 @@ async function withLocalSyncLock<T>(scope: string, task: () => Promise<T>): Prom
   }
 }
 
+// Prazo para esperar a trava de outra aba. Cada toque no link do WhatsApp abre
+// uma aba nova, e o Safari congela as antigas: uma aba congelada no meio de um
+// envio segura a trava sem nunca devolvê-la, e "Concluindo..." giraria para
+// sempre na aba nova. Passado o prazo, segue sem a trava — o envio é idempotente
+// pelo client_ref, e a fila local muda só dentro de transações do IndexedDB.
+export const SYNC_LOCK_WAIT_MS = 8_000
+
 // Um unico escritor por token: o Web Lock cobre abas distintas; o mutex local
 // e o fallback para navegadores sem a API. A revisao monotona no banco continua
 // sendo a ultima barreira contra replays originados por clientes antigos.
 export async function withStudentSyncLock<T>(
   scope: string,
-  task: () => Promise<T>
+  task: () => Promise<T>,
+  waitMs = SYNC_LOCK_WAIT_MS
 ): Promise<T> {
   if (typeof navigator !== 'undefined' && navigator.locks) {
-    return navigator.locks.request(`avalix-treino-sync:${scope}`, task)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), waitMs)
+    let acquired = false
+    try {
+      return await navigator.locks.request(`avalix-treino-sync:${scope}`, { signal: controller.signal }, () => {
+        acquired = true
+        clearTimeout(timer)
+        return task()
+      })
+    } catch (error) {
+      if (acquired) throw error
+      return task()
+    } finally {
+      clearTimeout(timer)
+    }
   }
   return withLocalSyncLock(scope, task)
 }
@@ -90,6 +112,18 @@ export function resolveStudentToken(
   return loadStudentToken()
 }
 
+// O link colado pelo aluno, de onde quer que ele tenha copiado: a URL inteira,
+// a mensagem do WhatsApp com texto em volta, ou só o token. Existe por causa do
+// iPhone: o app instalado na tela de início tem armazenamento separado do
+// Safari e o link do WhatsApp sempre abre no Safari, então o app instalado só
+// recebe o token se o aluno colar o link nele uma vez.
+export function tokenFromPastedLink(text: string): string | null {
+  const trimmed = text.trim()
+  if (isValidWorkoutToken(trimmed)) return trimmed
+  const match = /\/t#([A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/.exec(trimmed)
+  return match ? match[1] : null
+}
+
 // Chave do armazenamento local: o hash do token, nunca o cru.
 export async function studentScope(token: string): Promise<string> {
   return sha256Hex(token)
@@ -99,6 +133,8 @@ export async function studentScope(token: string): Promise<string> {
 // definitiva (o item sai com aviso). Insistir eternamente num envio que o
 // servidor nunca vai aceitar é como se perde a confiança do usuário na fila.
 export function isNetworkFailure(error: unknown): boolean {
+  const name = error && typeof error === 'object' && 'name' in error ? String((error as { name?: unknown }).name) : ''
+  if (name === 'AbortError' || name === 'TimeoutError') return true
   const message = (
     error && typeof error === 'object' && 'message' in error
       ? String((error as { message?: unknown }).message ?? '')
@@ -109,7 +145,12 @@ export function isNetworkFailure(error: unknown): boolean {
     message.includes('networkerror') ||
     message.includes('fetch failed') ||
     message.includes('load failed') ||
-    message.includes('network request failed')
+    message.includes('network request failed') ||
+    // Prazo das chamadas da página do aluno (studentApi): resposta que não
+    // chegou a tempo é tratada como falta de rede, nunca como recusa.
+    message.includes('aborterror') ||
+    message.includes('aborted') ||
+    message.includes('timeouterror')
   )
 }
 
