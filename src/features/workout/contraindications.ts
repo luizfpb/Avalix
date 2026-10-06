@@ -111,7 +111,7 @@ export function exerciseCautions(answers: AnamnesisAnswers, ex: ExerciseLite): s
     redFlags.length > 0 &&
     (ex.movementPattern === 'hinge' || ex.movementPattern === 'squat' || muscles.has('lower_back'))
   ) {
-    reasons.push(`sinais de alerta (${redFlagNames(redFlags)}) — evitar carga axial até avaliação médica`)
+    reasons.push(`sinais de alerta (${redFlagNames(redFlags)}): evitar carga axial até avaliação médica`)
   }
 
   return [...new Set(reasons)]

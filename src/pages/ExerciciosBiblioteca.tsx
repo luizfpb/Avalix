@@ -177,7 +177,7 @@ export default function ExerciciosBiblioteca() {
                       <button
                         onClick={() => setVideoId(videoId === e.id ? null : e.id)}
                         aria-expanded={videoId === e.id}
-                        className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Clapperboard className="size-3.5" /> {video.kind === 'own' ? 'Trocar vídeo' : 'Escolher vídeo'}
                       </button>
@@ -186,7 +186,7 @@ export default function ExerciciosBiblioteca() {
                       <>
                         <button
                           onClick={() => setEditingId(e.id)}
-                          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-primary hover:bg-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <Pencil className="size-3.5" /> Editar
                         </button>

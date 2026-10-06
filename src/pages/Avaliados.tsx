@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Plus, Search, Users, ChevronRight, Copy, MessageCircle, Send } from 'lucide-react'
+import { Plus, Search, ChevronRight, Copy, MessageCircle, Send } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
 import {
@@ -11,7 +11,7 @@ import {
 import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
-import { initials } from '../lib/initials'
+import { Initials } from '../components/Initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -117,10 +117,10 @@ export default function Avaliados() {
       ) : null}
 
       {generatedUrl ? (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="space-y-2 py-3 text-sm">
+        <Card>
+          <CardContent className="space-y-2 text-sm">
             <p className="font-medium">
-              Link gerado — o {labels.singular} se cadastra e já responde a anamnese
+              Link gerado. O {labels.singular} se cadastra e já responde a anamnese.
             </p>
             <input
               readOnly
@@ -209,7 +209,7 @@ export default function Avaliados() {
       ) : null}
 
       {isPending ? (
-        <ul className="divide-y rounded-xl border bg-card">
+        <ul className="divide-y rounded-lg border bg-card">
           {[0, 1, 2].map((i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-3">
               <span className="size-9 animate-pulse rounded-full bg-muted" />
@@ -218,14 +218,14 @@ export default function Avaliados() {
           ))}
         </ul>
       ) : isError ? (
-        <div className="space-y-2 rounded-xl border border-dashed px-4 py-8 text-center">
+        <div className="space-y-2 rounded-lg border border-dashed px-4 py-8 text-center">
           <p className="text-sm text-destructive">Não foi possível carregar a lista.</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Tentar de novo
           </Button>
         </div>
       ) : filtered.length > 0 ? (
-        <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+        <ul className="divide-y overflow-hidden rounded-lg border bg-card">
           {filtered.map((s) => {
             const age = ageFromBirthDate(s.birth_date)
             return (
@@ -234,13 +234,11 @@ export default function Avaliados() {
                   to={`/avaliados/${s.id}`}
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
                 >
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    {initials(s.full_name)}
-                  </span>
+                  <Initials name={s.full_name} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{s.full_name}</span>
                     <span className="block text-xs text-muted-foreground">
-                      {age !== null ? `${age} anos` : 'idade -'} ·{' '}
+                      {age !== null ? `${age} anos · ` : ''}
                       {s.sex === 'F' ? 'Feminino' : 'Masculino'}
                     </span>
                   </span>
@@ -256,13 +254,10 @@ export default function Avaliados() {
           Nenhum resultado para “{q}”.
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-12 text-center">
-          <span className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
-            <Users className="size-6" />
-          </span>
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-12 text-center">
           <p className="text-sm text-muted-foreground">
             Nenhum {labels.singular} cadastrado ainda. Cadastre você mesmo ou use “Convidar por
-            link” — o {labels.singular} preenche o próprio cadastro e a anamnese.
+            link”: o {labels.singular} preenche o próprio cadastro e a anamnese.
           </p>
           <Button asChild>
             <Link to="/avaliados/novo">

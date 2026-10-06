@@ -235,7 +235,7 @@ export default function PosturaSessaoDetalhe() {
         </div>
         <label className="inline-flex">
           <span
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 aria-disabled:opacity-50"
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary-solid px-4 text-sm font-medium text-primary-foreground hover:bg-primary-solid/90 aria-disabled:opacity-50"
             aria-disabled={uploading}
           >
             {uploading ? 'Enviando...' : 'Adicionar foto'}

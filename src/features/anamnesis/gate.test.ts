@@ -91,7 +91,7 @@ describe('computeGate — red flags e gestação levantam flag', () => {
     a.red_flags = ['febre', 'perda_peso']
     const motivo = computeGate(a).motivos.find((m) => m.startsWith('Sinais de alerta'))
     expect(motivo).toBe(
-      'Sinais de alerta (red flags): febre associada; perda de peso inexplicada — indicam avaliação médica antes de treinar.'
+      'Sinais de alerta (red flags): febre associada; perda de peso inexplicada. Indicam avaliação médica antes de treinar.'
     )
     expect(computeGate(a).motivos.join(' ')).not.toMatch(/coluna/)
   })

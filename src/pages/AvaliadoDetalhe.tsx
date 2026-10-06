@@ -49,18 +49,13 @@ import type { SignerKind } from '../features/consent/api'
 import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle, Download, ClipboardList } from 'lucide-react'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
-import { initials } from '../lib/initials'
+import { formatPhone } from '../lib/phone'
+import { Initials } from '../components/Initials'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/card'
 
 import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
@@ -73,14 +68,20 @@ function formatDate(iso: string): string {
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('pt-BR')
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
       <span className="block text-xs text-muted-foreground">{label}</span>
-      <span className="block">{value}</span>
+      {value ? (
+        <span className="block">{value}</span>
+      ) : (
+        <span className="block text-muted-foreground">Não informado</span>
+      )}
     </div>
   )
 }
@@ -146,13 +147,11 @@ function AvaliadoDetalheContent() {
             `truncate` do nome engolia o nome inteiro — sobrava o avatar. */}
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              {initials(s.full_name)}
-            </span>
+            <Initials name={s.full_name} size="lg" />
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold">{s.full_name}</h1>
               <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{age !== null ? `${age} anos` : 'idade -'}</span>
+                {age !== null ? <span>{age} anos</span> : null}
                 {!s.is_active ? <Badge variant="secondary">Inativo</Badge> : null}
               </div>
             </div>
@@ -191,17 +190,15 @@ function AvaliadoDetalheContent() {
         ) : null}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dados</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          <Info label="Idade" value={age !== null ? `${age} anos` : '-'} />
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Dados</h2>
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2">
+          <Info label="Idade" value={age !== null ? `${age} anos` : null} />
           <Info label="Sexo" value={s.sex === 'F' ? 'Feminino' : 'Masculino'} />
           <Info label="Nascimento" value={formatDate(s.birth_date)} />
-          <Info label="Altura" value={s.height_cm != null ? `${s.height_cm} cm` : '-'} />
-          <Info label="Telefone" value={s.phone ?? '-'} />
-          <Info label="E-mail" value={s.email ?? '-'} />
+          <Info label="Altura" value={s.height_cm != null ? `${s.height_cm} cm` : null} />
+          <Info label="Telefone" value={formatPhone(s.phone)} />
+          <Info label="E-mail" value={s.email} />
           {s.guardian_name ? (
             <Info
               label="Responsável"
@@ -215,8 +212,8 @@ function AvaliadoDetalheContent() {
               <Info label="Observações" value={s.notes} />
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <ConsentSection
         subjectId={s.id}
@@ -279,15 +276,15 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
   if (!anamneseRow && assessments.length === 0) return null
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Briefing para IA</CardTitle>
-        <CardDescription>
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-base font-semibold">Briefing para IA</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Anamnese e avaliações físicas num prompt só, para pedir a leitura cruzada antes de
           prescrever.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </div>
+      <div>
         <CopyPromptButton
           label="Copiar briefing"
           build={() =>
@@ -325,8 +322,8 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
             })
           }}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -350,7 +347,7 @@ function WorkoutSection({
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Treinos</h2>
-        <Button asChild size="sm">
+        <Button asChild size="sm" variant="outline">
           <Link to={`/avaliados/${subjectId}/treinos/nova`}>Novo plano</Link>
         </Button>
       </div>
@@ -370,7 +367,7 @@ function WorkoutSection({
                 <span className="min-w-0 truncate">{p.name}</span>
                 <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:text-sm">
                   <span>
-                    {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'sem' : 'sems'}
+                    {goalLabel(p.goal)} · {p.weeks} {p.weeks === 1 ? 'semana' : 'semanas'}
                   </span>
                   {p.status === 'active' ? (
                     <Badge variant="secondary">Vigente</Badge>
@@ -429,7 +426,7 @@ function PosturalSection({ subjectId }: { subjectId: string }) {
             <Button asChild size="sm" variant="outline">
               <Link to={`/avaliados/${subjectId}/postural/comparar`}>Comparar</Link>
             </Button>
-            <Button asChild size="sm">
+            <Button asChild size="sm" variant="outline">
               <Link to={`/avaliados/${subjectId}/postural/nova`}>Nova sessão</Link>
             </Button>
           </div>
@@ -532,7 +529,7 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
             <Send /> {generate.isPending ? 'Gerando...' : 'Enviar link'}
           </Button>
           {hasConsent ? (
-            <Button asChild size="sm">
+            <Button asChild size="sm" variant="outline">
               <Link to={`/avaliados/${subjectId}/anamnese/nova`}>Nova anamnese</Link>
             </Button>
           ) : null}
@@ -547,34 +544,32 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
       ) : null}
 
       {generatedUrl ? (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="space-y-2 py-3 text-sm">
-            <p className="font-medium">Link gerado — envie para o aluno responder</p>
-            <input
-              readOnly
-              value={generatedUrl}
-              onFocus={(e) => e.currentTarget.select()}
-              className={controlClass}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={copyLink}>
-                <Copy /> {copied ? 'Copiado!' : 'Copiar'}
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <a href={waHref} target="_blank" rel="noreferrer">
-                  <MessageCircle /> WhatsApp
-                </a>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setGeneratedUrl(null)}>
-                Fechar
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Válido por 7 dias e de uso único. O link fica disponível na lista abaixo (neste
-              aparelho) enquanto o convite estiver ativo.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="space-y-2 rounded-lg border bg-card p-4 text-sm">
+          <p className="font-medium">Link gerado. Envie para o aluno responder.</p>
+          <input
+            readOnly
+            value={generatedUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className={controlClass}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={copyLink}>
+              <Copy /> {copied ? 'Copiado!' : 'Copiar'}
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href={waHref} target="_blank" rel="noreferrer">
+                <MessageCircle /> WhatsApp
+              </a>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setGeneratedUrl(null)}>
+              Fechar
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Válido por 7 dias e de uso único. O link fica disponível na lista abaixo (neste
+            aparelho) enquanto o convite estiver ativo.
+          </p>
+        </div>
       ) : null}
 
       {intakes.length > 0 ? (
@@ -692,7 +687,7 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Avaliações</h2>
         {hasConsent ? (
-          <Button asChild size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link to={`/avaliados/${subjectId}/avaliacoes/nova`}>Nova avaliação</Link>
           </Button>
         ) : (
@@ -733,7 +728,7 @@ function AssessmentsSection({ subjectId }: { subjectId: string }) {
                       </span>
                     </span>
                     <span className="text-muted-foreground">
-                      {res?.bodyFatPct != null ? `${res.bodyFatPct.toFixed(1)}%` : '—'}
+                      {res?.bodyFatPct != null ? `${res.bodyFatPct.toFixed(1).replace('.', ',')}%` : '—'}
                     </span>
                   </Link>
                 </li>
@@ -778,14 +773,14 @@ function ConsentSection({
   const [signerName, setSignerName] = useState('')
   const [showText, setShowText] = useState(false)
   const [accepted, setAccepted] = useState(false)
+  const [confirmRevoke, setConfirmRevoke] = useState(false)
 
   if (consentQuery.isPending) {
     return (
-      <Card>
-        <CardContent className="py-4 text-sm text-muted-foreground">
-          Carregando consentimento...
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Consentimento</h2>
+        <p className="text-sm text-muted-foreground">Carregando consentimento...</p>
+      </section>
     )
   }
 
@@ -804,29 +799,40 @@ function ConsentSection({
 
   if (active) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Consentimento <Badge variant="success">Vigente</Badge>
-          </CardTitle>
-          <CardDescription>A coleta de dados está liberada.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          Consentimento <Badge variant="success">Vigente</Badge>
+        </h2>
+        <div className="space-y-3 rounded-lg border bg-card p-4 text-sm">
+          <p>A coleta de dados está liberada.</p>
           <p className="text-muted-foreground">
-            Aceito por {active.signer_name} ({active.signer_kind}) em{' '}
-            {formatDateTime(active.granted_at)} · versão {active.consent_version}
+            Aceito por {active.signer_name} (
+            {active.signer_kind === 'responsavel' ? 'responsável legal' : 'titular'}) em{' '}
+            {formatDateTime(active.granted_at)}, versão {active.consent_version} do termo.
           </p>
           {revokeError ? <p role="alert" className="text-destructive">{normalizeDbError(revokeError)}</p> : null}
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
+            className="text-destructive hover:text-destructive"
             disabled={revoke.isPending}
-            onClick={() => revoke.mutate(active.id)}
+            onClick={() => setConfirmRevoke(true)}
           >
             {revoke.isPending ? 'Revogando...' : 'Revogar consentimento'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+        <ConfirmDialog
+          open={confirmRevoke}
+          title="Revogar o consentimento?"
+          description="O sistema deixa de aceitar novas avaliações, anamneses e fotos neste cadastro até que um novo consentimento seja registrado. O que já foi registrado continua guardado."
+          confirmLabel="Revogar"
+          onConfirm={() => {
+            setConfirmRevoke(false)
+            revoke.mutate(active.id)
+          }}
+          onCancel={() => setConfirmRevoke(false)}
+        />
+      </section>
     )
   }
 
@@ -835,14 +841,14 @@ function ConsentSection({
     accepted && signerName.trim().length >= 3 && orgId.length > 0 && collectedBy.length > 0
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Consentimento</CardTitle>
-        <CardDescription>
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-base font-semibold">Consentimento</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Sem consentimento vigente. Sem ele, o sistema não permite registrar avaliações.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
+        </p>
+      </div>
+      <div className="space-y-4 rounded-lg border bg-card p-4 text-sm">
         <button
           type="button"
           onClick={() => setShowText((v) => !v)}
@@ -921,7 +927,7 @@ function ConsentSection({
           Ao registrar, guardamos a versão do termo, o hash do texto exibido, quem assinou e
           quando.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

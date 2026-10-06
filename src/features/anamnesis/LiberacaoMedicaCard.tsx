@@ -144,7 +144,7 @@ export function LiberacaoMedicaCard({
             {liberacao.obs ? <p className="text-sm whitespace-pre-wrap">{liberacao.obs}</p> : null}
             {alerta.liberacao.vencida ? (
               <p className="text-sm text-warning">
-                Este parecer venceu — peça um documento atualizado.
+                Este parecer venceu. Peça um documento atualizado.
               </p>
             ) : null}
             {alerta.ressalvas.map((r, i) => (
@@ -163,7 +163,7 @@ export function LiberacaoMedicaCard({
           <div className="space-y-1.5 text-sm text-muted-foreground">
             <p>
               A triagem indicou avaliação médica antes de progredir. Se o aluno já foi avaliado e
-              trouxe o parecer, registre aqui — os avisos passam a refletir o que o médico decidiu.
+              trouxe o parecer, registre aqui: os avisos passam a refletir o que o médico decidiu.
             </p>
             {declaracao.declarada === true ? (
               <p className="text-foreground">
@@ -185,7 +185,7 @@ export function LiberacaoMedicaCard({
                   className={[
                     'flex cursor-pointer gap-3 rounded-md border p-3 transition-colors',
                     form.status === op.value
-                      ? 'border-primary bg-primary/[0.06]'
+                      ? 'border-foreground/50 bg-accent'
                       : 'hover:bg-accent',
                   ].join(' ')}
                 >
@@ -327,7 +327,7 @@ export function LiberacaoMedicaCard({
         ) : null}
 
         <p className="text-xs text-muted-foreground">
-          Registro do que um profissional de saúde decidiu, feito por você — o Avalix não emite nem
+          Registro do que um profissional de saúde decidiu, feito por você. O Avalix não emite nem
           valida atestado. Guarde o documento original conforme sua rotina.
         </p>
       </CardContent>

@@ -293,13 +293,13 @@ function Form({
 
         <p className="text-sm text-muted-foreground">
           {isCadastro
-            ? 'Olá! Preencha seus dados e responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: elas orientam um acompanhamento seguro e sob medida pra você.'
-            : `Olá, ${intake.subjectFirstName}. Responda com sinceridade — leva alguns minutos. Não há respostas certas ou erradas: suas respostas orientam um acompanhamento seguro e sob medida pra você.`}
+            ? 'Olá! Preencha seus dados e responda com sinceridade. Leva alguns minutos. Não há respostas certas ou erradas: elas orientam um acompanhamento seguro e sob medida pra você.'
+            : `Olá, ${intake.subjectFirstName}. Responda com sinceridade. Leva alguns minutos. Não há respostas certas ou erradas: suas respostas orientam um acompanhamento seguro e sob medida pra você.`}
         </p>
 
         {draft.restored ? (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-            <span>Recuperamos o que você já tinha preenchido — continue de onde parou.</span>
+          <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+            <span>Recuperamos o que você já tinha preenchido. Continue de onde parou.</span>
             <button
               type="button"
               onClick={draft.dismiss}

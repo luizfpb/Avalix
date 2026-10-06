@@ -103,7 +103,7 @@ export function validateLogRows(rows: Record<string, LogRow[]>): string | null {
     for (const value of [row.weight, row.reps, row.rir]) {
       const text = value.trim()
       if (text && !(Number.isFinite(Number(text)) && Number(text) >= 0)) {
-        return 'Use só números nas séries — carga, repetições e RIR —, sem sinal de menos. Ex.: 12,5.'
+        return 'Use só números nas séries (carga, repetições e RIR), sem sinal de menos. Ex.: 12,5.'
       }
     }
   }

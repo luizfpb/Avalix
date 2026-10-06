@@ -6,7 +6,8 @@ import { useOrganization } from '../features/organization/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BrandLogo } from '../components/BrandLogo'
+import { BrandLogo, BrandMark } from '../components/BrandLogo'
+import { controlClass } from '@/lib/ui'
 
 const SUBJECT_TERMS = [
   { value: 'aluno', label: 'Aluno' },
@@ -59,21 +60,21 @@ export default function Onboarding() {
   }
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center px-4 py-10"
-      style={{ backgroundColor: '#2A0E52' }}
-    >
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <BrandLogo height={26} className="mb-4 text-[#ECE3FA]" />
-          <h1 className="text-xl font-semibold tracking-tight text-[#ECE3FA]">Quase lá</h1>
-          <p className="mt-1.5 text-sm text-[#ECE3FA]/70">
+        <div className="mb-6">
+          <div className="mb-10 flex items-center gap-3">
+            <BrandMark size={36} />
+            <BrandLogo height={16} className="text-foreground" />
+          </div>
+          <h1 className="text-2xl font-semibold">Quase lá</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Crie sua organização para começar a usar o Avalix.
           </p>
         </div>
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 rounded-xl border bg-card p-6 text-card-foreground shadow-xl"
+          className="space-y-4 rounded-lg border bg-card p-6 text-card-foreground"
         >
           <div className="space-y-1.5">
             <Label htmlFor="nome">Nome da organização ou profissional</Label>
@@ -91,7 +92,7 @@ export default function Onboarding() {
               id="termo"
               value={termo}
               onChange={(e) => setTermo(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={controlClass}
             >
               {SUBJECT_TERMS.map((t) => (
                 <option key={t.value} value={t.value}>

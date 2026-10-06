@@ -112,6 +112,6 @@ it('preserva as ressalvas calculadas na consulta da avaliacao', () => {
   expect(result.warnings?.length).toBeGreaterThan(0)
   m.row.results = result
   render(<MemoryRouter><AvaliacaoDetalhe /></MemoryRouter>)
-  expect(screen.getByText(`${result.bodyFatPct.toFixed(1)}%`)).toBeTruthy()
+  expect(screen.getByText(`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`)).toBeTruthy()
   for (const warning of result.warnings!) expect(screen.getByText(warning.message)).toBeTruthy()
 })

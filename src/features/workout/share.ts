@@ -9,7 +9,7 @@ import { formatSetsReps } from './effective'
 import { groupHint, groupLabel, techniqueLabel, toRowBlocks } from './groups'
 
 function fmtRir(rir: number): string {
-  return Number.isInteger(rir) ? String(rir) : rir.toFixed(1)
+  return Number.isInteger(rir) ? String(rir) : rir.toFixed(1).replace('.', ',')
 }
 
 function fmtRest(seconds: number | null): string {
@@ -50,7 +50,7 @@ export function planShareText(input: {
   const ordered = days.slice().sort((a, b) => a.position - b.position)
   for (const day of ordered) {
     lines.push('')
-    lines.push(`*Treino ${day.label}${day.name ? ` — ${day.name}` : ''}*`)
+    lines.push(`*Treino ${day.label}${day.name ? ` · ${day.name}` : ''}*`)
     const rows = exercises
       .filter((e) => e.day_id === day.id)
       .slice()
@@ -73,7 +73,7 @@ export function planShareText(input: {
         }`
         const recuo = bloco.kind != null ? '   ' : ''
         lines.push(
-          `${recuo}${bloco.start + j + 1}. ${exerciseNames[ex.exercise_id] ?? 'Exercício'} — ${formatSetsReps(ex.sets, ex.reps)}${rir}${extra}`
+          `${recuo}${bloco.start + j + 1}. ${exerciseNames[ex.exercise_id] ?? 'Exercício'}: ${formatSetsReps(ex.sets, ex.reps)}${rir}${extra}`
         )
       })
     }

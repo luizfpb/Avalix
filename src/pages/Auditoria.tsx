@@ -86,7 +86,7 @@ export default function Auditoria() {
         </Link>
         <h1 className="mt-2 text-xl font-semibold">Auditoria</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quem fez o quê e quando. A trilha é imutável — nem administradores conseguem editar ou
+          Quem fez o quê e quando. A trilha é imutável: nem administradores conseguem editar ou
           apagar eventos.
         </p>
       </div>

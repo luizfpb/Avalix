@@ -84,7 +84,7 @@ function YesNo({ value, onChange }: { value: boolean | null; onChange: (v: boole
           className={[
             'min-h-10 rounded-md border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             value === v
-              ? 'border-primary bg-primary text-primary-foreground'
+              ? 'border-primary-solid bg-primary-solid text-primary-foreground'
               : 'text-muted-foreground hover:bg-accent',
           ].join(' ')}
         >
@@ -123,7 +123,7 @@ function Choice({
           className={[
             'min-h-10 rounded-md border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             value === o.value
-              ? 'border-primary bg-primary text-primary-foreground'
+              ? 'border-primary-solid bg-primary-solid text-primary-foreground'
               : 'text-muted-foreground hover:bg-accent',
           ].join(' ')}
         >
@@ -386,7 +386,7 @@ function Medicamentos({
       />
       <p className="text-xs text-amber-800/80 dark:text-amber-200/70">
         {isAluno
-          ? 'Vale remédio de uso contínuo e o que você está tomando agora, com a dose se souber. Nenhuma resposta aqui atrapalha seu treino — ela ajuda a montar um treino seguro.'
+          ? 'Vale remédio de uso contínuo e o que você está tomando agora, com a dose se souber. Nenhuma resposta aqui atrapalha seu treino: ela ajuda a montar um treino seguro.'
           : 'Uso contínuo e uso atual, com a dose. Muda a leitura do treino e da composição corporal (ex.: betabloqueador atenua a FC; diurético e corticoide mexem em peso e retenção).'}
       </p>
       <label className="flex items-center gap-2 text-sm">
@@ -426,7 +426,7 @@ export function AnamneseCamadaA({
         title={isAluno ? 'Sobre sua saúde' : 'A1. Triagem de prontidão (PAR-Q+)'}
         desc={
           isAluno
-            ? 'Responda todos os itens com sinceridade — não há resposta certa ou errada.'
+            ? 'Responda todos os itens com sinceridade. Não há resposta certa ou errada.'
             : "Obrigatória. Qualquer 'Sim' retira a liberação automática."
         }
       >
@@ -584,7 +584,7 @@ export function AnamneseCamadaB({
         title={isAluno ? 'Seu treino' : 'B1b. Logística e preferências de treino'}
         desc={
           isAluno
-            ? 'Como o treino cabe na sua rotina — e do que você gosta.'
+            ? 'Como o treino cabe na sua rotina e do que você gosta.'
             : 'Disponibilidade, local, equipamentos e preferências: alimenta a montagem do treino.'
         }
       >
@@ -744,7 +744,7 @@ export function AnamneseCamadaB({
           label={
             isAluno
               ? 'Você percebe algum destes sinais atualmente?'
-              : 'Sinais de alerta (red flags) — indicam avaliação médica, não treino'
+              : 'Sinais de alerta (red flags): indicam avaliação médica, não treino'
           }
         >
           <MultiCheck options={RED_FLAGS} value={a.red_flags} onChange={(v) => set({ red_flags: v })} />

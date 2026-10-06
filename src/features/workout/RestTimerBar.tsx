@@ -42,8 +42,8 @@ export function RestTimerBar({
   const done = timer.targetSeconds != null && seconds >= timer.targetSeconds
   return (
     <div
-      className={`fixed inset-x-3 z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur sm:gap-3 ${className} ${
-        done ? 'border-success bg-success/15' : 'border-border bg-background/95'
+      className={`fixed inset-x-3 z-30 mx-auto flex max-w-2xl items-center gap-2 rounded-lg border px-3 py-2 shadow-lg sm:gap-3 ${className} ${
+        done ? 'border-success bg-[color-mix(in_oklab,var(--success)_15%,var(--background))]' : 'border-border bg-background'
       }`}
     >
       <span

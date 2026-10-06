@@ -33,9 +33,9 @@ describe('planShareText', () => {
     const idxCru = text.indexOf('Crucifixo')
     const idxSup = text.indexOf('Supino')
     expect(idxCru).toBeLessThan(idxSup) // position 0 antes do 1
-    expect(text).toContain('1. Crucifixo — 4×8-12 (RIR 2)')
-    expect(text).toContain('2. Supino — 3×10') // sem RIR
-    expect(text).toContain('*Treino A — Peito*')
+    expect(text).toContain('1. Crucifixo: 4×8-12 (RIR 2)')
+    expect(text).toContain('2. Supino: 3×10') // sem RIR
+    expect(text).toContain('*Treino A · Peito*')
     expect(text).toContain('*Treino B*') // dia sem nome
   })
 
@@ -44,8 +44,8 @@ describe('planShareText', () => {
   })
 
   it('imprime descanso e cadência, como o PDF', () => {
-    expect(text).toContain('1. Crucifixo — 4×8-12 (RIR 2) · 90s')
-    expect(text).toContain('2. Supino — 3×10 · 60s')
+    expect(text).toContain('1. Crucifixo: 4×8-12 (RIR 2) · 90s')
+    expect(text).toContain('2. Supino: 3×10 · 60s')
   })
 })
 
@@ -121,13 +121,13 @@ describe('planShareText com bloco e sem faixa de reps', () => {
   })
 
   it('recua os membros do bloco e mantém a numeração contínua', () => {
-    expect(texto).toContain('   1. Crucifixo — 4×8-12 (RIR 2) · 90s')
-    expect(texto).toContain('   2. Supino — 3×10 · 60s · Drop-set')
+    expect(texto).toContain('   1. Crucifixo: 4×8-12 (RIR 2) · 90s')
+    expect(texto).toContain('   2. Supino: 3×10 · 60s · Drop-set')
   })
 
   it('sem faixa de reps sai como séries, e não como "5×" pendurado', () => {
-    expect(texto).toContain('1. Agachamento — 5 séries (RIR 1) · 120s')
-    expect(texto).not.toContain('Agachamento — 5×')
+    expect(texto).toContain('1. Agachamento: 5 séries (RIR 1) · 120s')
+    expect(texto).not.toContain('Agachamento: 5×')
   })
 })
 

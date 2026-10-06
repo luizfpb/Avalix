@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 type="button"
                 onClick={this.recoverApp}
                 disabled={recovering}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-primary-solid px-4 text-sm font-medium text-primary-foreground hover:bg-primary-solid/90 disabled:opacity-60"
               >
                 {recovering ? 'Reparando…' : 'Reparar atualização'}
               </button>

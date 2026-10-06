@@ -129,7 +129,7 @@ export default function TreinoNovo() {
   if (subjectQuery.isError || !subjectQuery.data) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar o avaliado.</p>
+        <p className="text-sm text-destructive">Não foi possível carregar o cadastro.</p>
         <Button asChild variant="outline">
           <Link to="/avaliados">Voltar</Link>
         </Button>
@@ -702,7 +702,7 @@ function Builder({
     // avisa em vez de escolher no lugar do profissional.
     const voltasDivergentes = kind === 'circuit' && circuitSetsMismatch(block.items)
     return (
-      <div key={groupKey} className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2">
+      <div key={groupKey} className="space-y-2 rounded-md border bg-muted/50 p-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
             {kind === 'circuit' ? <Repeat className="size-3.5" /> : <Layers className="size-3.5" />}
@@ -724,13 +724,13 @@ function Builder({
               Circuito
             </option>
           </select>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {groupHint(kind, block.items.length)}
           </span>
         </div>
         {voltasDivergentes ? (
-          <p className="text-[11px] text-amber-700 dark:text-amber-400">
-            Num circuito as séries de cada exercício são as voltas — aqui elas estão diferentes
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Num circuito as séries de cada exercício são as voltas, e aqui elas estão diferentes
             entre si.
           </p>
         ) : null}
@@ -804,8 +804,8 @@ function Builder({
       {versao.conflict ? <VersionConflictBanner what="Este plano" /> : null}
 
       {draft.restored ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado. Continue de onde parou.</span>
           <button
             type="button"
             onClick={draft.dismiss}
@@ -890,7 +890,7 @@ function Builder({
           {planoAtivoQueSeraArquivado ? (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
               Este passa a ser o treino vigente. O plano “{planoAtivoQueSeraArquivado.name}” será
-              arquivado — o histórico dele continua disponível.
+              arquivado, e o histórico dele continua disponível.
             </p>
           ) : null}
         </Field>
@@ -1020,7 +1020,7 @@ function Builder({
           <CardContent className="space-y-2">
             <p className="text-xs text-muted-foreground">
               Ordem das sessões na semana. Repita uma divisão para treiná-la mais de uma vez (ex.:
-              A, B, A) — o volume conta as repetições.
+              A, B, A); o volume conta as repetições.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {weekSchedule.map((label, i) => (

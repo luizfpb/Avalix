@@ -88,7 +88,7 @@ export function effectiveDiff(
 
 // inteiro sem casas; fracionado com 1 casa (séries fracionadas: 2.5, 13)
 function fmtNumero(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
 // `4×8-12`, ou `4 séries` quando não há faixa de repetição prescrita. Fica aqui

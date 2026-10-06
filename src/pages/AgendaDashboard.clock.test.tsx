@@ -9,6 +9,7 @@ const { appointments, upcoming } = vi.hoisted(() => ({ appointments: vi.fn(), up
 const subject = { id: 's1', full_name: 'Mariana de Teste', is_active: true }
 const subjects = [subject]
 const query = (data: unknown) => ({ data, isPending: false, isError: false })
+vi.mock('../features/auth/context', () => ({ useAuth: () => ({ user: { id: 'u1', factors: [] } }) }))
 vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org-audit', name: 'Estúdio Audit', subject_term: 'aluno' } }),
 }))
@@ -37,7 +38,7 @@ it('atualiza o dia e a janela ao retomar o Dashboard no dia seguinte', () => {
   const previousWindow = upcoming.mock.calls.at(-1)!.slice(1)
   vi.setSystemTime(new Date(2026, 8, 9, 10, 0))
   act(() => window.dispatchEvent(new Event('focus')))
-  expect(screen.getByText(/Visão de hoje/).textContent).toContain('09 de setembro')
+  expect(screen.getByText(/9 de setembro/)).toBeTruthy()
   expect(upcoming.mock.calls.at(-1)!.slice(1)).not.toEqual(previousWindow)
 })
 

@@ -56,7 +56,7 @@ export function SourceCard({
                 return (
                   <option key={a.id} value={a.id}>
                     {fmtDate(a.assessed_at)}
-                    {rr?.bodyFatPct != null ? ` · ${rr.bodyFatPct.toFixed(1)}% gordura` : ''}
+                    {rr?.bodyFatPct != null ? ` · ${rr.bodyFatPct.toFixed(1).replace('.', ',')}% gordura` : ''}
                   </option>
                 )
               })}
@@ -82,23 +82,23 @@ export function SourceCard({
         {r && selected ? (
           <div className="rounded-md border bg-muted/20 p-3">
             <p className="text-xs text-muted-foreground">
-              Achados da avaliação de {fmtDate(selected.assessed_at)} — orientam a prescrição
+              Achados da avaliação de {fmtDate(selected.assessed_at)}, que orientam a prescrição
             </p>
             <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
               <span>
                 <span className="text-muted-foreground">% gordura </span>
-                <b>{r.bodyFatPct.toFixed(1)}%</b>{' '}
+                <b>{r.bodyFatPct.toFixed(1).replace('.', ',')}%</b>{' '}
                 <span className="text-muted-foreground">
                   ({classifyBodyFat(r.inputs.sex, r.bodyFatPct, r.inputs.ageYears).label})
                 </span>
               </span>
               <span>
                 <span className="text-muted-foreground">Massa magra </span>
-                <b>{r.leanMassKg.toFixed(1)} kg</b>
+                <b>{r.leanMassKg.toFixed(1).replace('.', ',')} kg</b>
               </span>
               <span>
                 <span className="text-muted-foreground">Massa gorda </span>
-                <b>{r.fatMassKg.toFixed(1)} kg</b>
+                <b>{r.fatMassKg.toFixed(1).replace('.', ',')} kg</b>
               </span>
               <span>
                 <span className="text-muted-foreground">Peso </span>

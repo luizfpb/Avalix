@@ -154,7 +154,7 @@ describe('AnamneseNova — edição', () => {
   it('triagem incompleta mostra a pendência de preenchimento, não o desfecho', () => {
     renderPage('/avaliados/s1/anamnese/nova')
 
-    expect(screen.getByText(/Triagem incompleta — responda todos os itens/)).toBeTruthy()
+    expect(screen.getByText(/Triagem incompleta: responda todos os itens/)).toBeTruthy()
     expect(screen.queryByText('Ver resultado da triagem')).toBeNull()
     expect(screen.queryByText(/encaminhamento recomendado/)).toBeNull()
     expect(screen.queryByText(/Nível ACSM/)).toBeNull()

@@ -239,7 +239,7 @@ function CompareTable({
         </thead>
         <tbody>
           {rows.map((r) => {
-            const fmt = (v: number | null) => (v != null ? v.toFixed(r.decimals) : '—')
+            const fmt = (v: number | null) => (v != null ? v.toFixed(r.decimals).replace('.', ',') : '—')
             let deltaClass = 'text-muted-foreground'
             if (r.delta != null && r.delta !== 0 && r.betterWhen) {
               const improved = r.betterWhen === 'up' ? r.delta > 0 : r.delta < 0
@@ -251,7 +251,7 @@ function CompareTable({
                 <td className="py-1.5 pr-2 text-muted-foreground">
                   {r.label}
                   {marcarDependentes && r.dependeDoProtocolo ? (
-                    <span title="Depende do protocolo — ver aviso acima"> *</span>
+                    <span title="Depende do protocolo; veja o aviso acima"> *</span>
                   ) : null}
                 </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{fmt(r.from)}</td>
@@ -259,7 +259,7 @@ function CompareTable({
                 <td className={`py-1.5 pl-2 text-right font-semibold tabular-nums ${deltaClass}`}>
                   {r.delta != null ? (
                     <>
-                      {arrow} {Math.abs(r.delta).toFixed(r.decimals)}
+                      {arrow} {Math.abs(r.delta).toFixed(r.decimals).replace('.', ',')}
                       {r.deltaUnit ? ` ${r.deltaUnit}` : ''}
                     </>
                   ) : (

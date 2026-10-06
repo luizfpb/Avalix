@@ -46,7 +46,7 @@ describe('exerciseCautions', () => {
   it('red flag poupa carga axial (hinge/squat/lombar) e diz qual é o sinal', () => {
     const a = { ...emptyAnamnesis(), red_flags: ['febre'] }
     expect(exerciseCautions(a, terra)).toEqual([
-      'sinais de alerta (febre associada) — evitar carga axial até avaliação médica',
+      'sinais de alerta (febre associada): evitar carga axial até avaliação médica',
     ])
     expect(exerciseCautions(a, rosca)).toEqual([]) // isolamento de bíceps não é axial
   })

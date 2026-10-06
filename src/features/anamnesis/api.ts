@@ -102,7 +102,7 @@ async function motivoDaRecusa(id: string, expectedUpdatedAt?: string | null): Pr
 // sobra é o que só o servidor sabe, como consentimento revogado.
 const ERROS_LIBERACAO: Record<string, string> = {
   'consentimento revogado: nao e possivel registrar parecer medico novo':
-    'O consentimento deste avaliado está revogado — não é possível registrar um parecer novo. Retirar o registro atual continua permitido.',
+    'O consentimento deste avaliado está revogado: não é possível registrar um parecer novo. Retirar o registro atual continua permitido.',
   'informe a data do parecer medico': 'Informe a data do parecer médico.',
   'a data do parecer medico nao pode estar no futuro':
     'A data do parecer não pode estar no futuro.',

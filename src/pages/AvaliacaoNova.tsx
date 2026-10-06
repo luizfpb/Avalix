@@ -85,7 +85,7 @@ export default function AvaliacaoNova() {
   if (subjectQuery.isError || !subjectQuery.data) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar o avaliado.</p>
+        <p className="text-sm text-destructive">Não foi possível carregar o cadastro.</p>
         <Button asChild variant="outline">
           <Link to="/avaliados">Voltar</Link>
         </Button>
@@ -97,7 +97,7 @@ export default function AvaliacaoNova() {
       <div className="max-w-xl space-y-3">
         <h1 className="text-xl font-semibold">{isEdit ? 'Editar avaliação' : 'Nova avaliação'}</h1>
         <p className="text-sm text-muted-foreground">
-          É preciso ter consentimento vigente do avaliado para registrar ou editar avaliações.
+          É preciso ter consentimento vigente para registrar ou editar avaliações.
         </p>
         <Button asChild variant="outline">
           <Link to={`/avaliados/${subjectQuery.data.id}`}>Ir para o cadastro e registrar</Link>
@@ -183,7 +183,7 @@ function CircumferencesCard({
       <CardHeader>
         <CardTitle className="text-base">Circunferências (cm)</CardTitle>
         <CardDescription>
-          Opcionais — registre quantas quiser para acompanhar a evolução.
+          Opcionais. Registre quantas quiser para acompanhar a evolução.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -510,8 +510,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
       {versao.conflict ? <VersionConflictBanner what="Esta avaliação" /> : null}
 
       {draft.restored ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado. Continue de onde parou.</span>
           <button
             type="button"
             onClick={draft.dismiss}
@@ -575,7 +575,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
                       />
                     ))}
                     <span className="w-16 text-right text-xs text-muted-foreground">
-                      {mean != null ? `méd ${mean.toFixed(1)}` : '—'}
+                      {mean != null ? `méd ${mean.toFixed(1).replace('.', ',')}` : '—'}
                     </span>
                   </div>
                 </div>
@@ -602,16 +602,16 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1)}%`} />
+            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
             {result.bodyDensity != null ? (
-              <Stat label="Densidade" value={result.bodyDensity.toFixed(4)} />
+              <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
             ) : null}
-            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1)} kg`} />
-            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1)} kg`} />
+            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
+            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
             {result.conversions ? (
               <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
-                Siri {result.conversions.siri.toFixed(1)}% · Brozek{' '}
-                {result.conversions.brozek.toFixed(1)}% (principal: Siri)
+                Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
+                {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
               </p>
             ) : null}
             {result.warnings?.length ? (

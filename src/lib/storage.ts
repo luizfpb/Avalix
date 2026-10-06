@@ -26,7 +26,7 @@ export class StorageRemovalError extends Error {
   constructor(remaining: string[]) {
     super(
       'Não foi possível remover todos os arquivos de foto do armazenamento. ' +
-        'Nada foi excluído do cadastro — tente de novo.'
+        'Nada foi excluído do cadastro. Tente de novo.'
     )
     this.name = 'StorageRemovalError'
     this.remaining = remaining

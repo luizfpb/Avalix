@@ -128,7 +128,7 @@ export function PwaUpdatePrompt() {
           <button
             onClick={handleUpdate}
             disabled={status !== 'ready'}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md bg-primary-solid px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
           >
             {status === 'ready' ? 'Atualizar' : 'Aguarde'}
           </button>

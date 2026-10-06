@@ -174,7 +174,7 @@ export default function AvaliacaoDetalhe() {
             Avaliação de {formatDate(assessment.assessed_at)}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {protocolLabel(assessment.protocol_id)} · {assessment.weight_kg} kg ·{' '}
+            {protocolLabel(assessment.protocol_id)} · {String(assessment.weight_kg).replace('.', ',')} kg ·{' '}
             {assessment.height_cm} cm
           </p>
         </div>
@@ -269,12 +269,12 @@ export default function AvaliacaoDetalhe() {
                 ))}
               </div>
             ) : null}
-            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1)}%`} />
+            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
             {result.bodyDensity != null ? (
-              <Stat label="Densidade" value={result.bodyDensity.toFixed(4)} />
+              <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
             ) : null}
-            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1)} kg`} />
-            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1)} kg`} />
+            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
+            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
             {(() => {
               const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct, ageYears)
               return (
@@ -301,8 +301,8 @@ export default function AvaliacaoDetalhe() {
             })()}
             {result.conversions ? (
               <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
-                Siri {result.conversions.siri.toFixed(1)}% · Brozek{' '}
-                {result.conversions.brozek.toFixed(1)}% (principal: Siri)
+                Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
+                {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
               </p>
             ) : null}
           </CardContent>
@@ -315,7 +315,7 @@ export default function AvaliacaoDetalhe() {
           <CardDescription>Índice de massa corporal · referência OMS</CardDescription>
         </CardHeader>
         <CardContent className="flex items-baseline gap-3">
-          <span className="text-2xl font-semibold">{bmi.toFixed(1)}</span>
+          <span className="text-2xl font-semibold">{bmi.toFixed(1).replace('.', ',')}</span>
           <span
             className={
               bmiCat.tone === 'warn'
@@ -345,7 +345,7 @@ export default function AvaliacaoDetalhe() {
                     {SKINFOLD_LABELS[s.site as SkinfoldSite] ?? s.site}
                   </span>
                   <span>
-                    {vals.join(' / ')} <span className="text-muted-foreground">(méd {mean.toFixed(1)})</span>
+                    {vals.map((v) => String(v).replace('.', ',')).join(' / ')} <span className="text-muted-foreground">(méd {mean.toFixed(1).replace('.', ',')})</span>
                   </span>
                 </div>
               )

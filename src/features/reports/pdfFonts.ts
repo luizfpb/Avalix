@@ -1,7 +1,8 @@
 import { Font } from '@react-pdf/renderer'
 
-// Clareza usa Manrope 400/700 em títulos, tabelas e gráficos. Newsreader
-// permanece nas telas e nas propostas históricas, sem ser carregada no PDF.
+// Clareza usa Manrope 400/700 em títulos, tabelas e gráficos. As telas do app
+// usam Inter desde out/2026; o PDF continua em Manrope até ser revisto com as
+// páginas renderizadas.
 //
 // Por que TTF e não os woff2 que o app já usa: o fontkit do @react-pdf não
 // decodifica woff2 — registrar passa, mas o render quebra com "Offset is

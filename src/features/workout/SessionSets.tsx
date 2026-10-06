@@ -19,10 +19,10 @@ export type SessionSet = {
 
 // numeric(6,2) pode chegar como 40 ou como "40.00" dependendo da rota (jsonb da
 // RPC do aluno x PostgREST na consulta do treinador). Normaliza os dois para a
-// forma que se lê numa ficha: 40, 42.5 — nunca 40.00.
+// forma que se lê numa ficha: 40, 42,5 (nunca 40.00).
 function fmtNumero(n: number): string {
   const v = Number(n)
-  return Number.isFinite(v) ? String(Number(v.toFixed(2))) : String(n)
+  return Number.isFinite(v) ? String(Number(v.toFixed(2))).replace('.', ',') : String(n)
 }
 
 function agrupar(sets: SessionSet[]): [string, SessionSet[]][] {

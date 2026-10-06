@@ -37,7 +37,7 @@ export default function PosturaSessaoNova() {
       <div className="max-w-xl space-y-3">
         <h1 className="text-xl font-semibold">Nova sessão postural</h1>
         <p className="text-sm text-muted-foreground">
-          É preciso registrar o consentimento do avaliado antes de coletar fotos.
+          É preciso registrar o consentimento antes de coletar fotos.
         </p>
         <Button asChild variant="outline">
           <Link to={`/avaliados/${id}`}>Ir para o cadastro e registrar</Link>

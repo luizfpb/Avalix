@@ -131,7 +131,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
   return (
     <>
       <dialog ref={dialog} aria-labelledby={`${id}-title`} onCancel={(event) => { event.preventDefault(); cancel() }}
-        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border bg-background p-4 text-foreground shadow-xl backdrop:bg-black/50 sm:p-5">
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-lg border bg-background p-4 text-foreground shadow-xl backdrop:bg-black/50 sm:p-5">
         <form noValidate onSubmit={(event) => { event.preventDefault(); void save() }} className="space-y-4">
           <div>
             <h2 id={`${id}-title`} className="text-lg font-semibold">Editar treino</h2>
@@ -147,7 +147,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             {exercises.map((ex) => (
               <div key={ex.id} className="rounded-md border bg-muted/20 p-2.5">
                 <p className="mb-2 text-sm font-medium">{ex.name}</p>
-                <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-xs text-muted-foreground sm:gap-2">
                   <span /><span>carga (kg)</span><span>reps</span><span>RIR</span><span>desc. (s)</span>
                 </div>
                 {ex.rows.map((row, index) => (

@@ -159,7 +159,7 @@ export function ExerciseForm({
           um conta volume com peso cheio (0040). */}
       <div className="space-y-1">
         <Label id={additionalLabelId} className="text-xs">
-          Outros músculos principais (opcional, até {MAX_ADDITIONAL_PRIMARY} — contam no volume com peso 1,0)
+          Outros músculos principais (opcional, até {MAX_ADDITIONAL_PRIMARY}; contam no volume com peso 1,0)
         </Label>
         <div role="group" aria-labelledby={additionalLabelId} className="flex flex-wrap gap-1">
           {MUSCLE_OPTIONS.map((m) => {
@@ -177,7 +177,7 @@ export function ExerciseForm({
                 onClick={() => toggleAdditionalPrimary(m.value)}
                 className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
                   on
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? 'border-primary-solid bg-primary-solid text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 } ${off ? 'cursor-not-allowed opacity-40' : ''}`}
               >
@@ -204,7 +204,7 @@ export function ExerciseForm({
                 onClick={() => toggleSecondary(m.value)}
                 className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
                   on
-                    ? 'border-primary bg-primary/10 text-primary'
+                    ? 'border-foreground bg-foreground text-background'
                     : 'text-muted-foreground hover:text-foreground'
                 } ${isPrimary ? 'cursor-not-allowed opacity-40' : ''}`}
               >

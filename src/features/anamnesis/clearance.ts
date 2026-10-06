@@ -223,12 +223,12 @@ export function anamneseAlerta(input: {
   if (l.status !== 'pendente') {
     if (l.anteriorAAnamnese) {
       ressalvas.push(
-        'O parecer é anterior à data desta anamnese — confirme se ele cobre as respostas atuais.'
+        'O parecer é anterior à data desta anamnese. Confirme se ele cobre as respostas atuais.'
       )
     }
     if (l.anamneseEditadaDepois) {
       ressalvas.push(
-        'A anamnese foi editada depois deste registro — confirme se o parecer ainda se aplica.'
+        'A anamnese foi editada depois deste registro. Confirme se o parecer ainda se aplica.'
       )
     }
   }
@@ -263,7 +263,7 @@ export function anamneseAlerta(input: {
         ...(l.obs ? [l.obs] : []),
         linhaParecer(l),
         ...(gate.status === 'incompleto'
-          ? ['A triagem desta anamnese está incompleta — a liberação não foi calculada.']
+          ? ['A triagem desta anamnese está incompleta, então a liberação não foi calculada.']
           : []),
         ...(nivelLinha ? [nivelLinha] : []),
       ],
@@ -281,7 +281,7 @@ export function anamneseAlerta(input: {
       nivel: 'atencao',
       titulo: 'Liberação médica vencida',
       linhas: [
-        `${linhaParecer(l)} — peça um documento atualizado.`,
+        `${linhaParecer(l)}. Peça um documento atualizado.`,
         ...(l.status === 'liberado_com_restricoes' && l.obs ? [l.obs] : []),
         ...(nivelLinha ? [nivelLinha] : []),
       ],
@@ -294,7 +294,7 @@ export function anamneseAlerta(input: {
     return {
       ...base,
       nivel: 'atencao',
-      titulo: 'Triagem incompleta — liberação não calculada',
+      titulo: 'Triagem incompleta: liberação não calculada',
       linhas: [],
       badge: { label: 'Incompleta', variant: 'secondary' },
       destacarMotivos: true,
@@ -331,7 +331,7 @@ export function anamneseAlerta(input: {
     return {
       ...base,
       nivel: 'info',
-      titulo: 'Aluno declara liberação médica — confirme',
+      titulo: 'Aluno declara liberação médica: confirme',
       linhas: [
         `Ele respondeu na anamnese que um médico o liberou${quando}. Peça o documento e registre a liberação para o aviso refletir isso.`,
         ...(nivelLinha ? [nivelLinha] : []),

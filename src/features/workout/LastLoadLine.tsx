@@ -35,7 +35,7 @@ export function LastLoadLine({
   repRange = null,
   targetRir = null,
   suggest = true,
-  className = 'mt-1 text-[11px] text-primary',
+  className = 'mt-1 text-xs text-primary',
 }: {
   last: LastLoad | null | undefined
   repRange?: RepRange | null

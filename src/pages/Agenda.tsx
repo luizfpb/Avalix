@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { CalendarPlus, Download, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
+import { subjectTermLabels } from '../lib/subjectTerm'
 import { useSubjects } from '../features/subjects/hooks'
 import {
   useAppointments,
@@ -61,6 +62,7 @@ export default function Agenda() {
   const now = useClock().getTime()
   const { organization } = useOrganization()
   const orgId = organization?.id
+  const labels = subjectTermLabels(organization?.subject_term)
   const [params] = useSearchParams()
   const subjectsQuery = useSubjects(orgId)
   const apptsQuery = useAppointments(orgId)
@@ -104,7 +106,7 @@ export default function Agenda() {
   async function create() {
     setError(null)
     if (!orgId) return setError('Organização não carregada.')
-    if (!subjectId) return setError('Escolha o avaliado.')
+    if (!subjectId) return setError(`Escolha o ${labels.singular}.`)
     if (!when) return setError('Escolha a data e hora.')
     const startsAt = new Date(when)
     if (Number.isNaN(startsAt.getTime())) return setError('Data/hora inválida.')
@@ -162,7 +164,7 @@ export default function Agenda() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="appointment-subject" className="text-xs">Avaliado</Label>
+              <Label htmlFor="appointment-subject" className="text-xs">{labels.singularCap}</Label>
               <select
                 id="appointment-subject"
                 className={controlClass}

@@ -38,7 +38,7 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
   const liberado = complete && !parqYes
   if (parqYes) {
     motivos.push(
-      'Triagem (PAR-Q+): ao menos uma resposta "Sim" — buscar liberação de profissional de saúde antes de progredir a intensidade.'
+      'Triagem (PAR-Q+): ao menos uma resposta "Sim". Buscar liberação de profissional de saúde antes de progredir a intensidade.'
     )
   }
 
@@ -63,18 +63,18 @@ export function computeGate(a: AnamnesisAnswers): GateResult {
   const gestante = a.gestante === true
 
   if (sintomas) {
-    motivos.push('Sinais/sintomas cardiovasculares presentes — liberação médica antes de exercício.')
+    motivos.push('Sinais/sintomas cardiovasculares presentes: liberação médica antes de exercício.')
   }
   if (cmr) {
     motivos.push('Doença cardiovascular, metabólica ou renal referida.')
   }
   if (redFlags) {
     motivos.push(
-      `Sinais de alerta (red flags): ${redFlagNames(a.red_flags)} — indicam avaliação médica antes de treinar.`
+      `Sinais de alerta (red flags): ${redFlagNames(a.red_flags)}. Indicam avaliação médica antes de treinar.`
     )
   }
   if (gestante) {
-    motivos.push('Gestante — exige protocolo próprio e acompanhamento.')
+    motivos.push('Gestante: exige protocolo próprio e acompanhamento.')
   }
 
   const flagEncaminhamento = parqYes || sintomas || cmr || redFlags || gestante

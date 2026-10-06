@@ -81,7 +81,7 @@ export function triagemBlock(answers: AnamnesisAnswers, liberacao?: Liberacao): 
     '- Saiu de regra fixa e auditada do app (triagem inspirada no PAR-Q+ e na matriz de pré-participação da ACSM). É entrada fixa: explique, não recalcule.',
     line(
       'Estado da triagem',
-      incomplete ? 'incompleta — liberação não calculada' : gate.status
+      incomplete ? 'incompleta: liberação não calculada' : gate.status
     ),
     line('Liberado na triagem', incomplete ? 'não calculado' : gate.liberado ? 'sim' : 'não'),
     line(
@@ -256,7 +256,7 @@ function dorBlock(a: AnamnesisAnswers): string {
       a.lesoes_estado_atual
     ),
     multiLine(
-      'Sinais de alerta (red flags) — indicam avaliação médica, não treino',
+      'Sinais de alerta (red flags): indicam avaliação médica, não treino',
       RED_FLAGS,
       a.red_flags
     ),

@@ -19,7 +19,7 @@ export function GroupBlock({
   children: ReactNode
 }) {
   return (
-    <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2">
+    <div className="space-y-2 rounded-md border bg-muted/50 p-2">
       <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold text-primary">
         {kind === 'circuit' ? (
           <Repeat className="size-3.5 shrink-0" />

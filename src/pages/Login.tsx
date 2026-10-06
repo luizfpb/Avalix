@@ -59,7 +59,7 @@ export default function Login() {
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive"
+            className="rounded-md border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm leading-relaxed text-destructive"
           >
             {error}
           </p>
@@ -68,7 +68,7 @@ export default function Login() {
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
       </form>
-      <div className="mt-5 flex items-center justify-between gap-4 text-xs">
+      <div className="mt-5 flex items-center justify-between gap-4 text-sm">
         <Link to="/recuperar-senha" className="font-medium text-muted-foreground hover:text-foreground">
           Esqueci minha senha
         </Link>

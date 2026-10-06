@@ -616,7 +616,7 @@ export default function TreinoAluno() {
     <Shell>
       <header className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{pacote.org_name}</p>
+          <p className="text-sm text-muted-foreground">{pacote.org_name}</p>
           <h1 className="text-xl font-semibold">Olá, {pacote.subject_first_name}</h1>
         </div>
         <BrandMark size={28} />
@@ -716,12 +716,12 @@ export default function TreinoAluno() {
       ) : null}
 
       <footer className="mt-8 border-t pt-4 text-center">
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           O que você registrar aqui fica visível para o profissional responsável pelo seu treino.
         </p>
         <button
           type="button"
-          className="mt-2 text-[11px] text-muted-foreground underline"
+          className="mt-2 text-xs text-muted-foreground underline"
           disabled={registrando}
           onClick={() => setConfirmarSaida(true)}
         >
@@ -781,7 +781,7 @@ function GlossarioDoDia({
         {temRir ? (
           <p>
             <strong>RIR</strong> é quantas repetições você ainda conseguiria fazer ao parar a
-            série. RIR 2 significa terminar sentindo que daria para fazer mais duas — não é para
+            série. RIR 2 significa terminar sentindo que daria para fazer mais duas. Não é para
             ir até não conseguir mais. RIR 0 significa que você estimou não conseguir outra repetição.
             Marque Falha se tentou continuar e não conseguiu completar a repetição.
           </p>
@@ -835,7 +835,7 @@ function StatusBar({
 
   if (fila.length === 0 && !semRede && !erro) {
     return sincronizadoEm ? (
-      <p className="mb-3 text-[11px] text-muted-foreground">
+      <p className="mb-3 text-xs text-muted-foreground">
         Atualizado em {new Date(sincronizadoEm).toLocaleString('pt-BR')}
       </p>
     ) : null
@@ -954,7 +954,7 @@ function dicaSemanaAluno(s: PlanWeekSuggestion): string {
     case 'advance':
       return `Você fechou a semana ${s.lastLoggedWeek} (${feitos}). Agora começa a semana ${s.week}.`
     case 'end':
-      return `A semana ${s.lastLoggedWeek} era a última do plano e já fechou — fale com seu treinador sobre o próximo.`
+      return `A semana ${s.lastLoggedWeek} era a última do plano e já fechou. Fale com seu treinador sobre o próximo.`
   }
 }
 
@@ -1669,7 +1669,7 @@ function TreinoDoDia({
       {planoMudou ? (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-2.5 text-xs"
+          className="flex items-start gap-2 rounded-md border bg-muted/50 p-2.5 text-xs"
         >
           <RefreshCw className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
           <p className="flex-1">{planoMudou}</p>
@@ -1696,7 +1696,7 @@ function TreinoDoDia({
               aria-pressed={dayId === d.id}
               className={`min-h-11 rounded-md border px-4 text-sm ${
                 dayId === d.id
-                  ? 'border-primary bg-primary text-primary-foreground'
+                  ? 'border-primary-solid bg-primary-solid text-primary-foreground'
                   : 'bg-background'
               }`}
             >
@@ -1783,11 +1783,14 @@ function TreinoDoDia({
         </p>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        Descanso (s): ao marcar a série feita, o cronômetro começa; toque em "Começou a série"
-        para anotar o tempo, ou digite. É opcional; 0 significa sem descanso.
-        {' '}Marque Falha quando tentou e não conseguiu completar a repetição; RIR 0 sozinho não marca falha.
-      </p>
+      <details className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Como registrar as séries?</summary>
+        <p className="mt-2">
+          Descanso: ao marcar a série feita, o cronômetro começa. Toque em "Começou a série" para
+          anotar o tempo, ou digite os segundos. É opcional; 0 significa sem descanso. Marque Falha
+          quando tentou e não conseguiu completar a repetição; RIR 0 sozinho não marca falha.
+        </p>
+      </details>
 
       {progresso.total > 0 ? (
         <div>
@@ -1831,7 +1834,7 @@ function TreinoDoDia({
                 <span className="text-sm font-medium">
                   {ex.name}
                   {tecnica ? (
-                    <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
                       {tecnica}
                     </span>
                   ) : null}
@@ -1842,19 +1845,19 @@ function TreinoDoDia({
                 </span>
               </div>
               {efetiva.restSeconds != null || ex.tempo ? (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {efetiva.restSeconds != null ? `descanso ${efetiva.restSeconds}s` : ''}
                   {efetiva.restSeconds != null && ex.tempo ? ' · ' : ''}
                   {ex.tempo ? `cadência ${ex.tempo}` : ''}
                 </p>
               ) : null}
               {efetiva.notes ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">{efetiva.notes}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{efetiva.notes}</p>
               ) : null}
               <ExerciseDemoLink
                 name={ex.name}
                 video={videoOrSearch(ex.video_url, ex.name)}
-                className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                className="mt-1 inline-flex min-h-8 items-center gap-1 text-xs font-medium text-primary hover:underline"
               />
 
               {efetiva.skipped ? (
@@ -1866,7 +1869,7 @@ function TreinoDoDia({
                   <LastLoadLine last={ultima} repRange={parseRepRange(efetiva.reps)} targetRir={efetiva.rir} />
 
                   <div className="mt-2 max-w-md space-y-1">
-                    <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                    <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-xs text-muted-foreground sm:gap-2">
                       <span />
                       <span>carga (kg)</span>
                       <span>reps</span>
@@ -1882,7 +1885,7 @@ function TreinoDoDia({
                   ))}
                     <button
                       type="button"
-                      className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() => addLinha(ex.id)}
                     >
                       + série
@@ -1910,7 +1913,7 @@ function TreinoDoDia({
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-medium">
                   {ex.name}
-                  <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                     trocado{origem ? ` · do treino ${origem.label}` : ''}
                   </span>
                 </span>
@@ -1925,7 +1928,7 @@ function TreinoDoDia({
               </div>
               <LastLoadLine last={ultima} suggest={false} />
               <div className="mt-2 max-w-md space-y-1">
-                <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+                <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-xs text-muted-foreground sm:gap-2">
                   <span />
                   <span>carga (kg)</span>
                   <span>reps</span>
@@ -1941,7 +1944,7 @@ function TreinoDoDia({
                   ))}
                 <button
                   type="button"
-                  className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => addLinha(ex.id)}
                 >
                   + série
@@ -1960,7 +1963,7 @@ function TreinoDoDia({
           <Label htmlFor="aluno-extra" className="text-xs">
             Trocou algum exercício?
           </Label>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Escolha o que você fez no lugar. A lista traz os exercícios das outras divisões do seu
             treino.
           </p>
@@ -1978,7 +1981,7 @@ function TreinoDoDia({
                 return (
                   <option key={e.id} value={e.id}>
                     {e.name}
-                    {origem ? ` — treino ${origem.label}` : ''}
+                    {origem ? ` (treino ${origem.label})` : ''}
                   </option>
                 )
               })}
@@ -2016,8 +2019,8 @@ function TreinoDoDia({
                   setDirty(true)
                   setSensacao(ativa ? null : opcao.value)
                 }}
-                className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
-                  ativa ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'
+                className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-md border text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                  ativa ? 'border-primary-solid bg-primary-solid text-primary-foreground' : 'text-muted-foreground'
                 }`}
               >
                 <Icone className="size-5" aria-hidden="true" />
@@ -2121,7 +2124,7 @@ function TreinoDoDia({
             Este aparelho não está guardando o que você digita. Conclua o treino com internet antes de fechar esta tela.
           </p>
         ) : (
-          <p className="text-center text-[11px] text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             O que você digita já fica guardado neste aparelho, mesmo sem internet.
           </p>
         )}
@@ -2333,7 +2336,7 @@ function Historico({
           onSave={salvarCorrecao} onCancel={() => setEditing(null)} />
       ) : null}
       {offline ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Sem internet: mostrando o que estava salvo no aparelho.
         </p>
       ) : null}
@@ -2348,7 +2351,7 @@ function Historico({
             <span className="text-sm font-medium">
               {s.day_label ? `Treino ${s.day_label}` : 'Treino'} · {dataBr(s.performed_at)}
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {s.source === 'trainer'
                 ? 'registrado pelo treinador'
                 : s.in_progress === true
@@ -2356,7 +2359,7 @@ function Historico({
                   : null}
             </span>
           </div>
-          <p className="flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
             <span>
               {s.plan_name}
               {s.week_number != null ? ` · semana ${s.week_number}` : ''}
@@ -2381,14 +2384,14 @@ function Historico({
               }))}
             />
           </div>
-          {s.notes ? <p className="mt-1 text-[11px] italic text-muted-foreground">{s.notes}</p> : null}
+          {s.notes ? <p className="mt-1 text-xs italic text-muted-foreground">{s.notes}</p> : null}
           {s.source === 'student' ? (
             <div className="mt-2">
               <Button type="button" size="sm" variant="outline" disabled={!s.updated_at || refreshing || openingEdit !== null}
                 onClick={() => void abrirEdicao(s)}>
                 {openingEdit === s.id ? 'Abrindo...' : 'Editar treino'}
               </Button>
-              {!s.updated_at ? <p className="mt-1 text-[11px] text-muted-foreground">Conecte-se à internet para atualizar e editar este registro.</p> : null}
+              {!s.updated_at ? <p className="mt-1 text-xs text-muted-foreground">Conecte-se à internet para atualizar e editar este registro.</p> : null}
             </div>
           ) : null}
         </div>
@@ -2496,7 +2499,7 @@ function Anteriores({
           >
             <span>
               <span className="block text-sm font-medium">{p.name}</span>
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-xs text-muted-foreground">
                 {p.starts_on ? `início ${dataBr(p.starts_on)} · ` : ''}
                 {p.weeks} {p.weeks === 1 ? 'semana' : 'semanas'} · {p.sessions}{' '}
                 {p.sessions === 1 ? 'treino registrado' : 'treinos registrados'}
@@ -2536,7 +2539,7 @@ function PlanoResumo({ detalhe }: { detalhe: StudentPlanDetail }) {
           <div key={d.id}>
             <p className="text-xs font-medium">
               Treino {d.label}
-              {d.name ? ` — ${d.name}` : ''}
+              {d.name ? ` · ${d.name}` : ''}
             </p>
             <ul className="mt-0.5 space-y-0.5">
               {blocos.map((bloco) => (
@@ -2551,7 +2554,7 @@ function PlanoResumo({ detalhe }: { detalhe: StudentPlanDetail }) {
                   {bloco.items
                     .map(
                       (e) =>
-                        `${e.name} — ${formatSetsReps(e.sets, e.reps)}${
+                        `${e.name}: ${formatSetsReps(e.sets, e.reps)}${
                           e.rir != null ? ` · RIR ${e.rir}` : ''
                         }`
                     )

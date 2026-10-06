@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useOrganization } from '../features/organization/context'
+import { subjectTermLabels } from '../lib/subjectTerm'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
 import { useAnamnese, useCreateAnamnese, useUpdateAnamnese } from '../features/anamnesis/hooks'
@@ -40,7 +41,7 @@ export default function AnamneseNova() {
   if (subjectQuery.isError || !subjectQuery.data) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar o avaliado.</p>
+        <p className="text-sm text-destructive">Não foi possível carregar o cadastro.</p>
         <Button asChild variant="outline">
           <Link to="/avaliados">Voltar</Link>
         </Button>
@@ -54,7 +55,7 @@ export default function AnamneseNova() {
           {isEdit ? 'Editar anamnese e triagem' : 'Nova anamnese'}
         </h1>
         <p className="text-sm text-muted-foreground">
-          É preciso ter consentimento vigente do avaliado para registrar ou editar dados de saúde.
+          É preciso ter consentimento vigente para registrar ou editar dados de saúde.
         </p>
         <Button asChild variant="outline">
           <Link to={`/avaliados/${subjectQuery.data.id}`}>Ir para o cadastro e registrar</Link>
@@ -89,6 +90,7 @@ export default function AnamneseNova() {
 
 function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseRow }) {
   const { organization } = useOrganization()
+  const labels = subjectTermLabels(organization?.subject_term)
   const navigate = useNavigate()
   const isEdit = !!existing
   const createMut = useCreateAnamnese(subject.id)
@@ -146,7 +148,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
     }
     if (!medicamentosOk) {
       return setSubmitError(
-        'Responda os medicamentos em uso: liste os medicamentos ou marque que o avaliado não usa nenhum.'
+        `Responda os medicamentos em uso: liste os medicamentos ou marque que o ${labels.singular} não usa nenhum.`
       )
     }
     if (!a.declaracao_veracidade || !a.consentimento_lgpd) {
@@ -189,12 +191,12 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Triagem de prontidão baseada no PAR-Q+ e nas diretrizes de pré-participação do ACSM
-          (redação própria). É triagem de segurança — não substitui avaliação médica.
+          (redação própria). É triagem de segurança e não substitui avaliação médica.
         </p>
         {isEdit ? (
           <p className="mt-2 text-sm text-muted-foreground">
             As alterações corrigem esta anamnese e recalculam a triagem. Para registrar uma
-            reavaliação sem apagar o histórico, use “Nova anamnese” no perfil do avaliado.
+            reavaliação sem apagar o histórico, use “Nova anamnese” no perfil do {labels.singular}.
           </p>
         ) : null}
       </div>
@@ -202,8 +204,8 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
       {versao.conflict ? <VersionConflictBanner what="Esta anamnese" /> : null}
 
       {draft.restored ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <span>Rascunho não salvo recuperado — continue de onde parou.</span>
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado. Continue de onde parou.</span>
           <button
             type="button"
             onClick={draft.dismiss}
@@ -233,14 +235,14 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
           estado do formulário, não resultado clínico. */}
       {gate.status === 'incompleto' ? (
         <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
-          Triagem incompleta — responda todos os itens das seções A1 e A2 para salvar.
+          Triagem incompleta: responda todos os itens das seções A1 e A2 para salvar.
         </p>
       ) : (
         <details className="rounded-md border bg-card p-3">
           <summary className="cursor-pointer text-sm font-medium">
             Ver resultado da triagem
             <span className="ml-2 text-xs font-normal text-muted-foreground">
-              só para você — não mostre ao aluno enquanto ele responde
+              só para você, não mostre ao aluno enquanto ele responde
             </span>
           </summary>
           <div className="mt-3">

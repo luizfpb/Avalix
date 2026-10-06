@@ -42,7 +42,7 @@ import { QueryError } from '../components/QueryError'
 
 const LEAN = 'var(--color-chart-1)'
 const FAT = 'var(--color-chart-2)'
-const tick = { fill: 'var(--color-muted-foreground)', fontSize: 10 }
+const tick = { fill: 'var(--color-muted-foreground)', fontSize: 12 }
 const axis = { stroke: 'var(--color-border)' }
 const tooltipStyle = {
   contentStyle: {
@@ -59,6 +59,8 @@ function dateShort(iso: string): string {
   return m ? `${m[3]}/${m[2]}` : iso
 }
 const round1 = (n: number) => Math.round(n * 10) / 10
+// Número com vírgula e no máximo uma casa, nos eixos e nas dicas dos gráficos.
+const decimalLabel = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 
 type SeriesPoint = { id: string; date: string; value: number | null }
 
@@ -174,7 +176,7 @@ export default function Evolucao() {
       <div className="space-y-3">
         {back}
         <p className="text-sm text-muted-foreground">
-          Sem avaliações ainda — os gráficos aparecem após a primeira avaliação física.
+          Sem avaliações ainda. Os gráficos aparecem após a primeira avaliação física.
         </p>
       </div>
     )
@@ -283,19 +285,19 @@ export default function Evolucao() {
               <>
                 <Stat
                   label="% Gordura"
-                  value={`${lastRes.bodyFatPct.toFixed(1)}%`}
+                  value={`${lastRes.bodyFatPct.toFixed(1).replace('.', ',')}%`}
                   hint={classifyBodyFat(sex, lastRes.bodyFatPct, lastAge).label}
                 />
-                <Stat label="Massa magra" value={`${lastRes.leanMassKg.toFixed(1)} kg`} />
-                <Stat label="Massa gorda" value={`${lastRes.fatMassKg.toFixed(1)} kg`} />
+                <Stat label="Massa magra" value={`${lastRes.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
+                <Stat label="Massa gorda" value={`${lastRes.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
               </>
             ) : null}
             <Stat
               label="IMC"
-              value={computeBmi(last.weight_kg, last.height_cm).toFixed(1)}
+              value={computeBmi(last.weight_kg, last.height_cm).toFixed(1).replace('.', ',')}
               hint={bmiCategory(computeBmi(last.weight_kg, last.height_cm), lastAge).label}
             />
-            <Stat label="Peso" value={`${last.weight_kg} kg`} />
+            <Stat label="Peso" value={`${decimalLabel(last.weight_kg)} kg`} />
           </div>
         </CardContent>
       </Card>
@@ -393,6 +395,9 @@ function MetricChart({
   const range = max - min
   const pad = range > 0 ? range * 0.25 : Math.max(1, Math.abs(max) * 0.05)
   const domain: [number, number] = [round1(min - pad), round1(max + pad)]
+  // Três marcas fixas no eixo: as automáticas caíam em frações como 47,875,
+  // que não cabiam na largura do eixo e apareciam cortadas.
+  const ticks = [domain[0], round1((domain[0] + domain[1]) / 2), domain[1]]
 
   const first = valid[0].value
   const lastV = valid[valid.length - 1].value
@@ -408,24 +413,32 @@ function MetricChart({
   const ud = deltaUnit ? ` ${deltaUnit}` : u
 
   return (
-    <div className="rounded-xl border bg-card p-3">
+    <div className="rounded-lg border bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-medium">{title}</span>
         <span className={`text-xs font-semibold ${deltaClass}`}>
-          {arrow} {Math.abs(delta).toFixed(1)}
+          {arrow} {Math.abs(delta).toFixed(1).replace('.', ',')}
           {ud}
         </span>
       </div>
       <p className="mb-1 text-xs text-muted-foreground">
-        {first.toFixed(1)} → {lastV.toFixed(1)}
+        {first.toFixed(1).replace('.', ',')} → {lastV.toFixed(1).replace('.', ',')}
         {u}
       </p>
       <ResponsiveContainer width="100%" height={150}>
-        <LineChart data={series} margin={{ top: 6, right: 8, left: -14, bottom: 0 }}>
+        <LineChart data={series} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis dataKey="date" tick={tick} axisLine={axis} tickLine={axis} />
-          <YAxis domain={domain} tick={tick} width={40} axisLine={axis} tickLine={axis} allowDecimals />
-          <Tooltip {...tooltipStyle} formatter={(value) => [`${value}${u}`, title]} />
+          <YAxis
+            domain={domain}
+            ticks={ticks}
+            tickFormatter={decimalLabel}
+            tick={tick}
+            width={44}
+            axisLine={axis}
+            tickLine={axis}
+          />
+          <Tooltip {...tooltipStyle} formatter={(value) => [`${decimalLabel(Number(value))}${u}`, title]} />
           <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} connectNulls dot={{ r: 3 }} />
         </LineChart>
       </ResponsiveContainer>
@@ -435,7 +448,7 @@ function MetricChart({
           <thead><tr><th scope="col">Data</th><th scope="col" className="text-right">{title}</th></tr></thead>
           <tbody>
             {valid.map((point) => (
-              <tr key={point.id}><td>{point.date}</td><td className="text-right tabular-nums">{point.value.toFixed(1)}{u}</td></tr>
+              <tr key={point.id}><td>{point.date}</td><td className="text-right tabular-nums">{point.value.toFixed(1).replace('.', ',')}{u}</td></tr>
             ))}
           </tbody>
         </table>
@@ -458,11 +471,11 @@ function BodyCompDonut({ res }: { res: AssessmentResultSnapshot }) {
               <Cell key={i} fill={d.fill} />
             ))}
           </Pie>
-          <Tooltip {...tooltipStyle} formatter={(value, n) => [`${Number(value).toFixed(1)} kg`, n]} />
+          <Tooltip {...tooltipStyle} formatter={(value, n) => [`${Number(value).toFixed(1).replace('.', ',')} kg`, n]} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-semibold">{res.bodyFatPct.toFixed(1)}%</span>
+        <span className="text-xl font-semibold">{res.bodyFatPct.toFixed(1).replace('.', ',')}%</span>
         <span className="text-xs text-muted-foreground">gordura</span>
       </div>
     </div>
@@ -513,7 +526,7 @@ function CircumferencesCharts({
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
               <XAxis type="number" tick={tick} axisLine={axis} tickLine={axis} />
               <YAxis type="category" dataKey="label" width={116} tick={tick} axisLine={axis} tickLine={axis} />
-              <Tooltip {...tooltipStyle} formatter={(value) => [`${value} cm`, 'Medida']} />
+              <Tooltip {...tooltipStyle} formatter={(value) => [`${decimalLabel(Number(value))} cm`, 'Medida']} />
               <Bar dataKey="value" fill="var(--color-chart-1)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>

@@ -261,7 +261,7 @@ describe('anamneseAlerta', () => {
       today: HOJE,
     })
     expect(a.nivel).toBe('info')
-    expect(a.titulo).toBe('Aluno declara liberação médica — confirme')
+    expect(a.titulo).toBe('Aluno declara liberação médica: confirme')
     expect(a.badge.label).toBe('Liberação declarada')
     // os motivos da triagem continuam em destaque: nada foi confirmado
     expect(a.destacarMotivos).toBe(true)

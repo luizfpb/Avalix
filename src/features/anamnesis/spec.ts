@@ -147,7 +147,7 @@ export const REGIAO_DOR: Option[] = [
 // lesões com diagnóstico médico/cirúrgico (histórico estruturado; o detalhe
 // do estado atual vai em texto livre)
 export const LESOES: Option[] = [
-  { value: 'lca', label: 'Ligamento cruzado anterior — LCA (joelho)' },
+  { value: 'lca', label: 'Ligamento cruzado anterior (LCA, joelho)' },
   { value: 'menisco', label: 'Menisco (joelho)' },
   { value: 'manguito', label: 'Manguito rotador (ombro)' },
   { value: 'luxacao_recidivante', label: 'Luxação recidivante ("articulação que sai do lugar")' },

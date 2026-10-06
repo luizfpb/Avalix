@@ -282,7 +282,7 @@ export function DangerZone({
       <div>
         <h2 className="text-sm font-semibold text-destructive">Excluir definitivamente</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Apaga este {termSingular} e todos os dados ligados a ele — avaliações, medidas, sessões,
+          Apaga este {termSingular} e todos os dados ligados a ele: avaliações, medidas, sessões,
           fotos e o registro de consentimento. As fotos são removidas do armazenamento. Esta ação é
           irreversível e atende ao direito de eliminação (LGPD).
         </p>

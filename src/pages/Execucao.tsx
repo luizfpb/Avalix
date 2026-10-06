@@ -165,7 +165,7 @@ export default function Execucao() {
         `Plano completo = ${plan.weeks} ${plan.weeks === 1 ? 'semana' : 'semanas'} × ${sessionsPerWeekCount} ` +
         `${sessionsPerWeekCount === 1 ? 'sessão' : 'sessões'} por semana.` +
         notaEmAndamento
-      : `Primeira semana em andamento — a adesão passa a ser calculada quando ela fechar. ` +
+      : `Primeira semana em andamento: a adesão passa a ser calculada quando ela fechar. ` +
         `Plano completo = ${plannedSessions(plan.weeks, sessionsPerWeekCount)} sessões.` +
         notaEmAndamento
   const progress = exerciseProgression(historyQuery.data ?? [])
@@ -263,7 +263,7 @@ export default function Execucao() {
             </div>
             {plannedToDate != null ? (
               <div className="h-2 rounded bg-muted">
-                <div className="h-2 rounded bg-primary" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
+                <div className="h-2 rounded bg-primary-solid" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
               </div>
             ) : null}
             <p className="text-xs text-muted-foreground">{adherenceCaption}</p>
@@ -277,7 +277,7 @@ export default function Execucao() {
                   ? ` · ${calendarWeek}ª semana desde ${formatDate(startedOn)}`
                   : ''}
                 {weekLag > 0
-                  ? ` — o mesociclo está ${weekLag} ${weekLag === 1 ? 'semana' : 'semanas'} atrás do calendário.`
+                  ? `. O mesociclo está ${weekLag} ${weekLag === 1 ? 'semana' : 'semanas'} atrás do calendário.`
                   : ''}
               </p>
             ) : null}
@@ -345,13 +345,13 @@ export default function Execucao() {
                   <div className="min-w-0">
                     <p className="truncate text-sm">{names[p.exerciseId] ?? 'Exercício'}</p>
                     <p className="text-xs text-muted-foreground">
-                      e1RM {roundToIncrement(p.latestE1rm).toFixed(1)} kg · melhor{' '}
-                      {roundToIncrement(p.bestE1rm).toFixed(1)} kg
+                      e1RM {roundToIncrement(p.latestE1rm).toFixed(1).replace('.', ',')} kg · melhor{' '}
+                      {roundToIncrement(p.bestE1rm).toFixed(1).replace('.', ',')} kg
                       {delta !== 0 ? (
                         <span className={delta > 0 ? 'text-primary' : 'text-warning'}>
                           {' '}
                           ({delta > 0 ? '+' : ''}
-                          {roundToIncrement(delta).toFixed(1)} kg)
+                          {roundToIncrement(delta).toFixed(1).replace('.', ',')} kg)
                         </span>
                       ) : null}
                     </p>
@@ -365,8 +365,8 @@ export default function Execucao() {
               )
             })}
           </ul>
-          <p className="text-[11px] text-muted-foreground">
-            e1RM estimado da melhor série de cada sessão (Epley). Estimativa — ver a calculadora em
+          <p className="text-xs text-muted-foreground">
+            e1RM estimado da melhor série de cada sessão (Epley). Estimativa: veja a calculadora em
             Ferramentas.
           </p>
         </section>
@@ -484,7 +484,7 @@ function LogRowItem({
             {/* O aluno salvou para continuar depois e não concluiu (0039): o
                 registro existe, mas não conta na adesão nem fecha a semana. */}
             {log.in_progress === true ? (
-              <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+              <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
                 não concluído
               </span>
             ) : null}
@@ -492,7 +492,7 @@ function LogRowItem({
                 audit_logs.user_id fica nulo: sem esta marca ninguém distingue
                 o registro dele do seu. */}
             {log.source === 'student' ? (
-              <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+              <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
                 registrado pelo aluno
               </span>
             ) : null}
@@ -581,7 +581,7 @@ function SetGrid({
 }) {
   return (
     <div className="mt-2 max-w-md space-y-1">
-      <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-[11px] text-muted-foreground sm:gap-2">
+      <div className="grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 text-center text-xs text-muted-foreground sm:gap-2">
         <span />
         <span>carga (kg)</span>
         <span>reps</span>
@@ -603,7 +603,7 @@ function SetGrid({
       <button
         type="button"
         onClick={onAddRow}
-        className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Plus className="size-3" /> série
       </button>
@@ -1283,7 +1283,7 @@ function LogForm({
         <span className="text-sm font-medium">
           {nome}
           {techniqueLabel(ex.technique) ? (
-            <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+            <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
               {techniqueLabel(ex.technique)}
             </span>
           ) : null}
@@ -1330,7 +1330,7 @@ function LogForm({
       },
       <span className="text-sm font-medium">
         {nome}
-        <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
           fora do plano
         </span>
       </span>,
@@ -1406,9 +1406,9 @@ function LogForm({
           </p>
         ) : null}
         {restored ? (
-          <div role="status" className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <div role="status" className="flex items-start justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
             <span>
-              Sessão não registrada recuperada deste aparelho — continue de onde parou.
+              Sessão não registrada recuperada deste aparelho. Continue de onde parou.
               {restored.lostRows > 0
                 ? ` ${restored.lostRows} ${restored.lostRows === 1 ? 'série ficou de fora porque o exercício saiu' : 'séries ficaram de fora porque os exercícios saíram'} do plano.`
                 : ''}
@@ -1443,7 +1443,7 @@ function LogForm({
               {days.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
-                  {d.name ? ` — ${d.name}` : ''}
+                  {d.name ? ` · ${d.name}` : ''}
                 </option>
               ))}
             </select>
@@ -1568,7 +1568,7 @@ function LogForm({
             de virar série perdida ou linha digitada no exercício errado. */}
         <div className="space-y-1.5 rounded-md border border-dashed p-2">
           <p className="text-xs text-muted-foreground">
-            Fez algo diferente do prescrito? Registre o exercício que foi feito de verdade — ele
+            Fez algo diferente do prescrito? Registre o exercício que foi feito de verdade: ele
             entra no histórico de carga do aluno.
           </p>
           <ExercisePicker
@@ -1642,7 +1642,7 @@ function weekHint(s: PlanWeekSuggestion): string {
         ? `Semana ${s.lastLoggedWeek} em andamento (${feitas}).`
         : `Continuando na semana ${s.lastLoggedWeek}, a do último treino.`
     case 'advance':
-      return `A semana ${s.lastLoggedWeek} fechou (${feitas}) — sugerindo a próxima.`
+      return `A semana ${s.lastLoggedWeek} fechou (${feitas}): sugerindo a próxima.`
     case 'end':
       return `A semana ${s.lastLoggedWeek} era a última do mesociclo e já fechou (${feitas}).`
   }

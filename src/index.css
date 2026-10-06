@@ -1,66 +1,53 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Inter: fonte única do app (textos, títulos e números). A marca AVALIX é
+   desenho em SVG e não depende dela; os PDFs seguem em Manrope (pdfFonts.ts). */
 @font-face {
-  font-family: "Manrope Variable";
+  font-family: "Inter Variable";
   font-style: normal;
   font-display: swap;
-  font-weight: 200 800;
-  src: url("@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
   unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "Manrope Variable";
+  font-family: "Inter Variable";
   font-style: normal;
   font-display: swap;
-  font-weight: 200 800;
-  src: url("@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2") format("woff2-variations");
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}
-
-@font-face {
-  font-family: "Newsreader Variable";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 800;
-  src: url("@fontsource-variable/newsreader/files/newsreader-latin-ext-wght-normal.woff2") format("woff2-variations");
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-@font-face {
-  font-family: "Newsreader Variable";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 800;
-  src: url("@fontsource-variable/newsreader/files/newsreader-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2-variations");
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 
 @custom-variant dark (&:is(.dark *));
 
 /* ===== LIGHT (toggle/sistema) ===== */
+/* Cinzas neutros. O roxo da marca aparece só no que se preenche (botão
+   principal, seleção: --primary-solid) e em texto de ação (--primary). */
 :root {
   --radius: 0.75rem;
-  --background: #f4f6f8;
-  --foreground: #18212b;
-  --card: #fbfcfd;
-  --card-foreground: #18212b;
+  --background: #f7f7f8;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
   --popover: #ffffff;
-  --popover-foreground: #18212b;
+  --popover-foreground: #18181b;
   --primary: #66539a;
+  --primary-solid: #66539a;
   --primary-foreground: #ffffff;
-  --secondary: #e9eef2;
-  --secondary-foreground: #25313d;
-  --muted: #edf1f4;
-  --muted-foreground: #66717e;
-  --accent: #edeaf5;
-  --accent-foreground: #4e3d7b;
+  --secondary: #f0f0f2;
+  --secondary-foreground: #27272a;
+  --muted: #f0f0f2;
+  --muted-foreground: #5f5f69;
+  --accent: #f0f0f2;
+  --accent-foreground: #18181b;
   --destructive: #bd3f4b;
   --destructive-foreground: #ffffff;
-  --border: #dce2e8;
-  --input: #cbd4dc;
-  --ring: #7663aa;
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #66539a;
   --success: #287a63;
   --warning: #885019;
   /* campo da marca (mesmo nos dois modos) */
@@ -75,32 +62,35 @@
 }
 
 /* ===== DARK (padrão) ===== */
+/* --primary é o lilás legível como texto sobre o fundo escuro; o que se
+   preenche usa --primary-solid, com texto branco. */
 .dark {
-  --background: #10151c;
-  --foreground: #edf1f5;
-  --card: #171e27;
-  --card-foreground: #edf1f5;
-  --popover: #1a222c;
-  --popover-foreground: #edf1f5;
-  --primary: #aa98d9;
-  --primary-foreground: #181124;
-  --secondary: #222b36;
-  --secondary-foreground: #e8edf2;
-  --muted: #1d252f;
-  --muted-foreground: #9ba6b2;
-  --accent: #28253a;
-  --accent-foreground: #eee9fa;
+  --background: #111113;
+  --foreground: #ececee;
+  --card: #18181b;
+  --card-foreground: #ececee;
+  --popover: #1c1c1f;
+  --popover-foreground: #ececee;
+  --primary: #a998e2;
+  --primary-solid: #6b55b8;
+  --primary-foreground: #ffffff;
+  --secondary: #232327;
+  --secondary-foreground: #e4e4e7;
+  --muted: #1f1f23;
+  --muted-foreground: #a1a1aa;
+  --accent: #232327;
+  --accent-foreground: #f4f4f5;
   --destructive: #ed7b84;
   --destructive-foreground: #260b0f;
-  --border: #2a3541;
-  --input: #35414e;
-  --ring: #aa98d9;
+  --border: #2b2b30;
+  --input: #3a3a40;
+  --ring: #a998e2;
   --success: #6fc3a6;
   --warning: #e0ad69;
   --brand: #2a0e52;
   --brand-foreground: #ece3fa;
   --brand-magenta: #d486a7;
-  --chart-1: #aa98d9;
+  --chart-1: #a998e2;
   --chart-2: #d486a7;
   --chart-3: #6fc3a6;
   --chart-4: #e0ad69;
@@ -119,6 +109,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-solid: var(--primary-solid);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -156,14 +147,12 @@
   body {
     @apply bg-background text-foreground antialiased;
     min-width: 320px;
-    font-family: "Manrope Variable", Manrope, ui-sans-serif, system-ui, sans-serif;
-    font-feature-settings: "ss02" 1, "cv11" 1;
+    font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   h1,
   h2,
   h3 {
-    font-family: "Newsreader Variable", Newsreader, Georgia, serif;
-    font-optical-sizing: auto;
+    letter-spacing: -0.011em;
   }
   button,
   a,
@@ -174,37 +163,6 @@
   }
   ::selection {
     background: color-mix(in oklab, var(--primary) 28%, transparent);
-  }
-}
-
-@layer utilities {
-  .font-display {
-    font-family: "Newsreader Variable", Newsreader, Georgia, serif;
-    font-optical-sizing: auto;
-  }
-
-  .measurement-field {
-    isolation: isolate;
-  }
-
-  .measurement-field::before {
-    background-image:
-      linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 9%, transparent) 1px, transparent 1px),
-      linear-gradient(to right, color-mix(in oklab, var(--primary) 8%, transparent) 1px, transparent 1px);
-    background-size: 100% 32px, 32px 100%;
-    content: "";
-    inset: 0;
-    mask-image: linear-gradient(to bottom, black, transparent 72%);
-    opacity: 0.45;
-    pointer-events: none;
-    position: absolute;
-    z-index: -1;
-  }
-
-  .surface-lift {
-    box-shadow:
-      0 1px 2px color-mix(in oklab, var(--foreground) 5%, transparent),
-      0 14px 36px color-mix(in oklab, var(--foreground) 6%, transparent);
   }
 }
 

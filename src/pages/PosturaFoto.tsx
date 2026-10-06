@@ -32,8 +32,8 @@ const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
 const HINTS: Record<Tool, string> = {
   move: 'Toque numa marca para selecioná-la; arraste os pontos para ajustar.',
   point: 'Clique na foto para marcar um ponto.',
-  line: 'Clique 2 pontos para traçar uma linha — mostra a inclinação em relação à horizontal.',
-  angle: 'Clique 3 pontos na ordem: 1ª ponta, vértice e 2ª ponta — mostra o ângulo.',
+  line: 'Clique 2 pontos para traçar uma linha. Mostra a inclinação em relação à horizontal.',
+  angle: 'Clique 3 pontos na ordem: 1ª ponta, vértice e 2ª ponta. Mostra o ângulo.',
 }
 
 export default function PosturaFoto() {
@@ -256,7 +256,7 @@ function PosturaFotoEditor() {
       <p className="text-xs text-muted-foreground">
         Ângulos e inclinações são calculados sobre a imagem (referência visual). Não substituem
         medição clínica. A deteção automática é uma sugestão de pontos (processada no seu
-        aparelho, a foto não sai do navegador) — ajuste ou apague qualquer marca antes de salvar.
+        aparelho, a foto não sai do navegador). Ajuste ou apague qualquer marca antes de salvar.
       </p>
 
       <ConfirmDialog

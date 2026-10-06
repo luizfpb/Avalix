@@ -300,7 +300,7 @@ function ShapeView({
         <Stroke d={`M ${a.x} ${a.y} L ${b.x} ${b.y}`} color={color} />
         <Vertex x={a.x} y={a.y} color={color} />
         <Vertex x={b.x} y={b.y} color={color} />
-        <Label x={(a.x + b.x) / 2 + 8} y={(a.y + b.y) / 2 - 8} text={`${tilt.toFixed(1)}°`} />
+        <Label x={(a.x + b.x) / 2 + 8} y={(a.y + b.y) / 2 - 8} text={`${tilt.toFixed(1).replace('.', ',')}°`} />
       </g>
     )
   }

@@ -57,7 +57,7 @@ describe('SessionSets', () => {
         ]}
       />
     )
-    expect(screen.getByText('42.5 kg')).toBeTruthy()
+    expect(screen.getByText('42,5 kg')).toBeTruthy()
     expect(screen.getByText('40 kg')).toBeTruthy()
   })
 

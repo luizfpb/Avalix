@@ -66,7 +66,7 @@ export function normalizeDbError(error: unknown): string {
     return 'Este registro está em uso por outro dado e não pode ser alterado ou excluído.'
   }
   if (code === '42501' || text.includes('row-level security')) {
-    return 'Ação bloqueada pelas regras de acesso — confira se o consentimento está vigente e se você tem permissão.'
+    return 'Ação bloqueada pelas regras de acesso. Confira se o consentimento está vigente e se você tem permissão.'
   }
   // 40001: conflito de concorrência otimista das RPCs save_* (migration 0023).
   // A mensagem do banco já vem em pt-BR e é específica (avaliação x plano),

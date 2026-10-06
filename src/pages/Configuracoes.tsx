@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import { Link } from 'react-router'
 import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
-import { User, ShieldCheck, Building2, Palette, Sun, Moon, Monitor, Dumbbell, Calculator, ChevronRight, ScrollText } from 'lucide-react'
+import { ShieldCheck, Sun, Moon, Monitor, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError, normalizeDbError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { roleLabel } from '../lib/roles'
 
 export default function Configuracoes() {
   const { user } = useAuth()
@@ -26,9 +27,7 @@ export default function Configuracoes() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <User className="size-4 text-muted-foreground" /> Conta
-          </CardTitle>
+          <CardTitle className="text-base">Conta</CardTitle>
         </CardHeader>
         <CardContent>
           <Info label="E-mail" value={user?.email ?? '-'} />
@@ -37,10 +36,7 @@ export default function Configuracoes() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="size-4 text-muted-foreground" /> Verificação em dois fatores
-            (2FA)
-          </CardTitle>
+          <CardTitle className="text-base">Verificação em dois fatores (2FA)</CardTitle>
         </CardHeader>
         <CardContent>
           <MfaSettings />
@@ -49,87 +45,58 @@ export default function Configuracoes() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="size-4 text-muted-foreground" /> Organização
-          </CardTitle>
+          <CardTitle className="text-base">Organização</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Info label="Nome" value={organization?.name ?? '-'} />
-            <Info label="Seu papel" value={role ?? '-'} />
+            <Info label="Seu papel" value={roleLabel(role)} />
           </div>
           <LogoSettings />
           <ContactSettings />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Dumbbell className="size-4 text-muted-foreground" /> Biblioteca de exercícios
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Link
-            to="/exercicios"
-            className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent"
-          >
-            <span>
-              Gerenciar exercícios
-              <span className="block text-xs text-muted-foreground">
-                Catálogo global + os exercícios criados pela sua organização
-              </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </Link>
-        </CardContent>
-      </Card>
-
-      {role === 'owner' || role === 'admin' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ScrollText className="size-4 text-muted-foreground" /> Auditoria
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Link
-              to="/auditoria"
-              className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent"
-            >
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Outras áreas</h2>
+        <ul className="divide-y overflow-hidden rounded-lg border bg-card">
+          <li>
+            <Link to="/exercicios" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
               <span>
-                Trilha de auditoria e erros
+                Biblioteca de exercícios
                 <span className="block text-xs text-muted-foreground">
-                  Quem fez o quê e quando (LGPD) + erros do aplicativo
+                  Catálogo global e os exercícios criados pela sua organização
                 </span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </Link>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Calculator className="size-4 text-muted-foreground" /> Ferramentas
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Link
-            to="/ferramentas/1rm"
-            className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-accent"
-          >
-            <span>
-              Calculadora de carga (1RM)
-              <span className="block text-xs text-muted-foreground">
-                Estima 1RM por carga×reps e gera a tabela de %1RM
+          </li>
+          {role === 'owner' || role === 'admin' ? (
+            <li>
+              <Link to="/auditoria" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
+                <span>
+                  Trilha de auditoria e erros
+                  <span className="block text-xs text-muted-foreground">
+                    Quem fez o quê e quando (LGPD) e os erros do aplicativo
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </li>
+          ) : null}
+          <li>
+            <Link to="/ferramentas/1rm" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
+              <span>
+                Calculadora de carga (1RM)
+                <span className="block text-xs text-muted-foreground">
+                  Estima o 1RM por carga×reps e gera a tabela de %1RM
+                </span>
               </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </Link>
-        </CardContent>
-      </Card>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </li>
+        </ul>
+      </section>
     </div>
   )
 }
@@ -296,7 +263,7 @@ function LogoSettings() {
         ) : null}
       </div>
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-      <p className="text-[11px] text-muted-foreground">PNG, JPEG ou WebP, até 1 MB.</p>
+      <p className="text-xs text-muted-foreground">PNG, JPEG ou WebP, até 1 MB.</p>
     </div>
   )
 }
@@ -312,12 +279,10 @@ function AppearanceCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Palette className="size-4 text-muted-foreground" /> Aparência
-        </CardTitle>
+        <CardTitle className="text-base">Aparência</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="inline-flex rounded-md border bg-card p-1" role="radiogroup" aria-label="Tema da interface">
+        <div className="inline-flex rounded-md bg-muted p-1" role="radiogroup" aria-label="Tema da interface">
           {THEME_OPTS.map((o) => (
             <button
               key={o.v}
@@ -328,7 +293,7 @@ function AppearanceCard() {
               className={[
                 'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
                 theme === o.v
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
               ].join(' ')}
             >
@@ -524,7 +489,7 @@ function MfaSettings() {
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
-        Não ativada. Recomendada para proteger os dados sensíveis dos avaliados.
+        Não ativada. Recomendada para proteger os dados de saúde guardados na sua conta.
       </p>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <Button size="sm" onClick={startEnroll} disabled={busy}>

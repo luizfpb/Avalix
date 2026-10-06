@@ -12,7 +12,7 @@ export function UnsavedBadge() {
   return (
     <span className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
       <CircleDot className="size-3.5 shrink-0" aria-hidden />
-      Alterações não salvas — guardadas neste aparelho
+      Alterações não salvas, guardadas neste aparelho
     </span>
   )
 }
@@ -33,7 +33,7 @@ export function UnsavedChangesPrompt({
       description={
         <>
           Suas alterações {what} ainda não foram enviadas. Elas ficam guardadas neste aparelho por
-          24 horas e voltam quando você abrir esta tela de novo — mas não estão no servidor e
+          24 horas e voltam quando você abrir esta tela de novo, mas não estão no servidor e
           ninguém mais as vê.
         </>
       }

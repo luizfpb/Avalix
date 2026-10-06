@@ -20,7 +20,7 @@ export function PendenciasBar({ answers }: { answers: AnamnesisAnswers }) {
 
   if (total === 0) {
     return (
-      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-success/10 px-4 py-2.5 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-[color-mix(in_oklab,var(--success)_10%,var(--background))] px-4 py-2.5">
         <p className="flex items-center gap-2 text-sm font-medium text-success">
           <CheckCircle2 className="size-4 shrink-0" aria-hidden />
           Tudo o que é obrigatório já foi respondido.
@@ -32,7 +32,7 @@ export function PendenciasBar({ answers }: { answers: AnamnesisAnswers }) {
   return (
     <div
       role="status"
-      className="sticky bottom-0 z-10 -mx-4 space-y-1.5 border-t bg-background/95 px-4 py-2.5 backdrop-blur"
+      className="sticky bottom-0 z-10 -mx-4 space-y-1.5 border-t bg-background px-4 py-2.5"
     >
       <p className="flex items-center gap-2 text-sm font-medium">
         <ListChecks className="size-4 shrink-0 text-warning" aria-hidden />

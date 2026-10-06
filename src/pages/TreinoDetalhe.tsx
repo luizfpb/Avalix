@@ -58,7 +58,7 @@ function formatDate(iso: string | null): string | null {
 }
 
 function fmtSets(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -528,7 +528,7 @@ export default function TreinoDetalhe() {
                 <span>
                   <span className="text-muted-foreground">Avaliação física: </span>
                   {formatDate(srcAssessment.assessed_at)}
-                  {srcBodyFat != null ? ` · ${srcBodyFat.toFixed(1)}% gordura` : ''}
+                  {srcBodyFat != null ? ` · ${srcBodyFat.toFixed(1).replace('.', ',')}% gordura` : ''}
                 </span>
                 <Link
                   to={`/avaliados/${id}/avaliacoes/${srcAssessment.id}`}
@@ -576,7 +576,7 @@ export default function TreinoDetalhe() {
               <CardHeader>
                 <CardTitle className="text-base">
                   Treino {day.label}
-                  {day.name ? <span className="text-muted-foreground"> — {day.name}</span> : null}
+                  {day.name ? <span className="text-muted-foreground"> · {day.name}</span> : null}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -591,7 +591,7 @@ export default function TreinoDetalhe() {
                           <span>
                             {block.start + j + 1}. {exName}
                             {tecnica ? (
-                              <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                              <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
                                 {tecnica}
                               </span>
                             ) : null}
@@ -762,7 +762,7 @@ function DuplicatePanel({
           </select>
           {targetSubjectId !== currentSubjectId ? (
             <p className="text-xs text-muted-foreground">
-              A avaliação/postura de origem não é copiada para outro avaliado.
+              A avaliação/postura de origem não é copiada para outra pessoa.
             </p>
           ) : null}
         </div>

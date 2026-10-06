@@ -65,14 +65,14 @@ export function OneRmCalculator() {
 
       {e1rm > 0 ? (
         <>
-          <div className="rounded-md border bg-primary/5 p-3">
+          <div className="rounded-md border bg-muted/50 p-3">
             <span className="text-xs text-muted-foreground">
               1RM estimado ({ONE_RM_FORMULA_LABELS[formula]})
             </span>
             <p className="text-2xl font-semibold text-primary">
-              {roundToIncrement(e1rm).toFixed(1)} kg{' '}
+              {roundToIncrement(e1rm).toFixed(1).replace('.', ',')} kg{' '}
               <span className="text-sm font-normal text-muted-foreground">
-                (~{e1rm.toFixed(1)})
+                (~{e1rm.toFixed(1).replace('.', ',')})
               </span>
             </p>
           </div>
@@ -91,7 +91,7 @@ export function OneRmCalculator() {
                   <tr key={row.pct} className="border-t">
                     <td className="px-3 py-1 tabular-nums">{row.pct}%</td>
                     <td className="px-3 py-1 text-right font-medium tabular-nums">
-                      {roundToIncrement(row.load).toFixed(1)}
+                      {roundToIncrement(row.load).toFixed(1).replace('.', ',')}
                     </td>
                     <td className="px-3 py-1 text-right tabular-nums text-muted-foreground">
                       {row.reps}
@@ -102,9 +102,9 @@ export function OneRmCalculator() {
             </table>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             Estimativa (cargas arredondadas para 2,5 kg). A precisão cai acima de ~10–12
-            repetições — use uma série mais pesada para um 1RM mais confiável.
+            repetições. Use uma série mais pesada para um 1RM mais confiável.
           </p>
         </>
       ) : (

@@ -131,7 +131,7 @@ describe('buildAnamnesePrompt — triagem como entrada fixa', () => {
 
   it('triagem incompleta não publica liberação ou encaminhamento calculados', () => {
     const p = prompt({ ...anamneseBase(), ativo_regular: null })
-    expect(p).toContain('Estado da triagem: incompleta — liberação não calculada')
+    expect(p).toContain('Estado da triagem: incompleta: liberação não calculada')
     expect(p).toContain('Liberado na triagem: não calculado')
     expect(p).toContain('Nível de encaminhamento: não calculado')
   })

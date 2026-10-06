@@ -77,7 +77,7 @@ export function WeeksCard({
                   <p className="text-xs text-muted-foreground">
                     Ajuste séries/reps/RIR/descanso ou marque pular. Em branco = igual ao template.
                   </p>
-                  <div className="hidden items-center gap-2 px-1 text-[11px] text-muted-foreground sm:flex">
+                  <div className="hidden items-center gap-2 px-1 text-xs text-muted-foreground sm:flex">
                     <span className="w-36">Exercício</span>
                     <span className="w-14 text-center">séries</span>
                     <span className="w-16 text-center">reps</span>

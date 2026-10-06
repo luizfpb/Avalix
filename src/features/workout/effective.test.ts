@@ -109,7 +109,7 @@ describe('effectiveDiff', () => {
   })
 
   it('séries fracionadas saem com uma casa', () => {
-    expect(effectiveDiff(base, over({ sets: 2.5 }))).toEqual(['2.5 séries'])
+    expect(effectiveDiff(base, over({ sets: 2.5 }))).toEqual(['2,5 séries'])
   })
 
   it('nota da semana entra quando difere da nota do exercício', () => {

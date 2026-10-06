@@ -58,7 +58,7 @@ function WorkoutLinkCardContent({
 
   const mensagem =
     `${orgName ? `${orgName}: ` : ''}${primeiroNome}, este é o seu treino. ` +
-    'Abra pelo link, marque as séries conforme for fazendo e salve no fim — funciona até sem internet.'
+    'Abra pelo link, marque as séries conforme for fazendo e salve no fim. Funciona até sem internet.'
 
   async function emitir() {
     setErro(null)
@@ -175,7 +175,7 @@ function WorkoutLinkCardContent({
         description={
           `O link atual para de funcionar no celular de ${primeiroNome}` +
           (link?.last_seen_at ? `, que abriu o treino ${desde(link.last_seen_at)}` : '') +
-          '. Treinos que ele registrou sem internet e ainda não subiram saem do aparelho dele — a tela mostra os dados para ele copiar e mandar a você. Se o link atual ainda funciona, prefira copiá-lo ou reenviá-lo.'
+          '. Treinos que ele registrou sem internet e ainda não subiram saem do aparelho dele, e a tela mostra os dados para ele copiar e mandar a você. Se o link atual ainda funciona, prefira copiá-lo ou reenviá-lo.'
         }
         confirmLabel="Emitir link novo"
         cancelLabel="Voltar"

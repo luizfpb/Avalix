@@ -99,14 +99,14 @@ export function suggestProgression(input: {
         kind: 'hold',
         suggestedWeightKg: w,
         suggestedReps: repRange.min,
-        reason: `Ficou abaixo da faixa/RIR, mas a carga já é a menor — manter e reconstruir a partir de ${repRange.min} reps.`,
+        reason: `Ficou abaixo da faixa/RIR, mas a carga já é a menor: manter e reconstruir a partir de ${repRange.min} reps.`,
       }
     }
     return {
       kind: 'reduce',
       suggestedWeightKg: menor,
       suggestedReps: repRange.min,
-      reason: `Ficou abaixo da faixa/RIR — reduzir ${fmtKg(step)} kg e reconstruir.`,
+      reason: `Ficou abaixo da faixa/RIR: reduzir ${fmtKg(step)} kg e reconstruir.`,
     }
   }
 
@@ -118,7 +118,7 @@ export function suggestProgression(input: {
       kind: 'increase_load',
       suggestedWeightKg: roundKg(w + step),
       suggestedReps: repRange.min,
-      reason: `Bateu ${repRange.max} reps com RIR ≥ alvo — +${fmtKg(step)} kg e voltar a ${repRange.min} reps.`,
+      reason: `Bateu ${repRange.max} reps com RIR ≥ alvo: +${fmtKg(step)} kg e voltar a ${repRange.min} reps.`,
     }
   }
 
@@ -130,7 +130,7 @@ export function suggestProgression(input: {
       kind: 'hold',
       suggestedWeightKg: w,
       suggestedReps: r,
-      reason: `Chegou a ${r} reps, mas com RIR abaixo do alvo — manter carga e repetições até sobrar folga.`,
+      reason: `Chegou a ${r} reps, mas com RIR abaixo do alvo: manter carga e repetições até sobrar folga.`,
     }
   }
 

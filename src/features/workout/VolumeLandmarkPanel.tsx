@@ -29,7 +29,7 @@ function zoneTextClass(zone: LandmarkZone | null): string {
 }
 
 function fmtSets(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
 function Row({ item }: { item: VolumeItem }) {
@@ -67,7 +67,7 @@ function Row({ item }: { item: VolumeItem }) {
       <span className="w-7 shrink-0 text-right text-xs font-semibold tabular-nums">
         {fmtSets(item.sets)}
       </span>
-      <span className={`w-24 shrink-0 text-right text-[11px] ${zoneTextClass(bar.zone)}`}>
+      <span className={`w-24 shrink-0 text-right text-xs ${zoneTextClass(bar.zone)}`}>
         {bar.zone ? ZONE_LABELS[bar.zone] : 'sem referência'}
       </span>
     </div>
@@ -106,7 +106,7 @@ export function VolumeLandmarkPanel({
                 onClick={() => setMethod('fractional')}
                 className={
                   method === 'fractional'
-                    ? 'bg-primary px-2 py-1 text-primary-foreground'
+                    ? 'bg-primary-solid px-2 py-1 text-primary-foreground'
                     : 'px-2 py-1 text-muted-foreground hover:bg-accent'
                 }
               >
@@ -117,7 +117,7 @@ export function VolumeLandmarkPanel({
                 onClick={() => setMethod('refined')}
                 className={
                   method === 'refined'
-                    ? 'bg-primary px-2 py-1 text-primary-foreground'
+                    ? 'bg-primary-solid px-2 py-1 text-primary-foreground'
                     : 'px-2 py-1 text-muted-foreground hover:bg-accent'
                 }
               >
@@ -136,7 +136,7 @@ export function VolumeLandmarkPanel({
               <Row key={it.muscle} item={it} />
             ))}
             {/* legenda das zonas */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
               <LegendDot color="var(--warning)" label="abaixo do mínimo" />
               <LegendDot color="var(--primary)" label="efetivo / ótimo" />
               <LegendDot color="var(--chart-2)" label="alto" />
@@ -147,7 +147,7 @@ export function VolumeLandmarkPanel({
             </div>
             {refined ? (
               <div className="space-y-1 rounded-md bg-muted/40 p-2">
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   {VOLUME_METHOD_NOTE_REFINED}
                 </p>
                 <div className="flex flex-col gap-0.5 pt-0.5">
@@ -157,7 +157,7 @@ export function VolumeLandmarkPanel({
                       href={r.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[11px] text-primary hover:underline"
+                      className="text-xs text-primary hover:underline"
                     >
                       {r.label}
                     </a>
@@ -165,9 +165,9 @@ export function VolumeLandmarkPanel({
                 </div>
               </div>
             ) : (
-              <p className="text-[11px] leading-relaxed text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{VOLUME_METHOD_NOTE}</p>
             )}
-            <p className="text-[11px] leading-relaxed text-muted-foreground">{VOLUME_LANDMARKS_NOTE}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{VOLUME_LANDMARKS_NOTE}</p>
           </>
         )}
       </CardContent>
