@@ -217,6 +217,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
         </div>
       ) : null}
 
+      {/* Travado enquanto salva: a resposta leva para o detalhe, e o que fosse
+          digitado depois do clique ficava fora do envio e sumia sem aviso. */}
+      <fieldset disabled={mut.isPending} className="min-w-0 space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="anamnesis-date">Data da anamnese</Label>
@@ -263,6 +266,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
           Confirmo o consentimento para o tratamento dos dados de saúde (LGPD).
         </label>
       </div>
+      </fieldset>
 
       {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 

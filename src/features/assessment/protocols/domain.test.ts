@@ -30,35 +30,46 @@ const JP7_OK = {
 } // soma 100 mm
 
 describe('medidas impossiveis viram erro, nao NaN', () => {
-  it('US Navy recusa cintura menor que o pescoco (antes devolvia NaN)', () => {
+  it('US Navy recusa abdomen menor que o pescoco (antes devolvia NaN)', () => {
     expect(() =>
       computeProtocol(
         'usNavy',
-        input({ circumferencesCm: { neck: 42, waist: 40 } })
+        input({ circumferencesCm: { neck: 42, abdomen: 40 } })
       )
     ).toThrow(ProtocolDomainError)
     try {
-      computeProtocol('usNavy', input({ circumferencesCm: { neck: 42, waist: 40 } }))
+      computeProtocol('usNavy', input({ circumferencesCm: { neck: 42, abdomen: 40 } }))
     } catch (e) {
       expect((e as ProtocolDomainError).code).toBe('medida-impossivel')
+      expect((e as Error).message).toMatch(/o abdômen precisa ser maior que o pescoço/)
       expect((e as Error).message).toMatch(/trocados/i)
     }
   })
 
-  it('US Navy recusa cintura igual ao pescoco (antes devolvia -450%)', () => {
+  it('US Navy recusa abdomen igual ao pescoco (antes devolvia -450%)', () => {
     expect(() =>
-      computeProtocol('usNavy', input({ circumferencesCm: { neck: 42, waist: 42 } }))
+      computeProtocol('usNavy', input({ circumferencesCm: { neck: 42, abdomen: 42 } }))
     ).toThrow(ProtocolDomainError)
   })
 
+  it('na mulher, a medida conferida contra o pescoco e a cintura', () => {
+    try {
+      computeProtocol('usNavy', input({ sex: 'F', heightCm: 165, circumferencesCm: { neck: 34, waist: 33, hip: 95 } }))
+      throw new Error('deveria ter lancado')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ProtocolDomainError)
+      expect((e as Error).message).toMatch(/a cintura precisa ser maior que o pescoço/)
+    }
+  })
+
   it('US Navy recusa o combo que produzia gordura negativa em aluno magro', () => {
-    // 180 cm, pescoco 42, cintura 70 -> -2,0% pela equacao. Perfil real de
+    // 180 cm, pescoco 42, abdomen 70 -> -2,0% pela equacao. Perfil real de
     // aluno avancado, nao absurdo: por isso precisa de erro claro e nao de um
     // numero negativo impresso no laudo.
     try {
       computeProtocol(
         'usNavy',
-        input({ heightCm: 180, circumferencesCm: { neck: 42, waist: 70 } })
+        input({ heightCm: 180, circumferencesCm: { neck: 42, abdomen: 70 } })
       )
       throw new Error('deveria ter lancado')
     } catch (e) {
@@ -70,7 +81,7 @@ describe('medidas impossiveis viram erro, nao NaN', () => {
   it('US Navy continua calculando um caso normal', () => {
     const r = computeProtocol(
       'usNavy',
-      input({ heightCm: 180, circumferencesCm: { neck: 38, waist: 85 } })
+      input({ heightCm: 180, circumferencesCm: { neck: 38, abdomen: 85 } })
     )
     expect(r.bodyFatPct).toBeCloseTo(16.1, 1)
     expect(r.warnings).toEqual([])

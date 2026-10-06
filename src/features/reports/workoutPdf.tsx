@@ -232,6 +232,12 @@ const LARGURA_NOME_EXERCICIO = 595 - 34 * 2 - 9 * 2 - 24 - 35 - 50 - 29 - 46 - 8
 // Linha do link de vídeo: margem + uma linha de 7 pt.
 const ALTURA_LINK_VIDEO = 3 + 7 * 1.4
 
+// Cabeçalho da tabela (Exercício, Séries...): 5 pt em cima e embaixo, uma
+// linha de 7 pt e o fio. Faixa de super-série ou circuito: a mesma conta, com
+// folga para a linha de 7,5 pt.
+const ALTURA_CABECALHO_TABELA = 20
+const ALTURA_FAIXA_GRUPO = 28
+
 export function estimateWorkoutExerciseHeight(
   ex: WorkoutExerciseRow,
   name: string,
@@ -285,11 +291,50 @@ function DayCard({
   const rowHeight = (ex: WorkoutExerciseRow) =>
     estimateWorkoutExerciseHeight(ex, names[ex.exercise_id] ?? 'Exercício', tempo, !!videos?.[ex.exercise_id])
   const headerHeight = 26 + estimateTextHeight({ text: name, fontSize: 14, lineHeight: 1.25, width: 470 })
-  const parte = headerHeight + 35 + rows.reduce((h, ex) => h + rowHeight(ex), 0) + blocks.filter((b) => b.kind).length * 28 > LIMITE_CARTAO_ATOMICO
+  const parte = headerHeight + 35 + rows.reduce((h, ex) => h + rowHeight(ex), 0) + blocks.filter((b) => b.kind).length * ALTURA_FAIXA_GRUPO > LIMITE_CARTAO_ATOMICO
 
-  return (
-    <View style={styles.dayCard} wrap={parte}>
-      <View style={styles.dayHeader} wrap={headerHeight > LIMITE_CARTAO_ATOMICO} minPresenceAhead={48}>
+  // Faixas fixed aninhadas em tabelas fixed corrompem a paginação do
+  // renderer. Grupos extensos são segmentados entre exercícios, com a mesma
+  // instrução e a indicação de continuação em cada segmento.
+  const segmentos = blocks.map((block) => {
+    if (block.kind == null) return []
+    const starts = [0]
+    let height = ALTURA_FAIXA_GRUPO
+    block.items.forEach((ex, i) => {
+      const nextHeight = rowHeight(ex)
+      if (i > starts[starts.length - 1] && height + nextHeight > 340) {
+        starts.push(i)
+        height = ALTURA_FAIXA_GRUPO
+      }
+      height += nextHeight
+    })
+    return starts.map((start, segment) => {
+      const end = starts[segment + 1] ?? block.items.length
+      const altura = ALTURA_FAIXA_GRUPO + block.items.slice(start, end).reduce((h, ex) => h + rowHeight(ex), 0)
+      return { start, end, altura }
+    })
+  })
+
+  // O título da divisão só fica no pé da folha se couber, embaixo dele, o
+  // cabeçalho da tabela e o primeiro bloco que o renderer não parte: a linha
+  // do primeiro exercício ou, se a divisão abre com super-série ou circuito,
+  // o primeiro segmento inteiro. Bloco que pode partir (texto maior que uma
+  // folha) só precisa do começo. Com 48 pt fixos, o título e o cabeçalho
+  // ficavam sozinhos no fim da página e o primeiro exercício ia para a
+  // seguinte (auditoria de 06/10/2026, A12).
+  const inteiro = (altura: number) => (altura <= LIMITE_CARTAO_ATOMICO ? altura : 60)
+  const primeiroSegmento = segmentos[0]?.[0]
+  const primeiraUnidade = !blocks[0] || rows.length === 0
+    ? 0
+    : blocks[0].kind == null
+      ? inteiro(rowHeight(blocks[0].items[0]))
+      : primeiroSegmento && primeiroSegmento.altura <= LIMITE_CARTAO_ATOMICO
+        ? primeiroSegmento.altura
+        : ALTURA_FAIXA_GRUPO + inteiro(rowHeight(blocks[0].items[0]))
+  const presencaDoTitulo = Math.max(48, ALTURA_CABECALHO_TABELA + primeiraUnidade)
+
+  const titulo = (
+      <View style={styles.dayHeader} wrap={headerHeight > LIMITE_CARTAO_ATOMICO} minPresenceAhead={presencaDoTitulo}>
         <View style={styles.dayBadge}>
           <Text style={styles.dayBadgeText}>{day.label}</Text>
         </View>
@@ -303,7 +348,10 @@ function DayCard({
           </Text>
         </View>
       </View>
+  )
 
+  const tabela = (
+    <>
       {/* O rótulo da divisão vai junto na coluna do exercício: na continuação
           de um cartão que partiu, o selo "A" ficou na página anterior. */}
       <View style={styles.thead} fixed={parte}>
@@ -315,7 +363,7 @@ function DayCard({
         <Text style={[styles.th, styles.colRest]}>Pausa</Text>
       </View>
 
-      {blocks.map((block) => {
+      {blocks.map((block, b) => {
         const linhas = block.items.map((ex, j) => {
           const i = block.start + j
           const sub = exerciseSub(ex, tempo)
@@ -353,24 +401,13 @@ function DayCard({
           )
         })
         if (block.kind == null) return linhas
-        // Faixas fixed aninhadas em tabelas fixed corrompem a paginação do
-        // renderer. Grupos extensos são segmentados entre exercícios, com a
-        // mesma instrução e a indicação de continuação em cada segmento.
-        const starts = [0]
-        let height = 28
-        block.items.forEach((ex, i) => {
-          const nextHeight = rowHeight(ex)
-          if (i > starts[starts.length - 1] && height + nextHeight > 340) {
-            starts.push(i)
-            height = 28
-          }
-          height += nextHeight
-        })
-        return starts.map((start, segment) => {
-          const end = starts[segment + 1] ?? block.items.length
-          const segmentHeight = 28 + block.items.slice(start, end).reduce((h, ex) => h + rowHeight(ex), 0)
+        return segmentos[b].map(({ start, end, altura }, segment) => {
           return (
-            <View key={`${block.key}-${start}`} wrap={segmentHeight > LIMITE_CARTAO_ATOMICO}>
+            <View key={`${block.key}-${start}`} wrap={altura > LIMITE_CARTAO_ATOMICO}>
+              {/* Marcador de altura zero: no paginador do react-pdf, o
+                  minPresenceAhead não vale para o primeiro filho de um
+                  contêiner. Só o segmento que pode partir precisa dele. */}
+              {altura > LIMITE_CARTAO_ATOMICO ? <View /> : null}
               <View style={styles.groupBand} minPresenceAhead={32}>
                 <Text style={styles.groupBandName}>
                   {groupLabel(block.kind!, block.items.length)}{segment > 0 ? ' · continuação' : ''} · {groupHint(block.kind!, block.items.length)}
@@ -381,7 +418,28 @@ function DayCard({
           )
         })
       })}
-    </View>
+    </>
+  )
+
+  // Divisão curta: um bloco só, que muda de página inteiro.
+  if (!parte) {
+    return (
+      <View style={styles.dayCard} wrap={false}>
+        {titulo}
+        {tabela}
+      </View>
+    )
+  }
+  // Divisão que parte: o título fica fora do contêiner da tabela. No
+  // paginador do react-pdf, o minPresenceAhead não vale para o primeiro filho
+  // de um contêiner, e quem quebra leva junto os irmãos fixos para a página de
+  // cima: dentro do cartão, o título ou ficava no pé da folha ou deixava lá
+  // sozinho o cabeçalho da tabela, que é fixo para repetir nas continuações.
+  return (
+    <>
+      {titulo}
+      <View style={styles.dayCard}>{tabela}</View>
+    </>
   )
 }
 
@@ -716,6 +774,10 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
         ) : null}
 
         <View style={styles.section}>
+          {/* Marcador de altura zero: sem ele, o título da primeira divisão
+              seria o primeiro filho da seção e o minPresenceAhead não valeria
+              (ver DayCard). */}
+          <View />
           {hasVideos ? (
             <Text style={styles.intro}>
               Toque no nome do exercício ou em “Ver vídeo da execução” para assistir à demonstração no YouTube.

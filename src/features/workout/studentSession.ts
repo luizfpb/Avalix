@@ -12,6 +12,7 @@ import {
   markSessionRetry,
   readQueue,
   saveStudentToken,
+  type DraftSession,
   type QueuedSession,
   type StudentStorageAccess,
 } from './studentStore'
@@ -160,7 +161,17 @@ export function isTransientStudentError(error: unknown): boolean {
   if (detail.status === 408 || detail.status === 425 || detail.status === 429 || (detail.status ?? 0) >= 500) return true
   if (/^(08|53|57)/.test(detail.code ?? '') || ['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003', '40001', '40P01'].includes(detail.code ?? '')) return true
   const message = (detail.message ?? String(error ?? '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-  return /schema cache|statement timeout|too many requests|rate limit|muitas requisicoes|muitas tentativas/.test(message)
+  // "muitas gravacoes" \u00e9 a cota de 30 envios por hora do pr\u00f3prio link (0039):
+  // chega como exce\u00e7\u00e3o comum (P0001, HTTP 400), e n\u00e3o como 429. Tratada como
+  // recusa definitiva, a sess\u00e3o nunca mais subia depois que a janela passava.
+  return /schema cache|statement timeout|too many requests|rate limit|muitas requisicoes|muitas tentativas|muitas gravacoes/.test(message)
+}
+
+// Item da fila que ainda vai subir: sem erro, ou com um erro passageiro (o
+// motivo fica gravado at\u00e9 a pr\u00f3xima tentativa). O resto \u00e9 recusa definitiva,
+// que a tela mostra para copiar ou descartar.
+export function isQueuedSessionPending(item: Pick<QueuedSession, 'error'>): boolean {
+  return !item.error || isTransientStudentError({ message: item.error })
 }
 
 export function isInvalidStudentLinkError(error: unknown): boolean {
@@ -202,7 +213,7 @@ export async function flushQueue(token: string, scope: string, access?: StudentS
 
   for (const item of queue) {
     if (!isStudentStorageAccessCurrent(lease)) throw new StudentAccessEndedError()
-    if (item.error && !isTransientStudentError({ message: item.error })) continue
+    if (!isQueuedSessionPending(item)) continue
     if (!force && (item.retryAt ?? 0) > Date.now()) continue
     let submitted: Awaited<ReturnType<typeof submitSession>>
     try {
@@ -255,6 +266,79 @@ export async function flushQueue(token: string, scope: string, access?: StudentS
 
   result.pending = (await readQueue(scope)).filter((q) => !q.error).length
   return result
+}
+
+function numeroDoCampo(raw: string | undefined): number | null {
+  const texto = (raw ?? '').trim()
+  return texto === '' ? null : Number(texto)
+}
+
+// Rascunho de um treino não concluído, no formato da fila, para o resgate
+// antes da purga (link revogado ou vencido): a cópia mostra o que a pessoa já
+// tinha marcado. As linhas são do plano; a identidade do rascunho diz qual
+// exercício do catálogo cada uma é, e o pacote cobre o rascunho antigo sem
+// ela. Linha sem carga e sem repetições não entra, como no envio; número
+// ilegível também não, porque aqui não há a quem avisar.
+export function draftAsQueuedSession(
+  draft: DraftSession,
+  exercises: { id: string; exercise_id: string }[],
+  days: { id: string; label: string }[]
+): QueuedSession | null {
+  const doPacote = new Map(exercises.map((ex) => [ex.id, ex.exercise_id]))
+  const contador = new Map<string, number>()
+  const sets: SubmitSet[] = []
+  for (const [rowId, rows] of Object.entries(draft.rows)) {
+    const exerciseId = draft.identity?.rowExercises[rowId] ?? doPacote.get(rowId)
+    if (!exerciseId) continue
+    for (const row of rows) {
+      const weight = numeroDoCampo(row.weight)
+      const reps = numeroDoCampo(row.reps)
+      const rir = numeroDoCampo(row.rir)
+      const rest = numeroDoCampo(row.rest)
+      if (weight == null && reps == null) continue
+      if ([weight, reps, rir, rest].some((n) => n != null && !Number.isFinite(n))) continue
+      const n = (contador.get(exerciseId) ?? 0) + 1
+      contador.set(exerciseId, n)
+      sets.push({
+        exercise_id: exerciseId,
+        set_number: n,
+        weight_kg: weight,
+        reps,
+        rir,
+        rest_seconds: rest,
+        reached_failure: row.failure ?? null,
+      })
+    }
+  }
+  if (sets.length === 0) return null
+  return {
+    clientRef: draft.clientRef,
+    revision: draft.revision,
+    planId: draft.planId,
+    dayLabel: draft.identity?.dayLabel ?? days.find((day) => day.id === draft.dayId)?.label ?? null,
+    weekNumber: draft.weekNumber,
+    performedAt: draft.performedAt,
+    notes: draft.notes.trim() || null,
+    feel: draft.feel ?? null,
+    inProgress: true,
+    sets,
+    queuedAt: '',
+  }
+}
+
+// O que oferecer para copiar quando o link deixa de valer: a fila, o envio
+// que o servidor acabou de recusar e os rascunhos. A mesma sessão pode estar
+// em mais de um lugar ("salvar progresso" sem internet fica na fila e no
+// rascunho, que continua andando): vale a revisão mais nova e, no empate, a
+// primeira lista, que é a fila. Sessão sem série não tem o que copiar.
+export function sessionsToRescue(...lists: QueuedSession[][]): QueuedSession[] {
+  const porRef = new Map<string, QueuedSession>()
+  for (const item of lists.flat()) {
+    if (item.sets.length === 0) continue
+    const atual = porRef.get(item.clientRef)
+    if (!atual || (item.revision ?? 0) > (atual.revision ?? 0)) porRef.set(item.clientRef, item)
+  }
+  return [...porRef.values()]
 }
 
 // Achata a grade da tela (linhas por exercício) no formato da RPC, numerando as

@@ -10,6 +10,7 @@ export {
   ENGINE_VERSION,
   PROTOCOLS,
   listProtocols,
+  circumferenceSitesFor,
   computeProtocol,
   protocolLabel,
   type ProtocolMeta,

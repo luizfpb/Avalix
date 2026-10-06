@@ -576,6 +576,20 @@ export async function readDraft(
   return selected
 }
 
+// Todas as sessões em rascunho de um plano, só para leitura. Serve ao resgate
+// antes da purga (link revogado ou vencido): readDraft migra o bucket numa
+// transação de escrita, e aqui não há o que migrar, só o que mostrar ao aluno
+// antes de apagar tudo.
+export async function readDraftSessions(scope: string, planId: string | null): Promise<DraftSession[]> {
+  let value = await idbGet<DraftStorage>(draftKey(scope, planId))
+  if (!value) {
+    const legacy = legacyDraft(scope, planId)
+    const old = await idbGet<DraftStorage>(legacy.key)
+    value = old && legacy.matches(old) ? old : null
+  }
+  return bucketOf(value).sessions.map(({ updatedAt: _updatedAt, ...session }) => session)
+}
+
 // Migra TODO o bucket na mesma transação, sem deixar cópias nos IDs antigos.
 // Rascunho cuja divisão desapareceu permanece armazenado; não o apagamos para
 // fabricar uma restauração bem-sucedida. Os rascunhos válidos seguem acessíveis.

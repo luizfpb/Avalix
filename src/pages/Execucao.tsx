@@ -58,14 +58,16 @@ import {
   RESTORE_TIMER_MAX_MS,
   execucaoContentKey,
   execucaoHasContent,
+  isExecucaoAttempt,
   isExecucaoDraft,
   reconcileExecucaoDraft,
   sessionToForm,
+  type ExecucaoAttempt,
   type ExecucaoContinuing,
   type ExecucaoDraft,
   type ExecucaoRestTimer,
 } from '../features/workout/execucaoDraft'
-import { listWorkoutLogSets } from '../features/workout/api'
+import { getWorkoutLog, listWorkoutLogSets } from '../features/workout/api'
 import { moveRow, orderSessionRows } from '../features/workout/sessionOrder'
 import { SessionSets } from '../features/workout/SessionSets'
 import { SetRowFields } from '../features/workout/SetRowFields'
@@ -688,12 +690,23 @@ function LogForm({
   // Referência da tentativa de gravar ESTA sessão (plano, divisão e data). Se a
   // conexão cair depois do commit e o educador tocar de novo, o banco
   // reconhece a mesma sessão (0043) em vez de criar uma segunda. Renasce a
-  // cada gravação aceita e quando a sessão muda de divisão ou de data.
-  const tentativa = useRef<{ chave: string; ref: string } | null>(null)
+  // cada gravação aceita e quando a sessão muda de divisão ou de data. Vai
+  // para o rascunho: a resposta perdida costuma acabar em tela fechada e
+  // reaberta, e com uma referência nova o banco criava outra sessão igual. A
+  // divisão entra pelo rótulo, que sobrevive à regravação do plano.
+  const [tentativa, setTentativa] = useState<ExecucaoAttempt | null>(null)
+  const tentativaRef = useRef(tentativa)
   function refDaTentativa(): string {
-    const chave = `${planId}:${dayKey}:${date}`
-    if (tentativa.current?.chave !== chave) tentativa.current = { chave, ref: crypto.randomUUID() }
-    return tentativa.current.ref
+    const chave = `${planId}:${day?.label ?? dayKey}:${date}`
+    if (tentativaRef.current?.key !== chave) {
+      tentativaRef.current = { key: chave, ref: crypto.randomUUID() }
+      setTentativa(tentativaRef.current)
+    }
+    return tentativaRef.current.ref
+  }
+  function esquecerTentativa() {
+    tentativaRef.current = null
+    setTentativa(null)
   }
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
@@ -716,6 +729,30 @@ function LogForm({
   // formulário inteiro, com todas as séries, enquanto o educador digitava.
   const [restTimer, setRestTimer] = useState<ExecucaoRestTimer | null>(null)
   const [restored, setRestored] = useState<{ lostRows: number } | null>(null)
+
+  // O plano foi regravado com esta tela aberta (em outra aba ou aparelho): o
+  // salvamento recria divisões e exercícios com ids novos, e a leitura do
+  // plano é refeita ao voltar o foco. A divisão escolhida deixava de existir,
+  // a lista ficava vazia e o rascunho vazio tomava o lugar do preenchido. O
+  // que está na tela é remapeado pela mesma identidade estável da restauração
+  // do rascunho (rótulo da divisão e exercício do catálogo), ainda durante a
+  // renderização, para a tela vazia nunca chegar a existir.
+  const preenchido = useRef<ExecucaoDraft | null>(null)
+  const [planoDaTela, setPlanoDaTela] = useState(detail)
+  const [planoAlterado, setPlanoAlterado] = useState<{ lostRows: number } | null>(null)
+  if (planoDaTela !== detail) {
+    setPlanoDaTela(detail)
+    const anterior = preenchido.current
+    if (anterior && days.length > 0 && !days.some((d) => d.id === dayKey)) {
+      const { draft, lostRows } = reconcileExecucaoDraft(anterior, detail)
+      setDayKey(draft.dayKey)
+      setSets((previous) => ({ ...previous, ...draft.sets }))
+      setOrder(draft.order ?? [])
+      setSkipped(draft.skipped ?? [])
+      setRestTimer(draft.restTimer)
+      setPlanoAlterado({ lostRows })
+    }
+  }
   // Sessão salva no servidor com "Salvar e continuar depois" que esta tela
   // está continuando, e o conteúdo dela no último salvamento (para saber se há
   // o que perder ao sair).
@@ -767,8 +804,12 @@ function LogForm({
       continuing,
       order,
       skipped,
+      attempt: tentativa,
     }
-  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer, continuing, order, skipped])
+  }, [dayExercises, fontes, sets, dayKey, day, date, week, weekTouched, notes, extras, restTimer, continuing, order, skipped, tentativa])
+  // Último estado com a divisão existindo no plano: é dele que o remapeamento
+  // acima parte quando o plano muda por baixo da tela.
+  if (day) preenchido.current = draftValue
   const contentKey = execucaoContentKey(draftValue)
   // Tem o que perder: conteúdo que ainda não foi salvo no servidor como está.
   const dirty = execucaoHasContent(draftValue) && contentKey !== serverKey
@@ -803,6 +844,10 @@ function LogForm({
     setContinuing(draft.continuing ?? null)
     setOrder(draft.order ?? [])
     setSkipped(draft.skipped ?? [])
+    if (isExecucaoAttempt(draft.attempt)) {
+      tentativaRef.current = draft.attempt
+      setTentativa(draft.attempt)
+    }
     setRestored({ lostRows })
   }
   useFormDraft<ExecucaoDraft>(planId ? `execucao:${planId}` : null, draftValue, restaurarRascunho)
@@ -1048,14 +1093,49 @@ function LogForm({
     return { weekValue, finalSets }
   }
 
+  // Conflito de versão ao salvar a sessão que esta tela está continuando: ela
+  // foi salva em outro aparelho, ou a confirmação de um salvamento desta tela
+  // não chegou e a versão guardada aqui ficou para trás. A mensagem mandava
+  // abrir de novo, e reabrir trazia a mesma versão velha do rascunho: o
+  // educador ficava preso com séries que não conseguia salvar. Agora ele
+  // escolhe entre salvar o que está na tela por cima e abrir a versão salva.
+  const [conflito, setConflito] = useState<{ log: WorkoutLogRow; acao: 'progresso' | 'registrar' } | null>(null)
+  async function abrirConflito(e: unknown, acao: 'progresso' | 'registrar'): Promise<boolean> {
+    if (!continuing || (e as { code?: unknown } | null)?.code !== '40001') return false
+    try {
+      const log = await getWorkoutLog(continuing.logId)
+      if (log && log.source === 'trainer' && log.in_progress === true) {
+        setConflito({ log, acao })
+        return true
+      }
+    } catch {
+      // sem a sessão do servidor, fica a mensagem do próprio conflito
+    }
+    return false
+  }
+  async function resolverConflito(escolha: 'tela' | 'servidor') {
+    if (!conflito) return
+    const { log, acao } = conflito
+    setConflito(null)
+    if (escolha === 'servidor') {
+      await continuarSessao(log)
+      return
+    }
+    setContinuing((atual) => (atual ? { ...atual, updatedAt: log.updated_at } : atual))
+    if (acao === 'progresso') await salvarProgresso(log.updated_at)
+    else await save(log.updated_at)
+  }
+
   // "Salvar e continuar depois": grava no servidor como sessão em andamento
   // (0041), que não conta na adesão nem fecha a semana, e pode ser continuada
   // de qualquer aparelho. Devolve se deu certo, para o "Salvar e sair".
-  async function salvarProgresso(): Promise<boolean> {
+  // `versao`: a do servidor, quando o educador escolhe salvar por cima dela.
+  async function salvarProgresso(versao?: string): Promise<boolean> {
     if (savingRef.current) return false
     setError(null)
     setOkMsg(false)
     setProgressMsg(null)
+    setConflito(null)
     const sessao = montarSessao()
     if (!sessao) return false
     const chave = execucaoContentKey(draftValue)
@@ -1065,7 +1145,7 @@ function LogForm({
       const salvo = await saveSessionMut.mutateAsync({
         planId,
         logId: continuing?.logId ?? null,
-        expectedUpdatedAt: continuing?.updatedAt ?? null,
+        expectedUpdatedAt: versao ?? continuing?.updatedAt ?? null,
         clientRef: continuing ? null : refDaTentativa(),
         inProgress: true,
         dayLabel: day?.label ?? null,
@@ -1075,7 +1155,7 @@ function LogForm({
         sets: sessao.finalSets,
       })
       const agora = new Date()
-      tentativa.current = null
+      esquecerTentativa()
       setContinuing({ logId: salvo.id, updatedAt: salvo.updated_at, savedAt: agora.toISOString() })
       setServerKey(chave)
       setProgressMsg(
@@ -1084,7 +1164,7 @@ function LogForm({
       )
       return true
     } catch (e) {
-      setError(normalizeDbError(e))
+      if (!(await abrirConflito(e, 'progresso'))) setError(normalizeDbError(e))
       return false
     } finally {
       savingRef.current = false
@@ -1092,11 +1172,12 @@ function LogForm({
     }
   }
 
-  async function save() {
+  async function save(versao?: string) {
     if (savingRef.current) return
     setError(null)
     setOkMsg(false)
     setProgressMsg(null)
+    setConflito(null)
     const sessao = montarSessao()
     if (!sessao) return
     const { weekValue, finalSets } = sessao
@@ -1110,7 +1191,7 @@ function LogForm({
         await saveSessionMut.mutateAsync({
           planId,
           logId: continuing.logId,
-          expectedUpdatedAt: continuing.updatedAt,
+          expectedUpdatedAt: versao ?? continuing.updatedAt,
           inProgress: false,
           dayLabel: day?.label ?? null,
           weekNumber: weekValue,
@@ -1131,7 +1212,7 @@ function LogForm({
           clientRef: refDaTentativa(),
         })
       }
-      tentativa.current = null
+      esquecerTentativa()
       setContinuing(null)
       setServerKey(null)
       // limpa pra registrar a próxima
@@ -1158,7 +1239,7 @@ function LogForm({
       setWeekTouched(false)
       setOkMsg(true)
     } catch (e) {
-      setError(normalizeDbError(e))
+      if (!(await abrirConflito(e, 'registrar'))) setError(normalizeDbError(e))
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -1405,6 +1486,24 @@ function LogForm({
             Continuando o treino salvo de {formatDate(date)}. "Registrar treino" conclui essa mesma sessão.
           </p>
         ) : null}
+        {planoAlterado ? (
+          <div role="status" className="flex items-start justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+            <span>
+              O plano foi alterado em outra tela ou aparelho. O que você já tinha preenchido foi mantido.
+              {planoAlterado.lostRows > 0
+                ? ` ${planoAlterado.lostRows} ${planoAlterado.lostRows === 1 ? 'série ficou de fora porque o exercício saiu' : 'séries ficaram de fora porque os exercícios saíram'} do plano.`
+                : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPlanoAlterado(null)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Fechar aviso de plano alterado"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         {restored ? (
           <div role="status" className="flex items-start justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
             <span>
@@ -1591,11 +1690,33 @@ function LogForm({
         </div>
 
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {conflito ? (
+          <div role="alert" className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <p>
+              A sessão salva no servidor mudou depois do último salvamento desta tela. Isso acontece
+              quando ela é salva em outro aparelho, ou quando a confirmação de um salvamento não chega.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" disabled={saving} onClick={() => void resolverConflito('tela')}>
+                Salvar o que está nesta tela
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving || loadingPending}
+                onClick={() => void resolverConflito('servidor')}
+              >
+                Abrir a versão salva
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {okMsg ? <p role="status" className="text-sm text-primary">Treino registrado!</p> : null}
         {progressMsg ? <p role="status" className="text-sm text-primary">{progressMsg}</p> : null}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={save} disabled={saving}>
+          <Button size="sm" onClick={() => void save()} disabled={saving}>
             {saving ? 'Salvando...' : 'Registrar treino'}
           </Button>
           {/* Parar no meio sem perder nada e sem contar o treino como feito:

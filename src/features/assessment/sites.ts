@@ -14,6 +14,7 @@ export const SKINFOLD_LABELS: Record<SkinfoldSite, string> = {
 export const CIRCUMFERENCE_LABELS: Record<CircumferenceSite, string> = {
   neck: 'Pescoço',
   waist: 'Cintura',
+  abdomen: 'Abdômen',
   hip: 'Quadril',
 }
 

@@ -26,7 +26,12 @@ import {
 // 1.1.0: entrou a camada de domínio (domain.ts). As equações não mudaram —
 // um laudo da 1.0.0 recalcula igual; o que mudou é que medida impossível
 // agora é recusada em vez de virar NaN/percentual negativo no PDF.
-export const ENGINE_VERSION = '1.1.0'
+// 1.2.0: o US Navy masculino passa a usar o abdômen na altura do umbigo, o
+// sítio do método original; até a 1.1.0 usava a cintura, que na avaliação
+// brasileira é medida no ponto mais estreito e subestima a gordura (cerca de
+// 7 pontos num homem com 10 cm de diferença entre as duas). A equação é a
+// mesma; laudos antigos mantêm o snapshot com que foram emitidos.
+export const ENGINE_VERSION = '1.2.0'
 
 export type ProtocolMeta = {
   id: string
@@ -34,8 +39,16 @@ export type ProtocolMeta = {
   kind: ProtocolKind
   sexes: Sex[]
   skinfoldSites: SkinfoldSite[]
-  // 'hip' só é usado no US Navy feminino; a UI decide por sexo
+  // Todas as circunferências que o protocolo usa, em qualquer sexo. As de
+  // cada sexo saem de circumferenceSitesFor.
   circumferenceSites: CircumferenceSite[]
+  // Quando o sítio muda com o sexo (US Navy).
+  circumferenceSitesBySex?: Partial<Record<Sex, CircumferenceSite[]>>
+}
+
+// As circunferências que o protocolo exige para este sexo.
+export function circumferenceSitesFor(protocol: ProtocolMeta, sex: Sex): CircumferenceSite[] {
+  return protocol.circumferenceSitesBySex?.[sex] ?? protocol.circumferenceSites
 }
 
 // compute devolve o resultado cru; a soma das dobras vai junto porque a
@@ -135,13 +148,17 @@ export const PROTOCOLS: Record<string, Protocol> = {
     kind: 'circumference',
     sexes: ['M', 'F'],
     skinfoldSites: [],
-    circumferenceSites: ['neck', 'waist', 'hip'],
+    circumferenceSites: ['neck', 'abdomen', 'waist', 'hip'],
+    // Hodgdon & Beckett (1984): homem, abdômen na altura do umbigo; mulher,
+    // cintura no ponto mais estreito e quadril na maior protuberância glútea.
+    circumferenceSitesBySex: { M: ['neck', 'abdomen'], F: ['neck', 'waist', 'hip'] },
     compute: (i) => {
       const c = i.circumferencesCm
-      if (c.neck == null || c.waist == null) {
-        throw new Error('pescoço e cintura são obrigatórios')
+      const tronco = i.sex === 'M' ? c.abdomen : c.waist
+      if (c.neck == null || tronco == null) {
+        throw new Error(i.sex === 'M' ? 'pescoço e abdômen são obrigatórios' : 'pescoço e cintura são obrigatórios')
       }
-      const bf = usNavyBodyFatPct(i.sex, i.heightCm, c.neck, c.waist, c.hip)
+      const bf = usNavyBodyFatPct(i.sex, i.heightCm, c.neck, tronco, c.hip)
       return { bodyDensity: null, bodyFatPct: bf, conversions: null, warnings: [], sumMm: null }
     },
   },

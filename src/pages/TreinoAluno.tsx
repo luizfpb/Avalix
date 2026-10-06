@@ -19,15 +19,18 @@ import {
 import {
   buildSets,
   CORRECTED_SESSION_MESSAGE,
+  draftAsQueuedSession,
   flushQueue,
   isInvalidStudentLinkError,
   isNetworkFailure,
+  isQueuedSessionPending,
   isTransientStudentError,
   isStudentLinkExpired,
   queuedSessionLabel,
   queuedSessionText,
   reconcileSetRows,
   resolveStudentToken,
+  sessionsToRescue,
   studentScope,
   suggestedWorkoutDayId,
   tokenFromPastedLink,
@@ -45,6 +48,7 @@ import {
   readCachedHistory,
   readCachedPlan,
   readCachedWorkout,
+  readDraftSessions,
   readReconciledDraft,
   readQueue,
   removeCachedPlan,
@@ -140,7 +144,8 @@ function errorMessage(error: unknown, fallback: string): string {
 
 // Treinos que o servidor não recebeu antes de o link deixar de valer. A tela
 // os mostra uma vez, só da memória, para o aluno mandar ao treinador — que
-// registra a sessão na data certa pela tela dele.
+// registra a sessão na data certa pela tela dele. Entram também os que ainda
+// estavam em andamento (rascunho ou "salvar progresso"), marcados como tal.
 function TreinosNaoEnviados({ itens, nomes }: { itens: QueuedSession[]; nomes: Record<string, string> }) {
   const [copiado, setCopiado] = useState<string | null>(null)
   const [falhou, setFalhou] = useState(false)
@@ -164,7 +169,10 @@ function TreinosNaoEnviados({ itens, nomes }: { itens: QueuedSession[]; nomes: R
       <ul className="space-y-1.5">
         {itens.map((item) => (
           <li key={item.clientRef} className="flex items-center justify-between gap-2">
-            <span>{queuedSessionLabel(item)}</span>
+            <span>
+              {queuedSessionLabel(item)}
+              {item.inProgress ? ' · não concluído' : ''}
+            </span>
             <Button size="xs" variant="outline" onClick={() => void copiar(item)}>
               <Copy /> {copiado === item.clientRef ? 'Copiado' : 'Copiar dados'}
             </Button>
@@ -231,6 +239,11 @@ function capturarTokenUmaVez(): string | null {
 
 type Aba = 'treino' | 'historico' | 'anteriores'
 
+// Treino concluído nesta página que o pacote ainda não conhece (ver
+// TreinoDoDia). Mora na página, e não na tela do treino: trocar para o
+// Histórico desmonta aquela tela, e a contagem perdida fazia a semana voltar.
+type ConclusaoLocal = WeekLogPoint & { client_ref: string; plan_id: string }
+
 export default function TreinoAluno() {
   const [token, setToken] = useState(capturarTokenUmaVez)
   const [scope, setScope] = useState<string | null>(null)
@@ -247,6 +260,7 @@ export default function TreinoAluno() {
   const [filaPerdida, setFilaPerdida] = useState<{ itens: QueuedSession[]; nomes: Record<string, string> } | null>(null)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const [aba, setAba] = useState<Aba>('treino')
+  const [conclusoesLocais, setConclusoesLocais] = useState<ConclusaoLocal[]>([])
   const accessEpoch = useRef(0)
   const storageAccess = useRef<StudentStorageAccess | null>(null)
   const scopeRef = useRef(scope)
@@ -256,6 +270,11 @@ export default function TreinoAluno() {
   const pacoteRef = useRef(pacote)
   pacoteRef.current = pacote
   const [registrando, setRegistrando] = useState(false)
+  // O servidor entregou o treino com o link valendo, mas pelo relógio do
+  // aparelho a validade já passou: o relógio está adiantado. Daí em diante só
+  // o servidor diz quando o link venceu; o relógio decidia sozinho e apagava
+  // rascunho e fila de um link ainda válido.
+  const relogioAdiantado = useRef(false)
   const savingActive = useRef(false)
   const pendingPackage = useRef<StudentWorkout | null>(null)
   const receberPacote = useCallback((next: StudentWorkout) => {
@@ -271,7 +290,9 @@ export default function TreinoAluno() {
     }
   }, [])
 
-  const invalidarAcesso = useCallback(async (limpar = true) => {
+  // `recusados`: o envio que o servidor acabou de recusar por link inválido.
+  // Vai junto no resgate mesmo quando o aparelho não guardou a fila.
+  const invalidarAcesso = useCallback(async (limpar = true, recusados: QueuedSession[] = []) => {
     // Esta montagem nunca reativa outro token. Respostas antigas não podem
     // executar uma segunda purga depois de outra aba ter aberto um novo link.
     if (accessEpoch.current > 0 || (storageAccess.current && !isStudentStorageAccessCurrent(storageAccess.current))) return
@@ -285,19 +306,24 @@ export default function TreinoAluno() {
     setInvalido(true)
     if (!limpar) return
     // A purga continua (aparelho perdido ou emprestado não pode guardar nada do
-    // link revogado), mas reemitir o link apagava calado o treino feito sem
-    // internet que ainda não tinha subido. Ele fica na tela para ser copiado.
+    // link revogado), mas reemitir o link apagava calado o treino que ainda não
+    // tinha subido. Ele fica na tela para ser copiado: a fila, o envio recusado
+    // agora e os rascunhos do treino em andamento, que também se perdiam.
     const escopo = scopeRef.current
-    const naoEnviados = escopo ? await readQueue(escopo).catch(() => filaAntes) : filaAntes
-    if (epoch === accessEpoch.current && naoEnviados.some((item) => item.sets.length > 0)) {
-      // A revogação pode chegar antes do treino carregar: os nomes vêm do
-      // pacote guardado, lido antes da purga.
-      const exercicios = pacoteAntes?.exercises
-        ?? (escopo ? (await readCachedWorkout(escopo).catch(() => null))?.data.exercises : undefined)
-        ?? []
+    const naFila = escopo ? await readQueue(escopo).catch(() => filaAntes) : filaAntes
+    // A revogação pode chegar antes do treino carregar: plano e nomes vêm do
+    // pacote guardado, lido antes da purga.
+    const guardado = pacoteAntes
+      ?? (escopo ? (await readCachedWorkout(escopo).catch(() => null))?.data ?? null : null)
+    const rascunhos = escopo && guardado?.plan
+      ? (await readDraftSessions(escopo, guardado.plan.id).catch(() => []))
+          .flatMap((rascunho) => draftAsQueuedSession(rascunho, guardado.exercises, guardado.days) ?? [])
+      : []
+    const naoEnviados = sessionsToRescue(naFila, recusados, rascunhos)
+    if (epoch === accessEpoch.current && naoEnviados.length > 0) {
       setFilaPerdida({
-        itens: naoEnviados.filter((item) => item.sets.length > 0),
-        nomes: Object.fromEntries(exercicios.map((ex) => [ex.exercise_id, ex.name])),
+        itens: naoEnviados,
+        nomes: Object.fromEntries((guardado?.exercises ?? []).map((ex) => [ex.exercise_id, ex.name])),
       })
     }
     try {
@@ -368,17 +394,19 @@ export default function TreinoAluno() {
       const cache = await readCachedWorkout(scope)
       if (!vivo || epoch !== accessEpoch.current) return
       const cacheLegado = cache && !cache.data.link_expires_at
-      if (cache && isStudentLinkExpired(cache.data.link_expires_at)) {
-        await invalidarAcesso()
-        if (vivo) setCarregando(false)
-        return
-      }
-      if (vivo && cache && !cacheLegado) {
+      // Vencido pelo relógio do aparelho: o cache não aparece, mas quem
+      // confirma é o servidor. O relógio pode estar adiantado, e a purga apaga
+      // rascunho e fila; sem rede, vale o relógio (com o resgate antes).
+      const vencidoNoAparelho = !!cache && isStudentLinkExpired(cache.data.link_expires_at)
+      // A fila vem antes do treino: o que foi concluído sem internet conta na
+      // semana sugerida, e a tela do treino a fixa ao montar.
+      await recarregarFila(epoch)
+      if (!vivo || epoch !== accessEpoch.current) return
+      if (cache && !cacheLegado && !vencidoNoAparelho) {
         setPacote(cache.data)
         setSincronizadoEm(cache.at)
         setCarregando(false)
       }
-      await recarregarFila(epoch)
 
       try {
         const fresco = await getWorkoutForLink(token)
@@ -387,9 +415,10 @@ export default function TreinoAluno() {
           // O servidor respondeu que o link não vale mais. Aí o cache também
           // não vale: seria mostrar um treino que o profissional revogou.
           await invalidarAcesso()
-        } else if (isStudentLinkExpired(fresco.link_expires_at)) {
-          await invalidarAcesso()
         } else {
+          // O servidor só entrega o pacote de link válido. Se o relógio daqui
+          // discorda, quem está errado é o relógio.
+          if (isStudentLinkExpired(fresco.link_expires_at)) relogioAdiantado.current = true
           await writeCachedWorkout(scope, fresco, access)
           if (!vivo || epoch !== accessEpoch.current) return
           setInvalido(false)
@@ -404,8 +433,9 @@ export default function TreinoAluno() {
         // mostra "inválido". Qualquer outra falha — rede, prazo, instabilidade
         // do servidor — mantém o cache ou cai em "não foi possível abrir", com
         // tentar de novo: mandar o aluno pedir outro link por um erro
-        // passageiro fazia o treinador revogar um link que ainda valia.
-        if (isInvalidStudentLinkError(error)) await invalidarAcesso()
+        // passageiro fazia o treinador revogar um link que ainda valia. A
+        // exceção é o cache vencido: sem servidor, a validade guardada decide.
+        if (isInvalidStudentLinkError(error) || vencidoNoAparelho) await invalidarAcesso()
         else {
           if (!isNetworkFailure(error)) reportHandledError('treino:abrir', error)
           setSemRede(true)
@@ -422,6 +452,7 @@ export default function TreinoAluno() {
 
   // Sobe a fila quando a rede volta e quando o app volta ao primeiro plano.
   const enviando = useRef(false)
+  const revalidarRef = useRef<() => Promise<void>>(async () => {})
   const enviarFila = useCallback(async (force = false) => {
     const access = storageAccess.current
     if (!token || !scope || !access || !isStudentStorageAccessCurrent(access) || enviando.current) return
@@ -430,7 +461,13 @@ export default function TreinoAluno() {
     try {
       const r = await withStudentSyncLock(scope, () => flushQueue(token, scope, access, force))
       if (epoch !== accessEpoch.current) return
-      if (r.sent > 0) setSemRede(false)
+      if (r.sent > 0) {
+        setSemRede(false)
+        // O que subiu sai da fila; o pacote novo traz essas sessões na
+        // contagem da semana. Sem ele, quem reabre a página sem internet
+        // depois veria a semana anterior.
+        void revalidarRef.current()
+      }
       for (const recusa of r.rejected) reportHandledError('treino:fila-recusada', { message: recusa.message })
       await recarregarFila()
     } catch (error) {
@@ -451,39 +488,48 @@ export default function TreinoAluno() {
   const revalidarAcesso = useCallback(async () => {
     const access = storageAccess.current
     if (!token || !scope || !access || invalido || revalidando.current) return
-    if (pacote && isStudentLinkExpired(pacote.link_expires_at)) {
+    const offline = typeof navigator !== 'undefined' && !navigator.onLine
+    // Vencido pelo relógio do aparelho: sem rede, vale o relógio; com rede, o
+    // servidor confirma logo abaixo.
+    const vencidoNoAparelho = !!pacote && !relogioAdiantado.current && isStudentLinkExpired(pacote.link_expires_at)
+    if (vencidoNoAparelho && offline) {
       await invalidarAcesso()
       return
     }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return
+    if (offline) return
     revalidando.current = true
     const epoch = accessEpoch.current
     try {
       const fresco = await getWorkoutForLink(token)
       if (epoch !== accessEpoch.current) return
-      if (!fresco || isStudentLinkExpired(fresco.link_expires_at)) {
+      if (!fresco) {
         await invalidarAcesso()
         return
       }
+      if (isStudentLinkExpired(fresco.link_expires_at)) relogioAdiantado.current = true
       await writeCachedWorkout(scope, fresco, access)
       if (epoch !== accessEpoch.current) return
       receberPacote(fresco)
       setSincronizadoEm(new Date().toISOString())
       setSemRede(false)
     } catch (error) {
-      if (isInvalidStudentLinkError(error)) await invalidarAcesso()
+      if (isInvalidStudentLinkError(error) || vencidoNoAparelho) await invalidarAcesso()
     } finally {
       revalidando.current = false
     }
   }, [invalido, invalidarAcesso, pacote, scope, token, receberPacote])
+  revalidarRef.current = revalidarAcesso
 
+  // A validade chega com a página aberta: quem confirma é o servidor (com
+  // rede) ou o relógio (sem rede), pela mesma revalidação do retorno ao app.
   useEffect(() => {
     if (!pacote?.link_expires_at || invalido) return
     let timer: number | undefined
     const schedule = () => {
+      if (relogioAdiantado.current) return
       const remaining = Date.parse(pacote.link_expires_at) - Date.now()
       if (remaining <= 0) {
-        void invalidarAcesso()
+        void revalidarRef.current()
         return
       }
       timer = window.setTimeout(schedule, Math.min(remaining, 2_000_000_000))
@@ -492,7 +538,7 @@ export default function TreinoAluno() {
     return () => {
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [invalido, invalidarAcesso, pacote?.link_expires_at])
+  }, [invalido, pacote?.link_expires_at])
 
   useEffect(() => {
     if (!token || !scope) return
@@ -524,7 +570,7 @@ export default function TreinoAluno() {
   }, [token, scope, enviarFila])
 
   useEffect(() => {
-    if (!fila.some((item) => !item.error || isTransientStudentError({ message: item.error }))) return
+    if (!fila.some(isQueuedSessionPending)) return
     const timer = window.setInterval(() => { void enviarFila() }, 30_000)
     return () => window.clearInterval(timer)
   }, [fila, enviarFila])
@@ -668,10 +714,16 @@ export default function TreinoAluno() {
             scope={scope}
             pacote={pacote}
             access={storageAccess.current!}
+            fila={fila}
+            conclusoesLocais={conclusoesLocais}
+            setConclusoesLocais={setConclusoesLocais}
             onSavingChange={aoRegistrar}
             onFilaMudou={recarregarFila}
             onSemRede={() => setSemRede(true)}
-            onLinkInvalid={invalidarAcesso}
+            // O pacote é rebuscado depois de concluir com internet: traz a
+            // sessão na contagem e a última carga para o próximo treino.
+            onConcluidoOnline={() => void revalidarAcesso()}
+            onLinkInvalid={(recusados) => invalidarAcesso(true, recusados)}
           />
         ) : (
           <Card>
@@ -830,8 +882,10 @@ function StatusBar({
       setCopia({ clientRef: item.clientRef, ok: false })
     }
   }
-  const pendentes = fila.filter((item) => !item.error)
-  const rejeitados = fila.filter((item) => item.error)
+  // Erro passageiro (cota do link, servidor fora) continua pendente: a fila
+  // tenta de novo sozinha, e mostrar "não foi enviado" mandaria descartar.
+  const pendentes = fila.filter(isQueuedSessionPending)
+  const rejeitados = fila.filter((item) => !isQueuedSessionPending(item))
 
   if (fila.length === 0 && !semRede && !erro) {
     return sincronizadoEm ? (
@@ -963,35 +1017,38 @@ function TreinoDoDia({
   scope,
   pacote,
   access,
+  fila,
+  conclusoesLocais,
+  setConclusoesLocais,
   onSavingChange,
   onFilaMudou,
   onSemRede,
+  onConcluidoOnline,
   onLinkInvalid,
 }: {
   token: string
   scope: string
   pacote: StudentWorkout
   access: StudentStorageAccess
+  fila: QueuedSession[]
+  conclusoesLocais: ConclusaoLocal[]
+  setConclusoesLocais: React.Dispatch<React.SetStateAction<ConclusaoLocal[]>>
   onSavingChange: (saving: boolean) => void
   onFilaMudou: () => Promise<void>
   onSemRede: () => void
-  onLinkInvalid: () => Promise<void>
+  onConcluidoOnline: () => void
+  onLinkInvalid: (recusados?: QueuedSession[]) => Promise<void>
 }) {
   const plano = pacote.plan!
   const dias = useMemo(
     () => pacote.days.slice().sort((a, b) => a.position - b.position),
     [pacote.days]
   )
-  const divisaoSugerida = suggestedWorkoutDayId(
-    plano.weekly_schedule,
-    dias,
-    pacote.current_plan_sessions
-  )
 
-  // Treinos concluídos nesta tela que o pacote ainda não conhece: ele só é
-  // rebuscado ao reabrir a página ou voltar ao app, então sem isto a semana
-  // sugerida ficaria parada até lá — o aluno que fecha a semana de manhã e
-  // volta à tarde continuaria vendo a semana anterior.
+  // Treinos concluídos que o pacote ainda não conhece: ele só é rebuscado ao
+  // reabrir a página, voltar ao app ou concluir com internet, então sem isto a
+  // semana sugerida ficaria parada até lá — o aluno que fecha a semana de
+  // manhã e volta à tarde continuaria vendo a semana anterior.
   //
   // Cada conclusão local leva o client_ref da sessão. A partir da 0039 o pacote
   // traz o client_ref de cada sessão concluída, e a que já aparece lá deixa de
@@ -1000,12 +1057,30 @@ function TreinoDoDia({
   // pacote já trazia — a salva com "continuar depois" e concluída ao voltar, ou
   // a concluída depois de o pacote ser rebuscado: a tela anunciava a semana
   // fechada e a divisão seguinte um treino antes da hora.
-  const [logsLocais, setLogsLocais] = useState<(WeekLogPoint & { client_ref: string })[]>([])
+  //
+  // As conclusões desta página vêm de cima (sobrevivem à troca de seção), e
+  // as que estão na fila do aparelho entram também: recarregar a página sem
+  // internet zera a memória, e a fila continua lá.
   const doServidor = pacote.plan_week_log
   // Pacote da 0039: cada item traz a chave client_ref (nula nos registros do
   // profissional). Lista vazia não tem o que deduplicar.
   const pacoteComIdentidade = !!doServidor &&
     (doServidor.length === 0 || doServidor.some((log) => 'client_ref' in log))
+  const logsLocais = useMemo(() => {
+    const daPagina = conclusoesLocais.filter((log) => log.plan_id === plano.id)
+    // Sem identidade no pacote não dá para saber se a sessão da fila já foi
+    // contada: aí só vale o que foi concluído nesta página, como antes.
+    if (!pacoteComIdentidade) return daPagina
+    const refs = new Set(daPagina.map((log) => log.client_ref))
+    const daFila = fila
+      .filter((item) => item.planId === plano.id && item.inProgress !== true &&
+        isQueuedSessionPending(item) && !refs.has(item.clientRef))
+      .map((item) => ({
+        performed_at: item.performedAt, week_number: item.weekNumber,
+        client_ref: item.clientRef, plan_id: plano.id,
+      }))
+    return [...daPagina, ...daFila]
+  }, [conclusoesLocais, fila, plano.id, pacoteComIdentidade])
   const sessoesNoPacote = useRef(pacote.current_plan_sessions)
   useEffect(() => {
     const antes = sessoesNoPacote.current
@@ -1016,9 +1091,13 @@ function TreinoDoDia({
     // pela quantidade que o pacote novo já contabilizou.
     if (agora > antes) {
       const contabilizadas = agora - antes
-      setLogsLocais((atuais) => atuais.slice(0, Math.max(0, atuais.length - contabilizadas)))
+      setConclusoesLocais((atuais) => {
+        const doPlano = atuais.filter((log) => log.plan_id === plano.id)
+        const descontadas = new Set(doPlano.slice(Math.max(0, doPlano.length - contabilizadas)))
+        return atuais.filter((log) => !descontadas.has(log))
+      })
     }
-  }, [pacote.current_plan_sessions, pacoteComIdentidade])
+  }, [pacote.current_plan_sessions, pacoteComIdentidade, plano.id, setConclusoesLocais])
   const refsNoServidor = useMemo(
     () => pacoteComIdentidade && doServidor
       ? new Set(doServidor.flatMap((log) => (log.client_ref ? [log.client_ref] : [])))
@@ -1031,6 +1110,11 @@ function TreinoDoDia({
     [refsNoServidor]
   )
   const locaisPendentes = useMemo(() => pendentesDe(logsLocais), [pendentesDe, logsLocais])
+  const divisaoSugerida = suggestedWorkoutDayId(
+    plano.weekly_schedule,
+    dias,
+    pacote.current_plan_sessions + locaisPendentes.length
+  )
 
   const sessoesPorSemana = sessionsPerWeek(plano.weekly_schedule, dias.length)
   // A semana vem do que o aluno REALMENTE registrou, não da data: ele pode ter
@@ -1496,6 +1580,9 @@ function TreinoDoDia({
     saving.current = true
     onSavingChange(true)
     setSalvando(concluir ? 'concluir' : 'progresso')
+    // A sessão enviada, para o resgate se o servidor responder que o link
+    // deixou de valer: com o aparelho sem fila, é a única cópia que sobra.
+    let enviada: QueuedSession | null = null
     try {
       // A reserva é uma transação IndexedDB: duas abas nunca recebem a mesma
       // revisão. No progresso ela é obrigatória, pois a mensagem promete que a
@@ -1517,6 +1604,7 @@ function TreinoDoDia({
         sets,
         queuedAt: new Date().toISOString(),
       }
+      enviada = sessao
 
       const result = await withStudentSyncLock(scope, async () => {
         let durableOutbox = false
@@ -1551,7 +1639,12 @@ function TreinoDoDia({
           return { offline: false }
         } catch (error) {
           if (!isTransientStudentError(error)) {
-            if (durableOutbox) await dequeueSession(scope, sessao.clientRef, false, access, sessao.revision)
+            // Recusa definitiva sai da fila: ela não vai subir nunca. Link que
+            // deixou de valer é outra coisa: a sessão fica para o resgate que
+            // vem antes da purga. Tirá-la aqui apagava a única cópia do treino.
+            if (durableOutbox && !isInvalidStudentLinkError(error)) {
+              await dequeueSession(scope, sessao.clientRef, false, access, sessao.revision)
+            }
             throw error
           }
           if (!durableOutbox) {
@@ -1587,6 +1680,7 @@ function TreinoDoDia({
             ? 'Treino concluído! Seu treinador já consegue ver.'
             : 'Progresso salvo. Você pode continuar o treino.'
         )
+        if (concluir) onConcluidoOnline()
       }
       if (concluir) {
         // Antes de reiniciar, porque reiniciar() zera as linhas.
@@ -1603,7 +1697,7 @@ function TreinoDoDia({
       }
     } catch (error) {
       if (!isInvalidStudentLinkError(error)) reportHandledError(concluir ? 'treino:concluir' : 'treino:progresso', error)
-      if (isInvalidStudentLinkError(error)) await onLinkInvalid()
+      if (isInvalidStudentLinkError(error)) await onLinkInvalid(enviada ? [enviada] : [])
       else if (error instanceof StudentStorageError) {
         // O aparelho não guardou e não deu para entregar ao servidor. "Libere
         // o armazenamento" mandava a pessoa mexer no celular quando o que
@@ -1624,17 +1718,15 @@ function TreinoDoDia({
     // A sessão que acabou de ser concluída conta para a próxima — pode ter sido
     // ela que fechou a semana — até o pacote refleti-la. Entra mesmo sem
     // semana anotada: a divisão sugerida também depende dela.
-    const proximosLogs = [
-      { performed_at: data, week_number: semana, client_ref: clientRef },
-      ...logsLocais.filter((log) => log.client_ref !== clientRef),
-    ]
+    const concluida: ConclusaoLocal = { performed_at: data, week_number: semana, client_ref: clientRef, plan_id: plano.id }
+    const proximosLogs = [concluida, ...logsLocais.filter((log) => log.client_ref !== clientRef)]
     const pendentes = pendentesDe(proximosLogs)
     const nextDayId = suggestedWorkoutDayId(
       plano.weekly_schedule,
       dias,
       pacote.current_plan_sessions + pendentes.length
     )
-    setLogsLocais(proximosLogs)
+    setConclusoesLocais((atuais) => [concluida, ...atuais.filter((log) => log.client_ref !== clientRef)])
     setDayId(nextDayId)
     setData(hoje())
     setDataEscolhida(false)

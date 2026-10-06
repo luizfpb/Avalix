@@ -674,11 +674,16 @@ describe('TreinoAluno', () => {
   })
 
   it('não renderiza cache expirado nem cache legado sem validade', async () => {
+    // Vencido pelo relógio do aparelho: o cache não aparece e quem confirma é
+    // o servidor (aqui, link que não vale mais).
     const expired = pacote({ link_expires_at: '2000-01-01T00:00:00.000Z' })
     readCachedWorkoutMock.mockResolvedValue({ at: '2000-01-01T00:00:00.000Z', data: expired })
+    getWorkoutMock.mockResolvedValue(null)
     render(<TreinoAluno />)
     expect(await screen.findByText(/Link inválido ou expirado/)).toBeTruthy()
     expect(screen.queryByText('Supino reto')).toBeNull()
+    expect(getWorkoutMock).toHaveBeenCalled()
+    await waitFor(() => expect(purgeRevokedMock).toHaveBeenCalled())
     cleanup()
 
     const legacy = { ...pacote() } as Partial<StudentWorkout>
@@ -1481,6 +1486,8 @@ describe('TreinoAluno — semana do mesociclo', () => {
       await screen.findByLabelText(/Carga da série 1 de Agachamento/)
       fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
       await screen.findByText(/Treino concluído! Seu treinador/)
+      // Concluir com internet rebusca o pacote; este ainda não traz o B.
+      await waitFor(() => expect(getWorkoutMock).toHaveBeenCalledTimes(2))
 
       expect((screen.getByLabelText('Semana') as HTMLSelectElement).value).toBe('2')
       expect(screen.getByText('Semana 2 em andamento: 2 de 3 treinos feitos.')).toBeTruthy()
@@ -1492,7 +1499,7 @@ describe('TreinoAluno — semana do mesociclo', () => {
         plan_week_log: [{ performed_at: hoje, week_number: 2, client_ref: 'ref-parcial' }, ...semana1eA(ontem)],
       }))
       await act(async () => { window.dispatchEvent(new Event('online')) })
-      await waitFor(() => expect(getWorkoutMock).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(getWorkoutMock).toHaveBeenCalledTimes(3))
       expect(screen.getByText('Semana 2 em andamento: 2 de 3 treinos feitos.')).toBeTruthy()
 
       // E o C, concluído em seguida, fecha a semana: próxima é a A da semana 3.

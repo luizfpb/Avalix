@@ -11,6 +11,7 @@ import {
 } from '../features/assessment/hooks'
 import type { SubjectRow } from '../features/subjects/api'
 import {
+  circumferenceSitesFor,
   listProtocols,
   type CircumferenceSite,
   type ProtocolInput,
@@ -164,16 +165,36 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 type CustomCirc = { site: string; value: string }
 
+// Onde medir, quando o protocolo depende disso. No US Navy o sítio do tronco
+// muda com o sexo, e "cintura" na avaliação brasileira é o ponto mais
+// estreito: sem a indicação, o homem era medido no lugar errado.
+function protocolMeasureHint(protocolId: string | undefined, sex: Sex): string | null {
+  if (protocolId !== 'usNavy') return null
+  return sex === 'M'
+    ? 'US Navy, homens: abdômen na altura do umbigo, com o abdômen relaxado.'
+    : 'US Navy, mulheres: cintura no ponto mais estreito do tronco e quadril na maior circunferência dos glúteos.'
+}
+
+// Avaliação US Navy masculina gravada até a 1.1.0 do motor, quando o cálculo
+// usava a cintura no lugar do abdômen.
+function navyMasculinoComCintura(results: unknown): boolean {
+  const medidas = (results as { inputs?: { circumferencesCm?: Record<string, number> } } | null)
+    ?.inputs?.circumferencesCm
+  return !!medidas && medidas.waist != null && medidas.abdomen == null
+}
+
 function CircumferencesCard({
   values,
   onChange,
   neededCircs,
+  measureHint,
   custom,
   setCustom,
 }: {
   values: Record<string, string>
   onChange: (key: string, v: string) => void
   neededCircs: CircumferenceSite[]
+  measureHint: string | null
   custom: CustomCirc[]
   setCustom: (updater: (prev: CustomCirc[]) => CustomCirc[]) => void
 }) {
@@ -254,7 +275,10 @@ function CircumferencesCard({
         </div>
 
         {neededCircs.length > 0 ? (
-          <p className="text-xs text-muted-foreground">* necessário para o protocolo selecionado.</p>
+          <p className="text-xs text-muted-foreground">
+            * necessário para o protocolo selecionado.
+            {measureHint ? ` ${measureHint}` : ''}
+          </p>
         ) : null}
       </CardContent>
     </Card>
@@ -361,9 +385,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const guard = useUnsavedChanges(dirty)
 
   const protocol = protocols.find((p) => p.id === protocolId) ?? protocols[0]
-  const neededCircs: CircumferenceSite[] = (protocol?.circumferenceSites ?? []).filter(
-    (c) => c !== 'hip' || sex === 'F'
-  )
+  const neededCircs: CircumferenceSite[] = protocol ? circumferenceSitesFor(protocol, sex) : []
+  const navyRecalculado =
+    isEdit && ea?.protocol_id === 'usNavy' && protocol?.id === 'usNavy' && sex === 'M' && navyMasculinoComCintura(ea.results)
 
   const weightKg = Number(weight)
   const heightCm = Number(height)
@@ -589,9 +613,18 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         values={circumferences}
         onChange={(key, v) => setCircumferences((prev) => ({ ...prev, [key]: v }))}
         neededCircs={neededCircs}
+        measureHint={protocolMeasureHint(protocol?.id, sex)}
         custom={customCircs}
         setCustom={setCustomCircs}
       />
+
+      {navyRecalculado ? (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+          Esta avaliação foi calculada com a cintura, como o app fazia até 06/10/2026. No método US Navy, o
+          homem é medido no abdômen, na altura do umbigo. Para salvar alterações, informe o abdômen: o
+          percentual será recalculado.
+        </p>
+      ) : null}
 
       {result ? (
         <Card>

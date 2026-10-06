@@ -15,7 +15,7 @@ export type SkinfoldSite =
   | 'thigh' // coxa
   | 'biceps' // bíceps (Durnin-Womersley)
 
-export type CircumferenceSite = 'neck' | 'waist' | 'hip'
+export type CircumferenceSite = 'neck' | 'waist' | 'abdomen' | 'hip'
 
 export type ProtocolKind = 'skinfold' | 'circumference'
 

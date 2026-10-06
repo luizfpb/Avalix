@@ -51,7 +51,7 @@ describe('Durnin-Womersley 4 dobras', () => {
 })
 
 describe('US Navy (circunferências, cm)', () => {
-  it('homem: altura 180, pescoço 38, cintura 85', () => {
+  it('homem: altura 180, pescoço 38, abdômen 85', () => {
     // 495/(1.0324 - 0.19077*log10(47) + 0.15456*log10(180)) - 450 ~= 16.1
     expect(usNavyBodyFatPct('M', 180, 38, 85)).toBeCloseTo(16.1, 1)
   })

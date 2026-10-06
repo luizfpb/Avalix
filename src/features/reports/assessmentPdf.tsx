@@ -538,8 +538,8 @@ const TEXTO_LIVRE_LARGURA = 595 - 34 * 2
 // começa numa folha limpa (break) e parte no meio do texto, nunca logo abaixo
 // do título.
 //
-// minPresenceAhead não serve aqui: o shouldBreak do @react-pdf/layout só o
-// consulta quando o bloco CABE inteiro na sobra da página.
+// minPresenceAhead não serve aqui: no paginador do @react-pdf/layout ele não
+// vale para o primeiro filho de um contêiner, que é onde o título fica.
 //
 function FreeTextSection({ title, text }: { title: string; text: string }) {
   const TITULO = 21
@@ -558,8 +558,9 @@ function FreeTextSection({ title, text }: { title: string; text: string }) {
 
 // Título, cabeçalho e as primeiras linhas de uma tabela andam juntos. Com só
 // o minPresenceAhead, o título chegou a ficar sozinho no pé da folha e a
-// tabela começava na página seguinte sem nome: o renderer só consulta essa
-// regra quando o bloco seguinte cabe inteiro na sobra da página.
+// tabela começava na página seguinte sem nome: o paginador do react-pdf
+// ignora essa regra no primeiro filho de um contêiner (ver DayCard, no PDF
+// de treino).
 const LINHAS_COM_O_TITULO = 2
 
 function SkinfoldTable({ rows }: { rows: SkinfoldReadingRow[] }) {

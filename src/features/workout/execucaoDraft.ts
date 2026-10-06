@@ -45,6 +45,19 @@ export type ExecucaoDraft = {
   // (sessionOrder.ts); opcionais pelo mesmo motivo
   order?: string[]
   skipped?: string[]
+  // Referência da tentativa de gravar esta sessão (0043), com a chave plano,
+  // divisão e data a que ela pertence. Fica no rascunho porque a resposta
+  // perdida depois do commit vira tela fechada e reaberta: com uma referência
+  // nova, o banco criava uma segunda sessão igual.
+  attempt?: ExecucaoAttempt | null
+}
+
+export type ExecucaoAttempt = { key: string; ref: string }
+
+export function isExecucaoAttempt(value: unknown): value is ExecucaoAttempt {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Partial<ExecucaoAttempt>
+  return typeof v.key === 'string' && typeof v.ref === 'string' && v.ref.length > 0
 }
 
 // O cronômetro restaurado só faz sentido dentro do teto do descanso (3600 s).

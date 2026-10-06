@@ -8,8 +8,11 @@ import tseslint from "typescript-eslint"
 export default defineConfig([
   // Geradores históricos reproduzem etapas antigas e não fazem parte do app.
   // Scripts operacionais atuais são lintados como Node logo abaixo.
+  // Pastas *.local ficam fora do git (amostras de PDF, provas de auditoria):
+  // sem isto, o lint local reprovava em arquivo que o CI nunca vê.
   globalIgnores([
     "dist",
+    "*.local/**",
     "scripts/write-etapa3-files.mjs",
     "scripts/write-etapa3-2-files.mjs",
   ]),

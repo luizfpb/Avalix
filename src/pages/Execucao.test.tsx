@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RouterProvider, createMemoryRouter } from 'react-router'
+import { useReducer } from 'react'
 import Execucao from './Execucao'
 import { setPrivateDraftScope } from '../lib/draft'
 import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/workout/api'
@@ -11,7 +12,8 @@ import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/work
 // sempre permitiu (workout_log_sets aponta para o catálogo, não para o
 // exercício do plano — 0009); estes testes fixam o caminho na tela.
 
-const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock, ultimasMock } = vi.hoisted(() => ({
+const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock, ultimasMock, lerSessaoMock } = vi.hoisted(() => ({
+  lerSessaoMock: vi.fn(),
   ultimasMock: vi.fn(),
   criarMock: vi.fn(),
   planoMock: vi.fn(),
@@ -25,7 +27,12 @@ const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listar
 vi.mock('../features/workout/api', async (original) => ({
   ...(await original<typeof import('../features/workout/api')>()),
   listWorkoutLogSets: (id: string) => listarSeriesMock(id),
+  getWorkoutLog: (id: string) => lerSessaoMock(id),
 }))
+
+// A leitura do plano refeita pelo React Query (foco, reconexão) chega como uma
+// nova renderização com os dados novos, sem desmontar o formulário.
+let refazerLeituraDoPlano: () => void = () => {}
 
 vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org-1' } }),
@@ -46,7 +53,11 @@ const exercicio = (id: string, name: string) => ({
 })
 
 vi.mock('../features/workout/hooks', () => ({
-  useWorkoutPlan: () => planoMock(),
+  useWorkoutPlan: () => {
+    const [, atualizar] = useReducer((n: number) => n + 1, 0)
+    refazerLeituraDoPlano = atualizar
+    return planoMock()
+  },
   useExercises: () => ({
     data: [exercicio('ex-1', 'Supino reto'), exercicio('ex-2', 'Crucifixo')],
     isPending: false,
@@ -945,5 +956,120 @@ describe('rascunho da sessão', () => {
     const router = abrir()
     await act(async () => { await router.navigate('/avaliados/subject-1/treinos/plan-1') })
     expect(await screen.findByText('detalhe do plano')).toBeTruthy()
+  })
+})
+
+// Auditoria de 06/10/2026: o que a sessão em andamento perdia quando o plano
+// mudava por baixo da tela (A03), quando a resposta de uma gravação se perdia
+// e a tela era reaberta (A07), e quando a confirmação de um "salvar e
+// continuar depois" não chegava (A09).
+describe('continuidade da sessão', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setPrivateDraftScope('user-1', 'org-1')
+  })
+  afterEach(() => {
+    setPrivateDraftScope(null, null)
+    localStorage.clear()
+  })
+
+  const carga = (serie: number) =>
+    (screen.getByLabelText(`Carga da série ${serie} de Supino reto`) as HTMLInputElement)
+
+  it('plano regravado em outra aba: o preenchido continua na tela e no rascunho', async () => {
+    abrir()
+    fireEvent.change(carga(1), { target: { value: '40' } })
+    const regravado = plano()
+    regravado.days[0].id = 'day-new'
+    regravado.exercises[0].id = 'we-new'
+    regravado.exercises[0].day_id = 'day-new'
+    planoMock.mockReturnValue({ data: regravado, isPending: false, isError: false })
+    await act(async () => { refazerLeituraDoPlano() })
+
+    expect(carga(1).value).toBe('40')
+    expect(screen.getByText(/O plano foi alterado em outra tela ou aparelho/)).toBeTruthy()
+    cleanup()
+    abrir()
+    await waitFor(() => expect(carga(1).value).toBe('40'))
+  })
+
+  it('resposta perdida e tela reaberta: a nova tentativa reencontra a mesma sessão', async () => {
+    criarMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    abrir()
+    fireEvent.change(carga(1), { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText(/Falha de conexão/)
+    cleanup()
+
+    abrir()
+    await waitFor(() => expect(carga(1).value).toBe('40'))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    const [primeira, segunda] = criarMock.mock.calls.map(([input]) => input.clientRef)
+    expect(primeira).toBeTruthy()
+    expect(segunda).toBe(primeira)
+  })
+
+  describe('confirmação do "salvar e continuar depois" que não chegou', () => {
+    const V1 = '2026-10-05T10:00:00Z'
+    const V2 = '2026-10-05T10:01:00Z'
+    const V3 = '2026-10-05T10:02:00Z'
+
+    // A segunda gravação chega ao banco (V2), mas a resposta se perde; a
+    // terceira, com a versão que a tela conhece (V1), é recusada por conflito.
+    async function chegarAoConflito() {
+      let versao = V1
+      salvarMock.mockImplementation(async (input) => {
+        if (input.logId == null) return { id: 'log-1', updated_at: V1 }
+        if (input.expectedUpdatedAt !== versao) {
+          throw Object.assign(new Error('esta sessao foi salva em outro aparelho; abra-a de novo antes de continuar'), { code: '40001' })
+        }
+        if (versao === V1) {
+          versao = V2
+          throw new TypeError('Failed to fetch')
+        }
+        versao = V3
+        return { id: 'log-1', updated_at: V3 }
+      })
+      lerSessaoMock.mockImplementation(async () => ({
+        ...sessao(), id: 'log-1', source: 'trainer', in_progress: true, performed_at: '2026-10-05',
+        notes: null, updated_at: versao,
+      }))
+      abrir()
+      fireEvent.change(carga(1), { target: { value: '40' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+      await screen.findByText(/Progresso salvo às/)
+      fireEvent.change(carga(2), { target: { value: '42' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+      await screen.findByText(/Falha de conexão/)
+      fireEvent.change(carga(3), { target: { value: '44' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar e continuar depois' }))
+      await screen.findByText(/A sessão salva no servidor mudou depois do último salvamento desta tela/)
+    }
+
+    it('salvar o que está na tela grava por cima da versão do servidor', async () => {
+      await chegarAoConflito()
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar o que está nesta tela' }))
+      await screen.findByText(/Progresso salvo às/)
+      const ultima = salvarMock.mock.calls.at(-1)![0]
+      expect(ultima).toMatchObject({ logId: 'log-1', expectedUpdatedAt: V2, inProgress: true })
+      expect(ultima.sets.map((s: { weightKg: number }) => s.weightKg)).toEqual([40, 42, 44])
+      expect(screen.queryByText(/A sessão salva no servidor mudou/)).toBeNull()
+    })
+
+    it('abrir a versão salva traz as séries do servidor', async () => {
+      await chegarAoConflito()
+      listarSeriesMock.mockResolvedValue([
+        { id: 's1', exercise_id: 'ex-1', set_number: 1, weight_kg: 40, reps: null, rir: null, rest_seconds: null, reached_failure: null },
+        { id: 's2', exercise_id: 'ex-1', set_number: 2, weight_kg: 42, reps: null, rir: null, rest_seconds: null, reached_failure: null },
+      ])
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir a versão salva' }))
+      // A versão do servidor substitui o que estava na tela: a série 3 era só daqui.
+      await waitFor(() => expect(screen.queryByLabelText('Carga da série 3 de Supino reto')).toBeNull())
+      expect(carga(1).value).toBe('40')
+      expect(carga(2).value).toBe('42')
+      expect(listarSeriesMock).toHaveBeenCalledWith('log-1')
+      expect(screen.queryByText(/A sessão salva no servidor mudou/)).toBeNull()
+    })
   })
 })

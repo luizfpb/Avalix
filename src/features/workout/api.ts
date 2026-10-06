@@ -671,6 +671,14 @@ export async function listWorkoutLogs(planId: string): Promise<WorkoutLogRow[]> 
   }
 }
 
+// Uma sessão como está no servidor agora. A Execução lê na hora do conflito de
+// versão: a lista de sessões da tela pode estar desatualizada justamente aí.
+export async function getWorkoutLog(id: string): Promise<WorkoutLogRow | null> {
+  const { data, error } = await supabase.from('workout_logs').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as WorkoutLogRow | null) ?? null
+}
+
 export async function listWorkoutLogSets(logId: string): Promise<WorkoutLogSetRow[]> {
   const { data, error } = await supabase
     .from('workout_log_sets')

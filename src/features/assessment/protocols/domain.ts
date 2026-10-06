@@ -7,9 +7,9 @@
 // — só que um número sem significado. Sem esta camada o app entregava, sem
 // avisar nada:
 //
-//   - US Navy com pescoço >= cintura -> NaN (que virava null no jsonb e
-//     derrubava a tela de detalhe) ou -450%;
-//   - US Navy num aluno magro e musculoso (180 cm, pescoço 42, cintura 70)
+//   - US Navy com pescoço >= abdômen (cintura, na mulher) -> NaN (que virava
+//     null no jsonb e derrubava a tela de detalhe) ou -450%;
+//   - US Navy num aluno magro e musculoso (180 cm, pescoço 42, abdômen 70)
 //     -> -2,0% de gordura, com massa gorda negativa em seguida;
 //   - Jackson & Pollock acima do vértice da parábola -> a relação se inverte
 //     e MAIS dobra passa a significar MENOS gordura. Nos 3 sítios femininos o
@@ -98,16 +98,18 @@ function verticeMm(protocolId: string, sex: Sex): number | null {
 // que a conta não tem como dar certo — nunca julgamento de plausibilidade.
 export function assertMeasurementsUsable(protocolId: string, input: ProtocolInput): void {
   if (protocolId !== 'usNavy') return
-  const { neck, waist, hip } = input.circumferencesCm
-  if (neck == null || waist == null) return // registry já trata ausência
-  if (waist - neck <= 0) {
+  const { neck, waist, abdomen, hip } = input.circumferencesCm
+  // O sítio do tronco muda com o sexo: abdômen no homem, cintura na mulher.
+  const tronco = input.sex === 'M' ? abdomen : waist
+  if (neck == null || tronco == null) return // registry já trata ausência
+  if (tronco - neck <= 0) {
     throw new ProtocolDomainError(
       'medida-impossivel',
-      'No protocolo US Navy a cintura precisa ser maior que o pescoço. ' +
+      `No protocolo US Navy ${input.sex === 'M' ? 'o abdômen' : 'a cintura'} precisa ser maior que o pescoço. ` +
         'Confira se os dois campos não foram trocados.'
     )
   }
-  if (input.sex === 'F' && hip != null && waist + hip - neck <= 0) {
+  if (input.sex === 'F' && hip != null && tronco + hip - neck <= 0) {
     throw new ProtocolDomainError(
       'medida-impossivel',
       'A soma de cintura e quadril precisa ser maior que o pescoço. Confira as medidas.'

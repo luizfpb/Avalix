@@ -62,18 +62,20 @@ export function durninWomersleyBodyDensity(sex: Sex, sumMm: number, ageYears: nu
 }
 
 // US Navy (Hodgdon-Beckett), medidas em cm. Retorna % de gordura diretamente.
-// Homem: usa pescoço e cintura. Mulher: pescoço, cintura e quadril.
+// O sítio do tronco muda com o sexo (Hodgdon & Beckett, 1984): no homem é o
+// abdômen na altura do umbigo; na mulher, a cintura no ponto mais estreito,
+// mais o quadril. Quem escolhe o sítio é o registry; aqui entra a medida.
 export function usNavyBodyFatPct(
   sex: Sex,
   heightCm: number,
   neckCm: number,
-  waistCm: number,
+  trunkCm: number,
   hipCm?: number
 ): number {
   if (sex === 'M') {
     return (
       495 /
-        (1.0324 - 0.19077 * Math.log10(waistCm - neckCm) + 0.15456 * Math.log10(heightCm)) -
+        (1.0324 - 0.19077 * Math.log10(trunkCm - neckCm) + 0.15456 * Math.log10(heightCm)) -
       450
     )
   }
@@ -82,7 +84,7 @@ export function usNavyBodyFatPct(
   }
   return (
     495 /
-      (1.29579 - 0.35004 * Math.log10(waistCm + hipCm - neckCm) + 0.221 * Math.log10(heightCm)) -
+      (1.29579 - 0.35004 * Math.log10(trunkCm + hipCm - neckCm) + 0.221 * Math.log10(heightCm)) -
     450
   )
 }
