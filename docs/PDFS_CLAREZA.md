@@ -1,14 +1,22 @@
-# PDFs — Clareza
+# PDFs: Clareza
 
 Direção aprovada pelo usuário em 08/09/2026, a partir da primeira proposta em `docs/design-pdfs/`. Implementação nos três documentos existentes: avaliação física, evolução e plano de treino.
 
 ## Sistema visual
 
-Manrope 400/700, papel branco, tinta `#212334`, violeta `#6250A1`, superfície lilás `#F4F2FA`, linhas `#E4E4EE`, texto secundário `#646579` e magenta `#AC577B`. Os tokens ficam em `src/features/reports/pdfTheme.tsx`; são específicos dos relatórios aprovados e não mudam o tema das telas.
+Revisado em 05/10/2026, junto com as telas (ver a seção "PDFs sem cara de gerado por IA" em DECISIONS.md). A estrutura aprovada em setembro continua; mudou o acabamento.
 
-Cabeçalho com organização e logo opcional, tipo do documento e título à esquerda. Identificação sem caixa externa, seções em caixa normal, tabelas com linhas finas e rodapé com Avalix, identificação profissional e paginação. Páginas seguintes recebem cabeçalho compacto com tipo e nome do avaliado. A4 com margens laterais de 34 pt e 70 pt reservados ao final da página.
+Inter 400 e 600 (os mesmos desenhos das telas), papel branco, tinta `#18181B`, texto secundário `#5F5F69`, linhas `#E4E4E7` e `#D4D4D8`, superfície cinza `#F4F4F5`. O roxo da marca `#66539A` e o magenta `#AD567B` ficam para as séries dos gráficos e para os links de vídeo; ressalvas em âmbar `#885019`. Os tokens ficam em `src/features/reports/pdfTheme.tsx`.
 
-Na avaliação, o gráfico circular e as massas ocupam uma faixa lilás; peso, IMC e altura usam cartões brancos. Na evolução, o resumo do período usa cartões suaves e os gráficos se organizam em pares. No treino, a sequência semanal usa letras em quadrados arredondados, os agrupamentos têm fundo e barra lateral contínuos e as mudanças por semana ficam em linhas compactas.
+Cabeçalho com organização e logo opcional; o título é o tipo do documento ("Avaliação física", "Relatório de evolução", "Plano de treino") e a linha de baixo diz o método ou o nome do plano. Sem rótulo em caixa alta, frase de efeito ou assinatura no canto. Identificação sem caixa externa, seções com título, tabelas com fios finos e rodapé com Avalix, identificação profissional, paginação e a data de emissão ("Gerado no Avalix em dd/mm/aaaa"). Páginas seguintes recebem cabeçalho compacto com tipo e nome do avaliado. A4 com margens laterais de 34 pt e 70 pt reservados ao final da página.
+
+Na avaliação, o gráfico circular e as massas ficam no único bloco com contorno do documento, com a legenda em quadradinhos de cor; peso, IMC e altura ficam numa faixa entre fios, sem caixa para cada número. Na evolução, o resumo do período é uma tabela (primeira medida, última e variação) e os gráficos se organizam em pares. No treino, a letra de cada divisão aparece num quadrado de contorno igual na sequência semanal e no título da divisão; a numeração dos exercícios é 1, 2, 3; os agrupamentos (super-série, circuito) são marcados só pelo fundo cinza, de ponta a ponta; as mudanças por semana ficam em linhas compactas. Observações e notas de método são texto corrido, sem barra lateral.
+
+Os rótulos dos gráficos usam a fonte embutida. Até out/2026 eles saíam em Helvetica, que não vai no arquivo, e cada leitor de PDF trocava por outra fonte.
+
+### Fontes
+
+`public/fonts/inter-400.ttf` e `inter-600.ttf` são gerados por `scripts/fontes-pdf.py` a partir dos TTF completos da Inter: repertório reduzido ao que `pdfText.tsx` garante (cerca de 40 KB cada), só o kerning como recurso tipográfico e os glifos compostos desmontados. Este último ponto não é estético: na Inter, "Ú" é montado de "U" mais acento, e o fontkit, ao embutir um PDF que usava "Ú", guardava o "U" sem a letra correspondente. Nos PDFs seguintes da mesma sessão o "U" perdia o texto e a quebra de linha deslocava uma posição ("P | ercentual"). `pdfFonts.test.ts` falha se algum glifo composto voltar.
 
 ## Conteúdo e paginação
 

@@ -23,6 +23,7 @@ import {
   ReportRunningHeader,
   SectionTitle,
   fmtDate,
+  issueNote,
   palette,
   pdfTheme,
   type InfoItem,
@@ -58,15 +59,15 @@ const styles = StyleSheet.create({
   intro: { fontSize: 7.5, color: palette.muted, marginBottom: 9, lineHeight: 1.45 },
   schedule: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   scheduleCopy: { flexGrow: 1, flexBasis: 165, paddingRight: 12 },
-  scheduleTitle: { fontSize: 10, fontWeight: 700 },
+  scheduleTitle: { fontSize: 11, fontWeight: 600 },
   scheduleDetail: { fontSize: 7.5, color: palette.muted, marginTop: 3 },
   sessions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 340, gap: 7 },
   session: { alignItems: 'center', width: 35 },
-  sessionLabel: { fontSize: 6, color: palette.muted, marginBottom: 4 },
-  sessionBadge: { width: 35, minHeight: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, padding: 4 },
-  sessionFirst: { backgroundColor: palette.violet },
-  sessionLetter: { fontSize: 14, fontWeight: 700, color: palette.violet },
-  sessionLetterFirst: { color: palette.paper },
+  sessionLabel: { fontSize: 6.5, color: palette.muted, marginBottom: 4 },
+  // A letra da divisão aparece no mesmo quadrado de contorno aqui e no título
+  // de cada divisão: é isso que liga a sequência da semana à tabela.
+  sessionBadge: { width: 32, minHeight: 30, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 0.8, borderColor: palette.rule, padding: 4 },
+  sessionLetter: { fontSize: 12, fontWeight: 600, color: palette.ink },
 
   // ---- Divisão: cartão com cabeçalho (letra + nome) e tabela de exercícios ----
   dayCard: {
@@ -78,33 +79,32 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dayBadge: {
-    minWidth: 37,
-    minHeight: 37,
-    padding: 5,
-    borderRadius: 9,
-    backgroundColor: palette.violet,
+    minWidth: 30,
+    minHeight: 30,
+    padding: 4,
+    borderRadius: 6,
+    borderWidth: 0.8,
+    borderColor: palette.rule,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
-  dayBadgeText: { fontSize: 21, fontFamily: 'Manrope', fontWeight: 700, color: palette.paper },
-  dayName: { fontSize: 14, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, lineHeight: 1.25 },
+  dayBadgeText: { fontSize: 13, fontWeight: 600, color: palette.ink },
+  dayName: { fontSize: 13, fontWeight: 600, color: palette.ink, lineHeight: 1.25 },
   daySub: { fontSize: 7.5, color: palette.muted, marginTop: 1 },
 
   // cabeçalho da tabela
   thead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.surface,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 9,
-    borderRadius: 5,
+    borderBottomWidth: 0.8,
+    borderBottomColor: palette.hairline,
   },
   th: {
-    fontSize: 6,
+    fontSize: 7,
     color: palette.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   tr: {
     flexDirection: 'row',
@@ -116,46 +116,38 @@ const styles = StyleSheet.create({
   },
   trLast: { borderBottomWidth: 0 },
   tdNum: { fontSize: 7.8, color: palette.muted, paddingTop: 1 },
-  tdName: { fontSize: 9, fontWeight: 700, color: palette.ink, lineHeight: 1.35 },
+  tdName: { fontSize: 9, fontWeight: 600, color: palette.ink, lineHeight: 1.35 },
   tdNameSub: { fontSize: 7, color: palette.muted, marginTop: 2, lineHeight: 1.45 },
   // Link do vídeo: o PDF vai para o celular do aluno, onde o toque abre o
   // YouTube. Sem sublinhado azul padrão do renderer; a cor da marca e o
   // triângulo de "play" já dizem que é tocável.
   nameLink: { textDecoration: 'none', color: palette.ink },
   videoLink: { flexDirection: 'row', alignItems: 'center', marginTop: 3, textDecoration: 'none' },
-  videoText: { fontSize: 7, fontWeight: 700, color: palette.violet, lineHeight: 1.4 },
+  videoText: { fontSize: 7, fontWeight: 600, color: palette.violet, lineHeight: 1.4 },
   videoTextSearch: { color: palette.muted },
-  tdStrong: { fontSize: 8.5, fontFamily: 'Manrope', fontWeight: 700, color: palette.ink, paddingTop: 1 },
+  tdStrong: { fontSize: 8.5, fontWeight: 600, color: palette.ink, paddingTop: 1 },
   tdCell: { fontSize: 8.5, color: palette.ink, paddingTop: 1 },
 
   // ---- Bloco (super-série / circuito) ----
   // Faixa acima dos membros, com a instrução de execução junto: a ficha
   // impressa é lida na academia por quem não sabe o jargão, e "Bi-set" sozinho
   // não diz o que fazer entre um exercício e outro.
-  // A faixa e os membros dividem uma barra lateral contínua: sem ela dava para
-  // ver onde o bloco começava, mas não onde ele terminava — e "quantos
-  // exercícios entram na super-série" é justamente o que a ficha precisa dizer.
-  // O padding esquerdo desconta a barra para as colunas não saírem do prumo.
+  // A faixa e os membros dividem o mesmo fundo cinza, de ponta a ponta: dá
+  // para ver onde o bloco começa e onde termina, e "quantos exercícios entram
+  // na super-série" é justamente o que a ficha precisa dizer.
   groupBand: {
     backgroundColor: palette.surface,
     paddingVertical: 5,
-    paddingRight: 9,
-    paddingLeft: 7,
-    borderLeftWidth: 2,
-    borderLeftColor: palette.violet,
+    paddingHorizontal: 9,
   },
   groupBandName: {
-    fontSize: 7,
-    fontFamily: 'Manrope', fontWeight: 700,
-    color: palette.violet,
+    fontSize: 7.5,
+    fontWeight: 600,
+    color: palette.ink,
     lineHeight: 1.4,
   },
-  // Fundo e barra lateral delimitam os membros do bloco de ponta a ponta.
   trGroup: {
     backgroundColor: palette.surface,
-    paddingLeft: 7,
-    borderLeftWidth: 2,
-    borderLeftColor: palette.violet,
   },
 
   // colunas da tabela de exercícios
@@ -174,40 +166,35 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: palette.hairline,
   },
-  weekNum: { width: 44, paddingRight: 6, fontSize: 9, fontWeight: 700, color: palette.violet },
+  weekNum: { width: 44, paddingRight: 6, fontSize: 9, fontWeight: 600, color: palette.ink },
   weekHead: { width: 116, paddingRight: 14 },
-  weekLabel: { fontSize: 8, fontWeight: 700, color: palette.ink, lineHeight: 1.4 },
+  weekLabel: { fontSize: 8, fontWeight: 600, color: palette.ink, lineHeight: 1.4 },
   weekContinuation: { fontSize: 6.5, color: palette.muted, marginTop: 3 },
   weekBody: { flex: 1 },
   deloadPill: {
     marginTop: 4,
     alignSelf: 'flex-start',
     backgroundColor: palette.surface,
-    color: palette.violet,
+    color: palette.ink,
     fontSize: 6.5,
-    fontFamily: 'Manrope', fontWeight: 700,
+    fontWeight: 600,
     paddingVertical: 1.5,
     paddingHorizontal: 6,
     borderRadius: 8,
   },
   // "sem alteração": a semana existe e segue a prescrição base. Dizer isso é
   // informação — a ausência de linha deixaria dúvida se faltou preencher.
-  // Sem fontStyle italic: só Manrope 400/700 normal são registradas em
+  // Sem fontStyle italic: só Inter 400/600/700 normais são registradas em
   // pdfFonts, e pedir um itálico inexistente derruba a geração inteira
-  // ("Could not resolve font for Manrope, fontStyle italic").
+  // ("Could not resolve font for Inter, fontStyle italic").
   weekSame: { fontSize: 7.5, lineHeight: 1.45, color: palette.muted },
   // Uma alteração: quem muda em negrito, seguido pelo ajuste prescrito.
   weekChange: { marginBottom: 5 },
-  weekChangeLabel: { fontSize: 7.5, fontWeight: 700, color: palette.ink, lineHeight: 1.4 },
+  weekChangeLabel: { fontSize: 7.5, fontWeight: 600, color: palette.ink, lineHeight: 1.4 },
   weekChangeDesc: { fontSize: 7.5, color: palette.muted, lineHeight: 1.45 },
 
-  // ---- Observações (callout) ----
-  notesBox: {
-    borderLeftWidth: 2,
-    borderLeftColor: palette.violet,
-    paddingLeft: 10,
-  },
-  notesText: { fontSize: 8, lineHeight: 1.5, color: palette.muted },
+  // ---- Observações ----
+  notesText: { fontSize: 8.5, lineHeight: 1.5, color: palette.ink },
 })
 
 // inteiro sem casas; fracionado com 1 casa (séries fracionadas: 2.5, 13)
@@ -345,7 +332,7 @@ function DayCard({
                 ...(block.kind != null ? [styles.trGroup] : []),
               ]}
             >
-              <Text style={[styles.tdNum, styles.colNum]}>{String(i + 1).padStart(2, '0')}</Text>
+              <Text style={[styles.tdNum, styles.colNum]}>{i + 1}</Text>
               <View style={styles.colName}>
                 {/* o nome também abre o vídeo: alvo de toque maior que a linha de 7 pt */}
                 {video ? <Link src={video.url} style={styles.nameLink}>{nome}</Link> : nome}
@@ -459,7 +446,7 @@ export function weekChangeGroups(
     exercises.filter((ex) => ex.day_id === dayId).sort((a, b) => a.position - b.position).forEach((ex, index) => {
       const nameKey = JSON.stringify([dayId, exerciseNames[ex.exercise_id] ?? 'Exercício'])
       nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
-      rowNumbers.set(ex.id, String(index + 1).padStart(2, '0'))
+      rowNumbers.set(ex.id, String(index + 1))
     })
   }
 
@@ -628,9 +615,9 @@ function WeeksSection({ data }: { data: WorkoutPdfData }) {
   )
 }
 
-// Largura útil do texto dentro da caixa de observações, em pontos: a folha A4
-// (595) menos margens de 34, recuo de 10 e a linha violeta de 2.
-const NOTES_LARGURA = 595 - 34 * 2 - 10 - 2
+// Largura útil do texto das observações, em pontos: a folha A4 (595) menos
+// as margens de 34.
+const NOTES_LARGURA = 595 - 34 * 2
 
 // Altura estimada do bloco "Observações" (título + caixa), em pontos.
 // Grosseira de propósito — serve só para decidir se o bloco cabe inteiro numa
@@ -641,7 +628,7 @@ export function estimateNotesHeight(notes: string): number {
   return (
     TITULO +
     CAIXA +
-    estimateTextHeight({ text: notes, fontSize: 8, lineHeight: 1.5, width: NOTES_LARGURA })
+    estimateTextHeight({ text: notes, fontSize: 8.5, lineHeight: 1.5, width: NOTES_LARGURA })
   )
 }
 
@@ -662,9 +649,7 @@ function NotesSection({ notes }: { notes: string }) {
     // renderer. O fluxo normal preserva o texto e usa o espaço disponível.
     <View style={styles.section} wrap={parte}>
       <SectionTitle>Observações</SectionTitle>
-      <View style={styles.notesBox}>
-        <Text style={styles.notesText}>{notes}</Text>
-      </View>
+      <Text style={styles.notesText}>{notes}</Text>
     </View>
   )
 }
@@ -706,23 +691,23 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
     <Document title={`Plano de treino · ${data.subjectName}`} author={data.orgName} subject={plan.name}>
       <Page size="A4" style={pdfTheme.page}>
         <ReportRunningHeader title="Plano de treino" subject={data.subjectName} />
-        <ReportHeader logoUrl={data.logoUrl} orgName={data.orgName} kicker="Plano de treino" title="Seu próximo movimento." subtitle={plan.name} />
+        <ReportHeader logoUrl={data.logoUrl} orgName={data.orgName} title="Plano de treino" subtitle={plan.name} />
         <InfoCard items={info} />
 
         {schedule.length > 0 ? (
           <View style={styles.schedule} wrap={false}>
             <View style={styles.scheduleCopy}>
-              <Text style={styles.scheduleTitle}>Sua sequência semanal</Text>
+              <Text style={styles.scheduleTitle}>Sequência semanal</Text>
               <Text style={styles.scheduleDetail}>
-                {schedule.length} {schedule.length === 1 ? 'sessão' : 'sessões'} · Siga a ordem das divisões
+                {schedule.length} {schedule.length === 1 ? 'sessão' : 'sessões'} por semana, nesta ordem
               </Text>
             </View>
             <View style={styles.sessions}>
               {schedule.map((label, i) => (
                 <View key={`${i}-${label}`} style={styles.session}>
                   <Text style={styles.sessionLabel}>{i + 1}ª sessão</Text>
-                  <View style={[styles.sessionBadge, ...(i === 0 ? [styles.sessionFirst] : [])]}>
-                    <Text style={[styles.sessionLetter, ...(i === 0 ? [styles.sessionLetterFirst] : [])]}>{label}</Text>
+                  <View style={styles.sessionBadge}>
+                    <Text style={styles.sessionLetter}>{label}</Text>
                   </View>
                 </View>
               ))}
@@ -759,7 +744,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
             plano, onde ela serve para decidir. No papel do aluno era jargão
             que ele não usa e uma folha a mais para imprimir. */}
 
-        <ReportFooter note="Montado no Avalix" evaluator={data.evaluatorName} />
+        <ReportFooter note={issueNote()} evaluator={data.evaluatorName} />
       </Page>
     </Document>
   )

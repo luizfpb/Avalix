@@ -42,11 +42,11 @@ describe('countWrappedLines', () => {
 
 describe('charsPerLine', () => {
   it('estima por cima da largura real do caractere', () => {
-    // Manrope 400 mede 0,483em por caractere em texto corrido em português
-    // (fontkit, medido em manrope-400.ttf). A conta usa 0,52em, então tem de
-    // caber MENOS caractere na estimativa do que na renderização real — é essa
-    // folga que impede o bloco de transbordar.
-    const real = Math.floor(496 / (9.5 * 0.483))
+    // Inter 600 mede 0,490em por caractere em texto corrido em português
+    // (fontkit, medido em inter-600.ttf; o 400 dá 0,481em). A conta usa 0,52em,
+    // então tem de caber MENOS caractere na estimativa do que na renderização
+    // real: é essa folga que impede o bloco de transbordar.
+    const real = Math.floor(496 / (9.5 * 0.490))
     expect(charsPerLine(9.5, 496)).toBeLessThan(real)
   })
 

@@ -146,8 +146,8 @@ const LONGA = Array.from(
 
 // Render de fumaça: o plano de treino não tinha nenhum, e a falta custou caro
 // — um `fontStyle: 'italic'` num estilo derrubava a geração inteira com
-// "Could not resolve font for Manrope, fontStyle italic", porque pdfFonts só
-// registra Manrope/Newsreader normais. Um erro assim não aparece em teste de
+// "Could not resolve font for Inter, fontStyle italic", porque pdfFonts só
+// registra Inter normal (400 e 600). Um erro assim não aparece em teste de
 // função pura: só rendendo. As duas semanas cobrem os dois caminhos da seção
 // (com alteração e sem).
 describe('generateWorkoutPdf', () => {
@@ -356,8 +356,8 @@ describe('weekPrescriptionRanges', () => {
     const result = weekPrescriptionRanges(fixture)
     expect(result.map(({ first, last }) => [first, last])).toEqual([[1, 1], [2, 2]])
     // A referência numérica aponta para a ocorrência correta na tabela.
-    expect(result[0].groups[0].label).toBe('A · 01 · Supino reto')
-    expect(result[1].groups[0].label).toBe('A · 02 · Supino reto')
+    expect(result[0].groups[0].label).toBe('A · 1 · Supino reto')
+    expect(result[1].groups[0].label).toBe('A · 2 · Supino reto')
   })
 
   it('normaliza a ordem dos overrides e ignora campos que repetem a base', () => {

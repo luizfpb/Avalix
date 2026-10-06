@@ -1,8 +1,10 @@
 import { Font } from '@react-pdf/renderer'
 
-// Clareza usa Manrope 400/700 em títulos, tabelas e gráficos. As telas do app
-// usam Inter desde out/2026; o PDF continua em Manrope até ser revisto com as
-// páginas renderizadas.
+// Os relatórios usam Inter 400 e 600, a mesma família das telas (desde
+// out/2026; antes, Manrope). Os arquivos foram reduzidos ao repertório que o
+// saneamento de pdfText.tsx garante (Latin-1 e a pontuação do CP1252), por
+// isso têm uns 40 KB cada, e não os 320 KB da fonte completa. Gerados por
+// scripts/fontes-pdf.py, que também desmonta os glifos compostos.
 //
 // Por que TTF e não os woff2 que o app já usa: o fontkit do @react-pdf não
 // decodifica woff2 — registrar passa, mas o render quebra com "Offset is
@@ -16,7 +18,7 @@ import { Font } from '@react-pdf/renderer'
 // qualquer jeito.
 
 const FAMILIES = [
-  { family: 'Manrope', arquivos: [['manrope-400.ttf', 400], ['manrope-700.ttf', 700]] },
+  { family: 'Inter', arquivos: [['inter-400.ttf', 400], ['inter-600.ttf', 600]] },
 ] as const
 
 function registrar(base: string): void {

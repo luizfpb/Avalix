@@ -3,15 +3,16 @@ import type { ReactNode } from 'react'
 import { sanitizePdfText, Text } from './pdfText'
 import { BRAND_LOGO } from '../../brand/paths'
 
-// Clareza, aprovada em docs/design-pdfs/01-clareza.pdf. Os relatórios têm
-// tokens próprios de papel; a identidade das telas continua independente.
+// A estrutura é a da Clareza, aprovada em 08/09/2026 (docs/PDFS_CLAREZA.md).
+// Desde out/2026 o papel fala a mesma língua das telas: Inter, cinzas neutros e
+// o roxo da marca só onde ele informa (séries dos gráficos e links). Nada de
+// faixa lilás, barra lateral, rótulo em caixa alta ou frase de efeito.
 export const palette = {
-  plum: '#2A0E52', plumLight: '#ECE3FA', violet: '#6250A1',
-  magenta: '#AC577B', green: '#2B796A', amber: '#94632A', blue: '#39779B',
-  ink: '#212334', muted: '#646579', hairline: '#E4E4EE',
-  surface: '#F4F2FA', paper: '#FFFFFF',
+  plum: '#2A0E52', violet: '#66539A', magenta: '#AD567B',
+  green: '#287A63', amber: '#885019', blue: '#39779B',
+  ink: '#18181B', muted: '#5F5F69', hairline: '#E4E4E7', rule: '#D4D4D8',
+  surface: '#F4F4F5', paper: '#FFFFFF',
 }
-export const RADIUS = 12
 
 export const pdfTheme = StyleSheet.create({
   page: {
@@ -20,23 +21,16 @@ export const pdfTheme = StyleSheet.create({
     paddingHorizontal: 34,
     fontSize: 9,
     color: palette.ink,
-    fontFamily: 'Manrope',
+    fontFamily: 'Inter',
     backgroundColor: palette.paper,
   },
   header: {
-    marginBottom: 17,
+    marginBottom: 16,
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 21,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 16,
+    marginBottom: 24,
   },
   logo: {
     width: 76,
@@ -46,50 +40,38 @@ export const pdfTheme = StyleSheet.create({
     flexShrink: 0,
   },
   org: {
-    fontSize: 10,
-    fontWeight: 700,
+    fontSize: 9.5,
+    fontWeight: 600,
     flex: 1,
   },
-  orgKicker: {
-    fontSize: 6.5,
-    color: palette.violet,
-    letterSpacing: 1.1,
-  },
-  kicker: {
-    fontSize: 7,
-    letterSpacing: 1.5,
-    color: palette.violet,
-    fontWeight: 700,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
   title: {
-    fontSize: 31,
-    fontWeight: 700,
-    letterSpacing: -1.1,
-    lineHeight: 1.16,
+    fontSize: 22,
+    fontWeight: 600,
+    letterSpacing: -0.4,
+    lineHeight: 1.2,
   },
   subtitle: {
-    fontSize: 8,
+    fontSize: 8.5,
     color: palette.muted,
-    marginTop: 6,
+    marginTop: 4,
+    lineHeight: 1.4,
   },
   infoCard: {
-    paddingBottom: 13,
-    marginBottom: 16,
-    borderBottomWidth: 0.8,
+    paddingBottom: 14,
+    marginBottom: 18,
+    borderBottomWidth: 0.6,
     borderBottomColor: palette.hairline,
   },
   infoHeadValue: {
-    fontSize: 17,
-    fontWeight: 700,
-    letterSpacing: -0.4,
+    fontSize: 14,
+    fontWeight: 600,
+    letterSpacing: -0.2,
     lineHeight: 1.3,
   },
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 9,
+    marginTop: 8,
   },
   infoCell: {
     width: '33.333%',
@@ -107,18 +89,18 @@ export const pdfTheme = StyleSheet.create({
   },
   infoValue: {
     fontSize: 8.5,
-    fontWeight: 700,
-    marginTop: 1,
+    fontWeight: 600,
+    marginTop: 1.5,
   },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 9,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: 700,
+    fontWeight: 600,
     color: palette.ink,
   },
   sectionDetail: {
@@ -128,11 +110,11 @@ export const pdfTheme = StyleSheet.create({
   },
   runningHeader: {
     position: 'absolute',
-    top: 13,
+    top: 14,
     left: 34,
     right: 34,
     color: palette.muted,
-    fontSize: 6.5,
+    fontSize: 7,
     lineHeight: 1.2,
   },
   footer: {
@@ -171,11 +153,13 @@ export const pdfTheme = StyleSheet.create({
     marginTop: 4,
     lineHeight: 1.3,
   },
+  // Nota de método no fim do documento: texto de rodapé, separado do
+  // conteúdo por um fio, como uma nota de laudo.
   methodNote: {
-    marginTop: 12,
-    paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: palette.violet,
+    marginTop: 14,
+    paddingTop: 9,
+    borderTopWidth: 0.6,
+    borderTopColor: palette.hairline,
   },
   methodNoteText: {
     fontSize: 7.5,
@@ -184,7 +168,7 @@ export const pdfTheme = StyleSheet.create({
   },
   methodNoteWarn: {
     fontSize: 7.5,
-    color: palette.magenta,
+    color: palette.amber,
     lineHeight: 1.5,
     marginTop: 5,
   },
@@ -197,23 +181,21 @@ export function BrandWordmark({ height = 11, color = palette.plum }: { height?: 
   return <Svg width={height * (w / h)} height={height} viewBox={BRAND_LOGO.viewBox}><Path d={BRAND_LOGO.d} fill={color} /></Svg>
 }
 
-export function ReportHeader({ logoUrl, orgName, title, subtitle, kicker }: {
+// Título é o tipo do documento ("Avaliação física"); a linha de baixo diz o
+// método ou o nome do plano. Quem recebe o PDF arquiva junto com outros e
+// precisa reconhecer o que é pela primeira linha.
+export function ReportHeader({ logoUrl, orgName, title, subtitle }: {
   logoUrl?: string | null
   orgName: string
   title: string
   subtitle?: string | null
-  kicker?: string | null
 }) {
   return (
     <View style={pdfTheme.header} wrap={false}>
       <View style={pdfTheme.headerRow}>
-        <View style={pdfTheme.headerLeft}>
-          {logoUrl ? <Image src={logoUrl} style={pdfTheme.logo} /> : null}
-          <Text style={pdfTheme.org}>{orgName}</Text>
-        </View>
-        <Text style={pdfTheme.orgKicker}>AVALIAÇÃO & MOVIMENTO</Text>
+        {logoUrl ? <Image src={logoUrl} style={pdfTheme.logo} /> : null}
+        <Text style={pdfTheme.org}>{orgName}</Text>
       </View>
-      {kicker ? <Text style={pdfTheme.kicker}>{kicker}</Text> : null}
       <Text style={pdfTheme.title}>{title}</Text>
       {subtitle ? <Text style={pdfTheme.subtitle}>{subtitle}</Text> : null}
     </View>
@@ -258,6 +240,13 @@ export function ReportRunningHeader({ title, subject }: { title: string; subject
   return <Text style={pdfTheme.runningHeader} fixed render={({ pageNumber }) =>
     pageNumber > 1 ? sanitizePdfText(`${title} · ${subject}`) : ''
   } />
+}
+
+// Data de emissão no rodapé: o PDF circula por WhatsApp e impressão, e quem o
+// lê semanas depois precisa saber de quando é aquela versão.
+export function issueNote(now: Date = new Date()): string {
+  const data = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now)
+  return `Gerado no Avalix em ${data}`
 }
 
 export function ReportFooter({ note, evaluator, evaluatorLabel = 'Responsável' }: {

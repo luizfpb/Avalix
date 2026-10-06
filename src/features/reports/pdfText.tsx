@@ -1,7 +1,7 @@
 import { Text as RawText } from '@react-pdf/renderer'
 import type { ComponentProps, ReactNode } from 'react'
 
-// Os arquivos Manrope locais têm repertório latino, não Unicode completo.
+// Os arquivos Inter locais têm repertório latino, não Unicode completo.
 // Mantemos o subconjunto conservador do saneamento original (WinAnsi): ele
 // evita símbolos sem glifo e preserva o sentido da prescrição, inclusive em
 // rótulos SVG. Por exemplo, menor-ou-igual é impresso como "<=".

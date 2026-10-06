@@ -10,10 +10,11 @@
 // Grosseira de propósito: quem usa deixa folga larga entre o limite de bloco
 // atômico e a altura útil da folha (738 pt no A4 com as margens de pdfTheme).
 
-// Largura média de caractere em Manrope 400, como fração do corpo. Medida na
-// renderização real: 111 caracteres de texto corrido em português couberam nos
-// 496 pt da linha do PDF de treino, ou seja 0,47em. 0,52 estima por cima de
-// propósito — o erro da conta tem de sobrar linha, nunca faltar.
+// Largura média de caractere do texto corrido, como fração do corpo. Medida
+// com o fontkit nos arquivos de public/fonts, em texto corrido em português:
+// Inter 400 dá 0,481em e Inter 600, 0,490em (a Manrope usada até out/2026
+// dava 0,462em). 0,52 estima por cima de propósito: o erro da conta tem de
+// sobrar linha, nunca faltar.
 const LARGURA_MEDIA_CARACTERE = 0.52
 
 // Quantos caracteres cabem numa linha de `width` pontos no corpo `fontSize`.
@@ -73,6 +74,6 @@ export const ALTURA_UTIL_A4 = 738
 
 // Acima disto um bloco de texto deixa de ser atômico. A folga de 178 pt até a
 // altura útil é a margem de erro da estimativa: mesmo num texto todo em
-// maiúsculas (~0,62em por caractere, o pior caso plausível) a altura real fica
-// em ~700 pt e ainda cabe na folha.
+// maiúsculas (0,60em por caractere na Inter; 0,62em é a margem do pior caso)
+// a altura real fica em ~670 pt e ainda cabe na folha.
 export const LIMITE_BLOCO_ATOMICO = 560
