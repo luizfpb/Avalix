@@ -1,13 +1,42 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { AuthLayout } from '../components/AuthLayout'
+import { readEmailLink } from '../features/auth/emailLink'
+import { EmailLinkStep } from '../features/auth/EmailLinkStep'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function Login() {
+  const { search } = useLocation()
+  const link = readEmailLink(search, 'email')
+  if (link) {
+    // Sucesso: a sessão nova faz o RouteGuard sair do /login para o
+    // onboarding, levando junto o token da URL.
+    return (
+      <EmailLinkStep
+        link={link}
+        title="Confirmar e-mail"
+        subtitle="Toque no botão para ativar sua conta no Avalix."
+        actionLabel="Confirmar e-mail"
+        failureHelp={
+          <p className="text-muted-foreground">
+            Se você já confirmou,{' '}
+            <Link to="/login" className="font-medium text-primary hover:underline">
+              entre com e-mail e senha
+            </Link>
+            .
+          </p>
+        }
+      />
+    )
+  }
+  return <LoginForm />
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

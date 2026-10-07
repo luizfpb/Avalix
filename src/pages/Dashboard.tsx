@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { UserPlus } from 'lucide-react'
-import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
@@ -55,7 +54,6 @@ const FILTROS: {
 ]
 
 export default function Dashboard() {
-  const { user } = useAuth()
   const { organization } = useOrganization()
   const orgId = organization?.id
   const labels = subjectTermLabels(organization?.subject_term)
@@ -118,9 +116,6 @@ export default function Dashboard() {
     lastAssessQ.isError ||
     plansQ.isError ||
     logsQ.isError
-  // O próprio supabase-js decide o nível exigido pela lista de fatores da
-  // sessão; aqui ela só decide se vale lembrar de ativar.
-  const sem2fa = !user?.factors?.some((factor) => factor.status === 'verified')
 
   return (
     <div className="space-y-8">
@@ -371,15 +366,6 @@ export default function Dashboard() {
           message="Não foi possível verificar os próximos compromissos."
           onRetry={() => void apptsQ.refetch()}
         />
-      ) : null}
-
-      {sem2fa ? (
-        <p className="text-sm text-muted-foreground">
-          Sua conta ainda não usa verificação em dois fatores.{' '}
-          <Link to="/configuracoes" className="font-medium text-foreground underline underline-offset-4">
-            Ativar em Ajustes
-          </Link>
-        </p>
       ) : null}
     </div>
   )

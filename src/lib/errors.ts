@@ -32,6 +32,7 @@ const MESSAGES_BY_CODE: Record<string, string> = {
     'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
   validation_failed: 'Dados inválidos. Confira os campos e tente de novo.',
   same_password: 'A nova senha precisa ser diferente da anterior.',
+  otp_expired: 'Este link expirou ou já foi usado. Peça um novo.',
 }
 
 export function normalizeAuthError(error: unknown): string {
@@ -46,6 +47,7 @@ export function normalizeAuthError(error: unknown): string {
     return MESSAGES_BY_CODE.user_already_exists
   if (text.includes('password should be at least')) return MESSAGES_BY_CODE.weak_password
   if (text.includes('rate limit')) return MESSAGES_BY_CODE.over_request_rate_limit
+  if (text.includes('expired or is invalid')) return MESSAGES_BY_CODE.otp_expired
 
   return message && message.trim().length > 0
     ? message

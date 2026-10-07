@@ -192,18 +192,9 @@ describe('Dashboard', () => {
     expect(screen.getByText('O outro aluno ativo está em dia.')).toBeTruthy()
   })
 
-  it('lembra da verificação em dois fatores só para quem ainda não ativou', () => {
+  it('não cobra a verificação em dois fatores no Início (ativar é escolha em Ajustes)', () => {
     renderDashboard()
-    expect(screen.getByRole('link', { name: 'Ativar em Ajustes' }).getAttribute('href')).toBe(
-      '/configuracoes'
-    )
-    cleanup()
-
-    useAuthMock.mockReturnValue({
-      user: { id: 'user-1', factors: [{ id: 'f1', status: 'verified' }] },
-    })
-    renderDashboard()
-    expect(screen.queryByRole('link', { name: 'Ativar em Ajustes' })).toBeNull()
+    expect(screen.queryByText(/dois fatores/)).toBeNull()
   })
 
   it('mostra Compromissos somente com compromisso futuro e leva ao aluno', () => {

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
+import { readEmailLink } from '../features/auth/emailLink'
+import { EmailLinkStep } from '../features/auth/EmailLinkStep'
 import { AuthLayout } from '../components/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +12,26 @@ import { Label } from '@/components/ui/label'
 
 export default function RecuperarSenha() {
   const { isRecovering, signOut } = useAuth()
+  const { search } = useLocation()
+  const navigate = useNavigate()
   if (isRecovering) return <DefinirNovaSenha onDone={signOut} />
+  const link = readEmailLink(search, 'recovery')
+  if (link) {
+    return (
+      <EmailLinkStep
+        link={link}
+        title="Redefinir senha"
+        subtitle="Toque em continuar para escolher uma nova senha."
+        actionLabel="Continuar"
+        failureHelp={
+          <Link to="/recuperar-senha" className="font-medium text-primary hover:underline">
+            Pedir um novo link
+          </Link>
+        }
+        onDone={() => navigate('/recuperar-senha', { replace: true })}
+      />
+    )
+  }
   return <PedirReset />
 }
 
@@ -39,7 +60,7 @@ function PedirReset() {
     return (
       <AuthLayout
         title="Verifique seu e-mail"
-        subtitle="Se este e-mail tiver conta, enviamos um link para redefinir a senha. O link abre esta tela já no modo de nova senha."
+        subtitle="Se este e-mail tiver conta, enviamos um link para redefinir a senha. Ele vale por 1 hora."
       >
         <Link
           to="/login"
