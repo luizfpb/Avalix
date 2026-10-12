@@ -62,6 +62,18 @@ describe('sessionToForm', () => {
     // fora da divisão, volta como avulso
     expect(form.extras).toEqual([{ rowId: 'extra:cat-crucifixo', exerciseId: 'cat-crucifixo' }])
     expect(form.sets['extra:cat-crucifixo'][0].weight).toBe('14')
+    // sem entry_order (sessão anterior à 0046), a tela segue o plano
+    expect(form.order).toEqual([])
+  })
+
+  it('devolve a ordem em que os exercícios foram gravados', () => {
+    const form = sessionToForm({ day_label: 'A' }, [
+      { exercise_id: 'cat-supino', set_number: 2, weight_kg: 40, reps: 9, rir: null, entry_order: 13 },
+      { exercise_id: 'cat-crucifixo', set_number: 1, weight_kg: 14, reps: 12, rir: null, entry_order: 10 },
+      { exercise_id: 'cat-supino', set_number: 1, weight_kg: 40, reps: 10, rir: null, entry_order: 12 },
+      { exercise_id: 'cat-crucifixo', set_number: 2, weight_kg: 14, reps: 11, rir: null, entry_order: 11 },
+    ], plano)
+    expect(form.order).toEqual(['extra:cat-crucifixo', 'we-supino'])
   })
 })
 

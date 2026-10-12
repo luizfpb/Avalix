@@ -867,8 +867,8 @@ function LogForm({
       if (form.dayKey) setDayKey(form.dayKey)
       setSets((previous) => ({ ...previous, ...form.sets }))
       setExtras(form.extras)
-      // A ordem não vai para o servidor: a sessão retomada volta na do plano.
-      setOrder([])
+      // Volta na ordem em que foi feita (0046); a sessão antiga, na do plano.
+      setOrder(form.order)
       setSkipped([])
       setWeek(session.week_number != null ? String(session.week_number) : '')
       setWeekTouched(true)

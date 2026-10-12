@@ -1383,6 +1383,7 @@ export type Database = {
       workout_log_sets: {
         Row: {
           created_at: string
+          entry_order: number | null
           exercise_id: string
           id: string
           log_id: string
@@ -1396,6 +1397,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          entry_order?: number | null
           exercise_id: string
           id?: string
           log_id: string
@@ -1409,6 +1411,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          entry_order?: number | null
           exercise_id?: string
           id?: string
           log_id?: string

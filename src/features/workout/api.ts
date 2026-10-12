@@ -679,11 +679,14 @@ export async function getWorkoutLog(id: string): Promise<WorkoutLogRow | null> {
   return (data as WorkoutLogRow | null) ?? null
 }
 
+// Na ordem em que foram feitas (0046): exercício por exercício, como estavam
+// na tela. Sessão anterior à 0046 não tem essa ordem e sai como antes.
 export async function listWorkoutLogSets(logId: string): Promise<WorkoutLogSetRow[]> {
   const { data, error } = await supabase
     .from('workout_log_sets')
     .select('*')
     .eq('log_id', logId)
+    .order('entry_order', { ascending: true, nullsFirst: false })
     .order('set_number')
   if (error) throw error
   return data ?? []

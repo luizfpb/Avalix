@@ -3,8 +3,9 @@
 // O plano diz uma ordem, a academia impõe outra: aparelho ocupado, o avulso
 // que entrou no lugar de um prescrito e precisa ficar no meio, o exercício que
 // hoje não vai ser feito. Nada disso muda o PLANO — é a ordem e o conteúdo
-// desta sessão só. O registro (workout_log_sets) não guarda ordem, então ela
-// vive no estado da tela e no rascunho do aparelho.
+// desta sessão só. Ela vive no estado da tela e no rascunho do aparelho, e o
+// registro a guarda pela ordem de gravação das séries (entry_order, 0046): o
+// envio monta as séries na ordem de `orderSessionRows`.
 
 // Aplica a ordem escolhida e tira os exercícios removidos da sessão. Linha que
 // não está em `order` (o avulso adicionado depois de reordenar, ou tudo quando

@@ -132,21 +132,29 @@ export type SavedSessionSet = {
   rir: number | null
   rest_seconds?: number | null
   reached_failure?: boolean | null
+  entry_order?: number | null
 }
 
 // Sessão salva no servidor -> formulário da Execução, para continuar de onde
 // parou. As séries vão para a linha do mesmo exercício do catálogo na divisão
 // da sessão, na posição do número da série; exercício que não está na divisão
 // volta como avulso. Tudo o que foi gravado volta marcado como feito.
+//
+// `order` é a ordem da sessão (a de `orderSessionRows`): as linhas na ordem em
+// que as séries foram gravadas (0046). O que não teve série vai para o fim, na
+// ordem do plano. Sessão anterior à 0046 não sabe a ordem: volta vazia, e a
+// tela segue o plano.
 export function sessionToForm(
   session: { day_label: string | null },
   sets: SavedSessionSet[],
   plano: PlanoAtual
-): { dayKey: string; sets: Record<string, LogRow[]>; extras: ExecucaoExtra[] } {
+): { dayKey: string; sets: Record<string, LogRow[]>; extras: ExecucaoExtra[]; order: string[] } {
   const dia = plano.days.find((d) => d.label === session.day_label) ?? plano.days[0] ?? null
   const rows: Record<string, LogRow[]> = {}
   const extras: ExecucaoExtra[] = []
   const vazia = (): LogRow => ({ weight: '', reps: '', rir: '', rest: '', failure: false })
+  const comOrdem = sets.length > 0 && sets.every((set) => set.entry_order != null)
+  const ordemDaLinha = new Map<string, number>()
   for (const set of [...sets].sort((a, b) => a.set_number - b.set_number)) {
     const doDia = dia
       ? plano.exercises.find((e) => e.day_id === dia.id && e.exercise_id === set.exercise_id)
@@ -155,6 +163,9 @@ export function sessionToForm(
     if (!rowId) {
       rowId = `extra:${set.exercise_id}`
       if (!extras.some((x) => x.rowId === rowId)) extras.push({ rowId, exerciseId: set.exercise_id })
+    }
+    if (comOrdem) {
+      ordemDaLinha.set(rowId, Math.min(ordemDaLinha.get(rowId) ?? Infinity, set.entry_order!))
     }
     const linhas = (rows[rowId] ??= [])
     const index = Math.max(0, set.set_number - 1)
@@ -168,7 +179,8 @@ export function sessionToForm(
       done: true,
     }
   }
-  return { dayKey: dia?.id ?? '', sets: rows, extras }
+  const order = [...ordemDaLinha].sort((a, b) => a[1] - b[1]).map(([rowId]) => rowId)
+  return { dayKey: dia?.id ?? '', sets: rows, extras, order }
 }
 
 type PlanoAtual = {
