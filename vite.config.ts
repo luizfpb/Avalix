@@ -101,7 +101,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: "https://example.supabase.co",
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
     },
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "supabase/functions/**/*.test.ts"],
     // Shim de ambiente (jsdom x Request do Node). Ver src/testSetup.ts.
     setupFiles: ["./src/testSetup.ts"],
     // A suite completa roda arquivos jsdom pesados em paralelo. Em runners

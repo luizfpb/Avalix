@@ -2,3 +2,11 @@
 # Se algum comando pedir mais configuracao, rode: npx supabase init
 # (o script write-etapa3-files.mjs nao sobrescreve este arquivo).
 project_id = "bodytrack"
+
+# Cobrança (migration 0049). O app chama `billing` com o JWT do usuário; o
+# Asaas chama `billing-webhook` sem JWT, autenticado pelo token do webhook.
+[functions.billing]
+verify_jwt = true
+
+[functions.billing-webhook]
+verify_jwt = false

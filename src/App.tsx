@@ -33,6 +33,7 @@ const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
 const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
+const Plano = lazy(() => import('./pages/Plano'))
 const Agenda = lazy(() => import('./pages/Agenda'))
 const AvaliacoesComparar = lazy(() => import('./pages/AvaliacoesComparar'))
 const Auditoria = lazy(() => import('./pages/Auditoria'))
@@ -107,6 +108,7 @@ export default function App() {
               element={<PosturaSessaoDetalhe />}
             />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/configuracoes/plano" element={<Plano />} />
             <Route path="/auditoria" element={<Auditoria />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/carteira" element={<Navigate to="/dashboard" replace />} />

@@ -428,6 +428,44 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          event: string
+          id: string
+          org_id: string | null
+          outcome: string | null
+          payment_id: string | null
+          received_at: string
+          subscription_id: string | null
+        }
+        Insert: {
+          event: string
+          id: string
+          org_id?: string | null
+          outcome?: string | null
+          payment_id?: string | null
+          received_at?: string
+          subscription_id?: string | null
+        }
+        Update: {
+          event?: string
+          id?: string
+          org_id?: string | null
+          outcome?: string | null
+          payment_id?: string | null
+          received_at?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circumference_readings: {
         Row: {
           assessment_id: string
@@ -770,24 +808,73 @@ export type Database = {
       }
       org_subscriptions: {
         Row: {
+          asaas_checkout_id: string | null
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
+          billing_cycle: string | null
+          canceled_at: string | null
+          checkout_created_at: string | null
+          checkout_cycle: string | null
+          checkout_plan_id: string | null
+          created_at: string
           current_period_end: string | null
           org_id: string
+          pending_due_date: string | null
+          pending_invoice_url: string | null
+          pending_payment_id: string | null
           plan_id: string
           status: string
+          trial_ends_at: string | null
+          updated_at: string
         }
         Insert: {
+          asaas_checkout_id?: string | null
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          billing_cycle?: string | null
+          canceled_at?: string | null
+          checkout_created_at?: string | null
+          checkout_cycle?: string | null
+          checkout_plan_id?: string | null
+          created_at?: string
           current_period_end?: string | null
           org_id: string
+          pending_due_date?: string | null
+          pending_invoice_url?: string | null
+          pending_payment_id?: string | null
           plan_id: string
           status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
         }
         Update: {
+          asaas_checkout_id?: string | null
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          billing_cycle?: string | null
+          canceled_at?: string | null
+          checkout_created_at?: string | null
+          checkout_cycle?: string | null
+          checkout_plan_id?: string | null
+          created_at?: string
           current_period_end?: string | null
           org_id?: string
+          pending_due_date?: string | null
+          pending_invoice_url?: string | null
+          pending_payment_id?: string | null
           plan_id?: string
           status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "org_subscriptions_checkout_plan_id_fkey"
+            columns: ["checkout_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "org_subscriptions_org_id_fkey"
             columns: ["org_id"]
@@ -843,18 +930,24 @@ export type Database = {
           max_subjects: number | null
           monthly_price_brl: number | null
           name: string
+          sort_order: number
+          yearly_price_brl: number | null
         }
         Insert: {
           id: string
           max_subjects?: number | null
           monthly_price_brl?: number | null
           name: string
+          sort_order?: number
+          yearly_price_brl?: number | null
         }
         Update: {
           id?: string
           max_subjects?: number | null
           monthly_price_brl?: number | null
           name?: string
+          sort_order?: number
+          yearly_price_brl?: number | null
         }
         Relationships: []
       }
@@ -1833,6 +1926,41 @@ export type Database = {
         }[]
       }
       app_schema_version: { Args: never; Returns: string }
+      billing_apply_event: {
+        Args: {
+          p_cycle?: string
+          p_event: string
+          p_event_id: string
+          p_org: string
+          p_payment?: Json
+          p_subscription_id: string
+        }
+        Returns: Json
+      }
+      billing_change_plan: {
+        Args: { p_cycle: string; p_org: string; p_plan: string }
+        Returns: Json
+      }
+      billing_checkout_started: {
+        Args: {
+          p_checkout_id: string
+          p_cycle: string
+          p_org: string
+          p_plan: string
+        }
+        Returns: undefined
+      }
+      billing_find_org: {
+        Args: {
+          p_checkout_id: string
+          p_external_reference: string
+          p_subscription_id: string
+        }
+        Returns: string
+      }
+      billing_manage_org: { Args: { p_org: string }; Returns: string }
+      billing_mark_canceled: { Args: { p_org: string }; Returns: undefined }
+      billing_snapshot: { Args: { p_org: string }; Returns: Json }
       cancel_anamnese_intake: { Args: { p_intake: string }; Returns: undefined }
       create_assessment: {
         Args: {
@@ -1969,6 +2097,7 @@ export type Database = {
           subject_sex: string
         }[]
       }
+      get_org_billing: { Args: { p_org: string }; Returns: Json }
       get_workout_for_link: { Args: { p_token: string }; Returns: Json }
       get_workout_history_for_link: {
         Args: { p_before?: string; p_limit?: number; p_token: string }

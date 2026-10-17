@@ -57,6 +57,13 @@ export default defineConfig([
     },
   },
   {
+    // Edge Functions rodam no Deno do Supabase, não no navegador.
+    files: ["supabase/functions/**/*.ts"],
+    languageOptions: {
+      globals: { Deno: "readonly" },
+    },
+  },
+  {
     // assessmentPdf mistura o gerador de PDF com componentes @react-pdf (nao sao
     // componentes DOM); fast-refresh nao se aplica.
     files: ["src/features/reports/**/*.tsx"],

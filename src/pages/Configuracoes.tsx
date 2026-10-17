@@ -61,6 +61,17 @@ export default function Configuracoes() {
         <h2 className="text-base font-semibold">Outras áreas</h2>
         <ul className="divide-y overflow-hidden rounded-lg border bg-card">
           <li>
+            <Link to="/configuracoes/plano" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
+              <span>
+                Plano e cobrança
+                <span className="block text-xs text-muted-foreground">
+                  Assinatura, faturas e troca de plano
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </li>
+          <li>
             <Link to="/exercicios" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
               <span>
                 Biblioteca de exercícios

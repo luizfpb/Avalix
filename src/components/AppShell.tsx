@@ -7,6 +7,7 @@ import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { roleLabel } from '../lib/roles'
 import { BrandLogo, BrandMark } from './BrandLogo'
+import { BillingBanner } from './BillingBanner'
 
 type NavItem = { to: string; label: string; icon: LucideIcon }
 
@@ -132,6 +133,7 @@ export function AppShell() {
 
       <div className="lg:pl-64">
         <main id="app-main" ref={mainRef} tabIndex={-1} className="relative mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 outline-none sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
+          <BillingBanner />
           <Outlet />
         </main>
       </div>
