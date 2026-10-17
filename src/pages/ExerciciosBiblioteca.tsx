@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
 import { controlClass } from '@/lib/ui'
+import { matchesSearch, searchTerms } from '@/lib/search'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
@@ -37,11 +38,11 @@ export default function ExerciciosBiblioteca() {
   const customCount = exercises.filter((e) => e.org_id).length
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const terms = searchTerms(search)
     return exercises.filter((e) => {
       if (muscle && !worksMuscle(e, muscle)) return false
       if (videoFilter && resolveExerciseVideo(e).kind !== videoFilter) return false
-      if (q && !e.name.toLowerCase().includes(q)) return false
+      if (!matchesSearch(e.name, terms)) return false
       return true
     })
   }, [exercises, search, muscle, videoFilter])

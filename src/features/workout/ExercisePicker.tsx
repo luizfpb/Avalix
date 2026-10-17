@@ -11,6 +11,7 @@ import { resolveExerciseVideo } from './demo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { controlClass } from '@/lib/ui'
+import { matchesSearch, searchTerms } from '@/lib/search'
 
 // Busca/filtro do catálogo + criação rápida de exercício custom (extraído de
 // TreinoNovo na v2.0; única mudança: o botão de fechar usa o ícone X, não a
@@ -32,12 +33,12 @@ export function ExercisePicker({
   const [creating, setCreating] = useState(false)
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const terms = searchTerms(search)
     return exercises
       .filter((e) => {
         if (excludedExerciseIds?.has(e.id)) return false
         if (muscle && !worksMuscle(e, muscle)) return false
-        if (q && !e.name.toLowerCase().includes(q)) return false
+        if (!matchesSearch(e.name, terms)) return false
         return true
       })
       .slice(0, 60)

@@ -10,6 +10,7 @@ import {
 } from '../features/anamnesis/intakeHooks'
 import { IntakeLinkButtons } from '../features/anamnesis/IntakeLinkButtons'
 import { subjectTermLabels } from '../lib/subjectTerm'
+import { matchesSearch, searchTerms } from '../lib/search'
 import { ageFromBirthDate } from '../lib/age'
 import { Initials } from '../components/Initials'
 import { Button } from '@/components/ui/button'
@@ -77,9 +78,9 @@ export default function Avaliados() {
     : '#'
 
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    if (!term) return data ?? []
-    return (data ?? []).filter((s) => s.full_name.toLowerCase().includes(term))
+    const terms = searchTerms(q)
+    if (terms.length === 0) return data ?? []
+    return (data ?? []).filter((s) => matchesSearch(s.full_name, terms))
   }, [data, q])
 
   return (
