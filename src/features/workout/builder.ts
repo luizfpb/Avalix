@@ -115,6 +115,86 @@ export function emptyEditorPlan(): EditorPlan {
   }
 }
 
+// ---- montagem no editor -----------------------------------------------
+
+// Primeira letra livre (A, B, C...). Contar as divisões dava letra repetida
+// depois de apagar uma do meio: com A e C restantes, a próxima saía "C".
+export function nextDayLabel(days: readonly Pick<EditorDay, 'label'>[]): string {
+  const used = new Set(days.map((d) => d.label.trim().toUpperCase()))
+  for (let i = 0; i < 26; i++) {
+    const letter = String.fromCharCode(65 + i)
+    if (!used.has(letter)) return letter
+  }
+  for (let n = days.length + 1; ; n++) if (!used.has(String(n))) return String(n)
+}
+
+export const DEFAULT_PRESCRIPTION = { sets: 3, reps: '8-12', rir: 2, restSeconds: 90 } as const
+
+// Exercício novo copia séries, reps, RIR e descanso do último da divisão: quem
+// monta costuma repetir o padrão, e o 3 x 8-12 fixo obrigava a corrigir um por
+// um. Técnica, cadência, observação e bloco são do exercício e não passam.
+export function newEditorExercise(day: Pick<EditorDay, 'exercises'> | undefined, exerciseId: string, key: string): EditorExercise {
+  const last = day?.exercises[day.exercises.length - 1]
+  const base = last
+    ? { sets: last.sets, reps: last.reps, rir: last.rir, restSeconds: last.restSeconds }
+    : DEFAULT_PRESCRIPTION
+  return {
+    key,
+    exerciseId,
+    sets: base.sets,
+    reps: base.reps,
+    rir: base.rir,
+    restSeconds: base.restSeconds,
+    tempo: null,
+    notes: null,
+    groupKey: null,
+    groupKind: null,
+    technique: null,
+  }
+}
+
+// Cópia da divisão logo depois dela, com a próxima letra livre: monta-se o A2
+// a partir do A trocando um ou outro exercício. Tudo ganha chave nova (blocos
+// inclusive, para a cópia não se fundir ao bloco do original) e os ajustes por
+// semana dos exercícios vêm junto. A sequência semanal não muda: se ela foi
+// escrita à mão, o profissional decide onde a cópia entra.
+export function duplicateEditorDay(
+  plan: EditorPlan,
+  dayKey: string,
+  newKey: () => string,
+  newGroupKey: () => string
+): EditorPlan {
+  const index = plan.days.findIndex((d) => d.key === dayKey)
+  if (index < 0) return plan
+  const source = plan.days[index]
+  const exerciseKeys = new Map<string, string>()
+  const groupKeys = new Map<string, string>()
+  const exercises = source.exercises.map((ex) => {
+    const key = newKey()
+    exerciseKeys.set(ex.key, key)
+    let groupKey: string | null = null
+    if (ex.groupKey != null) {
+      if (!groupKeys.has(ex.groupKey)) groupKeys.set(ex.groupKey, newGroupKey())
+      groupKey = groupKeys.get(ex.groupKey)!
+    }
+    return { ...ex, key, groupKey }
+  })
+  const copy: EditorDay = {
+    key: newKey(),
+    label: nextDayLabel(plan.days),
+    // o nome da divisão vai até 80 caracteres no banco; o sufixo não pode estourar
+    name: source.name ? `${source.name.slice(0, 80 - ' (cópia)'.length)} (cópia)` : null,
+    exercises,
+  }
+  const overrides = plan.overrides.flatMap((o) => {
+    const key = exerciseKeys.get(o.exerciseKey)
+    return key ? [{ ...o, exerciseKey: key }] : []
+  })
+  const days = plan.days.slice()
+  days.splice(index + 1, 0, copy)
+  return { ...plan, days, overrides: [...plan.overrides, ...overrides] }
+}
+
 export function duplicateExerciseInDay(plan: EditorPlan): { dayLabel: string; exerciseId: string } | null {
   for (const day of plan.days) {
     const seen = new Set<string>()

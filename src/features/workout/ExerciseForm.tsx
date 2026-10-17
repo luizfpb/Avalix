@@ -44,6 +44,7 @@ export function ExerciseForm({
   const secondaryLabelId = `${formId}-secondary-label`
   const additionalLabelId = `${formId}-additional-primary-label`
   const cuesId = `${formId}-cues`
+  const aliasesId = `${formId}-aliases`
   const { user } = useAuth()
   const createMut = useCreateCustomExercise(orgId)
   const updateMut = useUpdateCustomExercise(orgId)
@@ -213,6 +214,20 @@ export function ExerciseForm({
             )
           })}
         </div>
+      </div>
+
+      {/* Como a academia chama o exercício além do nome oficial. A busca
+          consulta esses nomes, e eles não aparecem no treino. */}
+      <div className="space-y-1">
+        <Label htmlFor={aliasesId} className="text-xs">
+          Outros nomes (opcional, separados por vírgula; a busca também acha por eles)
+        </Label>
+        <Input
+          id={aliasesId}
+          placeholder="ex.: pulley, puxada alta"
+          value={v.aliases_text ?? ''}
+          onChange={(e) => set('aliases_text', e.target.value)}
+        />
       </div>
 
       <Label htmlFor={cuesId} className="sr-only">Dicas de execução (opcional)</Label>

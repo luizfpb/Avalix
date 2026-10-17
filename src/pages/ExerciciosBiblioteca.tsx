@@ -10,12 +10,12 @@ import { resolveExerciseVideo, type ExerciseVideoKind } from '../features/workou
 import { equipmentLabel, type Equipment } from '../features/workout/volume'
 import { primaryMusclesLabel, worksMuscle } from '../features/workout/exerciseMuscles'
 import { MUSCLE_OPTIONS } from '../features/workout/schema'
+import { searchExercises } from '../features/workout/exerciseSearch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
 import { controlClass } from '@/lib/ui'
-import { matchesSearch, searchTerms } from '@/lib/search'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
@@ -38,13 +38,12 @@ export default function ExerciciosBiblioteca() {
   const customCount = exercises.filter((e) => e.org_id).length
 
   const filtered = useMemo(() => {
-    const terms = searchTerms(search)
-    return exercises.filter((e) => {
+    const pool = exercises.filter((e) => {
       if (muscle && !worksMuscle(e, muscle)) return false
       if (videoFilter && resolveExerciseVideo(e).kind !== videoFilter) return false
-      if (!matchesSearch(e.name, terms)) return false
       return true
     })
+    return searchExercises(pool, search)
   }, [exercises, search, muscle, videoFilter])
 
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -93,7 +92,7 @@ export default function ExerciciosBiblioteca() {
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem_11rem]">
         <div>
           <label htmlFor="exercise-search" className="sr-only">Buscar exercício</label>
-          <Input id="exercise-search" placeholder="Buscar exercício..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input id="exercise-search" placeholder="Buscar exercício (nome ou apelido)..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div>
           <label htmlFor="exercise-muscle" className="sr-only">Filtrar por grupo muscular</label>
@@ -133,7 +132,7 @@ export default function ExerciciosBiblioteca() {
         <p className="text-sm text-muted-foreground">Nenhum exercício encontrado.</p>
       ) : (
         <ul className="divide-y rounded-md border bg-card">
-          {filtered.map((e) => {
+          {filtered.map(({ exercise: e, alias }) => {
             const custom = !!e.org_id
             const video = resolveExerciseVideo(e)
             if (editingId === e.id && orgId) {
@@ -171,6 +170,9 @@ export default function ExerciciosBiblioteca() {
                         ? ` · +${e.secondary_muscles.length} secundário${e.secondary_muscles.length > 1 ? 's' : ''}`
                         : ''}
                     </p>
+                    {alias ? (
+                      <p className="truncate text-xs text-muted-foreground">também chamado: {alias}</p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1 text-xs sm:justify-end">
                     <ExerciseDemoLink name={e.name} video={video} className="inline-flex min-h-10 items-center gap-1 px-2 text-muted-foreground hover:text-foreground" />

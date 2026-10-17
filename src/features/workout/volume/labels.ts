@@ -34,12 +34,13 @@ export const EQUIPMENT_LABELS: Record<Equipment, string> = {
   kettlebell: 'Kettlebell',
   machine: 'Máquina',
   smith_machine: 'Smith',
-  cable: 'Polia / cabo',
+  cable: 'Polia',
   bodyweight: 'Peso corporal',
   resistance_band: 'Faixa elástica',
   suspension: 'Suspensão (TRX)',
   plate: 'Anilha',
   medicine_ball: 'Medicine ball',
+  ankle_weight: 'Caneleira',
   other: 'Outro',
 }
 

@@ -608,6 +608,7 @@ export default function TreinoDetalhe() {
                             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                           />
                         </div>
+                        {ex.notes ? <p className="text-xs text-muted-foreground">{ex.notes}</p> : null}
                       </div>
                     )
                   })

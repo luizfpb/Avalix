@@ -46,6 +46,7 @@ export type Equipment =
   | 'suspension'
   | 'plate'
   | 'medicine_ball'
+  | 'ankle_weight'
   | 'other'
 
 export type MovementPattern =

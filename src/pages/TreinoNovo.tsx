@@ -14,6 +14,7 @@ import {
   Link2,
   Repeat,
   Unlink,
+  Copy,
 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -27,6 +28,9 @@ import type { ExerciseRow } from '../features/workout/api'
 import {
   emptyEditorPlan,
   duplicateExerciseInDay,
+  duplicateEditorDay,
+  newEditorExercise,
+  nextDayLabel,
   planDetailToEditor,
   snapshotFromEditor,
   editorToSaveInput,
@@ -315,11 +319,13 @@ function Builder({
 
   // ---- mutadores do editor -------------------------------------------
   function addDay() {
-    const nextLabel = String.fromCharCode(65 + plan.days.length) // A, B, C...
     setPlan((p) => ({
       ...p,
-      days: [...p.days, { key: newKey(), label: nextLabel, name: null, exercises: [] }],
+      days: [...p.days, { key: newKey(), label: nextDayLabel(p.days), name: null, exercises: [] }],
     }))
+  }
+  function duplicateDay(dayKey: string) {
+    setPlan((p) => duplicateEditorDay(p, dayKey, newKey, newGroupKey))
   }
   function removeDay(dayKey: string) {
     setPlan((p) => {
@@ -385,25 +391,7 @@ function Builder({
       ...p,
       days: p.days.map((d) =>
         d.key === dayKey
-          ? {
-              ...d,
-              exercises: [
-                ...d.exercises,
-                {
-                  key: newKey(),
-                  exerciseId,
-                  sets: 3,
-                  reps: '8-12',
-                  rir: 2,
-                  restSeconds: 90,
-                  tempo: null,
-                  notes: null,
-                  groupKey: null,
-                  groupKind: null,
-                  technique: null,
-                },
-              ],
-            }
+          ? { ...d, exercises: [...d.exercises, newEditorExercise(d, exerciseId, newKey())] }
           : d
       ),
     }))
@@ -429,6 +417,8 @@ function Builder({
       rir: number | null
       restSeconds: number | null
       technique: Technique | null
+      tempo: string | null
+      notes: string | null
     }>
   ) {
     setPlan((p) => ({
@@ -666,7 +656,7 @@ function Builder({
           </Field>
           {/* Drop-set, rest-pause, cluster e myo-reps acontecem DENTRO do
               exercício — por isso são um campo dele, e não um tipo de bloco. O
-              detalhe ("3 quedas de 20%") vai nas observações do plano. */}
+              detalhe ("3 quedas de 20%") vai na observação do exercício. */}
           <Field id={`exercise-${ex.key}-tech`} label="Técnica">
             <select
               id={`exercise-${ex.key}-tech`}
@@ -686,6 +676,35 @@ function Builder({
                 </option>
               ))}
             </select>
+          </Field>
+        </div>
+        {/* Cadência e observação já iam para o banco, o PDF e a página do
+            aluno, mas o editor não tinha onde escrever: "pegada aberta" ou "3
+            quedas de 20%" acabavam nas observações gerais do plano. */}
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[8rem_1fr]">
+          <Field id={`exercise-${ex.key}-tempo`} label="Cadência">
+            <Input
+              id={`exercise-${ex.key}-tempo`}
+              aria-label={`Cadência de ${exName} na divisão ${day.label}`}
+              placeholder="ex.: 3-0-1-0"
+              maxLength={15}
+              value={ex.tempo ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, { tempo: e.target.value.trim() === '' ? null : e.target.value })
+              }
+            />
+          </Field>
+          <Field id={`exercise-${ex.key}-notes`} label="Observação">
+            <Input
+              id={`exercise-${ex.key}-notes`}
+              aria-label={`Observação de ${exName} na divisão ${day.label}`}
+              placeholder="ex.: pegada aberta, 3 quedas de 20%"
+              maxLength={300}
+              value={ex.notes ?? ''}
+              onChange={(e) =>
+                patchExercise(day.key, ex.key, { notes: e.target.value.trim() === '' ? null : e.target.value })
+              }
+            />
           </Field>
         </div>
       </div>
@@ -991,6 +1010,15 @@ function Builder({
               </div>
               <button
                 type="button"
+                onClick={() => duplicateDay(day.key)}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+                title="Duplicar divisão"
+                aria-label={`Duplicar a divisão ${day.label}`}
+              >
+                <Copy className="size-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => removeDay(day.key)}
                 className="shrink-0 text-destructive"
                 title="Remover divisão"
@@ -1004,6 +1032,8 @@ function Builder({
                 exercises={exercises}
                 orgId={orgId}
                 excludedExerciseIds={new Set(day.exercises.map((exercise) => exercise.exerciseId))}
+                excludedLabel="já está nesta divisão"
+                stayOpen
                 onPick={(exerciseId) => addExercise(day.key, exerciseId)}
               />
             </CardContent>

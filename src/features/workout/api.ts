@@ -3,13 +3,14 @@ import type { Database, Json } from '../../lib/database.types'
 import type { GroupKind, Technique } from './groups'
 import type { VolumeSnapshot } from './volume'
 
-// A 0040 acrescenta os outros músculos principais e a 0042, o vídeo curado do
-// catálogo; opcionais até regenerar os tipos do banco. `own_video_url` não é
+// A 0040 acrescenta os outros músculos principais, a 0042 o vídeo curado do
+// catálogo e a 0047 os apelidos; opcionais até regenerar os tipos do banco. `own_video_url` não é
 // coluna: é o vídeo que a organização escolheu (exercise_videos), juntado por
 // listExercises.
 export type ExerciseRow = Database['public']['Tables']['exercises']['Row'] & {
   additional_primary_muscles?: string[] | null
   catalog_video_url?: string | null
+  aliases?: string[] | null
   own_video_url?: string | null
 }
 export type WorkoutPlanRow = Database['public']['Tables']['workout_plans']['Row']
@@ -104,10 +105,11 @@ export type CreateExerciseInput = {
   movementPattern: string
   isUnilateral?: boolean
   cues?: string | null
+  aliases?: string[]
   createdBy?: string | null
 }
 
-// Contrato da tabela com a coluna da 0040, até regenerar database.types.
+// Contrato da tabela com as colunas da 0040 e da 0047, até regenerar database.types.
 type ExercisesWrite = {
   from(table: 'exercises'): {
     insert(values: Record<string, unknown>): { select(columns: '*'): { single(): PromiseLike<{ data: ExerciseRow | null; error: unknown }> } }
@@ -134,6 +136,7 @@ export async function createCustomExercise(input: CreateExerciseInput): Promise<
       movement_pattern: input.movementPattern,
       is_unilateral: input.isUnilateral ?? false,
       cues: input.cues ?? null,
+      aliases: input.aliases ?? [],
       created_by: input.createdBy ?? null,
     })
     .select('*')
@@ -152,6 +155,7 @@ export type UpdateExerciseInput = {
   movementPattern: string
   isUnilateral?: boolean
   cues?: string | null
+  aliases?: string[]
 }
 
 // Edita um exercicio custom. org_id e congelado por trigger; o resto e livre.
@@ -171,6 +175,7 @@ export async function updateCustomExercise(
       movement_pattern: input.movementPattern,
       is_unilateral: input.isUnilateral ?? false,
       cues: input.cues ?? null,
+      aliases: input.aliases ?? [],
     })
     .eq('id', id)
     .select('*')

@@ -263,9 +263,12 @@ describe('Execucao — exercício fora do plano', () => {
 
     expect(screen.getByRole('button', { name: /^Crucifixo/ })).toBeTruthy()
     // Supino reto já está prescrito hoje: dois cartões do mesmo movimento na
-    // mesma sessão só confundiriam quem digita. (O nome exato exclui os botões
-    // de marcar série feita, que também citam o exercício.)
-    expect(screen.queryByRole('button', { name: /^Supino reto/ })).toBeNull()
+    // mesma sessão só confundiriam quem digita. Ele aparece apagado e com o
+    // motivo, para não parecer que falta no catálogo. (O nome exato exclui os
+    // botões de marcar série feita, que também citam o exercício.)
+    const supino = screen.getByRole('button', { name: /^Supino reto/ }) as HTMLButtonElement
+    expect(supino.disabled).toBe(true)
+    expect(supino.textContent).toContain('já está nesta sessão')
   })
 
   it('remover o avulso tira as séries dele do registro', async () => {

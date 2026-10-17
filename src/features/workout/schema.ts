@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { CreateExerciseInput, ExerciseRow, UpdateExerciseInput } from './api'
 import type { Equipment, MovementPattern, MuscleGroup } from './volume'
 import { additionalPrimaryMuscles, MAX_ADDITIONAL_PRIMARY } from './exerciseMuscles'
+import { foldText } from '@/lib/search'
 import {
   EQUIPMENT_LABELS,
   GOAL_LABELS,
@@ -48,8 +49,17 @@ export const exerciseFormSchema = z
     movement_pattern: z.string().min(1, 'Selecione o padrão de movimento'),
     is_unilateral: z.boolean().optional(),
     cues: z.string().optional(),
+    // outros nomes (0047), separados por vírgula; a busca também os consulta
+    aliases_text: z.string().optional(),
   })
   .superRefine((v, ctx) => {
+    const apelidos = parseAliases(v.aliases_text)
+    if (apelidos.length > MAX_ALIASES) {
+      ctx.addIssue({ code: 'custom', path: ['aliases_text'], message: `Informe no máximo ${MAX_ALIASES} outros nomes` })
+    }
+    if (apelidos.some((a) => a.length > MAX_ALIAS_LENGTH)) {
+      ctx.addIssue({ code: 'custom', path: ['aliases_text'], message: `Cada outro nome pode ter até ${MAX_ALIAS_LENGTH} caracteres` })
+    }
     if (!muscleEnum.safeParse(v.primary_muscle).success) {
       ctx.addIssue({ code: 'custom', path: ['primary_muscle'], message: 'Músculo inválido' })
     }
@@ -95,6 +105,24 @@ export const exerciseFormSchema = z
 
 export type ExerciseFormValues = z.infer<typeof exerciseFormSchema>
 
+export const MAX_ALIASES = 20
+export const MAX_ALIAS_LENGTH = 60
+
+// "pulley, puxada alta; pulley" -> ['pulley', 'puxada alta']. Repetição conta
+// sem acento e sem maiúscula, como a busca (o banco recusa repetido exato).
+export function parseAliases(text: string | null | undefined): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of (text ?? '').split(/[,;\n]/)) {
+    const alias = raw.trim().replace(/\s+/g, ' ')
+    const key = foldText(alias)
+    if (!alias || seen.has(key)) continue
+    seen.add(key)
+    out.push(alias)
+  }
+  return out
+}
+
 export function emptyExerciseForm(): ExerciseFormValues {
   return {
     name: '',
@@ -105,6 +133,7 @@ export function emptyExerciseForm(): ExerciseFormValues {
     movement_pattern: '',
     is_unilateral: false,
     cues: '',
+    aliases_text: '',
   }
 }
 
@@ -123,6 +152,7 @@ export function exerciseFormToInput(
     movementPattern: v.movement_pattern,
     isUnilateral: v.is_unilateral ?? false,
     cues: v.cues?.trim() ? v.cues.trim() : null,
+    aliases: parseAliases(v.aliases_text),
     createdBy,
   }
 }
@@ -137,6 +167,7 @@ export function exerciseFormToUpdate(v: ExerciseFormValues): UpdateExerciseInput
     movementPattern: v.movement_pattern,
     isUnilateral: v.is_unilateral ?? false,
     cues: v.cues?.trim() ? v.cues.trim() : null,
+    aliases: parseAliases(v.aliases_text),
   }
 }
 
@@ -150,6 +181,7 @@ export function exerciseRowToForm(r: ExerciseRow): ExerciseFormValues {
     movement_pattern: r.movement_pattern,
     is_unilateral: r.is_unilateral,
     cues: r.cues ?? '',
+    aliases_text: (r.aliases ?? []).join(', '),
   }
 }
 

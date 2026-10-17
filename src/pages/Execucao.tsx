@@ -1372,6 +1372,7 @@ function LogForm({
         <span className="text-xs text-muted-foreground">
           plano: {formatSetsReps(effective.sets, effective.reps)}
           {effective.rir != null ? ` · RIR ${effective.rir}` : ''}
+          {ex.tempo ? ` · cadência ${ex.tempo}` : ''}
         </span>
       </>,
       <>
@@ -1674,6 +1675,7 @@ function LogForm({
             exercises={exercises}
             orgId={orgId}
             excludedExerciseIds={usedExerciseIds}
+            excludedLabel="já está nesta sessão"
             onPick={addExtra}
           />
         </div>

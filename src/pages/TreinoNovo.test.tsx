@@ -148,9 +148,10 @@ function planoSalvo(): WorkoutPlanDetail {
 // Divisão A com os dois exercícios do catálogo, na ordem.
 function montarDivisaoComDoisExercicios() {
   fireEvent.click(screen.getByRole('button', { name: /Adicionar divisão/ }))
+  // a busca fica aberta entre um exercício e outro: abre uma vez só
+  fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))
   for (const nome of ['Supino reto', 'Crucifixo']) {
-    fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(nome) }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${nome}`) }))
   }
 }
 
@@ -357,5 +358,53 @@ describe('TreinoNovo — plano de outro avaliado', () => {
     abrir('/avaliados/subject-1/treinos/plan-1/editar')
     expect(screen.getByRole('alert').textContent).toMatch(/Este plano não pertence a este avaliado/)
     expect(screen.queryByLabelText('Nome do plano')).toBeNull()
+  })
+})
+
+describe('TreinoNovo — montagem', () => {
+  it('grava cadência e observação de cada exercício', async () => {
+    abrir()
+    montarDivisaoComDoisExercicios()
+    fireEvent.change(screen.getByLabelText('Cadência de Supino reto na divisão A'), {
+      target: { value: '3-0-1-0' },
+    })
+    fireEvent.change(screen.getByLabelText('Observação de Supino reto na divisão A'), {
+      target: { value: 'pegada aberta' },
+    })
+    salvar()
+
+    await vi.waitFor(() => expect(criarMock).toHaveBeenCalled())
+    const enviado = criarMock.mock.calls[0][0] as SaveWorkoutPlanInput
+    expect(enviado.days[0].exercises[0]).toMatchObject({ tempo: '3-0-1-0', notes: 'pegada aberta' })
+    expect(enviado.days[0].exercises[1]).toMatchObject({ tempo: null, notes: null })
+  })
+
+  it('exercício novo herda séries, reps, RIR e descanso do anterior', async () => {
+    abrir()
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar divisão/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Supino reto/ }))
+    fireEvent.change(screen.getByLabelText('Séries de Supino reto na divisão A'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('Repetições de Supino reto na divisão A'), { target: { value: '6-8' } })
+    fireEvent.change(screen.getByLabelText('Descanso de Supino reto na divisão A'), { target: { value: '150' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Crucifixo/ }))
+    salvar()
+
+    await vi.waitFor(() => expect(criarMock).toHaveBeenCalled())
+    const enviado = criarMock.mock.calls[0][0] as SaveWorkoutPlanInput
+    expect(enviado.days[0].exercises[1]).toMatchObject({ sets: 4, reps: '6-8', rir: 2, restSeconds: 150 })
+  })
+
+  it('duplica a divisão logo abaixo, com a próxima letra', async () => {
+    abrir()
+    montarDivisaoComDoisExercicios()
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicar a divisão A' }))
+    expect(screen.getByLabelText('Rótulo da divisão 2')).toHaveProperty('value', 'B')
+    salvar()
+
+    await vi.waitFor(() => expect(criarMock).toHaveBeenCalled())
+    const enviado = criarMock.mock.calls[0][0] as SaveWorkoutPlanInput
+    expect(enviado.days.map((d) => d.label)).toEqual(['A', 'B'])
+    expect(enviado.days[1].exercises.map((e) => e.exerciseId)).toEqual(['ex-1', 'ex-2'])
   })
 })
