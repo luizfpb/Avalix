@@ -62,14 +62,16 @@ export type CheckoutInput = {
   imageBase64: string
 }
 
-// Corpo do POST /v3/checkouts. Recorrente, cartão ou Pix, primeira cobrança
-// hoje. O org_id vai como referência externa para o webhook achar a
+// Corpo do POST /v3/checkouts. O checkout recorrente do Asaas só aceita
+// cartão ("CREDIT_CARD é o único método permitido para RECURRENT"); o Pix
+// vai por assinatura criada direto na API (pixSubscriptionBody). Primeira
+// cobrança hoje. O org_id vai como referência externa para o webhook achar a
 // organização mesmo se o checkout guardado tiver sido substituído.
 export function checkoutBody(input: CheckoutInput) {
   const base = input.appUrl.replace(/\/+$/, '')
   const back = (status: string) => `${base}/configuracoes/plano?retorno=${status}`
   return {
-    billingTypes: ['CREDIT_CARD', 'PIX'],
+    billingTypes: ['CREDIT_CARD'],
     chargeTypes: ['RECURRENT'],
     minutesToExpire: 60,
     externalReference: input.orgId,
@@ -92,6 +94,60 @@ export function checkoutBody(input: CheckoutInput) {
       nextDueDate: input.today,
     },
   }
+}
+
+// Assinatura Pix (POST /v3/subscriptions): o Asaas gera uma fatura Pix por
+// ciclo e avisa o cliente; a primeira vence hoje. A referência externa é o
+// org_id, que o webhook usa para achar a organização.
+export function pixSubscriptionBody(input: {
+  customerId: string
+  orgId: string
+  planName: string
+  cycle: Cycle
+  value: number
+  today: string
+}) {
+  return {
+    customer: input.customerId,
+    billingType: 'PIX',
+    value: input.value,
+    nextDueDate: input.today,
+    cycle: asaasCycle(input.cycle),
+    description: `Avalix ${input.planName} (${cycleLabel(input.cycle)})`,
+    externalReference: input.orgId,
+  }
+}
+
+export function onlyDigits(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+function cpfValid(d: string): boolean {
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false
+  const check = (len: number) => {
+    let sum = 0
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i)
+    const rest = (sum * 10) % 11
+    return rest === 10 ? 0 : rest
+  }
+  return check(9) === Number(d[9]) && check(10) === Number(d[10])
+}
+
+function cnpjValid(d: string): boolean {
+  if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false
+  const check = (len: number) => {
+    const weights = len === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    const sum = weights.reduce((acc, w, i) => acc + Number(d[i]) * w, 0)
+    const rest = sum % 11
+    return rest < 2 ? 0 : 11 - rest
+  }
+  return check(12) === Number(d[12]) && check(13) === Number(d[13])
+}
+
+// CPF ou CNPJ com dígitos verificadores válidos (o Asaas recusa o resto).
+export function validCpfCnpj(value: string): boolean {
+  const d = onlyDigits(value)
+  return d.length === 11 ? cpfValid(d) : d.length === 14 ? cnpjValid(d) : false
 }
 
 // Comparação em tempo constante para o token do webhook.

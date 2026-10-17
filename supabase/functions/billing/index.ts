@@ -3,15 +3,20 @@
 // owner/admin com 2FA em dia (billing_manage_org). O resto roda com a service
 // role, pelas funções billing_* da migration 0049.
 //
-// POST { action: 'checkout', org_id, plan, cycle } -> { url }
+// POST { action: 'checkout', org_id, plan, cycle, method: 'card' } -> { url } (checkout do Asaas)
+// POST { action: 'checkout', org_id, plan, cycle, method: 'pix', name, cpf_cnpj, email }
+//        -> { url, method: 'pix' } (fatura Pix)
 // POST { action: 'change',   org_id, plan, cycle } -> { ok: true }
 // POST { action: 'cancel',   org_id }              -> { ok: true }
 import {
   checkoutBody,
   cycleLabel,
   isCycle,
+  onlyDigits,
+  pixSubscriptionBody,
   planValue,
   saoPauloDate,
+  validCpfCnpj,
   type Cycle,
   type PlanPrice,
 } from '../_shared/billing.ts'
@@ -71,7 +76,14 @@ async function startCheckout(s: Snapshot, body: Record<string, unknown>) {
   if (hasLiveSubscription(s)) {
     throw new HttpError(409, 'Você já tem uma assinatura. Para mudar de plano, use "Trocar plano".')
   }
-  const { planId, cycle, plan, value } = pickPlan(s, body.plan, body.cycle)
+  const picked = pickPlan(s, body.plan, body.cycle)
+  return body.method === 'pix' ? startPix(s, body, picked) : startCard(s, picked)
+}
+
+type Picked = ReturnType<typeof pickPlan>
+
+// Cartão: checkout hospedado do Asaas, recorrente. O cartão nunca passa por aqui.
+async function startCard(s: Snapshot, { planId, cycle, plan, value }: Picked) {
   const checkout = await asaas<{ id: string; link?: string }>(
     'POST',
     '/checkouts',
@@ -93,6 +105,72 @@ async function startCheckout(s: Snapshot, body: Record<string, unknown>) {
     p_cycle: cycle,
   })
   return { url: checkout.link || asaasCheckoutUrl(checkout.id) }
+}
+
+type AsaasList<T> = { data?: T[] }
+type AsaasPayment = { id: string; invoiceUrl?: string; status?: string }
+
+// Pix: o checkout recorrente não aceita Pix, então a assinatura é criada
+// direto na API. O Asaas exige cliente com nome e CPF/CNPJ; o documento vai
+// só para o Asaas, o Avalix não guarda.
+async function startPix(s: Snapshot, body: Record<string, unknown>, { planId, cycle, plan, value }: Picked) {
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 100) : ''
+  const document = typeof body.cpf_cnpj === 'string' ? onlyDigits(body.cpf_cnpj) : ''
+  const email = typeof body.email === 'string' && body.email.includes('@') ? body.email.trim().slice(0, 200) : undefined
+  if (name.length < 3) throw new HttpError(400, 'Informe o nome completo de quem paga.')
+  if (!validCpfCnpj(document)) throw new HttpError(400, 'CPF ou CNPJ inválido.')
+
+  // assinatura Pix anterior que ficou sem pagar: sai antes de criar outra
+  if (s.asaas_subscription_id) {
+    await asaas('DELETE', `/subscriptions/${encodeURIComponent(s.asaas_subscription_id)}`).catch((error) => {
+      if (!(error instanceof HttpError && error.status === 404)) throw error
+    })
+  }
+
+  const found = await asaas<AsaasList<{ id: string }>>(
+    'GET',
+    `/customers?cpfCnpj=${encodeURIComponent(document)}&limit=1`
+  )
+  const customerId =
+    found.data?.[0]?.id ??
+    (await asaas<{ id: string }>('POST', '/customers', {
+      name,
+      cpfCnpj: document,
+      email,
+      externalReference: s.org_id,
+    })).id
+
+  const subscription = await asaas<{ id: string }>(
+    'POST',
+    '/subscriptions',
+    pixSubscriptionBody({
+      customerId,
+      orgId: s.org_id,
+      planName: plan.name,
+      cycle,
+      value,
+      today: saoPauloDate(new Date()),
+    })
+  )
+  // o plano escolhido fica pendente até o pagamento, como no checkout
+  await rpcService('billing_checkout_started', {
+    p_org: s.org_id,
+    p_checkout_id: `pix:${subscription.id}`,
+    p_plan: planId,
+    p_cycle: cycle,
+  })
+
+  // a primeira fatura (vence hoje) nasce junto com a assinatura
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const payments = await asaas<AsaasList<AsaasPayment>>(
+      'GET',
+      `/subscriptions/${encodeURIComponent(subscription.id)}/payments`
+    )
+    const invoice = payments.data?.find((p) => p.invoiceUrl)?.invoiceUrl
+    if (invoice) return { url: invoice, method: 'pix' }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+  throw new HttpError(502, 'A fatura Pix ainda está sendo gerada. Ela aparece nesta tela em instantes.')
 }
 
 async function changePlan(s: Snapshot, body: Record<string, unknown>) {

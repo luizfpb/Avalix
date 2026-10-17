@@ -15,6 +15,10 @@ vi.mock('../features/organization/context', () => ({
   useOrganization: () => ({ organization: { id: 'org-1', name: 'Estúdio', subject_term: 'aluno' }, role: 'owner' }),
 }))
 
+vi.mock('../features/auth/context', () => ({
+  useAuth: () => ({ user: { email: 'dono@estudio.test' } }),
+}))
+
 vi.mock('../features/billing/api', () => ({
   useOrgBilling: useOrgBillingMock,
   billingRequest: billingRequestMock,
@@ -65,7 +69,7 @@ afterEach(() => {
 })
 
 describe('Plano', () => {
-  it('em teste, assina o plano anual escolhido e vai para o pagamento', async () => {
+  it('em teste, assina o plano anual com cartão e vai para o checkout', async () => {
     const assign = vi.fn()
     vi.stubGlobal('location', { ...window.location, assign })
     billingRequestMock.mockResolvedValue({ url: 'https://sandbox.asaas.com/checkoutSession/show?id=chk' })
@@ -77,10 +81,38 @@ describe('Plano', () => {
     expect(screen.getByText(/Economia de R\$ 99,80/)).toBeTruthy()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Assinar' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Pagar com cartão' }))
     await waitFor(() =>
-      expect(billingRequestMock).toHaveBeenCalledWith('org-1', { action: 'checkout', plan: 'ate30', cycle: 'yearly' })
+      expect(billingRequestMock).toHaveBeenCalledWith('org-1', {
+        action: 'checkout', plan: 'ate30', cycle: 'yearly', method: 'card',
+      })
     )
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://sandbox.asaas.com/checkoutSession/show?id=chk'))
+  })
+
+  it('Pix pede nome e CPF válido e mostra o link da fatura', async () => {
+    vi.stubGlobal('scrollTo', vi.fn())
+    billingRequestMock.mockResolvedValue({ url: 'https://sandbox.asaas.com/i/pay_1', method: 'pix' })
+    renderPage(billing())
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Assinar' })[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Pagar com Pix' }))
+    fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Fulana de Tal' } })
+    fireEvent.change(screen.getByLabelText('CPF ou CNPJ'), { target: { value: '529.982.247-24' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Pix' }))
+    expect(screen.getByText('CPF ou CNPJ inválido.')).toBeTruthy()
+    expect(billingRequestMock).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText('CPF ou CNPJ'), { target: { value: '529.982.247-25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Pix' }))
+    await waitFor(() =>
+      expect(billingRequestMock).toHaveBeenCalledWith('org-1', {
+        action: 'checkout', plan: 'ilimitado', cycle: 'monthly', method: 'pix',
+        name: 'Fulana de Tal', cpf_cnpj: '529.982.247-25', email: 'dono@estudio.test',
+      })
+    )
+    const link = await screen.findByRole('link', { name: /Pagar com Pix/ })
+    expect(link.getAttribute('href')).toBe('https://sandbox.asaas.com/i/pay_1')
   })
 
   it('assinante vê o plano atual, não desce acima do limite e confirma antes de cancelar', async () => {

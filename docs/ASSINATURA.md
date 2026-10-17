@@ -32,9 +32,17 @@ testar no sandbox. Nada disso foi executado daqui.
 - **Organizações que já existiam** quando a 0049 entrou viram **cortesia**:
   sem cobrança e sem limite. Para pôr uma delas em teste:
   `update public.org_subscriptions set status = 'trial', trial_ends_at = now() + interval '14 days' where org_id = '<uuid>';`
-- **Pagamento:** checkout hospedado pelo Asaas (o cartão nunca passa pelo
-  Avalix), recorrente, cartão ou Pix. Pix gera uma fatura por ciclo; o
-  Asaas avisa o cliente por e-mail e o app mostra "Pagar fatura".
+- **Pagamento:** a pessoa escolhe entre cartão e Pix. O checkout recorrente
+  do Asaas **só aceita cartão** (resposta do sandbox em 17/10/2026: "CREDIT_CARD
+  é o único método de pagamento permitido para operações RECURRENT").
+  - **Cartão:** checkout hospedado do Asaas, recorrente; o cartão nunca passa
+    pelo Avalix.
+  - **Pix:** a Edge Function cria cliente (nome + CPF/CNPJ, exigidos pelo Asaas
+    e não guardados no Avalix) e assinatura `billingType: PIX` direto na API,
+    e devolve a primeira fatura. Cada ciclo gera uma fatura nova, que o Asaas
+    envia por e-mail; o app mostra "Pagar fatura". O plano escolhido fica
+    pendente em `checkout_plan_id` com `asaas_checkout_id = 'pix:<id da
+    assinatura>'`, e o webhook acha a org pela referência externa.
 - **Troca de plano:** o limite novo vale na hora, e o valor novo vale a partir
   da próxima cobrança, sem cobrança proporcional. Não deixa descer para o
   Até 30 com mais de 30 ativos.
@@ -151,10 +159,6 @@ set ASAAS_ENV=production
 
 - **Pix Automático** (débito recorrente por Pix) no Asaas exige CNPJ ativo
   há 6 meses. Até lá, Pix recorrente é fatura por ciclo, que o cliente paga.
-- **Checkout recorrente com Pix:** a documentação do Asaas não deixa
-  explícito se ele aceita Pix. Confirmar no sandbox; se não aceitar, o
-  checkout mostra só cartão, e o Pix fica para a fatura das cobranças
-  seguintes.
 - **Nota fiscal:** pessoa física não emite NFS-e pelo Asaas. Receita de
   pessoa física para pessoa física entra no carnê-leão mensal. Falar com um
   contador antes de o faturamento crescer (ME no Simples, por causa do fator R).

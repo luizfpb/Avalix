@@ -19,7 +19,16 @@ export function useOrgBilling(orgId: string | null | undefined) {
 }
 
 export type BillingRequest =
-  | { action: 'checkout'; plan: string; cycle: BillingCycle }
+  | { action: 'checkout'; plan: string; cycle: BillingCycle; method: 'card' }
+  | {
+      action: 'checkout'
+      plan: string
+      cycle: BillingCycle
+      method: 'pix'
+      name: string
+      cpf_cnpj: string
+      email?: string
+    }
   | { action: 'change'; plan: string; cycle: BillingCycle }
   | { action: 'cancel' }
 
@@ -28,7 +37,7 @@ export type BillingRequest =
 export async function billingRequest(
   orgId: string,
   request: BillingRequest
-): Promise<{ url?: string; ok?: boolean }> {
+): Promise<{ url?: string; ok?: boolean; method?: 'pix' }> {
   const { data, error } = await supabase.functions.invoke('billing', {
     body: { org_id: orgId, ...request },
   })
@@ -39,5 +48,5 @@ export async function billingRequest(
     }
     throw error
   }
-  return (data ?? {}) as { url?: string; ok?: boolean }
+  return (data ?? {}) as { url?: string; ok?: boolean; method?: 'pix' }
 }

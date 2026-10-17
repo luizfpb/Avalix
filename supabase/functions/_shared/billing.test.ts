@@ -3,7 +3,9 @@ import {
   checkoutBody,
   cycleFromAsaas,
   parseWebhook,
+  pixSubscriptionBody,
   planValue,
+  validCpfCnpj,
   safeEqual,
   saoPauloDate,
 } from './billing'
@@ -37,8 +39,8 @@ describe('checkoutBody', () => {
     imageBase64: 'AAAA',
   })
 
-  it('assinatura recorrente com cartão ou Pix, começando hoje', () => {
-    expect(body.billingTypes).toEqual(['CREDIT_CARD', 'PIX'])
+  it('checkout recorrente só com cartão (o Asaas recusa Pix em RECURRENT), começando hoje', () => {
+    expect(body.billingTypes).toEqual(['CREDIT_CARD'])
     expect(body.chargeTypes).toEqual(['RECURRENT'])
     expect(body.subscription).toEqual({ cycle: 'YEARLY', nextDueDate: '2026-10-17' })
   })
@@ -52,6 +54,43 @@ describe('checkoutBody', () => {
   it('respeita os limites de texto do Asaas', () => {
     expect(body.items[0].name.length).toBeLessThanOrEqual(30)
     expect(body.items[0]).toMatchObject({ name: 'Avalix Ilimitado', quantity: 1, value: 899 })
+  })
+})
+
+describe('pixSubscriptionBody', () => {
+  it('assinatura Pix com o org_id como referência e a primeira fatura hoje', () => {
+    expect(
+      pixSubscriptionBody({
+        customerId: 'cus_1',
+        orgId: 'org-1',
+        planName: 'Até 30',
+        cycle: 'monthly',
+        value: 19.9,
+        today: '2026-10-17',
+      })
+    ).toEqual({
+      customer: 'cus_1',
+      billingType: 'PIX',
+      value: 19.9,
+      nextDueDate: '2026-10-17',
+      cycle: 'MONTHLY',
+      description: 'Avalix Até 30 (mensal)',
+      externalReference: 'org-1',
+    })
+  })
+})
+
+describe('validCpfCnpj', () => {
+  it('aceita CPF e CNPJ com dígitos verificadores certos, com ou sem máscara', () => {
+    expect(validCpfCnpj('529.982.247-25')).toBe(true)
+    expect(validCpfCnpj('52998224725')).toBe(true)
+    expect(validCpfCnpj('11.222.333/0001-81')).toBe(true)
+  })
+  it('recusa dígito errado, repetição e tamanho errado', () => {
+    expect(validCpfCnpj('529.982.247-24')).toBe(false)
+    expect(validCpfCnpj('111.111.111-11')).toBe(false)
+    expect(validCpfCnpj('11.222.333/0001-80')).toBe(false)
+    expect(validCpfCnpj('1234')).toBe(false)
   })
 })
 
