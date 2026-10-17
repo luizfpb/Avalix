@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
 import type { LogRow } from './logRows'
+import { previousSetText, type PreviousSet } from './lastLoad'
 
 // Uma série da sessão em execução. É o componente que a mão suada usa no meio
 // da academia, então os alvos são de 44 px e o número da série é, ele mesmo, o
@@ -9,7 +10,7 @@ import type { LogRow } from './logRows'
 // inteira muda de cor para dizer o que já passou.
 export function SetRowFields({
   name, index, row, onChange, repsPlaceholder = '—', rirPlaceholder = '—',
-  restPlaceholder = '—', disabled = false, markable = true,
+  restPlaceholder = '—', disabled = false, markable = true, previous = null,
 }: {
   name: string
   index: number
@@ -24,9 +25,15 @@ export function SetRowFields({
    * correção de uma sessão já enviada o número volta a ser só o número.
    */
   markable?: boolean
+  /**
+   * A série de mesmo número da última sessão (0048). Fica na linha de baixo,
+   * à esquerda do "Falha", que já existia: a linha não cresce por causa dela.
+   */
+  previous?: PreviousSet | null
 }) {
   const number = index + 1
   const done = row.done === true
+  const anterior = previous ? previousSetText(previous) : null
   return (
     <div
       className={`grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-x-1.5 gap-y-0.5 rounded-md sm:gap-x-2 ${
@@ -62,7 +69,12 @@ export function SetRowFields({
       <Input aria-label={`Descanso da série ${number} de ${name}`} className="h-11 w-full min-w-0 px-1 text-center"
         type="number" inputMode="numeric" min={0} max={3600} step={1} placeholder={restPlaceholder}
         value={row.rest ?? ''} disabled={disabled} onChange={(e) => onChange('rest', e.target.value)} />
-      <label className="col-span-2 col-start-4 flex min-h-11 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+      {anterior ? (
+        <span className="col-span-2 col-start-2 row-start-2 text-xs leading-tight text-muted-foreground">
+          última: {anterior}
+        </span>
+      ) : null}
+      <label className="col-span-2 col-start-4 row-start-2 flex min-h-11 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
         <input type="checkbox" className="size-5 accent-primary" checked={row.failure === true}
           aria-label={`Falha na série ${number} de ${name}`} disabled={disabled}
           onChange={(e) => onChange('failure', e.target.checked)} />

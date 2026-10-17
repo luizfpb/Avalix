@@ -82,6 +82,8 @@ export type StudentLastSet = {
   rir: number | null
   rest_seconds?: number | null
   reached_failure?: boolean | null
+  // séries da mesma sessão (0048); pacote antigo em cache não traz
+  sets?: { set_number: number; weight_kg: number | null; reps: number | null; rir: number | null; reached_failure?: boolean | null }[] | null
 }
 
 export type StudentHistoryPlan = {

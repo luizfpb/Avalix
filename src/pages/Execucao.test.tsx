@@ -257,6 +257,20 @@ describe('Execucao — exercício fora do plano', () => {
     expect(screen.getByText(/sugestão: 45 kg × 8 \(subir carga\)/)).toBeTruthy()
   })
 
+  // 0048: cada série mostra a série de mesmo número da última sessão.
+  it('mostra embaixo de cada série a última vez daquela série', () => {
+    ultimasMock.mockReturnValue({ data: [
+      { exercise_id: 'ex-1', performed_at: '2026-09-30', weight_kg: 55, reps: 8, rir: 1, reached_failure: false,
+        sets: [
+          { set_number: 1, weight_kg: 55, reps: 8, rir: 1, reached_failure: false },
+          { set_number: 2, weight_kg: 50, reps: 12, rir: null, reached_failure: true },
+        ] },
+    ] })
+    abrir()
+    expect(screen.getByText('última: 55 kg × 8, RIR 1')).toBeTruthy()
+    expect(screen.getByText('última: 50 kg × 12, falha')).toBeTruthy()
+  })
+
   it('não oferece exercício que já está na divisão do dia', () => {
     abrir()
     fireEvent.click(screen.getByRole('button', { name: /Adicionar exercício/ }))

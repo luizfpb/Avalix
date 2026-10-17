@@ -713,6 +713,8 @@ export type SubjectLastSet = {
   reps: number | null
   rir: number | null
   reached_failure?: boolean | null
+  // séries da mesma sessão (0048)
+  sets?: { set_number: number; weight_kg: number | null; reps: number | null; rir: number | null; reached_failure?: boolean | null }[] | null
 }
 
 export async function listSubjectLastSets(subjectId: string): Promise<SubjectLastSet[]> {

@@ -1,18 +1,13 @@
 import { suggestProgression, type ProgressionKind, type RepRange } from './progression'
+import { kg, type LastLoad } from './lastLoad'
+
+export type { LastLoad } from './lastLoad'
 
 // A última vez que a pessoa fez o exercício: a melhor série da sessão mais
 // recente, em qualquer plano e registrada por quem for (app.workout_last_sets,
 // 0043). A tela do aluno e a Execução mostram a mesma linha, com a mesma
 // sugestão — antes cada uma escolhia a "última" por um critério diferente e só
 // a do profissional sugeria carga.
-export type LastLoad = {
-  weightKg: number | null
-  reps: number | null
-  rir: number | null
-  date: string | null
-  reachedFailure?: boolean | null
-}
-
 const KIND_LABEL: Record<ProgressionKind, string> = {
   increase_load: 'subir carga',
   add_reps: '+1 rep',
@@ -21,9 +16,6 @@ const KIND_LABEL: Record<ProgressionKind, string> = {
   insufficient: '',
 }
 
-function kg(value: number): string {
-  return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
-}
 
 function dataBr(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)

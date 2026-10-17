@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, CloudOff, Copy, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import { ExerciseDemoLink } from '../features/workout/ExerciseDemoLink'
-import { LastLoadLine, type LastLoad } from '../features/workout/LastLoadLine'
+import { LastLoadLine } from '../features/workout/LastLoadLine'
+import { lastLoadFromServer, previousSetAt, type LastLoad } from '../features/workout/lastLoad'
 import { parseRepRange } from '../features/workout/progression'
 import { videoOrSearch } from '../features/workout/demo'
 import {
@@ -1226,9 +1227,7 @@ function TreinoDoDia({
   )
 
   const ultimaPorExercicio = useMemo(
-    () => new Map<string, LastLoad>(pacote.last_sets.map((s) => [s.exercise_id, {
-      weightKg: s.weight_kg, reps: s.reps, rir: s.rir, date: s.performed_at, reachedFailure: s.reached_failure,
-    }])),
+    () => new Map<string, LastLoad>(pacote.last_sets.map((s) => [s.exercise_id, lastLoadFromServer(s)])),
     [pacote.last_sets]
   )
 
@@ -1972,6 +1971,7 @@ function TreinoDoDia({
                     <SetRowFields key={i} name={ex.name} index={i} row={row}
                       repsPlaceholder={efetiva.reps ?? '—'}
                       rirPlaceholder={efetiva.rir != null ? String(efetiva.rir) : '—'}
+                      previous={previousSetAt(ultima, i)}
                       disabled={switchingSession || salvando !== null}
                       onChange={(field, value) => setCelula(ex.id, i, field, value)} />
                   ))}
@@ -2031,6 +2031,7 @@ function TreinoDoDia({
                     <SetRowFields key={i} name={ex.name} index={i} row={row}
                       repsPlaceholder={ex.reps ?? '—'}
                       rirPlaceholder={ex.rir != null ? String(ex.rir) : '—'}
+                      previous={previousSetAt(ultima, i)}
                       disabled={switchingSession || salvando !== null}
                       onChange={(field, value) => setCelula(ex.id, i, field, value)} />
                   ))}

@@ -30,7 +30,8 @@ import {
   type PlanWeekSuggestion,
 } from '../features/workout/progress'
 import { latestBestByExercise, parseRepRange } from '../features/workout/progression'
-import { LastLoadLine, type LastLoad } from '../features/workout/LastLoadLine'
+import { LastLoadLine } from '../features/workout/LastLoadLine'
+import { lastLoadFromServer, previousSetAt, type LastLoad } from '../features/workout/lastLoad'
 import { roundToIncrement } from '../features/workout/oneRm'
 import { effectivePrescription, formatSetsReps, overrideFor, overrideIndex } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
@@ -572,9 +573,11 @@ function SetGrid({
   restPlaceholder,
   onCell,
   onAddRow,
+  last,
 }: {
   name: string
   rows: LogRow[]
+  last?: LastLoad | null
   repsPlaceholder: string
   rirPlaceholder: string
   restPlaceholder: string
@@ -599,6 +602,7 @@ function SetGrid({
           repsPlaceholder={repsPlaceholder}
           rirPlaceholder={rirPlaceholder}
           restPlaceholder={restPlaceholder}
+          previous={previousSetAt(last, i)}
           onChange={(field, value) => onCell(i, field, value)}
         />
       ))}
@@ -650,9 +654,7 @@ function LogForm({
   const lastSetsQuery = useSubjectLastSets(subjectId)
   const lastByExercise = useMemo(() => {
     if (lastSetsQuery.data) {
-      return new Map<string, LastLoad>(lastSetsQuery.data.map((s) => [s.exercise_id, {
-        weightKg: s.weight_kg, reps: s.reps, rir: s.rir, date: s.performed_at, reachedFailure: s.reached_failure,
-      }]))
+      return new Map<string, LastLoad>(lastSetsQuery.data.map((s) => [s.exercise_id, lastLoadFromServer(s)]))
     }
     return new Map<string, LastLoad>([...latestBestByExercise(history)].map(([id, s]) => [id, { ...s }]))
   }, [lastSetsQuery.data, history])
@@ -1394,6 +1396,7 @@ function LogForm({
           restPlaceholder={String(effective.restSeconds ?? '—')}
           onCell={(i, field, value) => setCell(ex.id, i, field, value)}
           onAddRow={() => addRow(ex.id)}
+          last={effective.skipped ? null : lastByExercise.get(ex.exercise_id)}
         />
       </>
     )
@@ -1426,6 +1429,7 @@ function LogForm({
           restPlaceholder="—"
           onCell={(i, field, value) => setCell(extra.rowId, i, field, value)}
           onAddRow={() => addRow(extra.rowId)}
+          last={last}
         />
       </>,
       true
