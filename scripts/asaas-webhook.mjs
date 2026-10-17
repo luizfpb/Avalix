@@ -2,6 +2,7 @@
 // Uso no CMD, depois de definir as variáveis da sessão:
 //   set ASAAS_API_KEY=<chave da conta>
 //   set ASAAS_WEBHOOK_TOKEN=<o mesmo token gravado nos secrets do Supabase>
+//   set ASAAS_WEBHOOK_EMAIL=<e-mail que recebe aviso de falha do webhook>
 //   set ASAAS_ENV=sandbox            (ou production)
 //   node scripts/asaas-webhook.mjs          -> cria
 //   node scripts/asaas-webhook.mjs listar   -> só lista os existentes
@@ -67,7 +68,8 @@ async function main() {
   const created = await call('POST', '/webhooks', {
     name: 'Avalix',
     url,
-    email: process.env.ASAAS_WEBHOOK_EMAIL?.trim() || undefined,
+    // o Asaas exige: é para onde ele avisa quando a fila do webhook pausa
+    email: required('ASAAS_WEBHOOK_EMAIL'),
     enabled: true,
     interrupted: false,
     apiVersion: 3,

@@ -14,8 +14,12 @@ testar no sandbox. Nada disso foi executado daqui.
 
   | Plano | Limite | Mensal | Anual (10x) |
   |---|---|---|---|
-  | Até 30 | 30 avaliados ativos | R$ 49,90 | R$ 499,00 |
-  | Ilimitado | sem limite | R$ 89,90 | R$ 899,00 |
+  | Até 30 | 30 avaliados ativos | R$ 19,90 | R$ 199,00 |
+  | Ilimitado | sem limite | R$ 39,90 | R$ 399,00 |
+
+  Preço de lançamento, aplicado por UPDATE em 17/10/2026 (a 0049 semeou
+  49,90/499 e 89,90/899). Assinatura já feita mantém no Asaas o valor da
+  época; subir o preço depois só vale para quem assinar ou trocar de plano.
 
 - **Teste grátis** de 14 dias no Ilimitado, só na primeira organização de
   cada usuário.
@@ -106,6 +110,10 @@ set ASAAS_API_KEY=COLE_A_CHAVE
 
 ```cmd
 set ASAAS_WEBHOOK_TOKEN=COLE_O_TOKEN
+```
+
+```cmd
+set ASAAS_WEBHOOK_EMAIL=SEU_EMAIL
 ```
 
 ```cmd
