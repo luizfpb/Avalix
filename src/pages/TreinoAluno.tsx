@@ -2358,8 +2358,10 @@ function Historico({
           rest_seconds: s.restSeconds ?? null, reached_failure: s.reachedFailure ?? null })),
       })
       // Sair do aparelho ou revogar o link pode desmontar o histórico durante
-      // a requisição. Sua resposta não pode repovoar o cache já apagado.
-      if (!mounted.current) return
+      // a requisição. Sua resposta não pode repovoar o cache já apagado. O
+      // acesso é conferido também: outra aba trocar o link o invalida na hora,
+      // e a desmontagem pode chegar só depois da resposta (o CI pegou isso).
+      if (!mounted.current || !isStudentStorageAccessCurrent(access)) return
       const next = (sessoes ?? []).map((session) => session.id === updated.id ? updated : session)
       setSessoes(next)
       setEditing(null)
