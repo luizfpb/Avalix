@@ -68,6 +68,12 @@ export function yearlySavings(plan: Pick<BillingPlan, 'monthly_price_brl' | 'yea
   return Math.max(0, Math.round((plan.monthly_price_brl * 12 - plan.yearly_price_brl) * 100) / 100)
 }
 
+// Quantas mensalidades o anual dá de graça, arredondado (anual = 8x -> 4).
+export function freeMonths(plan: Pick<BillingPlan, 'monthly_price_brl' | 'yearly_price_brl'>): number {
+  if (plan.monthly_price_brl <= 0) return 0
+  return Math.max(0, Math.round(yearlySavings(plan) / plan.monthly_price_brl))
+}
+
 export function monthlyEquivalent(plan: Pick<BillingPlan, 'yearly_price_brl'>): number {
   return Math.round((plan.yearly_price_brl / 12) * 100) / 100
 }

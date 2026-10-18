@@ -3,6 +3,7 @@ import {
   billingBanner,
   daysLeft,
   formatDate,
+  freeMonths,
   monthlyEquivalent,
   planLimitLabel,
   statusLabel,
@@ -39,6 +40,11 @@ describe('preços', () => {
   it('anual sai por 10 mensalidades', () => {
     expect(yearlySavings(plan)).toBe(99.8)
     expect(monthlyEquivalent(plan)).toBe(41.58)
+  })
+  it('conta os meses grátis do anual pelos preços reais', () => {
+    expect(freeMonths(plan)).toBe(2)
+    expect(freeMonths({ monthly_price_brl: 19.9, yearly_price_brl: 159 })).toBe(4)
+    expect(freeMonths({ monthly_price_brl: 39.9, yearly_price_brl: 319 })).toBe(4)
   })
   it('descreve o limite com o termo da organização', () => {
     expect(planLimitLabel(30, 'alunos')).toBe('Até 30 alunos ativos')

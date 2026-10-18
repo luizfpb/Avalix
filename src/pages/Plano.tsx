@@ -10,6 +10,7 @@ import {
   daysLeft,
   formatBRL,
   formatDate,
+  freeMonths,
   monthlyEquivalent,
   planLimitLabel,
   plural,
@@ -270,7 +271,7 @@ function PlanPicker({
   const [pending, setPending] = useState<Pending | null>(null)
   const [chosen, setChosen] = useState<BillingPlan | null>(null)
   const subscribed = billing.has_subscription
-  const bestSavings = Math.max(0, ...billing.plans.map(yearlySavings))
+  const bestFreeMonths = Math.max(0, ...billing.plans.map(freeMonths))
 
   async function run(key: string, action: () => Promise<void>) {
     setBusy(key)
@@ -341,8 +342,10 @@ function PlanPicker({
               ].join(' ')}
             >
               {c === 'monthly' ? 'Mensal' : 'Anual'}
-              {c === 'yearly' && bestSavings > 0 ? (
-                <span className="ml-1.5 text-xs text-success">2 meses grátis</span>
+              {c === 'yearly' && bestFreeMonths > 0 ? (
+                <span className="ml-1.5 text-xs text-success">
+                  {bestFreeMonths} {plural(bestFreeMonths, 'mês grátis', 'meses grátis')}
+                </span>
               ) : null}
             </button>
           ))}
