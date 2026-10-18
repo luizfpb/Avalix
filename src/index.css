@@ -24,8 +24,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ===== LIGHT (toggle/sistema) ===== */
-/* Cinzas neutros. O roxo da marca aparece só no que se preenche (botão
-   principal, seleção: --primary-solid) e em texto de ação (--primary). */
+/* Cinzas neutros. Ação é grafite: botão principal e seleção preenchem com
+   --primary-solid; texto de ação (--primary) é a cor do texto, e link ganha
+   sublinhado discreto (abaixo). O roxo-escuro fica só na marca (--brand:
+   logo, ícone, PDFs). Lilás em botão foi abandonado em 18/10/2026 por ter
+   cara de app gerado por IA. */
 :root {
   --radius: 0.75rem;
   --background: #f7f7f8;
@@ -34,8 +37,8 @@
   --card-foreground: #18181b;
   --popover: #ffffff;
   --popover-foreground: #18181b;
-  --primary: #66539a;
-  --primary-solid: #66539a;
+  --primary: #18181b;
+  --primary-solid: #18181b;
   --primary-foreground: #ffffff;
   --secondary: #f0f0f2;
   --secondary-foreground: #27272a;
@@ -47,23 +50,22 @@
   --destructive-foreground: #ffffff;
   --border: #e4e4e7;
   --input: #d4d4d8;
-  --ring: #66539a;
+  --ring: #71717a;
   --success: #287a63;
   --warning: #885019;
   /* campo da marca (mesmo nos dois modos) */
   --brand: #2a0e52;
   --brand-foreground: #ece3fa;
   --brand-magenta: #ad567b;
-  --chart-1: #66539a;
+  --chart-1: #2f5d7c;
   --chart-2: #ad567b;
   --chart-3: #287a63;
   --chart-4: #b77a35;
-  --chart-5: #39779b;
+  --chart-5: #5f5f69;
 }
 
 /* ===== DARK (padrão) ===== */
-/* --primary é o lilás legível como texto sobre o fundo escuro; o que se
-   preenche usa --primary-solid, com texto branco. */
+/* Ação clara sobre o fundo escuro: botão quase branco com texto escuro. */
 .dark {
   --background: #111113;
   --foreground: #ececee;
@@ -71,9 +73,9 @@
   --card-foreground: #ececee;
   --popover: #1c1c1f;
   --popover-foreground: #ececee;
-  --primary: #a998e2;
-  --primary-solid: #6b55b8;
-  --primary-foreground: #ffffff;
+  --primary: #ececee;
+  --primary-solid: #ececee;
+  --primary-foreground: #18181b;
   --secondary: #232327;
   --secondary-foreground: #e4e4e7;
   --muted: #1f1f23;
@@ -84,17 +86,17 @@
   --destructive-foreground: #260b0f;
   --border: #2b2b30;
   --input: #3a3a40;
-  --ring: #a998e2;
+  --ring: #a1a1aa;
   --success: #6fc3a6;
   --warning: #e0ad69;
   --brand: #2a0e52;
   --brand-foreground: #ece3fa;
   --brand-magenta: #d486a7;
-  --chart-1: #a998e2;
+  --chart-1: #7fb0cf;
   --chart-2: #d486a7;
   --chart-3: #6fc3a6;
   --chart-4: #e0ad69;
-  --chart-5: #73afd0;
+  --chart-5: #a1a1aa;
 }
 
 @theme inline {
@@ -163,6 +165,19 @@
   }
   ::selection {
     background: color-mix(in oklab, var(--primary) 28%, transparent);
+  }
+  /* Ação em texto tem a cor do texto; o sublinhado fraco é o que diz que é
+     clicável (hover:underline dos utilitários continua reforçando). */
+  a.text-primary,
+  button.text-primary {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 35%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  a.text-primary:hover,
+  button.text-primary:hover {
+    text-decoration-color: currentColor;
   }
 }
 
