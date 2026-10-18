@@ -67,12 +67,7 @@ export default function Plano() {
 
   return (
     <div className="max-w-5xl space-y-5">
-      <div>
-        <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Ajustes
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold">Plano e cobrança</h1>
-      </div>
+      <h1 className="text-xl font-semibold">Plano e cobrança</h1>
 
       {retorno ? (
         <ReturnNotice
@@ -579,7 +574,11 @@ function FinePrint() {
       <a className="underline underline-offset-2" href={`mailto:${SUPPORT_EMAIL}`}>
         {SUPPORT_EMAIL}
       </a>{' '}
-      e devolvemos o valor integral.
+      e devolvemos o valor integral. Ao assinar, você concorda com os{' '}
+      <Link to="/termos" target="_blank" className="underline underline-offset-2">
+        Termos de Uso
+      </Link>
+      .
     </p>
   )
 }

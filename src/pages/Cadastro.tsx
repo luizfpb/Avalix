@@ -88,6 +88,13 @@ export default function Cadastro() {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Criando...' : 'Criar conta'}
         </Button>
+        <p className="text-center text-xs leading-relaxed text-muted-foreground">
+          Ao criar a conta, você concorda com os{' '}
+          <Link to="/termos" target="_blank" className="underline underline-offset-2 hover:text-foreground">
+            Termos de Uso
+          </Link>
+          .
+        </p>
       </form>
       <div className="mt-4 text-center text-xs">
         <Link to="/login" className="text-muted-foreground hover:text-foreground">

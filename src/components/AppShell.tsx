@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { NavLink, Link, Outlet, useLocation } from 'react-router'
-import { LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
+import { CreditCard, LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
@@ -9,7 +9,8 @@ import { roleLabel } from '../lib/roles'
 import { BrandLogo, BrandMark } from './BrandLogo'
 import { BillingBanner } from './BillingBanner'
 
-type NavItem = { to: string; label: string; icon: LucideIcon }
+// end: só fica ativo na rota exata (Ajustes não acende dentro de /configuracoes/plano)
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 function PendingBadge({ count, mobile = false }: { count: number; mobile?: boolean }) {
   if (count === 0) return null
@@ -38,13 +39,15 @@ export function AppShell() {
   const navItems: NavItem[] = useMemo(() => [
     { to: '/dashboard', label: 'Início', icon: LayoutDashboard },
     { to: '/avaliados', label: subjectLabel, icon: Users },
-    { to: '/configuracoes', label: 'Ajustes', icon: Settings },
+    { to: '/configuracoes/plano', label: 'Plano', icon: CreditCard },
+    { to: '/configuracoes', label: 'Ajustes', icon: Settings, end: true },
   ], [subjectLabel])
 
   useEffect(() => {
     const current = navItems.find((item) =>
-      location.pathname === item.to || (item.to !== '/dashboard' && location.pathname.startsWith(`${item.to}/`))
-    )?.label
+      location.pathname === item.to ||
+      (!item.end && item.to !== '/dashboard' && location.pathname.startsWith(`${item.to}/`))
+    )?.label ?? (location.pathname.startsWith('/configuracoes/') ? 'Ajustes' : undefined)
     const section = current ?? (location.pathname.includes('/treinos') ? 'Treinos' : location.pathname.includes('/postural') ? 'Postura' : location.pathname.includes('/avaliacoes') ? 'Avaliações' : 'Avalix')
     document.title = section === 'Avalix' ? 'Avalix' : `${section} · Avalix`
     if (previousPath.current && previousPath.current !== location.pathname) mainRef.current?.focus()
@@ -78,6 +81,7 @@ export function AppShell() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               className={({ isActive }) =>
                 [
                   'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
@@ -147,6 +151,7 @@ export function AppShell() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               className={({ isActive }) =>
                 [
                   'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',

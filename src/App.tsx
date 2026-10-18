@@ -34,6 +34,7 @@ const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Plano = lazy(() => import('./pages/Plano'))
+const Termos = lazy(() => import('./pages/Termos'))
 const Agenda = lazy(() => import('./pages/Agenda'))
 const AvaliacoesComparar = lazy(() => import('./pages/AvaliacoesComparar'))
 const Auditoria = lazy(() => import('./pages/Auditoria'))
@@ -51,7 +52,8 @@ function PageFallback() {
 
 export default function App() {
   const location = useLocation()
-  const publicIntake = isPublicTokenPath(location.pathname)
+  // Termos de Uso: públicos como as rotas do aluno, abrem logado ou não
+  const publicIntake = isPublicTokenPath(location.pathname) || location.pathname === '/termos'
   const routes = (
     <Suspense fallback={<PageFallback />}>
         <Routes>
@@ -60,6 +62,7 @@ export default function App() {
           {/* Treino do aluno: token no fragmento, e /t sem fragmento para
               reabrir instalado ou offline (o token fica no aparelho). */}
           <Route path="/t" element={<TreinoAluno />} />
+          <Route path="/termos" element={<Termos />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />

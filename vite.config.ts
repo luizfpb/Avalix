@@ -60,6 +60,9 @@ export default defineConfig({
           // og-avalix.png só é lido por crawler de preview de link (WhatsApp e
           // afins), nunca pelo app: 20 KB que não fazem falta na instalação.
           "og-avalix.png",
+          // Termos de Uso: texto lido online (cadastro, assinatura); não
+          // precisa ocupar a instalação de quem usa o app no dia a dia.
+          "**/Termos-*.js",
           "**/pdfTheme-*.js",
           "**/assessmentPdf-*.js",
           "**/workoutPdf-*.js",

@@ -165,7 +165,9 @@ set ASAAS_ENV=production
 - **Nota fiscal:** pessoa física não emite NFS-e pelo Asaas. Receita de
   pessoa física para pessoa física entra no carnê-leão mensal. Falar com um
   contador antes de o faturamento crescer (ME no Simples, por causa do fator R).
-- **Termos de Uso** do serviço (preço, renovação, cancelamento, dados após o
-  fim) ainda não existem como página.
+- **Termos de Uso:** a página pública `/termos` existe (texto em
+  `src/features/legal/terms.ts`, versão 1.0), com link no cadastro e na tela
+  do plano. Falta preencher `PROVIDER.document` (CPF) e `PROVIDER.address`,
+  exigidos pelo Decreto 7.962/2013. Campo vazio não aparece na página.
 - Criar o e-mail `contato@avalixfit.com.br` (Cloudflare Email Routing,
   encaminhando para a sua caixa).

@@ -34,7 +34,7 @@ afterEach(() => {
 })
 
 describe('AppShell — navegação principal', () => {
-  it('oferece exatamente Início, o termo da organização e Ajustes no desktop e no mobile', () => {
+  it('oferece exatamente Início, o termo da organização, Plano e Ajustes no desktop e no mobile', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
         <AppShell />
@@ -46,16 +46,30 @@ describe('AppShell — navegação principal', () => {
 
     for (const navigation of navigations) {
       const links = within(navigation).getAllByRole('link')
-      expect(links).toHaveLength(3)
-      expect(links.map((link) => link.textContent)).toEqual(['Início', 'Atletas', 'Ajustes'])
+      expect(links).toHaveLength(4)
+      expect(links.map((link) => link.textContent)).toEqual(['Início', 'Atletas', 'Plano', 'Ajustes'])
       expect(links.map((link) => link.getAttribute('href'))).toEqual([
         '/dashboard',
         '/avaliados',
+        '/configuracoes/plano',
         '/configuracoes',
       ])
       expect(within(navigation).queryByText('Agenda')).toBeNull()
       expect(within(navigation).queryByText('Carteira')).toBeNull()
     }
+  })
+})
+
+describe('AppShell — item ativo', () => {
+  it('na tela do plano, só Plano fica ativo, não Ajustes', () => {
+    render(
+      <MemoryRouter initialEntries={['/configuracoes/plano']}>
+        <AppShell />
+      </MemoryRouter>
+    )
+    const [desktop] = screen.getAllByRole('navigation', { name: 'Navegação principal' })
+    expect(within(desktop).getByRole('link', { name: 'Plano' }).getAttribute('aria-current')).toBe('page')
+    expect(within(desktop).getByRole('link', { name: 'Ajustes' }).getAttribute('aria-current')).toBeNull()
   })
 })
 
