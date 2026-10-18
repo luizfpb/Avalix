@@ -102,7 +102,7 @@ function LoginForm() {
           Esqueci minha senha
         </Link>
         <Link to="/cadastro" className="font-semibold text-primary hover:underline">
-          Criar conta
+          Criar conta (14 dias grátis)
         </Link>
       </div>
     </AuthLayout>

@@ -90,11 +90,13 @@ export function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many
 }
 
-export type BannerTone = 'info' | 'warn' | 'danger'
+export type BannerTone = 'note' | 'info' | 'warn' | 'danger'
 export type Banner = { tone: BannerTone; text: string; cta: string }
 
-// Faixa no topo do app. Só aparece quando há algo a fazer: teste acabando,
-// pagamento em atraso, assinatura bloqueada ou limite do plano batendo.
+// Faixa no topo do app. No teste grátis aparece sempre (discreta até faltarem
+// 5 dias, então mais forte), para ninguém descobrir o prazo só no fim. Fora
+// dele, só quando há algo a fazer: pagamento em atraso, assinatura bloqueada
+// ou limite do plano batendo.
 export function billingBanner(b: OrgBilling, now: Date, subjectPlural: string): Banner | null {
   if (b.status === 'courtesy') return null
 
@@ -118,12 +120,20 @@ export function billingBanner(b: OrgBilling, now: Date, subjectPlural: string): 
 
   if (b.status === 'trial') {
     const days = daysLeft(b.trial_ends_at, now)
-    if (days !== null && days <= 5) {
+    if (days !== null) {
+      const until = formatDate(b.trial_ends_at)
+      if (days > 5) {
+        return {
+          tone: 'note',
+          text: `Você está no teste grátis de 14 dias: faltam ${days} dias (até ${until}). Todos os recursos estão liberados, sem precisar de cartão.`,
+          cta: 'Ver planos',
+        }
+      }
       return {
-        tone: 'info',
+        tone: 'warn',
         text: days === 0
-          ? 'Seu teste grátis termina hoje.'
-          : `Seu teste grátis termina em ${days} ${plural(days, 'dia', 'dias')}.`,
+          ? 'Seu teste grátis termina hoje. Assine para continuar criando e editando.'
+          : `Seu teste grátis termina em ${days} ${plural(days, 'dia', 'dias')} (${until}). Assine para continuar criando e editando.`,
         cta: 'Ver planos',
       }
     }

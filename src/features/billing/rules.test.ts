@@ -73,12 +73,15 @@ describe('billingBanner', () => {
     expect(billingBanner(billing(), NOW, 'alunos')).toBeNull()
   })
 
-  it('avisa nos últimos dias do teste, não antes', () => {
+  it('mostra o teste grátis desde o primeiro dia e reforça nos últimos 5', () => {
     const trial = { status: 'trial' as const, has_subscription: false, current_period_end: null }
-    expect(billingBanner(billing({ ...trial, trial_ends_at: '2026-10-27T15:00:00Z' }), NOW, 'alunos')).toBeNull()
+    expect(billingBanner(billing({ ...trial, trial_ends_at: '2026-10-31T15:00:00Z' }), NOW, 'alunos')).toMatchObject({
+      tone: 'note',
+      text: 'Você está no teste grátis de 14 dias: faltam 14 dias (até 31/10/2026). Todos os recursos estão liberados, sem precisar de cartão.',
+    })
     expect(billingBanner(billing({ ...trial, trial_ends_at: '2026-10-20T15:00:00Z' }), NOW, 'alunos')).toMatchObject({
-      tone: 'info',
-      text: 'Seu teste grátis termina em 3 dias.',
+      tone: 'warn',
+      text: 'Seu teste grátis termina em 3 dias (20/10/2026). Assine para continuar criando e editando.',
     })
   })
 

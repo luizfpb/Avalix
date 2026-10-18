@@ -69,7 +69,8 @@ export default function Onboarding() {
           </div>
           <h1 className="text-2xl font-semibold">Quase lá</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Crie sua organização para começar a usar o Avalix.
+            Crie sua organização para começar a usar o Avalix. Os primeiros 14 dias são grátis,
+            com todos os recursos e sem precisar de cartão.
           </p>
         </div>
         <form

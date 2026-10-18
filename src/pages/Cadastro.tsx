@@ -50,7 +50,7 @@ export default function Cadastro() {
   return (
     <AuthLayout
       title="Criar conta"
-      subtitle="Cadastre seu acesso profissional. Depois da confirmação do e-mail, você configura seu espaço no Avalix."
+      subtitle="14 dias grátis, com todos os recursos e sem cartão. Depois da confirmação do e-mail, você configura seu espaço no Avalix."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">

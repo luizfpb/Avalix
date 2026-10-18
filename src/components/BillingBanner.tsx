@@ -5,6 +5,7 @@ import { billingBanner } from '../features/billing/rules'
 import { subjectTermLabels } from '../lib/subjectTerm'
 
 const TONES = {
+  note: 'bg-card',
   info: 'border-primary/25 bg-primary/5',
   warn: 'border-warning/35 bg-warning/10',
   danger: 'border-destructive/35 bg-destructive/10',
