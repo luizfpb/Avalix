@@ -63,7 +63,7 @@ export default function ExerciciosBiblioteca() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-5xl space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">

@@ -40,7 +40,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="block text-xs text-muted-foreground">{label}</span>
-      <span className="block text-base font-semibold">{value}</span>
+      <span className="block text-base font-semibold tabular-nums lg:text-xl">{value}</span>
     </div>
   )
 }
@@ -161,8 +161,8 @@ export default function AvaliacaoDetalhe() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+    <div className="max-w-6xl space-y-6 lg:space-y-8">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <Link
             to={`/avaliados/${id}`}
@@ -170,7 +170,7 @@ export default function AvaliacaoDetalhe() {
           >
             ← Voltar
           </Link>
-          <h1 className="mt-2 text-xl font-semibold">
+          <h1 className="mt-2 text-xl font-semibold lg:text-2xl">
             Avaliação de {formatDate(assessment.assessed_at)}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -255,145 +255,153 @@ export default function AvaliacaoDetalhe() {
         }}
       />
 
-      {result ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resultado</CardTitle>
-            <CardDescription>motor {result.engineVersion}</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {result.warnings?.length ? (
-              <div className="col-span-2 space-y-2 sm:col-span-4">
-                {result.warnings.map((warning) => (
-                  <p key={warning.code} role="status" className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">{warning.message}</p>
+      {/* Computador: resultado e IMC à esquerda, medidas à direita. No celular
+          segue tudo numa coluna, na mesma ordem. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:items-start">
+        <div className="min-w-0 space-y-6">
+          {result ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Resultado</CardTitle>
+                <CardDescription>motor {result.engineVersion}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {result.warnings?.length ? (
+                  <div className="col-span-2 space-y-2 sm:col-span-4">
+                    {result.warnings.map((warning) => (
+                      <p key={warning.code} role="status" className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">{warning.message}</p>
+                    ))}
+                  </div>
+                ) : null}
+                <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
+                {result.bodyDensity != null ? (
+                  <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
+                ) : null}
+                <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
+                <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
+                {(() => {
+                  const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct, ageYears)
+                  return (
+                    <p className="col-span-2 text-xs sm:col-span-4">
+                      <span className="text-muted-foreground">Classificação: </span>
+                      <span
+                        className={
+                          cat.tone === 'none'
+                            ? 'text-muted-foreground'
+                            : cat.tone === 'normal'
+                              ? 'font-medium'
+                              : 'font-medium text-amber-600'
+                        }
+                      >
+                        {cat.label}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {adultReferenceApplies(ageYears)
+                          ? ' · referência ACE por sexo'
+                          : ' · as faixas ACE são para adultos'}
+                      </span>
+                    </p>
+                  )
+                })()}
+                {result.conversions ? (
+                  <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
+                    Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
+                    {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">IMC</CardTitle>
+              <CardDescription>Índice de massa corporal · referência OMS</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-baseline gap-3">
+              <span className="text-2xl font-semibold">{bmi.toFixed(1).replace('.', ',')}</span>
+              <span
+                className={
+                  bmiCat.tone === 'warn'
+                    ? 'text-sm font-medium text-amber-600'
+                    : 'text-sm text-muted-foreground'
+                }
+              >
+                {bmiCat.label}
+              </span>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          {skinfolds.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Dobras cutâneas (mm)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {skinfolds.map((s) => {
+                  const vals = [s.reading_1, s.reading_2, s.reading_3].filter(
+                    (v): v is number => v != null
+                  )
+                  const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+                  return (
+                    <div key={s.id} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">
+                        {SKINFOLD_LABELS[s.site as SkinfoldSite] ?? s.site}
+                      </span>
+                      <span>
+                        {vals.map((v) => String(v).replace('.', ',')).join(' / ')} <span className="text-muted-foreground">(méd {mean.toFixed(1).replace('.', ',')})</span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {circumferences.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Circunferências (cm)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {circumferences.map((c) => (
+                  <div key={c.id} className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">{circumferenceLabel(c.site)}</span>
+                    <span>{c.value_cm}</span>
+                  </div>
                 ))}
-              </div>
-            ) : null}
-            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
-            {result.bodyDensity != null ? (
-              <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
-            ) : null}
-            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
-            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
-            {(() => {
-              const cat = classifyBodyFat(result.inputs.sex, result.bodyFatPct, ageYears)
-              return (
-                <p className="col-span-2 text-xs sm:col-span-4">
-                  <span className="text-muted-foreground">Classificação: </span>
-                  <span
-                    className={
-                      cat.tone === 'none'
-                        ? 'text-muted-foreground'
-                        : cat.tone === 'normal'
-                          ? 'font-medium'
-                          : 'font-medium text-amber-600'
-                    }
-                  >
-                    {cat.label}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {adultReferenceApplies(ageYears)
-                      ? ' · referência ACE por sexo'
-                      : ' · as faixas ACE são para adultos'}
-                  </span>
-                </p>
-              )
-            })()}
-            {result.conversions ? (
-              <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
-                Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
-                {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Só aparece em avaliação registrada antes de agosto/2026: o campo saiu
+              deste formulário e virou pergunta obrigatória da anamnese. O que já
+              foi coletado continua visível aqui e no laudo — apagar da tela dado de
+              saúde que está gravado seria pior do que a duplicidade que existiu. */}
+          {assessment.medications ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
+                <Pill className="size-4" /> Medicamentos em uso
               </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+              <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
+                {assessment.medications}
+              </p>
+              <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-300/70">
+                Registrado nesta avaliação antes de os medicamentos passarem para a anamnese.
+              </p>
+            </div>
+          ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">IMC</CardTitle>
-          <CardDescription>Índice de massa corporal · referência OMS</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-baseline gap-3">
-          <span className="text-2xl font-semibold">{bmi.toFixed(1).replace('.', ',')}</span>
-          <span
-            className={
-              bmiCat.tone === 'warn'
-                ? 'text-sm font-medium text-amber-600'
-                : 'text-sm text-muted-foreground'
-            }
-          >
-            {bmiCat.label}
-          </span>
-        </CardContent>
-      </Card>
-
-      {skinfolds.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Dobras cutâneas (mm)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            {skinfolds.map((s) => {
-              const vals = [s.reading_1, s.reading_2, s.reading_3].filter(
-                (v): v is number => v != null
-              )
-              const mean = vals.reduce((a, b) => a + b, 0) / vals.length
-              return (
-                <div key={s.id} className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">
-                    {SKINFOLD_LABELS[s.site as SkinfoldSite] ?? s.site}
-                  </span>
-                  <span>
-                    {vals.map((v) => String(v).replace('.', ',')).join(' / ')} <span className="text-muted-foreground">(méd {mean.toFixed(1).replace('.', ',')})</span>
-                  </span>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {circumferences.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Circunferências (cm)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            {circumferences.map((c) => (
-              <div key={c.id} className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{circumferenceLabel(c.site)}</span>
-                <span>{c.value_cm}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Só aparece em avaliação registrada antes de agosto/2026: o campo saiu
-          deste formulário e virou pergunta obrigatória da anamnese. O que já
-          foi coletado continua visível aqui e no laudo — apagar da tela dado de
-          saúde que está gravado seria pior do que a duplicidade que existiu. */}
-      {assessment.medications ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-300">
-            <Pill className="size-4" /> Medicamentos em uso
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-100">
-            {assessment.medications}
-          </p>
-          <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-300/70">
-            Registrado nesta avaliação antes de os medicamentos passarem para a anamnese.
-          </p>
+          {assessment.notes ? (
+            <div className="text-sm">
+              <span className="block text-xs text-muted-foreground">Observações</span>
+              <p className="whitespace-pre-wrap">{assessment.notes}</p>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-
-      {assessment.notes ? (
-        <div className="text-sm">
-          <span className="block text-xs text-muted-foreground">Observações</span>
-          <p className="whitespace-pre-wrap">{assessment.notes}</p>
-        </div>
-      ) : null}
+      </div>
     </div>
   )
 }

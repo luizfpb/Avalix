@@ -204,7 +204,7 @@ export default function Evolucao() {
   const comparabilidade = comparabilidadeDeProtocolos(assessments.map((a) => a.protocol_id))
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           {back}
@@ -280,7 +280,7 @@ export default function Evolucao() {
           ) : (
             <p className="text-sm text-muted-foreground">Avaliação sem composição corporal.</p>
           )}
-          <div className="grid grid-cols-2 gap-3 self-center">
+          <div className="grid grid-cols-2 gap-3 self-center lg:grid-cols-3">
             {lastRes ? (
               <>
                 <Stat
@@ -314,7 +314,7 @@ export default function Evolucao() {
               {comparabilidade.aviso}
             </p>
           ) : null}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <MetricChart
               title="% de gordura"
               unit="%"
@@ -543,7 +543,7 @@ function CircumferencesCharts({
       {siteSeries.length > 0 ? (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Evolução das circunferências</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {siteSeries.map((s, i) => (
               <MetricChart
                 key={s.site}

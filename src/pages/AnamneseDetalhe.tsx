@@ -49,7 +49,7 @@ export default function AnamneseDetalhe() {
   const edited = new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">

@@ -26,7 +26,7 @@ export function BillingBanner() {
       role={banner.tone === 'danger' ? 'alert' : 'status'}
       className={`mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm ${TONES[banner.tone]}`}
     >
-      <span>{banner.text}</span>
+      <span className="lg:min-w-0 lg:flex-1">{banner.text}</span>
       {data.can_manage ? (
         <Link
           to="/configuracoes/plano"

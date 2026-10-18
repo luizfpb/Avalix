@@ -518,7 +518,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div>
         <Link
           to={`/avaliados/${subject.id}`}
@@ -526,7 +526,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         >
           ← {subject.full_name}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">
+        <h1 className="mt-2 text-xl font-semibold lg:text-2xl">
           {isEdit ? 'Editar avaliação' : 'Nova avaliação'}
         </h1>
       </div>
@@ -547,150 +547,161 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Data">
-          <Input type="date" value={assessedAt} onChange={(e) => setAssessedAt(e.target.value)} />
-        </Field>
-        <Field label="Protocolo">
-          <select
-            className={controlClass}
-            value={protocolId}
-            onChange={(e) => setProtocolId(e.target.value)}
-          >
-            {protocols.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Peso (kg)">
-          <DecimalInput value={weight} onValueChange={setWeight} />
-        </Field>
-        <Field label="Altura (cm)">
-          <DecimalInput value={height} onValueChange={setHeight} />
-        </Field>
-      </div>
-
-      {protocol?.kind === 'skinfold' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Dobras cutâneas (mm)</CardTitle>
-            <CardDescription>Até 3 aferições por ponto; usamos a média.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {protocol.skinfoldSites.map((site) => {
-              const trio = trioOf(site)
-              const mean = meanReading(trio.map(Number))
-              return (
-                <div
-                  key={site}
-                  className="flex flex-wrap items-center justify-between gap-2"
-                >
-                  <span className="w-28 text-sm">{SKINFOLD_LABELS[site]}</span>
-                  <div className="flex items-center gap-2">
-                    {[0, 1, 2].map((i) => (
-                      <DecimalInput
-                        key={i}
-                        className="w-16"
-                        aria-label={`${SKINFOLD_LABELS[site]}, aferição ${i + 1}`}
-                        value={trio[i]}
-                        onValueChange={(value) => setSkinfold(site, i, value)}
-                      />
-                    ))}
-                    <span className="w-16 text-right text-xs text-muted-foreground">
-                      {mean != null ? `méd ${mean.toFixed(1).replace('.', ',')}` : '—'}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <CircumferencesCard
-        values={circumferences}
-        onChange={(key, v) => setCircumferences((prev) => ({ ...prev, [key]: v }))}
-        neededCircs={neededCircs}
-        measureHint={protocolMeasureHint(protocol?.id, sex)}
-        custom={customCircs}
-        setCustom={setCustomCircs}
-      />
-
-      {navyRecalculado ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-          Esta avaliação foi calculada com a cintura, como o app fazia até 06/10/2026. No método US Navy, o
-          homem é medido no abdômen, na altura do umbigo. Para salvar alterações, informe o abdômen: o
-          percentual será recalculado.
-        </p>
-      ) : null}
-
-      {result ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resultado</CardTitle>
-            <CardDescription>
-              {protocol?.label} · motor {result.engineVersion}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
-            {result.bodyDensity != null ? (
-              <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
-            ) : null}
-            <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
-            <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
-            {result.conversions ? (
-              <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
-                Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
-                {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
-              </p>
-            ) : null}
-            {result.warnings?.length ? (
-              <div className="col-span-2 space-y-1.5 sm:col-span-4">
-                {result.warnings.map((w) => (
-                  <p
-                    key={w.code}
-                    role="status"
-                    className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
-                  >
-                    {w.message}
-                  </p>
+      {/* Computador: medidas à esquerda e o resultado parado à direita,
+          recalculando enquanto se digita. A ordem no código é a do celular
+          (medidas, resultado, observações), e o grid só reposiciona. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:gap-8">
+        <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Data">
+              <Input type="date" value={assessedAt} onChange={(e) => setAssessedAt(e.target.value)} />
+            </Field>
+            <Field label="Protocolo">
+              <select
+                className={controlClass}
+                value={protocolId}
+                onChange={(e) => setProtocolId(e.target.value)}
+              >
+                {protocols.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
                 ))}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : domainError ? (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {domainError}
-        </p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Preencha peso, altura e as medidas do protocolo para ver o resultado.
-        </p>
-      )}
+              </select>
+            </Field>
+            <Field label="Peso (kg)">
+              <DecimalInput value={weight} onValueChange={setWeight} />
+            </Field>
+            <Field label="Altura (cm)">
+              <DecimalInput value={height} onValueChange={setHeight} />
+            </Field>
+          </div>
 
-      <Field label="Observações (opcional)">
-        <textarea
-          rows={3}
-          className={controlClass}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </Field>
+          {protocol?.kind === 'skinfold' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Dobras cutâneas (mm)</CardTitle>
+                <CardDescription>Até 3 aferições por ponto; usamos a média.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {protocol.skinfoldSites.map((site) => {
+                  const trio = trioOf(site)
+                  const mean = meanReading(trio.map(Number))
+                  return (
+                    <div
+                      key={site}
+                      className="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <span className="w-28 text-sm">{SKINFOLD_LABELS[site]}</span>
+                      <div className="flex items-center gap-2">
+                        {[0, 1, 2].map((i) => (
+                          <DecimalInput
+                            key={i}
+                            className="w-16"
+                            aria-label={`${SKINFOLD_LABELS[site]}, aferição ${i + 1}`}
+                            value={trio[i]}
+                            onValueChange={(value) => setSkinfold(site, i, value)}
+                          />
+                        ))}
+                        <span className="w-16 text-right text-xs text-muted-foreground">
+                          {mean != null ? `méd ${mean.toFixed(1).replace('.', ',')}` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          ) : null}
 
-      {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
+          <CircumferencesCard
+            values={circumferences}
+            onChange={(key, v) => setCircumferences((prev) => ({ ...prev, [key]: v }))}
+            neededCircs={neededCircs}
+            measureHint={protocolMeasureHint(protocol?.id, sex)}
+            custom={customCircs}
+            setCustom={setCustomCircs}
+          />
+        </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleSave} disabled={mut.isPending || !result}>
-          {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar avaliação'}
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to={`/avaliados/${subject.id}`}>Cancelar</Link>
-        </Button>
-        {dirty ? <UnsavedBadge /> : null}
+        <div className="min-w-0 space-y-6 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start">
+          {navyRecalculado ? (
+            <p role="status" className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+              Esta avaliação foi calculada com a cintura, como o app fazia até 06/10/2026. No método US Navy, o
+              homem é medido no abdômen, na altura do umbigo. Para salvar alterações, informe o abdômen: o
+              percentual será recalculado.
+            </p>
+          ) : null}
+
+          {result ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Resultado</CardTitle>
+                <CardDescription>
+                  {protocol?.label} · motor {result.engineVersion}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
+                <Stat label="% Gordura" value={`${result.bodyFatPct.toFixed(1).replace('.', ',')}%`} />
+                {result.bodyDensity != null ? (
+                  <Stat label="Densidade" value={result.bodyDensity.toFixed(4).replace('.', ',')} />
+                ) : null}
+                <Stat label="Massa gorda" value={`${result.fatMassKg.toFixed(1).replace('.', ',')} kg`} />
+                <Stat label="Massa magra" value={`${result.leanMassKg.toFixed(1).replace('.', ',')} kg`} />
+                {result.conversions ? (
+                  <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4 xl:col-span-2">
+                    Siri {result.conversions.siri.toFixed(1).replace('.', ',')}% · Brozek{' '}
+                    {result.conversions.brozek.toFixed(1).replace('.', ',')}% (principal: Siri)
+                  </p>
+                ) : null}
+                {result.warnings?.length ? (
+                  <div className="col-span-2 space-y-1.5 sm:col-span-4 xl:col-span-2">
+                    {result.warnings.map((w) => (
+                      <p
+                        key={w.code}
+                        role="status"
+                        className="rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+                      >
+                        {w.message}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : domainError ? (
+            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {domainError}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Preencha peso, altura e as medidas do protocolo para ver o resultado.
+            </p>
+          )}
+        </div>
+
+        <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-2">
+          <Field label="Observações (opcional)">
+            <textarea
+              rows={3}
+              className={controlClass}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Field>
+
+          {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={handleSave} disabled={mut.isPending || !result}>
+              {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar avaliação'}
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to={`/avaliados/${subject.id}`}>Cancelar</Link>
+            </Button>
+            {dirty ? <UnsavedBadge /> : null}
+          </div>
+        </div>
       </div>
 
       <UnsavedChangesPrompt guard={guard} what="nesta avaliação" />

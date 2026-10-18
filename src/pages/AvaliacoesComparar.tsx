@@ -69,7 +69,7 @@ export default function AvaliacoesComparar() {
   const effectiveTo = toId ?? assessments[assessments.length - 1].id
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div>
         {back}
         <h1 className="mt-2 text-xl font-semibold">Comparar avaliações</h1>

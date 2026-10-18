@@ -146,6 +146,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* No computador a tela sobra: a base sobe de 16 para 17 px e tudo que é
+     medido em rem (texto, ícones, espaçamentos) cresce junto. O celular fica
+     como está. */
+  @media (min-width: 1280px) {
+    html {
+      font-size: 17px;
+    }
+  }
   body {
     @apply bg-background text-foreground antialiased;
     min-width: 320px;

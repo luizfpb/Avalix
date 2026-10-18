@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { NavLink, Link, Outlet, useLocation } from 'react-router'
-import { CreditCard, LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
+import { Calculator, CalendarDays, CreditCard, Dumbbell, LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
@@ -11,6 +11,22 @@ import { BillingBanner } from './BillingBanner'
 
 // end: só fica ativo na rota exata (Ajustes não acende dentro de /configuracoes/plano)
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
+
+// Só na barra lateral do computador: no celular a barra de baixo comporta
+// quatro itens e essas telas seguem em Início e Ajustes.
+const toolItems: NavItem[] = [
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/exercicios', label: 'Exercícios', icon: Dumbbell },
+  { to: '/ferramentas/1rm', label: 'Calculadora 1RM', icon: Calculator },
+]
+
+const sideLinkClass = ({ isActive }: { isActive: boolean }) =>
+  [
+    'flex h-11 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
+    isActive
+      ? 'bg-accent text-foreground'
+      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+  ].join(' ')
 
 function PendingBadge({ count, mobile = false }: { count: number; mobile?: boolean }) {
   if (count === 0) return null
@@ -44,7 +60,7 @@ export function AppShell() {
   ], [subjectLabel])
 
   useEffect(() => {
-    const current = navItems.find((item) =>
+    const current = [...navItems, ...toolItems].find((item) =>
       location.pathname === item.to ||
       (!item.end && item.to !== '/dashboard' && location.pathname.startsWith(`${item.to}/`))
     )?.label ?? (location.pathname.startsWith('/configuracoes/') ? 'Ajustes' : undefined)
@@ -62,41 +78,42 @@ export function AppShell() {
       >
         Ir para o conteúdo principal
       </a>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r bg-card lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r bg-card lg:flex xl:w-72">
         <Link
           to="/dashboard"
-          className="flex h-16 shrink-0 items-center gap-3 px-5 transition-colors hover:bg-accent/60"
+          className="flex h-[4.5rem] shrink-0 items-center gap-3 border-b px-5 transition-colors hover:bg-accent/60"
         >
-          <BrandMark size={32} />
+          <BrandMark size={36} />
           <span className="min-w-0">
-            <BrandLogo height={14} className="block text-foreground" />
+            <BrandLogo height={15} className="block text-foreground" />
             <span className="mt-1 block truncate text-xs text-muted-foreground">
               {organization?.name ?? 'Seu espaço profissional'}
             </span>
           </span>
         </Link>
 
-        <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Navegação principal">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                [
-                  'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
-                  isActive
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-                ].join(' ')
-              }
-            >
-              <item.icon className="size-4" />
-              <span>{item.label}</span>
-              {item.to === '/dashboard' ? <PendingBadge count={pendingCount} /> : null}
-            </NavLink>
-          ))}
-        </nav>
+        <div className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+          <nav className="space-y-1" aria-label="Navegação principal">
+            {navItems.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.end} className={sideLinkClass}>
+                <item.icon className="size-5" strokeWidth={1.8} />
+                <span>{item.label}</span>
+                {item.to === '/dashboard' ? <PendingBadge count={pendingCount} /> : null}
+              </NavLink>
+            ))}
+          </nav>
+          <nav className="space-y-1 border-t pt-5" aria-labelledby="ferramentas-titulo">
+            <p id="ferramentas-titulo" className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+              Ferramentas
+            </p>
+            {toolItems.map((item) => (
+              <NavLink key={item.to} to={item.to} className={sideLinkClass}>
+                <item.icon className="size-5" strokeWidth={1.8} />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </div>
 
         <div className="flex items-center gap-3 border-t px-5 py-4">
           <span className="min-w-0 flex-1">
@@ -135,8 +152,8 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="lg:pl-64">
-        <main id="app-main" ref={mainRef} tabIndex={-1} className="relative mx-auto min-h-screen max-w-[1280px] px-4 pb-28 pt-7 outline-none sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
+      <div className="lg:pl-64 xl:pl-72">
+        <main id="app-main" ref={mainRef} tabIndex={-1} className="relative mx-auto min-h-screen max-w-[1480px] px-4 pb-28 pt-7 outline-none sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
           <BillingBanner />
           <Outlet />
         </main>

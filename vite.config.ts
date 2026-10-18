@@ -63,6 +63,11 @@ export default defineConfig({
           // Termos de Uso: texto lido online (cadastro, assinatura); não
           // precisa ocupar a instalação de quem usa o app no dia a dia.
           "**/Termos-*.js",
+          // Plano e Auditoria só funcionam com internet (cobrança no Asaas,
+          // trilha lida do servidor). Sair do pré-cache abriu espaço para o
+          // layout de computador (18/10/2026) sem subir o teto de 2 MB.
+          "**/Plano-*.js",
+          "**/Auditoria-*.js",
           "**/pdfTheme-*.js",
           "**/assessmentPdf-*.js",
           "**/workoutPdf-*.js",

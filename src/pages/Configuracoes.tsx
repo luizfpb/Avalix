@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import { Link } from 'react-router'
 import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
-import { ShieldCheck, Sun, Moon, Monitor, ChevronRight } from 'lucide-react'
+import { Calculator, ChevronRight, CreditCard, Dumbbell, Monitor, Moon, ScrollText, ShieldCheck, Sun, type LucideIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { normalizeAuthError, normalizeDbError } from '../lib/errors'
 import { useAuth } from '../features/auth/context'
@@ -16,96 +16,83 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { roleLabel } from '../lib/roles'
 
+type AreaLink = { to: string; title: string; hint: string; icon: LucideIcon }
+
 export default function Configuracoes() {
   const { user } = useAuth()
   const { organization, role } = useOrganization()
+  const areas: AreaLink[] = [
+    { to: '/configuracoes/plano', title: 'Plano e cobrança', hint: 'Assinatura, faturas e troca de plano', icon: CreditCard },
+    { to: '/exercicios', title: 'Biblioteca de exercícios', hint: 'Catálogo global e os exercícios criados pela sua organização', icon: Dumbbell },
+    ...(role === 'owner' || role === 'admin'
+      ? [{ to: '/auditoria', title: 'Trilha de auditoria e erros', hint: 'Quem fez o quê e quando (LGPD) e os erros do aplicativo', icon: ScrollText }]
+      : []),
+    { to: '/ferramentas/1rm', title: 'Calculadora de carga (1RM)', hint: 'Estima o 1RM por carga×reps e gera a tabela de %1RM', icon: Calculator },
+  ]
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5 lg:space-y-8">
       <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
 
-      <AppearanceCard />
+      {/* Duas pilhas no computador; no celular uma embaixo da outra, na mesma
+          ordem de antes. */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-start xl:gap-6">
+        <div className="min-w-0 space-y-5 lg:space-y-6">
+          <AppearanceCard />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Conta</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Info label="E-mail" value={user?.email ?? '-'} />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Conta</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Info label="E-mail" value={user?.email ?? '-'} />
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Verificação em dois fatores (2FA)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MfaSettings />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Verificação em dois fatores (2FA)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MfaSettings />
+            </CardContent>
+          </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Organização</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Info label="Nome" value={organization?.name ?? '-'} />
-            <Info label="Seu papel" value={roleLabel(role)} />
-          </div>
-          <LogoSettings />
-          <ContactSettings />
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Organização</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Info label="Nome" value={organization?.name ?? '-'} />
+              <Info label="Seu papel" value={roleLabel(role)} />
+            </div>
+            <LogoSettings />
+            <ContactSettings />
+          </CardContent>
+        </Card>
+      </div>
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Outras áreas</h2>
-        <ul className="divide-y overflow-hidden rounded-lg border bg-card">
-          <li>
-            <Link to="/configuracoes/plano" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
-              <span>
-                Plano e cobrança
-                <span className="block text-xs text-muted-foreground">
-                  Assinatura, faturas e troca de plano
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {areas.map((area) => (
+            <li key={area.to}>
+              <Link
+                to={area.to}
+                className="group flex h-full items-start gap-3 rounded-lg border bg-card p-4 text-sm transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-md bg-secondary text-foreground">
+                  <area.icon className="size-5" strokeWidth={1.8} />
                 </span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
-          <li>
-            <Link to="/exercicios" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
-              <span>
-                Biblioteca de exercícios
-                <span className="block text-xs text-muted-foreground">
-                  Catálogo global e os exercícios criados pela sua organização
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{area.title}</span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{area.hint}</span>
                 </span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
-          {role === 'owner' || role === 'admin' ? (
-            <li>
-              <Link to="/auditoria" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
-                <span>
-                  Trilha de auditoria e erros
-                  <span className="block text-xs text-muted-foreground">
-                    Quem fez o quê e quando (LGPD) e os erros do aplicativo
-                  </span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </Link>
             </li>
-          ) : null}
-          <li>
-            <Link to="/ferramentas/1rm" className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent">
-              <span>
-                Calculadora de carga (1RM)
-                <span className="block text-xs text-muted-foreground">
-                  Estima o 1RM por carga×reps e gera a tabela de %1RM
-                </span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
+          ))}
         </ul>
       </section>
     </div>

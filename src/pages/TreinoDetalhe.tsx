@@ -61,6 +61,12 @@ function fmtSets(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
+// classes inteiras para o Tailwind enxergar
+const DAY_COLUMNS: Record<number, string> = {
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-2 xl:grid-cols-3',
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
   active: 'Ativo',
@@ -348,17 +354,16 @@ export default function TreinoDetalhe() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      {/* Título em cima e ações embaixo, em qualquer largura. Lado a lado não
-          cabe nem no PC: a página tem no máximo 672 px e as seis ações somam
-          quase isso, então o nome do plano, o objetivo e a sequência ficavam
-          espremidos numa coluna de uma palavra. */}
+    <div className="space-y-6 lg:space-y-8">
+      {/* Título em cima e ações embaixo, em qualquer largura. As seis ações
+          somam quase 700 px: lado a lado, o nome do plano, o objetivo e a
+          sequência ficavam espremidos numa coluna de uma palavra. */}
       <div className="flex flex-col gap-3">
         <div className="min-w-0">
           <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
             ← Voltar
           </Link>
-          <h1 className="mt-2 text-xl font-semibold">{plan.name}</h1>
+          <h1 className="mt-2 text-xl font-semibold lg:text-2xl">{plan.name}</h1>
           <p className="text-sm text-muted-foreground">
             {goalLabel(plan.goal)} · {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
             {startsOn ? ` · início ${startsOn}` : ''}
@@ -566,64 +571,67 @@ export default function TreinoDetalhe() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Divisões</h2>
-        {orderedDays.map((day) => {
-          const rows = exercises
-            .filter((e) => e.day_id === day.id)
-            .slice()
-            .sort((a, b) => a.position - b.position)
-          return (
-            <Card key={day.id}>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Treino {day.label}
-                  {day.name ? <span className="text-muted-foreground"> · {day.name}</span> : null}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {toRowBlocks(rows).map((block) => {
-                  const cartoes = block.items.map((ex, j) => {
-                    const meta = exerciseMeta(ex)
-                    const exName = exerciseNames[ex.exercise_id] ?? 'Exercício'
-                    const tecnica = techniqueLabel(ex.technique)
-                    return (
-                      <div key={ex.id} className="flex flex-col border-b py-1 last:border-0">
-                        <div className="flex justify-between gap-3">
-                          <span>
-                            {block.start + j + 1}. {exName}
-                            {tecnica ? (
-                              <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
-                                {tecnica}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="shrink-0 font-semibold tabular-nums">
-                            {formatSetsReps(ex.sets, ex.reps)}
-                          </span>
+        {/* No computador as divisões ficam lado a lado, até três por linha. */}
+        <div className={`grid grid-cols-1 items-start gap-4 ${DAY_COLUMNS[Math.min(orderedDays.length, 3)] ?? ''}`}>
+          {orderedDays.map((day) => {
+            const rows = exercises
+              .filter((e) => e.day_id === day.id)
+              .slice()
+              .sort((a, b) => a.position - b.position)
+            return (
+              <Card key={day.id}>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Treino {day.label}
+                    {day.name ? <span className="text-muted-foreground"> · {day.name}</span> : null}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {toRowBlocks(rows).map((block) => {
+                    const cartoes = block.items.map((ex, j) => {
+                      const meta = exerciseMeta(ex)
+                      const exName = exerciseNames[ex.exercise_id] ?? 'Exercício'
+                      const tecnica = techniqueLabel(ex.technique)
+                      return (
+                        <div key={ex.id} className="flex flex-col border-b py-1 last:border-0 lg:py-2">
+                          <div className="flex justify-between gap-3">
+                            <span>
+                              {block.start + j + 1}. {exName}
+                              {tecnica ? (
+                                <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                                  {tecnica}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="shrink-0 font-semibold tabular-nums">
+                              {formatSetsReps(ex.sets, ex.reps)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
+                            <ExerciseDemoLink
+                              name={exName}
+                              video={exerciseVideos[ex.exercise_id] ?? videoOrSearch(null, exName)}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            />
+                          </div>
+                          {ex.notes ? <p className="text-xs text-muted-foreground">{ex.notes}</p> : null}
                         </div>
-                        <div className="flex items-center justify-between gap-3">
-                          {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : <span />}
-                          <ExerciseDemoLink
-                            name={exName}
-                            video={exerciseVideos[ex.exercise_id] ?? videoOrSearch(null, exName)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                          />
-                        </div>
-                        {ex.notes ? <p className="text-xs text-muted-foreground">{ex.notes}</p> : null}
-                      </div>
+                      )
+                    })
+                    return block.kind == null ? (
+                      cartoes
+                    ) : (
+                      <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
+                        {cartoes}
+                      </GroupBlock>
                     )
-                  })
-                  return block.kind == null ? (
-                    cartoes
-                  ) : (
-                    <GroupBlock key={block.key} kind={block.kind} size={block.items.length}>
-                      {cartoes}
-                    </GroupBlock>
-                  )
-                })}
-              </CardContent>
-            </Card>
-          )
-        })}
+                  })}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       </section>
 
       {weekNumbers.length > 0 ? (

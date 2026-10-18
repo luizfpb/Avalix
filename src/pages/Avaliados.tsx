@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { Plus, Search, ChevronRight, Copy, MessageCircle, Send } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
+import { useLastAssessmentBySubject } from '../features/assessment/hooks'
+import { useOrgActivePlans } from '../features/workout/hooks'
 import {
   useRegistrationIntakes,
   useGenerateRegistrationLink,
@@ -25,6 +27,13 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('pt-BR')
 }
 
+// assessed_at é só a data: passar por Date leria como UTC e mostraria o dia
+// anterior no Brasil.
+function formatDay(day: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : day
+}
+
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
@@ -32,11 +41,23 @@ function formatDateTime(iso: string): string {
     : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+// Colunas só do computador; no celular a linha continua nome + idade.
+const LAST_COL = 'hidden w-36 shrink-0 lg:block'
+const PLAN_COL = 'hidden w-56 shrink-0 xl:w-64 lg:block'
+
 export default function Avaliados() {
   const { organization } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
   const { data, isPending, isError, refetch } = useSubjects(organization?.id)
   const [q, setQ] = useState('')
+  // Colunas extras do computador. Mesmas consultas do Início, então quem vem
+  // de lá já as tem em cache.
+  const lastAssessment = useLastAssessmentBySubject(organization?.id).data
+  const activePlans = useOrgActivePlans(organization?.id).data
+  const planBySubject = useMemo(
+    () => new Map((activePlans ?? []).map((p) => [p.subjectId, p.name])),
+    [activePlans]
+  )
 
   // Convite de cadastro pelo link: o aluno preenche os proprios dados +
   // anamnese e tudo fica pendente ate o personal aceitar (vira avaliado so no
@@ -226,30 +247,48 @@ export default function Avaliados() {
           </Button>
         </div>
       ) : filtered.length > 0 ? (
-        <ul className="divide-y overflow-hidden rounded-lg border bg-card">
-          {filtered.map((s) => {
-            const age = ageFromBirthDate(s.birth_date)
-            return (
-              <li key={s.id}>
-                <Link
-                  to={`/avaliados/${s.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
-                >
-                  <Initials name={s.full_name} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{s.full_name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {age !== null ? `${age} anos · ` : ''}
-                      {s.sex === 'F' ? 'Feminino' : 'Masculino'}
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <div aria-hidden className="hidden items-center gap-4 border-b px-5 py-2.5 text-xs font-medium text-muted-foreground lg:flex">
+            <span className="flex-1">Nome</span>
+            <span className={LAST_COL}>Última avaliação</span>
+            <span className={PLAN_COL}>Treino vigente</span>
+            <span className="w-24" />
+          </div>
+          <ul className="divide-y">
+            {filtered.map((s) => {
+              const age = ageFromBirthDate(s.birth_date)
+              const last = lastAssessment?.[s.id]
+              const plan = planBySubject.get(s.id)
+              return (
+                <li key={s.id}>
+                  <Link
+                    to={`/avaliados/${s.id}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent lg:gap-4 lg:px-5 lg:py-3.5"
+                  >
+                    <Initials name={s.full_name} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{s.full_name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {age !== null ? `${age} anos · ` : ''}
+                        {s.sex === 'F' ? 'Feminino' : 'Masculino'}
+                      </span>
                     </span>
-                  </span>
-                  {!s.is_active ? <Badge variant="secondary">Inativo</Badge> : null}
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+                    <span className={`${LAST_COL} text-sm tabular-nums ${last ? '' : 'text-muted-foreground'}`}>
+                      {last ? formatDay(last) : 'Nenhuma'}
+                    </span>
+                    <span className={`${PLAN_COL} truncate text-sm ${plan ? '' : 'text-muted-foreground'}`}>
+                      {plan ?? 'Sem plano ativo'}
+                    </span>
+                    <span className="flex shrink-0 items-center justify-end gap-3 lg:w-24">
+                      {!s.is_active ? <Badge variant="secondary">Inativo</Badge> : null}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       ) : data && data.length > 0 ? (
         <p className="px-1 py-8 text-center text-sm text-muted-foreground">
           Nenhum resultado para “{q}”.

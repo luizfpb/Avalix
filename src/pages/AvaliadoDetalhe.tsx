@@ -78,7 +78,7 @@ function Info({ label, value }: { label: string; value: string | null }) {
     <div>
       <span className="block text-xs text-muted-foreground">{label}</span>
       {value ? (
-        <span className="block">{value}</span>
+        <span className="block break-words">{value}</span>
       ) : (
         <span className="block text-muted-foreground">Não informado</span>
       )}
@@ -138,7 +138,7 @@ function AvaliadoDetalheContent() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       <div>
         <Link to="/avaliados" className="text-sm text-muted-foreground hover:text-foreground">
           ← {labels.pluralCap}
@@ -147,11 +147,18 @@ function AvaliadoDetalheContent() {
             `truncate` do nome engolia o nome inteiro — sobrava o avatar. */}
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <Initials name={s.full_name} size="lg" />
+            <Initials name={s.full_name} size="xl" />
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold">{s.full_name}</h1>
+              <h1 className="truncate text-xl font-semibold lg:text-2xl">{s.full_name}</h1>
               <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
-                {age !== null ? <span>{age} anos</span> : null}
+                <span>
+                  {age !== null ? `${age} anos` : null}
+                  <span className="hidden lg:inline">
+                    {age !== null ? ' · ' : ''}
+                    {s.sex === 'F' ? 'Feminino' : 'Masculino'}
+                    {s.height_cm != null ? ` · ${s.height_cm} cm` : ''}
+                  </span>
+                </span>
                 {!s.is_active ? <Badge variant="secondary">Inativo</Badge> : null}
               </div>
             </div>
@@ -190,48 +197,154 @@ function AvaliadoDetalheContent() {
         ) : null}
       </div>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Dados</h2>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2">
-          <Info label="Idade" value={age !== null ? `${age} anos` : null} />
-          <Info label="Sexo" value={s.sex === 'F' ? 'Feminino' : 'Masculino'} />
-          <Info label="Nascimento" value={formatDate(s.birth_date)} />
-          <Info label="Altura" value={s.height_cm != null ? `${s.height_cm} cm` : null} />
-          <Info label="Telefone" value={formatPhone(s.phone)} />
-          <Info label="E-mail" value={s.email} />
-          {s.guardian_name ? (
-            <Info
-              label="Responsável"
-              value={`${s.guardian_name}${
-                s.guardian_relationship ? ` (${s.guardian_relationship})` : ''
-              }`}
-            />
-          ) : null}
-          {s.notes ? (
-            <div className="sm:col-span-2">
-              <Info label="Observações" value={s.notes} />
+      {/* Duas colunas no computador. Cada coluna é uma pilha na ordem do
+          celular (a da esquerda vem antes), então nada muda de lugar lá. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:items-start xl:gap-8">
+        <div className="min-w-0 space-y-6 lg:space-y-8">
+          <BodySnapshot subjectId={s.id} />
+
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold">Dados</h2>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2 lg:p-5">
+              <Info label="Idade" value={age !== null ? `${age} anos` : null} />
+              <Info label="Sexo" value={s.sex === 'F' ? 'Feminino' : 'Masculino'} />
+              <Info label="Nascimento" value={formatDate(s.birth_date)} />
+              <Info label="Altura" value={s.height_cm != null ? `${s.height_cm} cm` : null} />
+              <Info label="Telefone" value={formatPhone(s.phone)} />
+              <Info label="E-mail" value={s.email} />
+              {s.guardian_name ? (
+                <Info
+                  label="Responsável"
+                  value={`${s.guardian_name}${
+                    s.guardian_relationship ? ` (${s.guardian_relationship})` : ''
+                  }`}
+                />
+              ) : null}
+              {s.notes ? (
+                <div className="sm:col-span-2">
+                  <Info label="Observações" value={s.notes} />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </section>
+
+          <ConsentSection
+            subjectId={s.id}
+            orgId={organization?.id ?? ''}
+            controllerName={organization?.name ?? null}
+            requiresGuardian={age !== null && age < 18}
+          />
+
+          <AnamneseSection subjectId={s.id} />
         </div>
-      </section>
 
-      <ConsentSection
-        subjectId={s.id}
-        orgId={organization?.id ?? ''}
-        controllerName={organization?.name ?? null}
-        requiresGuardian={age !== null && age < 18}
-      />
+        <div className="min-w-0 space-y-6 lg:space-y-8">
+          <AssessmentsSection subjectId={s.id} />
 
-      <AnamneseSection subjectId={s.id} />
+          <BriefingSection subject={s} />
 
-      <AssessmentsSection subjectId={s.id} />
+          <WorkoutSection subjectId={s.id} subjectName={s.full_name} orgName={organization?.name ?? ''} />
 
-      <BriefingSection subject={s} />
-
-      <WorkoutSection subjectId={s.id} subjectName={s.full_name} orgName={organization?.name ?? ''} />
-
-      <PosturalSection subjectId={s.id} />
+          <PosturalSection subjectId={s.id} />
+        </div>
+      </div>
     </div>
+  )
+}
+
+function decimal(value: number): string {
+  return value.toFixed(1).replace('.', ',')
+}
+
+// Resumo físico no alto da ficha, só no computador: a composição da última
+// avaliação e a linha da % de gordura em todas elas. No celular a ficha segue
+// direto para os dados, como antes.
+function BodySnapshot({ subjectId }: { subjectId: string }) {
+  const assessmentsQuery = useAssessments(subjectId)
+  const assessments = useMemo(
+    () => sortAssessmentsChronologically(assessmentsQuery.data ?? []),
+    [assessmentsQuery.data]
+  )
+  const series = assessments
+    .map((a) => ({ date: a.assessed_at, results: a.results as AssessmentResultSnapshot | null }))
+    .filter((p): p is { date: string; results: AssessmentResultSnapshot } => p.results != null)
+  const last = series.at(-1)
+  if (!last) return null
+  const first = series[0]
+  const fat = last.results.bodyFatPct
+  const delta = series.length > 1 ? fat - first.results.bodyFatPct : null
+
+  return (
+    <section aria-labelledby="resumo-fisico" className="hidden rounded-lg border bg-card p-5 lg:block">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="resumo-fisico" className="text-base font-semibold">Composição atual</h2>
+        <span className="text-sm text-muted-foreground tabular-nums">{formatDate(last.date)}</span>
+      </div>
+      <div className="mt-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-5xl leading-none font-semibold tracking-tight tabular-nums">
+            {decimal(fat)}
+            <span className="ml-0.5 text-2xl font-medium text-muted-foreground">%</span>
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">gordura corporal</p>
+        </div>
+        {series.length > 1 ? <FatTrend values={series.map((p) => p.results.bodyFatPct)} /> : null}
+      </div>
+      {delta != null ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground tabular-nums">
+            {delta > 0 ? '▲' : delta < 0 ? '▼' : '–'} {decimal(Math.abs(delta))} p.p.
+          </span>{' '}
+          desde {formatDate(first.date)}, em {series.length} avaliações
+        </p>
+      ) : null}
+      <dl className="mt-5 grid grid-cols-3 divide-x border-t pt-4">
+        {[
+          ['Peso', last.results.inputs.weightKg],
+          ['Massa magra', last.results.leanMassKg],
+          ['Massa gorda', last.results.fatMassKg],
+        ].map(([label, value], i) => (
+          <div key={label} className={i === 0 ? 'pr-3' : 'px-3'}>
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="mt-1 text-lg font-semibold tabular-nums">
+              {decimal(value as number)}
+              <span className="ml-0.5 text-sm font-normal text-muted-foreground">kg</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+// Linha da % de gordura, da primeira à última avaliação. Os valores exatos
+// estão na lista de avaliações e em Evolução; aqui só a direção.
+function FatTrend({ values }: { values: number[] }) {
+  const w = 156
+  const h = 64
+  const pad = 4
+  const max = Math.max(...values)
+  const span = max - Math.min(...values) || 1
+  const points = values.map((v, i) => [
+    pad + (i * (w - 2 * pad)) / (values.length - 1),
+    pad + ((max - v) * (h - 2 * pad)) / span,
+  ])
+  const [lx, ly] = points[points.length - 1]
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="shrink-0 text-muted-foreground">
+      <polyline
+        points={points.map((p) => p.join(',')).join(' ')}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {points.slice(0, -1).map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={2} className="fill-muted-foreground" />
+      ))}
+      <circle cx={lx} cy={ly} r={3.5} className="fill-foreground" />
+    </svg>
   )
 }
 
@@ -517,8 +630,8 @@ function AnamneseSection({ subjectId }: { subjectId: string }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Anamnese e triagem</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold whitespace-nowrap">Anamnese e triagem</h2>
         <div className="flex gap-2">
           <Button
             size="sm"

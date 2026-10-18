@@ -60,6 +60,21 @@ describe('AppShell — navegação principal', () => {
   })
 })
 
+describe('AppShell — ferramentas', () => {
+  it('Agenda, Exercícios e 1RM ficam num grupo à parte, só na barra lateral', () => {
+    render(
+      <MemoryRouter initialEntries={['/agenda']}>
+        <AppShell />
+      </MemoryRouter>
+    )
+    const tools = screen.getByRole('navigation', { name: 'Ferramentas' })
+    const links = within(tools).getAllByRole('link')
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/agenda', '/exercicios', '/ferramentas/1rm'])
+    expect(within(tools).getByRole('link', { name: 'Agenda' }).getAttribute('aria-current')).toBe('page')
+    expect(document.title).toBe('Agenda · Avalix')
+  })
+})
+
 describe('AppShell — item ativo', () => {
   it('na tela do plano, só Plano fica ativo, não Ajustes', () => {
     render(

@@ -809,7 +809,7 @@ function Builder({
   const weekSchedule = baseSchedule(plan)
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div>
         <Link
           to={`/avaliados/${subjectId}`}
@@ -855,303 +855,314 @@ function Builder({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field id="workout-plan-name" label="Nome do plano">
-          <Input id="workout-plan-name" value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
-        </Field>
-        <Field id="workout-plan-goal" label="Objetivo">
-          <select
-            id="workout-plan-goal"
-            className={controlClass}
-            value={plan.goal ?? ''}
-            onChange={(e) => setPlan((p) => ({ ...p, goal: e.target.value || null }))}
-          >
-            <option value="">Sem objetivo</option>
-            {GOAL_OPTIONS.map((g) => (
-              <option key={g.value} value={g.value}>
-                {g.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field id="workout-plan-weeks" label="Semanas (mesociclo)">
-          <Input
-            id="workout-plan-weeks"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={52}
-            value={plan.weeks}
-            onChange={(e) => setPlan((p) => ({ ...p, weeks: Math.max(1, Number(e.target.value) || 1) }))}
+      {/* Telas largas: o volume semanal fica parado à direita e acompanha a
+          montagem das divisões. A ordem no código é a do celular; o grid só
+          reposiciona. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] xl:grid-rows-[auto_1fr] xl:gap-8">
+        <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field id="workout-plan-name" label="Nome do plano">
+              <Input id="workout-plan-name" value={plan.name} onChange={(e) => setPlan((p) => ({ ...p, name: e.target.value }))} />
+            </Field>
+            <Field id="workout-plan-goal" label="Objetivo">
+              <select
+                id="workout-plan-goal"
+                className={controlClass}
+                value={plan.goal ?? ''}
+                onChange={(e) => setPlan((p) => ({ ...p, goal: e.target.value || null }))}
+              >
+                <option value="">Sem objetivo</option>
+                {GOAL_OPTIONS.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id="workout-plan-weeks" label="Semanas (mesociclo)">
+              <Input
+                id="workout-plan-weeks"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={52}
+                value={plan.weeks}
+                onChange={(e) => setPlan((p) => ({ ...p, weeks: Math.max(1, Number(e.target.value) || 1) }))}
+              />
+            </Field>
+            <Field id="workout-plan-start" label="Início (opcional)">
+              <Input
+                id="workout-plan-start"
+                type="date"
+                value={plan.startsOn ?? ''}
+                onChange={(e) => setPlan((p) => ({ ...p, startsOn: e.target.value || null }))}
+              />
+            </Field>
+            <Field id="workout-plan-status" label="Situação">
+              <select
+                id="workout-plan-status"
+                className={controlClass}
+                value={plan.status}
+                onChange={(e) => setPlan((p) => ({ ...p, status: e.target.value }))}
+              >
+                <option value="draft">Rascunho</option>
+                <option value="active">Ativo</option>
+                <option value="archived">Arquivado</option>
+              </select>
+              {/* Um aluno tem um treino vigente só (0027). O banco arquiva o
+                  anterior sozinho; a surpresa seria do usuário, não do banco. */}
+              {planoAtivoQueSeraArquivado ? (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  Este passa a ser o treino vigente. O plano “{planoAtivoQueSeraArquivado.name}” será
+                  arquivado, e o histórico dele continua disponível.
+                </p>
+              ) : null}
+            </Field>
+          </div>
+
+          <SourceCard
+            subjectId={subjectId}
+            assessmentId={plan.sourceAssessmentId}
+            sessionId={plan.sourcePostureSessionId}
+            onChange={(patch) => setPlan((p) => ({ ...p, ...patch }))}
           />
-        </Field>
-        <Field id="workout-plan-start" label="Início (opcional)">
-          <Input
-            id="workout-plan-start"
-            type="date"
-            value={plan.startsOn ?? ''}
-            onChange={(e) => setPlan((p) => ({ ...p, startsOn: e.target.value || null }))}
-          />
-        </Field>
-        <Field id="workout-plan-status" label="Situação">
-          <select
-            id="workout-plan-status"
-            className={controlClass}
-            value={plan.status}
-            onChange={(e) => setPlan((p) => ({ ...p, status: e.target.value }))}
-          >
-            <option value="draft">Rascunho</option>
-            <option value="active">Ativo</option>
-            <option value="archived">Arquivado</option>
-          </select>
-          {/* Um aluno tem um treino vigente só (0027). O banco arquiva o
-              anterior sozinho; a surpresa seria do usuário, não do banco. */}
-          {planoAtivoQueSeraArquivado ? (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-              Este passa a ser o treino vigente. O plano “{planoAtivoQueSeraArquivado.name}” será
-              arquivado, e o histórico dele continua disponível.
-            </p>
-          ) : null}
-        </Field>
-      </div>
-
-      <SourceCard
-        subjectId={subjectId}
-        assessmentId={plan.sourceAssessmentId}
-        sessionId={plan.sourcePostureSessionId}
-        onChange={(patch) => setPlan((p) => ({ ...p, ...patch }))}
-      />
-
-      {/* Volume ao vivo, contra os landmarks (MEV/MAV/MRV) */}
-      <VolumeLandmarkPanel
-        items={snapshotVolumeItems(snapshot)}
-        refinedItems={snapshotVolumeItems(refinedSnapshot)}
-        typicalWeek={snapshot.typicalWeek}
-        emptyHint="Adicione exercícios para ver o volume por grupo muscular."
-      />
-
-      {/* Divisões */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Divisões</h2>
-          <Button type="button" size="sm" variant="outline" onClick={addDay}>
-            <Plus /> Adicionar divisão
-          </Button>
         </div>
-        {plan.days.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma divisão ainda. Crie A, B, C... e adicione exercícios.
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Reps e RIR podem ficar em branco quando não há número definido
-            (aquecimento, mobilidade, trabalho até a falha). Use{' '}
-            <Link2 className="inline size-3.5 align-text-bottom" aria-hidden /> para juntar um
-            exercício ao de cima numa super-série ou circuito.
-          </p>
-        )}
-        {plan.days.map((day, dayIndex) => (
-          <Card
-            key={day.key}
-            onDragOver={(e) => {
-              if (dragDay !== null) e.preventDefault()
-            }}
-            onDrop={(e) => {
-              if (dragDay !== null) {
-                e.preventDefault()
-                moveDay(dragDay, dayIndex)
-                setDragDay(null)
-              }
-            }}
-            className={dragDay !== null && dragDay !== dayIndex ? 'border-dashed border-primary/60' : ''}
-          >
-            <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-              <span
-                draggable
-                onDragStart={() => setDragDay(dayIndex)}
-                onDragEnd={() => setDragDay(null)}
-                className="cursor-grab text-muted-foreground"
-                title="Arraste para reordenar a divisão"
-              >
-                <GripVertical className="size-4" />
-              </span>
-              <Input
-                className="w-16"
-                aria-label={`Rótulo da divisão ${dayIndex + 1}`}
-                value={day.label}
-                onChange={(e) => patchDay(day.key, { label: e.target.value })}
-                placeholder="A"
-              />
-              <Input
-                aria-label={`Nome da divisão ${day.label || dayIndex + 1}`}
-                value={day.name ?? ''}
-                onChange={(e) => patchDay(day.key, { name: e.target.value || null })}
-                placeholder="Nome (ex.: Peito e tríceps)"
-              />
-              <div className="flex shrink-0 items-center">
-                <button
-                  type="button"
-                  onClick={() => moveDay(dayIndex, dayIndex - 1)}
-                  disabled={dayIndex === 0}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                  title="Subir"
-                >
-                  <ChevronUp className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveDay(dayIndex, dayIndex + 1)}
-                  disabled={dayIndex === plan.days.length - 1}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                  title="Descer"
-                >
-                  <ChevronDown className="size-4" />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => duplicateDay(day.key)}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-                title="Duplicar divisão"
-                aria-label={`Duplicar a divisão ${day.label}`}
-              >
-                <Copy className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeDay(day.key)}
-                className="shrink-0 text-destructive"
-                title="Remover divisão"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {toBlocks(day.exercises).map((block) => renderBlock(day, block))}
-              <ExercisePicker
-                exercises={exercises}
-                orgId={orgId}
-                excludedExerciseIds={new Set(day.exercises.map((exercise) => exercise.exerciseId))}
-                excludedLabel="já está nesta divisão"
-                stayOpen
-                onPick={(exerciseId) => addExercise(day.key, exerciseId)}
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
-      {/* Sequência semanal (repetir divisão na semana, ex.: ABA) */}
-      {plan.days.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Sequência semanal</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Ordem das sessões na semana. Repita uma divisão para treiná-la mais de uma vez (ex.:
-              A, B, A); o volume conta as repetições.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {weekSchedule.map((label, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-1 rounded-md border bg-card py-1 pl-2 pr-1"
-                >
-                  <span className="text-xs text-muted-foreground">{i + 1}</span>
-                  {/* Fundo e cor EXPLÍCITOS, não bg-transparent. Num select
-                      nativo sem cor de fundo própria, o Chrome no Windows
-                      desenha a lista aberta sobre uma superfície clara e ainda
-                      assim herda a cor do texto do tema — no modo escuro isso
-                      dava letra clara sobre fundo claro, e a divisão só
-                      aparecia ao passar o mouse. As <option> também levam cor
-                      própria: onde o navegador respeita o estilo, é o que
-                      garante contraste nos dois temas; onde ignora, o
-                      color-scheme do index.css já resolve. Era o único select
-                      do app fora do controlClass. */}
-                  <select
-                    className="rounded bg-card text-sm text-foreground outline-none"
-                    value={label}
-                    aria-label={`Divisão da sessão ${i + 1} da semana`}
-                    onChange={(e) => setScheduleSlot(i, e.target.value)}
-                  >
-                    {dayLabels.map((l) => (
-                      <option key={l} value={l} className="bg-card text-foreground">
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeScheduleSlot(i)}
-                    className="text-muted-foreground hover:text-destructive"
-                    title="Remover sessão"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-              <Button type="button" size="xs" variant="outline" onClick={addScheduleSlot}>
-                <Plus /> Sessão
+        <div className="min-w-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start">
+          {/* Volume ao vivo, contra os landmarks (MEV/MAV/MRV) */}
+          <VolumeLandmarkPanel
+            items={snapshotVolumeItems(snapshot)}
+            refinedItems={snapshotVolumeItems(refinedSnapshot)}
+            typicalWeek={snapshot.typicalWeek}
+            emptyHint="Adicione exercícios para ver o volume por grupo muscular."
+          />
+        </div>
+
+        <div className="min-w-0 space-y-6 xl:col-start-1 xl:row-start-2">
+          {/* Divisões */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Divisões</h2>
+              <Button type="button" size="sm" variant="outline" onClick={addDay}>
+                <Plus /> Adicionar divisão
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {weekSchedule.length} {weekSchedule.length === 1 ? 'sessão' : 'sessões'} por semana
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
+            {plan.days.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma divisão ainda. Crie A, B, C... e adicione exercícios.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Reps e RIR podem ficar em branco quando não há número definido
+                (aquecimento, mobilidade, trabalho até a falha). Use{' '}
+                <Link2 className="inline size-3.5 align-text-bottom" aria-hidden /> para juntar um
+                exercício ao de cima numa super-série ou circuito.
+              </p>
+            )}
+            {plan.days.map((day, dayIndex) => (
+              <Card
+                key={day.key}
+                onDragOver={(e) => {
+                  if (dragDay !== null) e.preventDefault()
+                }}
+                onDrop={(e) => {
+                  if (dragDay !== null) {
+                    e.preventDefault()
+                    moveDay(dragDay, dayIndex)
+                    setDragDay(null)
+                  }
+                }}
+                className={dragDay !== null && dragDay !== dayIndex ? 'border-dashed border-primary/60' : ''}
+              >
+                <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+                  <span
+                    draggable
+                    onDragStart={() => setDragDay(dayIndex)}
+                    onDragEnd={() => setDragDay(null)}
+                    className="cursor-grab text-muted-foreground"
+                    title="Arraste para reordenar a divisão"
+                  >
+                    <GripVertical className="size-4" />
+                  </span>
+                  <Input
+                    className="w-16"
+                    aria-label={`Rótulo da divisão ${dayIndex + 1}`}
+                    value={day.label}
+                    onChange={(e) => patchDay(day.key, { label: e.target.value })}
+                    placeholder="A"
+                  />
+                  <Input
+                    aria-label={`Nome da divisão ${day.label || dayIndex + 1}`}
+                    value={day.name ?? ''}
+                    onChange={(e) => patchDay(day.key, { name: e.target.value || null })}
+                    placeholder="Nome (ex.: Peito e tríceps)"
+                  />
+                  <div className="flex shrink-0 items-center">
+                    <button
+                      type="button"
+                      onClick={() => moveDay(dayIndex, dayIndex - 1)}
+                      disabled={dayIndex === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title="Subir"
+                    >
+                      <ChevronUp className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveDay(dayIndex, dayIndex + 1)}
+                      disabled={dayIndex === plan.days.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title="Descer"
+                    >
+                      <ChevronDown className="size-4" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => duplicateDay(day.key)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Duplicar divisão"
+                    aria-label={`Duplicar a divisão ${day.label}`}
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeDay(day.key)}
+                    className="shrink-0 text-destructive"
+                    title="Remover divisão"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {toBlocks(day.exercises).map((block) => renderBlock(day, block))}
+                  <ExercisePicker
+                    exercises={exercises}
+                    orgId={orgId}
+                    excludedExerciseIds={new Set(day.exercises.map((exercise) => exercise.exerciseId))}
+                    excludedLabel="já está nesta divisão"
+                    stayOpen
+                    onPick={(exerciseId) => addExercise(day.key, exerciseId)}
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-      {/* Semanas / overrides */}
-      {plan.days.length > 0 ? (
-        <WeeksCard
-          plan={plan}
-          flatExercises={flatExercises}
-          onWeekMeta={patchWeekMeta}
-          onOverride={upsertOverride}
-        />
-      ) : null}
+          {/* Sequência semanal (repetir divisão na semana, ex.: ABA) */}
+          {plan.days.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Sequência semanal</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Ordem das sessões na semana. Repita uma divisão para treiná-la mais de uma vez (ex.:
+                  A, B, A); o volume conta as repetições.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {weekSchedule.map((label, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1 rounded-md border bg-card py-1 pl-2 pr-1"
+                    >
+                      <span className="text-xs text-muted-foreground">{i + 1}</span>
+                      {/* Fundo e cor EXPLÍCITOS, não bg-transparent. Num select
+                          nativo sem cor de fundo própria, o Chrome no Windows
+                          desenha a lista aberta sobre uma superfície clara e ainda
+                          assim herda a cor do texto do tema — no modo escuro isso
+                          dava letra clara sobre fundo claro, e a divisão só
+                          aparecia ao passar o mouse. As <option> também levam cor
+                          própria: onde o navegador respeita o estilo, é o que
+                          garante contraste nos dois temas; onde ignora, o
+                          color-scheme do index.css já resolve. Era o único select
+                          do app fora do controlClass. */}
+                      <select
+                        className="rounded bg-card text-sm text-foreground outline-none"
+                        value={label}
+                        aria-label={`Divisão da sessão ${i + 1} da semana`}
+                        onChange={(e) => setScheduleSlot(i, e.target.value)}
+                      >
+                        {dayLabels.map((l) => (
+                          <option key={l} value={l} className="bg-card text-foreground">
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeScheduleSlot(i)}
+                        className="text-muted-foreground hover:text-destructive"
+                        title="Remover sessão"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <Button type="button" size="xs" variant="outline" onClick={addScheduleSlot}>
+                    <Plus /> Sessão
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {weekSchedule.length} {weekSchedule.length === 1 ? 'sessão' : 'sessões'} por semana
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
-      <Card>
-        <CardHeader className="py-0">
-          <button
-            type="button"
-            onClick={() => setShowCalc((s) => !s)}
-            className="flex w-full items-center justify-between py-4"
-          >
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calculator className="size-4 text-muted-foreground" /> Calculadora de carga (1RM)
-            </CardTitle>
-            {showCalc ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-          </button>
-        </CardHeader>
-        {showCalc ? (
-          <CardContent>
-            <OneRmCalculator />
-          </CardContent>
-        ) : null}
-      </Card>
+          {/* Semanas / overrides */}
+          {plan.days.length > 0 ? (
+            <WeeksCard
+              plan={plan}
+              flatExercises={flatExercises}
+              onWeekMeta={patchWeekMeta}
+              onOverride={upsertOverride}
+            />
+          ) : null}
 
-      <Field id="workout-plan-notes" label="Observações (opcional)">
-        <textarea
-          id="workout-plan-notes"
-          rows={3}
-          className={controlClass}
-          value={plan.notes ?? ''}
-          onChange={(e) => setPlan((p) => ({ ...p, notes: e.target.value || null }))}
-        />
-      </Field>
+          <Card>
+            <CardHeader className="py-0">
+              <button
+                type="button"
+                onClick={() => setShowCalc((s) => !s)}
+                className="flex w-full items-center justify-between py-4"
+              >
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Calculator className="size-4 text-muted-foreground" /> Calculadora de carga (1RM)
+                </CardTitle>
+                {showCalc ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+              </button>
+            </CardHeader>
+            {showCalc ? (
+              <CardContent>
+                <OneRmCalculator />
+              </CardContent>
+            ) : null}
+          </Card>
 
-      {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+          <Field id="workout-plan-notes" label="Observações (opcional)">
+            <textarea
+              id="workout-plan-notes"
+              rows={3}
+              className={controlClass}
+              value={plan.notes ?? ''}
+              onChange={(e) => setPlan((p) => ({ ...p, notes: e.target.value || null }))}
+            />
+          </Field>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleSave} disabled={mut.isPending}>
-          {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar plano'}
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to={`/avaliados/${subjectId}`}>Cancelar</Link>
-        </Button>
-        {dirty ? <UnsavedBadge /> : null}
+          {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={handleSave} disabled={mut.isPending}>
+              {mut.isPending ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Salvar plano'}
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to={`/avaliados/${subjectId}`}>Cancelar</Link>
+            </Button>
+            {dirty ? <UnsavedBadge /> : null}
+          </div>
+        </div>
       </div>
 
       <UnsavedChangesPrompt guard={guard} what="neste plano de treino" />

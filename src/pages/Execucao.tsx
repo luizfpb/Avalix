@@ -217,7 +217,7 @@ export default function Execucao() {
   const historyLoading = logsQuery.isPending || historyQuery.isPending
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <Link
           to={`/avaliados/${id}/treinos/${plan.id}`}
@@ -225,7 +225,7 @@ export default function Execucao() {
         >
           ← {plan.name}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">Execução do treino</h1>
+        <h1 className="mt-2 text-xl font-semibold lg:text-2xl">Execução do treino</h1>
       </div>
 
       {deleteMut.isError ? (
@@ -234,146 +234,158 @@ export default function Execucao() {
         </p>
       ) : null}
 
-      {historyDegraded ? (
-        <QueryError
-          message="Não foi possível carregar o histórico do treino, então a adesão e as sugestões de carga estão ocultas. O registro da sessão abaixo continua funcionando normalmente."
-          onRetry={() => {
-            void Promise.all([logsQuery.refetch(), historyQuery.refetch()])
-          }}
-        />
-      ) : historyLoading ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Carregando adesão e histórico...
-        </p>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Adesão</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-semibold">
-                {plannedToDate != null ? doneToDate : completos.length}
-                <span className="text-base font-normal text-muted-foreground">
-                  {plannedToDate != null
-                    ? ` de ${planned} ${planned === 1 ? 'sessão' : 'sessões'}`
-                    : ` ${completos.length === 1 ? 'sessão registrada' : 'sessões registradas'}`}
-                </span>
-              </span>
-              {plannedToDate != null ? (
-                <span className="text-sm text-muted-foreground">{Math.round(pct * 100)}%</span>
-              ) : null}
-            </div>
-            {plannedToDate != null ? (
-              <div className="h-2 rounded bg-muted">
-                <div className="h-2 rounded bg-primary-solid" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
-              </div>
-            ) : null}
-            <p className="text-xs text-muted-foreground">{adherenceCaption}</p>
-            {weekSuggestion ? (
-              <p className="text-xs text-muted-foreground">
-                Semana do mesociclo: <strong className="font-medium text-foreground">
-                  {weekSuggestion.week} de {plan.weeks}
-                </strong>{' '}
-                (pelas sessões registradas)
-                {calendarWeek != null && startedOn
-                  ? ` · ${calendarWeek}ª semana desde ${formatDate(startedOn)}`
-                  : ''}
-                {weekLag > 0
-                  ? `. O mesociclo está ${weekLag} ${weekLag === 1 ? 'semana' : 'semanas'} atrás do calendário.`
-                  : ''}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
-      <LogForm
-        detail={detail}
-        orgId={organization?.id ?? ''}
-        subjectId={plan.subject_id}
-        names={names}
-        exercises={exercisesQuery.data ?? []}
-        history={historyQuery.data ?? []}
-        weekSuggestion={weekSuggestion}
-        pendingSession={
-          logs.find((log) => log.in_progress === true && log.source === 'trainer') ?? null
-        }
-      />
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Sessões registradas</h2>
-        {logsQuery.isError ? (
-          // Nunca afirmar "nenhuma sessão" quando na verdade não foi possível
-          // ler a lista: o educador acharia que o registro dele se perdeu.
-          <p className="text-sm text-muted-foreground">
-            Não foi possível carregar as sessões já registradas.
-          </p>
-        ) : logsQuery.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Carregando sessões...</p>
-        ) : logs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
-        ) : (
-          <ul className="divide-y rounded-md border bg-card">
-            {logs.map((log) => (
-              <LogRowItem
-                key={log.id}
-                log={log}
-                names={names}
-                aberto={openLogId === log.id}
-                onAlternar={() => setOpenLogId(openLogId === log.id ? null : log.id)}
-                onExcluir={() => setConfirmLogId(log.id)}
-                excluindo={deleteMut.isPending}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {progress.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold">Progressão de carga (e1RM)</h2>
-          <ul className="divide-y rounded-md border bg-card">
-            {progress.map((p) => {
-              const l = linePath(
-                p.points.map((pt) => pt.e1rm),
-                90,
-                26,
-                2,
-                3
-              )
-              const delta = p.points.length >= 2 ? p.latestE1rm - p.points[0].e1rm : 0
-              return (
-                <li key={p.exerciseId} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">{names[p.exerciseId] ?? 'Exercício'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      e1RM {roundToIncrement(p.latestE1rm).toFixed(1).replace('.', ',')} kg · melhor{' '}
-                      {roundToIncrement(p.bestE1rm).toFixed(1).replace('.', ',')} kg
-                      {delta !== 0 ? (
-                        <span className={delta > 0 ? 'text-primary' : 'text-warning'}>
-                          {' '}
-                          ({delta > 0 ? '+' : ''}
-                          {roundToIncrement(delta).toFixed(1).replace('.', ',')} kg)
-                        </span>
-                      ) : null}
-                    </p>
-                  </div>
-                  {p.points.length >= 2 ? (
-                    <svg width={90} height={26} className="shrink-0" aria-hidden="true">
-                      <polyline points={l.points} fill="none" stroke="var(--primary)" strokeWidth={1.5} />
-                    </svg>
+      {/* Telas largas: o registro da sessão à esquerda; adesão, sessões e
+          progressão numa coluna à direita. A ordem no código é a do celular e
+          o grid só reposiciona (a segunda linha leva a sobra de altura, para a
+          adesão não ganhar um vão embaixo). */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-rows-[auto_1fr] xl:gap-8">
+        <div className="min-w-0 xl:col-start-2 xl:row-start-1">
+          {historyDegraded ? (
+            <QueryError
+              message="Não foi possível carregar o histórico do treino, então a adesão e as sugestões de carga estão ocultas. O registro da sessão abaixo continua funcionando normalmente."
+              onRetry={() => {
+                void Promise.all([logsQuery.refetch(), historyQuery.refetch()])
+              }}
+            />
+          ) : historyLoading ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              Carregando adesão e histórico...
+            </p>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Adesão</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-2xl font-semibold">
+                    {plannedToDate != null ? doneToDate : completos.length}
+                    <span className="text-base font-normal text-muted-foreground">
+                      {plannedToDate != null
+                        ? ` de ${planned} ${planned === 1 ? 'sessão' : 'sessões'}`
+                        : ` ${completos.length === 1 ? 'sessão registrada' : 'sessões registradas'}`}
+                    </span>
+                  </span>
+                  {plannedToDate != null ? (
+                    <span className="text-sm text-muted-foreground">{Math.round(pct * 100)}%</span>
                   ) : null}
-                </li>
-              )
-            })}
-          </ul>
-          <p className="text-xs text-muted-foreground">
-            e1RM estimado da melhor série de cada sessão (Epley). Estimativa: veja a calculadora em
-            Ferramentas.
-          </p>
-        </section>
-      ) : null}
+                </div>
+                {plannedToDate != null ? (
+                  <div className="h-2 rounded bg-muted">
+                    <div className="h-2 rounded bg-primary-solid" style={{ width: `${(pct * 100).toFixed(0)}%` }} />
+                  </div>
+                ) : null}
+                <p className="text-xs text-muted-foreground">{adherenceCaption}</p>
+                {weekSuggestion ? (
+                  <p className="text-xs text-muted-foreground">
+                    Semana do mesociclo: <strong className="font-medium text-foreground">
+                      {weekSuggestion.week} de {plan.weeks}
+                    </strong>{' '}
+                    (pelas sessões registradas)
+                    {calendarWeek != null && startedOn
+                      ? ` · ${calendarWeek}ª semana desde ${formatDate(startedOn)}`
+                      : ''}
+                    {weekLag > 0
+                      ? `. O mesociclo está ${weekLag} ${weekLag === 1 ? 'semana' : 'semanas'} atrás do calendário.`
+                      : ''}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="min-w-0 xl:col-start-1 xl:row-span-2 xl:row-start-1">
+          <LogForm
+            detail={detail}
+            orgId={organization?.id ?? ''}
+            subjectId={plan.subject_id}
+            names={names}
+            exercises={exercisesQuery.data ?? []}
+            history={historyQuery.data ?? []}
+            weekSuggestion={weekSuggestion}
+            pendingSession={
+              logs.find((log) => log.in_progress === true && log.source === 'trainer') ?? null
+            }
+          />
+        </div>
+
+        <div className="min-w-0 space-y-6 xl:col-start-2 xl:row-start-2 xl:self-start">
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold">Sessões registradas</h2>
+            {logsQuery.isError ? (
+              // Nunca afirmar "nenhuma sessão" quando na verdade não foi possível
+              // ler a lista: o educador acharia que o registro dele se perdeu.
+              <p className="text-sm text-muted-foreground">
+                Não foi possível carregar as sessões já registradas.
+              </p>
+            ) : logsQuery.isPending ? (
+              <p role="status" className="text-sm text-muted-foreground">Carregando sessões...</p>
+            ) : logs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
+            ) : (
+              <ul className="divide-y rounded-md border bg-card">
+                {logs.map((log) => (
+                  <LogRowItem
+                    key={log.id}
+                    log={log}
+                    names={names}
+                    aberto={openLogId === log.id}
+                    onAlternar={() => setOpenLogId(openLogId === log.id ? null : log.id)}
+                    onExcluir={() => setConfirmLogId(log.id)}
+                    excluindo={deleteMut.isPending}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {progress.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold">Progressão de carga (e1RM)</h2>
+              <ul className="divide-y rounded-md border bg-card">
+                {progress.map((p) => {
+                  const l = linePath(
+                    p.points.map((pt) => pt.e1rm),
+                    90,
+                    26,
+                    2,
+                    3
+                  )
+                  const delta = p.points.length >= 2 ? p.latestE1rm - p.points[0].e1rm : 0
+                  return (
+                    <li key={p.exerciseId} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                        <p className="truncate text-sm">{names[p.exerciseId] ?? 'Exercício'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          e1RM {roundToIncrement(p.latestE1rm).toFixed(1).replace('.', ',')} kg · melhor{' '}
+                          {roundToIncrement(p.bestE1rm).toFixed(1).replace('.', ',')} kg
+                          {delta !== 0 ? (
+                            <span className={delta > 0 ? 'text-primary' : 'text-warning'}>
+                              {' '}
+                              ({delta > 0 ? '+' : ''}
+                              {roundToIncrement(delta).toFixed(1).replace('.', ',')} kg)
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      {p.points.length >= 2 ? (
+                        <svg width={90} height={26} className="shrink-0" aria-hidden="true">
+                          <polyline points={l.points} fill="none" stroke="var(--primary)" strokeWidth={1.5} />
+                        </svg>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                e1RM estimado da melhor série de cada sessão (Epley). Estimativa: veja a calculadora em
+                Ferramentas.
+              </p>
+            </section>
+          ) : null}
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirmLogId != null}
