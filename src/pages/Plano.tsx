@@ -66,7 +66,7 @@ export default function Plano() {
   }, [waiting, orgId, queryClient])
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-5xl space-y-5">
       <div>
         <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
           ← Ajustes
@@ -352,7 +352,7 @@ function PlanPicker({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {billing.plans.map((plan) => {
           const current =
             (subscribed && plan.id === billing.plan_id && cycle === billing.billing_cycle) ||

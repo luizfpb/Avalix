@@ -10,8 +10,9 @@ set local search_path = public, extensions, pg_catalog;
 select plan(48);
 
 select ok(public.app_schema_version() >= '0049', 'schema inclui a assinatura');
-select is((select count(*)::int from public.plans where monthly_price_brl > 0 and yearly_price_brl > 0), 2,
-  'dois planos com preço mensal e anual');
+select ok((select count(*) from public.plans
+             where id in ('ate30', 'ilimitado') and monthly_price_brl > 0 and yearly_price_brl > 0) = 2,
+  'Até 30 e Ilimitado com preço mensal e anual');
 select is((select max_subjects from public.plans where id = 'ate30'), 30, 'o plano Até 30 limita a 30');
 select ok((select max_subjects is null from public.plans where id = 'ilimitado'), 'o Ilimitado não tem limite');
 

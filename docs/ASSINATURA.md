@@ -15,11 +15,13 @@ testar no sandbox. Nada disso foi executado daqui.
   | Plano | Limite | Mensal | Anual (10x) |
   |---|---|---|---|
   | Até 30 | 30 avaliados ativos | R$ 19,90 | R$ 159,00 |
-  | Ilimitado | sem limite | R$ 39,90 | R$ 319,00 |
+  | Até 100 | 100 avaliados ativos | R$ 39,90 | R$ 319,00 |
+  | Ilimitado | sem limite | R$ 100,00 | R$ 799,00 |
 
-  Preço de lançamento: anual = 8 mensalidades (4 meses grátis), arredondado
-  para baixo. Aplicado por UPDATE (a 0049 semeou 49,90/499 e 89,90/899). O
-  selo "N meses grátis" da tela é calculado a partir dos preços. Assinatura já feita mantém no Asaas o valor da
+  Preço de lançamento (migration 0050): anual = 8 mensalidades (4 meses
+  grátis), arredondado para baixo. A 0049 semeou só dois planos com preços
+  de referência. O selo "N meses grátis" da tela é calculado a partir dos
+  preços. Para mudar preço depois, basta um UPDATE em `plans`. Assinatura já feita mantém no Asaas o valor da
   época; subir o preço depois só vale para quem assinar ou trocar de plano.
 
 - **Teste grátis** de 14 dias no Ilimitado, só na primeira organização de
