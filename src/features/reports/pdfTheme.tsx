@@ -32,11 +32,14 @@ export const pdfTheme = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
+  // Só a altura é fixa: a largura sai da proporção da imagem, então logo
+  // quadrada não fica perdida numa caixa larga e a horizontal ganha espaço.
+  // maxWidth segura as muito compridas (encolhem por contain).
   logo: {
-    width: 76,
-    height: 30,
+    height: 56,
+    maxWidth: 200,
     objectFit: 'contain',
-    marginRight: 10,
+    marginRight: 14,
     flexShrink: 0,
   },
   org: {

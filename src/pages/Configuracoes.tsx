@@ -261,7 +261,10 @@ function LogoSettings() {
         ) : null}
       </div>
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-      <p className="text-xs text-muted-foreground">PNG, JPEG ou WebP, até 10 MB. Imagens grandes são reduzidas antes do envio.</p>
+      <p className="text-xs text-muted-foreground">
+        Ideal: PNG com fundo transparente, de preferência horizontal, com cerca de 800 × 250 px.
+        Aceita PNG, JPEG ou WebP até 10 MB; imagens grandes são reduzidas antes do envio.
+      </p>
     </div>
   )
 }
