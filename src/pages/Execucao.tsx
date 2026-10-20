@@ -36,6 +36,7 @@ import { roundToIncrement } from '../features/workout/oneRm'
 import { effectivePrescription, formatSetsReps, overrideFor, overrideIndex } from '../features/workout/effective'
 import { techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { GroupBlock } from '../features/workout/GroupBlock'
+import { PlanNotes } from '../features/workout/PlanNotes'
 import { SessionFeel } from '../features/workout/SessionFeel'
 import { ExercisePicker } from '../features/workout/ExercisePicker'
 import { linePath } from '../features/reports/charts'
@@ -724,6 +725,7 @@ function LogForm({
   }
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
+  const semanaDaTela = weekNumber != null ? detail.weeks.find((w) => w.week_number === weekNumber) ?? null : null
 
   const suggestedWeek = weekSuggestion?.week ?? null
   useEffect(() => {
@@ -1626,6 +1628,13 @@ function LogForm({
             ) : null}
           </p>
         ) : null}
+
+        <PlanNotes
+          planNotes={detail.plan?.notes}
+          weekNumber={weekNumber}
+          weekLabel={semanaDaTela?.label}
+          weekNotes={semanaDaTela?.notes}
+        />
 
         <p className="text-xs text-muted-foreground">
           Descanso: informe quantos segundos descansou após cada série. O preenchimento é opcional.

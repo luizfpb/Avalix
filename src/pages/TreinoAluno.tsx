@@ -75,6 +75,7 @@ import {
   overrideIndex,
 } from '../features/workout/effective'
 import { GroupBlock } from '../features/workout/GroupBlock'
+import { PlanNotes } from '../features/workout/PlanNotes'
 import { groupLabel, techniqueLabel, toRowBlocks } from '../features/workout/groups'
 import { SessionSets } from '../features/workout/SessionSets'
 import { FEEL_OPTIONS } from '../features/workout/feel'
@@ -1873,6 +1874,13 @@ function TreinoDoDia({
           ) : null}
         </p>
       ) : null}
+
+      <PlanNotes
+        planNotes={plano.notes}
+        weekNumber={semana}
+        weekLabel={pacote.weeks.find((w) => w.week_number === semana)?.label}
+        weekNotes={pacote.weeks.find((w) => w.week_number === semana)?.notes}
+      />
 
       <details className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
         <summary className="cursor-pointer">Como registrar as séries?</summary>
