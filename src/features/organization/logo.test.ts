@@ -1,8 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const { signed } = vi.hoisted(() => ({ signed: vi.fn() }))
-vi.mock('../../lib/supabase', () => ({ supabase: { storage: { from: () => ({ createSignedUrl: signed }) } } }))
-import { LOGO_STORED_MAX_BYTES, loadOrgLogoDataUrl, prepareOrgLogo } from './logo'
+const { signed, calls, orgUpdate } = vi.hoisted(() => ({ signed: vi.fn(), calls: [] as string[], orgUpdate: vi.fn() }))
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        createSignedUrl: signed,
+        remove: async (paths: string[]) => { calls.push(`remove ${paths.join(',')}`); return { data: [], error: null } },
+      }),
+    },
+    from: (table: string) => ({
+      update: (values: unknown) => ({
+        eq: async (_col: string, id: string) => { calls.push(`update ${table} ${id}`); orgUpdate(values); return { error: null } },
+      }),
+    }),
+  },
+}))
+import { LOGO_STORED_MAX_BYTES, loadOrgLogoDataUrl, prepareOrgLogo, removeOrgLogo } from './logo'
 
 const fetchMock = vi.fn()
 beforeEach(() => {
@@ -120,5 +134,17 @@ describe('preparo do logo antes do envio', () => {
     await expect(prepareOrgLogo(fileOf('image/gif', 100))).rejects.toThrow('PNG, JPEG ou WebP')
     vi.stubGlobal('createImageBitmap', vi.fn(async () => { throw new Error('decode') }))
     await expect(prepareOrgLogo(fileOf('image/png', 100))).rejects.toThrow('Não foi possível ler a imagem')
+  })
+})
+
+describe('remoção do logo', () => {
+  beforeEach(() => { calls.length = 0; orgUpdate.mockReset() })
+  it('desvincula a organização antes de apagar as três chaves canônicas', async () => {
+    await removeOrgLogo('org-1')
+    expect(orgUpdate).toHaveBeenCalledWith({ logo_path: null })
+    expect(calls).toEqual([
+      'update organizations org-1',
+      'remove org-1/logo.png,org-1/logo.jpg,org-1/logo.webp',
+    ])
   })
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
+import { removeOrgLogo, signedLogoUrl, uploadOrgLogo } from '../features/organization/logo'
 import type { Factor } from '@supabase/supabase-js'
 import { Calculator, ChevronRight, CreditCard, Dumbbell, Monitor, Moon, ScrollText, ShieldCheck, Sun, type LucideIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -201,7 +201,8 @@ function LogoSettings() {
   const { organization, role, refresh } = useOrganization()
   const canManage = role === 'owner' || role === 'admin'
   const [preview, setPreview] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const logoPath = organization?.logo_path
 
@@ -222,7 +223,7 @@ function LogoSettings() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || !organization) return
-    setBusy(true)
+    setBusy('upload')
     setError(null)
     try {
       await uploadOrgLogo(organization.id, file)
@@ -230,7 +231,22 @@ function LogoSettings() {
     } catch (err) {
       setError(normalizeDbError(err))
     } finally {
-      setBusy(false)
+      setBusy(null)
+    }
+  }
+
+  async function remove() {
+    setConfirmRemove(false)
+    if (!organization) return
+    setBusy('remove')
+    setError(null)
+    try {
+      await removeOrgLogo(organization.id)
+      await refresh()
+    } catch (err) {
+      setError(normalizeDbError(err))
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -246,20 +262,42 @@ function LogoSettings() {
           )}
         </div>
         {canManage ? (
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              onChange={onFile}
-              disabled={busy}
-            />
-            <span className="inline-flex items-center rounded-md border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-accent">
-              {busy ? 'Enviando...' : logoPath ? 'Trocar logo' : 'Enviar logo'}
-            </span>
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={onFile}
+                disabled={busy !== null}
+              />
+              <span className="inline-flex items-center rounded-md border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-accent">
+                {busy === 'upload' ? 'Enviando...' : logoPath ? 'Trocar logo' : 'Enviar logo'}
+              </span>
+            </label>
+            {logoPath ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                disabled={busy !== null}
+                onClick={() => setConfirmRemove(true)}
+              >
+                {busy === 'remove' ? 'Removendo...' : 'Remover'}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remover o logo?"
+        description="Os próximos PDFs saem sem logo. Os relatórios já baixados não mudam."
+        confirmLabel="Remover"
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmRemove(false)}
+      />
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
       <p className="text-xs text-muted-foreground">
         Ideal: PNG com fundo transparente, de preferência horizontal, com cerca de 800 × 250 px.

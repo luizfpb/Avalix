@@ -68,6 +68,18 @@ export async function uploadOrgLogo(orgId: string, file: File): Promise<string> 
   return path
 }
 
+// A organização deixa de apontar para o arquivo antes de ele sumir: assim um
+// PDF gerado no meio da remoção nunca tenta carregar um logo inexistente. Uma
+// falha na limpeza do Storage deixa só um órfão nas chaves canônicas, que o
+// próximo envio sobrescreve.
+export async function removeOrgLogo(orgId: string): Promise<void> {
+  const upd = await supabase.from('organizations').update({ logo_path: null }).eq('id', orgId)
+  if (upd.error) throw upd.error
+  await supabase.storage
+    .from('logos')
+    .remove(Object.values(MIME_EXT).map((ext) => `${orgId}/logo.${ext}`))
+}
+
 // URL assinada (TTL 300s) pra exibir o logo em <img>.
 export async function signedLogoUrl(logoPath: string | null | undefined): Promise<string | null> {
   if (!logoPath) return null
