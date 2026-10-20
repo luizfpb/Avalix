@@ -261,7 +261,7 @@ function LogoSettings() {
         ) : null}
       </div>
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-      <p className="text-xs text-muted-foreground">PNG, JPEG ou WebP, até 1 MB.</p>
+      <p className="text-xs text-muted-foreground">PNG, JPEG ou WebP, até 10 MB. Imagens grandes são reduzidas antes do envio.</p>
     </div>
   )
 }

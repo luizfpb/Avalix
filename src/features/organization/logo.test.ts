@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { signed } = vi.hoisted(() => ({ signed: vi.fn() }))
 vi.mock('../../lib/supabase', () => ({ supabase: { storage: { from: () => ({ createSignedUrl: signed }) } } }))
-import { loadOrgLogoDataUrl } from './logo'
+import { LOGO_STORED_MAX_BYTES, loadOrgLogoDataUrl, prepareOrgLogo } from './logo'
 
 const fetchMock = vi.fn()
 beforeEach(() => {
@@ -58,5 +58,67 @@ describe('logo nos relatórios', () => {
   it('expõe falha HTTP no download e não a confunde com ausência de logo', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 503 })
     await expect(loadOrgLogoDataUrl('org/logo.png')).rejects.toThrow('Não foi possível preparar o logo')
+  })
+})
+
+function fileOf(mime: string, size: number) {
+  return new File([new Uint8Array(size)], 'logo', { type: mime })
+}
+
+function stubCanvas(sizes: Record<number, number>) {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D)
+  return vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, callback, mime) {
+    const side = Math.max(this.width, this.height)
+    callback(new Blob([new Uint8Array(sizes[side] ?? 10)], { type: mime }))
+  })
+}
+
+describe('preparo do logo antes do envio', () => {
+  it('sobe intacto o arquivo que já cabe em 1024 px e 1 MB', async () => {
+    const bitmap = { width: 800, height: 400, close: vi.fn() }
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
+    const toBlob = stubCanvas({})
+    const file = fileOf('image/png', 200_000)
+    expect(await prepareOrgLogo(file)).toBe(file)
+    expect(toBlob).not.toHaveBeenCalled()
+    expect(bitmap.close).toHaveBeenCalledOnce()
+  })
+  it('reduz JPEG grande para 1024 px mantendo JPEG', async () => {
+    const bitmap = { width: 4000, height: 3000, close: vi.fn() }
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
+    const toBlob = stubCanvas({ 1024: 300_000 })
+    const out = await prepareOrgLogo(fileOf('image/jpeg', 6 * 1024 * 1024))
+    expect(out.type).toBe('image/jpeg')
+    expect(out.size).toBe(300_000)
+    expect(toBlob).toHaveBeenCalledOnce()
+    expect(bitmap.close).toHaveBeenCalledOnce()
+  })
+  it('converte WebP para PNG e encolhe até caber em 1 MB', async () => {
+    const bitmap = { width: 2000, height: 2000, close: vi.fn() }
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
+    const toBlob = stubCanvas({ 1024: LOGO_STORED_MAX_BYTES + 1, 768: 900_000 })
+    const out = await prepareOrgLogo(fileOf('image/webp', 3 * 1024 * 1024))
+    expect(out.type).toBe('image/png')
+    expect(out.size).toBe(900_000)
+    expect(toBlob).toHaveBeenCalledTimes(2)
+  })
+  it('recusa quando nem 512 px cabe em 1 MB', async () => {
+    const bitmap = { width: 3000, height: 3000, close: vi.fn() }
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
+    const big = LOGO_STORED_MAX_BYTES + 1
+    stubCanvas({ 1024: big, 768: big, 512: big })
+    await expect(prepareOrgLogo(fileOf('image/png', 5 * 1024 * 1024))).rejects.toThrow('Não foi possível reduzir')
+    expect(bitmap.close).toHaveBeenCalledOnce()
+  })
+  it('recusa arquivo acima de 10 MB sem decodificar', async () => {
+    const decode = vi.fn()
+    vi.stubGlobal('createImageBitmap', decode)
+    await expect(prepareOrgLogo(fileOf('image/png', 10 * 1024 * 1024 + 1))).rejects.toThrow('no máximo 10 MB')
+    expect(decode).not.toHaveBeenCalled()
+  })
+  it('recusa formato fora da lista e imagem que não decodifica', async () => {
+    await expect(prepareOrgLogo(fileOf('image/gif', 100))).rejects.toThrow('PNG, JPEG ou WebP')
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => { throw new Error('decode') }))
+    await expect(prepareOrgLogo(fileOf('image/png', 100))).rejects.toThrow('Não foi possível ler a imagem')
   })
 })
