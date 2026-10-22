@@ -13,8 +13,8 @@ export const TERMS_UPDATED_AT = '17/10/2026'
 
 export const PROVIDER = {
   name: 'Luiz Felipe',
-  document: '', // CPF (ou CNPJ, quando houver)
-  address: '', // cidade/UF ou endereço completo
+  document: '123.358.696-39', // CPF (ou CNPJ, quando houver)
+  address: 'Resplendor/MG', // cidade/UF ou endereço completo
   email: 'contato@avalixfit.com.br',
 }
 
