@@ -17,6 +17,7 @@ vi.mock('../features/subjects/hooks', () => ({ useSubjects: () => query(subjects
 vi.mock('../features/appointments/hooks', () => ({
   useAppointments: appointments, useUpcomingAppointments: upcoming,
   useCreateAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteAppointment: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 vi.mock('../features/anamnesis/intakeHooks', () => ({ usePendingIntakes: () => query([]) }))

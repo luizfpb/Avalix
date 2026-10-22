@@ -107,7 +107,9 @@ export async function asaas<T>(
   if (!response.ok) {
     const errors = (data as { errors?: { description?: string }[] } | null)?.errors
     const detail = errors?.map((e) => e.description).filter(Boolean).join('; ')
-    console.error(`asaas ${method} ${path} -> ${response.status} ${detail ?? ''}`)
+    // sem a query: a busca de cliente leva o CPF/CNPJ (?cpfCnpj=), que não
+    // pode ficar no log da função
+    console.error(`asaas ${method} ${path.split('?')[0]} -> ${response.status} ${detail ?? ''}`)
     throw new HttpError(response.status === 404 ? 404 : 502,
       detail ? `Asaas recusou: ${detail}` : 'O serviço de pagamento não respondeu. Tente de novo em instantes.')
   }

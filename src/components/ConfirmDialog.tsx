@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 
-// Confirmação destrutiva padronizada (substitui o window.confirm nativo, que
-// exibe chrome do navegador e destoa do app). Casos de altíssimo risco, como a
+// Confirmação padronizada (substitui o window.confirm nativo, que exibe chrome
+// do navegador e destoa do app). Destrutiva por padrão; `tone="default"` para
+// o que não apaga nem tira nada (trocar de plano, por exemplo). Casos de altíssimo risco, como a
 // exclusão definitiva do avaliado, continuam com confirmação por nome digitado.
 export function ConfirmDialog({
   open,
@@ -13,6 +14,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   extraAction,
+  tone = 'destructive',
 }: {
   open: boolean
   title: string
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   onCancel: () => void
   // terceira saída, não destrutiva (ex.: "Salvar e sair")
   extraAction?: { label: string; onClick: () => void; disabled?: boolean }
+  tone?: 'destructive' | 'default'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -69,7 +72,7 @@ export function ConfirmDialog({
               {extraAction.label}
             </Button>
           ) : null}
-          <Button type="button" variant="destructive" size="sm" onClick={onConfirm}>
+          <Button type="button" variant={tone} size="sm" onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

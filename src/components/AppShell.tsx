@@ -8,6 +8,7 @@ import { subjectTermLabels } from '../lib/subjectTerm'
 import { roleLabel } from '../lib/roles'
 import { BrandLogo, BrandMark } from './BrandLogo'
 import { BillingBanner } from './BillingBanner'
+import { ReadOnlyGate } from './ReadOnlyGate'
 
 // end: só fica ativo na rota exata (Ajustes não acende dentro de /configuracoes/plano)
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
@@ -155,7 +156,9 @@ export function AppShell() {
       <div className="lg:pl-64 xl:pl-72">
         <main id="app-main" ref={mainRef} tabIndex={-1} className="relative mx-auto min-h-screen max-w-[1480px] px-4 pb-28 pt-7 outline-none sm:px-6 sm:pt-10 lg:px-10 lg:pb-16 xl:px-14">
           <BillingBanner />
-          <Outlet />
+          <ReadOnlyGate>
+            <Outlet />
+          </ReadOnlyGate>
         </main>
       </div>
 

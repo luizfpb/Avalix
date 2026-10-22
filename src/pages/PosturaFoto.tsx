@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 
 const TOOLS: { tool: Tool; label: string; icon: LucideIcon }[] = [
   { tool: 'move', label: 'Mover', icon: MousePointer2 },
@@ -178,6 +179,8 @@ function PosturaFotoEditor() {
           </Button>
         </div>
       </div>
+
+      <ReadOnlyNotice>As marcações não serão gravadas até a assinatura ser regularizada.</ReadOnlyNotice>
 
       <div className="flex flex-wrap items-center gap-2 rounded-md border p-2" role="toolbar" aria-label="Ferramentas de anotação">
         <div className="flex flex-wrap gap-1">

@@ -15,12 +15,14 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { roleLabel } from '../lib/roles'
+import { SUBJECT_TERMS, subjectTermLabels } from '../lib/subjectTerm'
+import { controlClass } from '@/lib/ui'
 
 type AreaLink = { to: string; title: string; hint: string; icon: LucideIcon }
 
 export default function Configuracoes() {
   const { user } = useAuth()
-  const { organization, role } = useOrganization()
+  const { role } = useOrganization()
   const areas: AreaLink[] = [
     { to: '/configuracoes/plano', title: 'Plano e cobrança', hint: 'Assinatura, faturas e troca de plano', icon: CreditCard },
     { to: '/exercicios', title: 'Biblioteca de exercícios', hint: 'Catálogo global e os exercícios criados pela sua organização', icon: Dumbbell },
@@ -63,10 +65,8 @@ export default function Configuracoes() {
             <CardTitle className="text-base">Organização</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Info label="Nome" value={organization?.name ?? '-'} />
-              <Info label="Seu papel" value={roleLabel(role)} />
-            </div>
+            <Info label="Seu papel" value={roleLabel(role)} />
+            <IdentitySettings />
             <LogoSettings />
             <ContactSettings />
           </CardContent>
@@ -105,6 +105,91 @@ function Info({ label, value }: { label: string; value: string }) {
       <span className="block text-xs text-muted-foreground">{label}</span>
       <span className="block text-sm">{value}</span>
     </div>
+  )
+}
+
+// Nome da organização e como ela chama quem é avaliado. Os dois eram
+// escolhidos só no primeiro acesso, sem como corrigir depois; o nome sai nos
+// PDFs e na página do aluno.
+function IdentitySettings() {
+  const { organization, role, refresh } = useOrganization()
+  const canManage = role === 'owner' || role === 'admin'
+  const [name, setName] = useState(organization?.name ?? '')
+  const [term, setTerm] = useState(organization?.subject_term ?? 'avaliado')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const dirty = name.trim() !== (organization?.name ?? '') || term !== (organization?.subject_term ?? 'avaliado')
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    if (!organization) return
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setError('Informe o nome da organização.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const { data, error: err } = await supabase
+        .from('organizations')
+        .update({ name: trimmed, subject_term: term })
+        .eq('id', organization.id)
+        .select('id')
+      if (err) throw err
+      // a policy recusa em silêncio (0 linhas) quem não pode editar
+      if (!data?.length) throw new Error('Não foi possível salvar. Confira se a verificação em dois fatores está em dia.')
+      await refresh()
+      setSaved(true)
+    } catch (e) {
+      setError(normalizeDbError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canManage) return <Info label="Nome" value={organization?.name ?? '-'} />
+
+  return (
+    <form className="space-y-2" onSubmit={(e) => void save(e)}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="org-name">Nome da organização</Label>
+          <Input
+            id="org-name"
+            value={name}
+            maxLength={120}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="org-term">Termo usado no app</Label>
+          <select
+            id="org-term"
+            className={controlClass}
+            value={term}
+            disabled={busy}
+            onChange={(e) => setTerm(e.target.value)}
+          >
+            {SUBJECT_TERMS.map((t) => (
+              <option key={t} value={t}>{subjectTermLabels(t).singularCap}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        O nome aparece nos PDFs e na página do aluno. O termo (aluno, cliente...) aparece nas telas e nos PDFs.
+      </p>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {saved && !dirty ? <p role="status" className="text-xs text-muted-foreground">Organização salva.</p> : null}
+      <Button type="submit" size="sm" variant="outline" disabled={busy || !dirty}>
+        {busy ? 'Salvando...' : 'Salvar organização'}
+      </Button>
+    </form>
   )
 }
 
@@ -191,7 +276,7 @@ function ContactSettings() {
           {busy ? 'Salvando...' : 'Salvar contato'}
         </Button>
       ) : (
-        <p className="text-xs text-muted-foreground">Só owner ou admin edita o contato.</p>
+        <p className="text-xs text-muted-foreground">Só o dono ou um administrador edita o contato.</p>
       )}
     </div>
   )
@@ -204,6 +289,9 @@ function LogoSettings() {
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Trocar um PNG por outro PNG mantém o mesmo path ({org}/logo.png): sem esta
+  // contagem a prévia continuaria mostrando o logo antigo.
+  const [version, setVersion] = useState(0)
   const logoPath = organization?.logo_path
 
   useEffect(() => {
@@ -217,7 +305,7 @@ function LogoSettings() {
     return () => {
       active = false
     }
-  }, [logoPath])
+  }, [logoPath, version])
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -228,6 +316,7 @@ function LogoSettings() {
     try {
       await uploadOrgLogo(organization.id, file)
       await refresh()
+      setVersion((v) => v + 1)
     } catch (err) {
       setError(normalizeDbError(err))
     } finally {

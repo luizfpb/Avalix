@@ -29,6 +29,7 @@ import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
+import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -216,6 +217,8 @@ export default function PosturaSessaoDetalhe() {
         onConfirm={onDeleteSession}
         onCancel={() => setConfirmSession(false)}
       />
+
+      <ReadOnlyNotice>Fotos novas não serão gravadas até a assinatura ser regularizada.</ReadOnlyNotice>
 
       <div className="flex flex-wrap items-end gap-3 rounded-md border p-4">
         <div className="space-y-1.5">

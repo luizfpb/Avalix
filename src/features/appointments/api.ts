@@ -83,6 +83,33 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   return data
 }
 
+// Aluno e organização ficam (freeze_columns da 0011); o resto se corrige.
+export type UpdateAppointmentInput = {
+  id: string
+  title: string
+  startsAt: string
+  durationMin: number
+  location: string | null
+  notes: string | null
+}
+
+export async function updateAppointment(input: UpdateAppointmentInput): Promise<AppointmentRow> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({
+      title: input.title,
+      starts_at: input.startsAt,
+      duration_min: input.durationMin,
+      location: input.location,
+      notes: input.notes,
+    })
+    .eq('id', input.id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function deleteAppointment(id: string): Promise<void> {
   const { error } = await supabase.from('appointments').delete().eq('id', id)
   if (error) throw error

@@ -8,6 +8,7 @@
 //        -> { url, method: 'pix' } (fatura Pix)
 // POST { action: 'change',   org_id, plan, cycle } -> { ok: true }
 // POST { action: 'cancel',   org_id }              -> { ok: true }
+//        (sem assinatura em vigor, desiste do Pix gerado e não pago)
 import {
   checkoutBody,
   cycleLabel,
@@ -39,6 +40,8 @@ type Snapshot = {
   plan_id: string
   billing_cycle: Cycle | null
   asaas_subscription_id: string | null
+  // Pix gerado e não pago (0052)
+  has_pending: boolean
   active_subjects: number
   plans: Record<string, PlanPrice>
 }
@@ -202,7 +205,10 @@ async function changePlan(s: Snapshot, body: Record<string, unknown>) {
 }
 
 async function cancel(s: Snapshot) {
-  if (!hasLiveSubscription(s)) throw new HttpError(409, 'Não há assinatura em vigor para cancelar.')
+  if (!hasLiveSubscription(s)) {
+    if (s.has_pending) return discardPending(s)
+    throw new HttpError(409, 'Não há assinatura em vigor para cancelar.')
+  }
   try {
     await asaas('DELETE', `/subscriptions/${encodeURIComponent(s.asaas_subscription_id!)}`)
   } catch (error) {
@@ -210,6 +216,19 @@ async function cancel(s: Snapshot) {
     if (!(error instanceof HttpError && error.status === 404)) throw error
   }
   await rpcService('billing_mark_canceled', { p_org: s.org_id })
+  return { ok: true }
+}
+
+// Desistir do Pix gerado e não pago: a assinatura sai do Asaas (senão ele
+// segue mandando uma fatura por ciclo) e o pendente sai daqui. O teste
+// grátis, se ainda valer, continua como estava.
+async function discardPending(s: Snapshot) {
+  if (s.asaas_subscription_id) {
+    await asaas('DELETE', `/subscriptions/${encodeURIComponent(s.asaas_subscription_id)}`).catch((error) => {
+      if (!(error instanceof HttpError && error.status === 404)) throw error
+    })
+  }
+  await rpcService('billing_discard_pending', { p_org: s.org_id })
   return { ok: true }
 }
 

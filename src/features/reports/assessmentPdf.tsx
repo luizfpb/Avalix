@@ -78,6 +78,8 @@ export function historyWarnings(history: AssessmentHistoryPoint[]): { code: stri
 export type AssessmentPdfData = {
   orgName: string
   subjectName: string
+  // como a organização chama quem é avaliado (Aluno, Cliente...); padrão Avaliado
+  subjectLabel?: string
   // profissional responsavel, impresso no rodape de todas as paginas
   evaluatorName?: string | null
   // logo da org como data URL (branding); ausente = plaqueta AVALIX
@@ -670,7 +672,7 @@ function AssessmentDoc({ data }: { data: AssessmentPdfData }) {
   const adulto = adultReferenceApplies(ageYears)
 
   const info: InfoItem[] = [
-    { label: 'Avaliado', value: data.subjectName, wide: true },
+    { label: data.subjectLabel ?? 'Avaliado', value: data.subjectName, wide: true },
     { label: 'Data', value: fmtDate(assessment.assessed_at) ?? '—' },
     ...(ageYears != null ? [{ label: 'Idade na avaliação', value: `${ageYears} anos` }] : []),
   ]
@@ -771,6 +773,8 @@ export async function generateAssessmentPdf(data: AssessmentPdfData): Promise<Bl
 export type EvolutionPdfData = {
   orgName: string
   subjectName: string
+  // como a organização chama quem é avaliado (Aluno, Cliente...); padrão Avaliado
+  subjectLabel?: string
   evaluatorName?: string | null
   logoUrl?: string | null
   history: AssessmentHistoryPoint[]
@@ -844,7 +848,7 @@ function EvolutionDoc({ data }: { data: EvolutionPdfData }) {
   const first = data.history[0]
   const last = data.history[data.history.length - 1]
   const info: InfoItem[] = [
-    { label: 'Avaliado', value: data.subjectName, wide: true },
+    { label: data.subjectLabel ?? 'Avaliado', value: data.subjectName, wide: true },
     { label: 'Período', value: first && last ? `${first.date} a ${last.date}` : '—' },
     { label: 'Avaliações', value: String(data.history.length) },
   ]

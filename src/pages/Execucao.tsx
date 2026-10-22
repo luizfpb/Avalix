@@ -76,6 +76,7 @@ import { SetRowFields } from '../features/workout/SetRowFields'
 import { RestTimerBar } from '../features/workout/RestTimerBar'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from '../features/workout/SessionEditForm'
 import type { WorkoutLogRow } from '../features/workout/api'
+import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 
 function dateIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -1628,6 +1629,8 @@ function LogForm({
             ) : null}
           </p>
         ) : null}
+
+        <ReadOnlyNotice>O registro da sessão não será gravado até a assinatura ser regularizada.</ReadOnlyNotice>
 
         <PlanNotes
           planNotes={detail.plan?.notes}

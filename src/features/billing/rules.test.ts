@@ -4,6 +4,8 @@ import {
   daysLeft,
   formatDate,
   freeMonths,
+  hasLiveSubscription,
+  hasPendingPix,
   monthlyEquivalent,
   planLimitLabel,
   statusLabel,
@@ -96,6 +98,9 @@ describe('billingBanner', () => {
     expect(banner?.tone).toBe('danger')
     expect(banner?.text).toContain('Seus dados estão guardados')
     expect(billingBanner(billing({ status: 'past_due', access: 'blocked' }), NOW, 'alunos')?.cta).toBe('Regularizar')
+    // renovação não paga sem o aviso de atraso: mesma situação, mesmo botão
+    expect(billingBanner(billing({ status: 'active', access: 'blocked' }), NOW, 'alunos')?.cta).toBe('Regularizar')
+    expect(billingBanner(billing({ status: 'canceled', access: 'blocked' }), NOW, 'alunos')?.cta).toBe('Assinar')
   })
 
   it('avisa quando bate o limite do plano', () => {
@@ -103,6 +108,19 @@ describe('billingBanner', () => {
       'Você chegou ao limite do plano: 30 de 30 alunos ativos.'
     )
     expect(billingBanner(billing({ active_subjects: 30, max_subjects: null }), NOW, 'alunos')).toBeNull()
+  })
+})
+
+describe('assinatura em vigor e Pix pendente', () => {
+  it('Pix gerado no teste não é assinatura em vigor', () => {
+    const pix = billing({ status: 'trial', has_subscription: true, pending_invoice_url: 'https://x.test/i/1' })
+    expect(hasLiveSubscription(pix)).toBe(false)
+    expect(hasPendingPix(pix)).toBe(true)
+  })
+  it('fatura em aberto de assinatura em vigor não é Pix pendente', () => {
+    const overdue = billing({ status: 'past_due', has_subscription: true, pending_invoice_url: 'https://x.test/i/2' })
+    expect(hasLiveSubscription(overdue)).toBe(true)
+    expect(hasPendingPix(overdue)).toBe(false)
   })
 })
 

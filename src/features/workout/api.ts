@@ -790,14 +790,23 @@ export type ActivePlanSummary = {
 
 // Planos ativos da org com sessoes/semana (embed do count de divisoes). RLS vale.
 export async function listOrgActivePlans(orgId: string): Promise<ActivePlanSummary[]> {
-  const { data, error } = await supabase
-    .from('workout_plans')
-    .select('id, subject_id, name, weeks, weekly_schedule, starts_on, created_at, workout_days(count)')
-    .eq('org_id', orgId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<{
+  // um plano ativo por avaliado: paginado, porque a API corta em 1000 linhas
+  const data: unknown[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const page = await supabase
+      .from('workout_plans')
+      .select('id, subject_id, name, weeks, weekly_schedule, starts_on, created_at, workout_days(count)')
+      .eq('org_id', orgId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (page.error) throw page.error
+    data.push(...(page.data ?? []))
+    if ((page.data?.length ?? 0) < pageSize) break
+  }
+  const rows = data as unknown as Array<{
     id: string
     subject_id: string
     name: string
@@ -839,12 +848,21 @@ export async function listOrgWorkoutLogSummary(orgId: string): Promise<Record<st
   // `select('*')` e o cast: first_date chega com a 0037, e o database.types so
   // conhece a coluna depois que o banco e atualizado e os tipos regenerados.
   // Ate la o campo vem ausente e o inicio efetivo cai no fallback de sempre.
-  const { data, error } = await supabase
-    .from('workout_log_summary')
-    .select('*')
-    .eq('org_id', orgId)
-  if (error) throw error
-  const rows = (data ?? []) as unknown as Array<{
+  // uma linha por plano: paginada, porque a API corta em 1000 linhas sem erro
+  const data: unknown[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const page = await supabase
+      .from('workout_log_summary')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('plan_id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (page.error) throw page.error
+    data.push(...(page.data ?? []))
+    if ((page.data?.length ?? 0) < pageSize) break
+  }
+  const rows = data as unknown as Array<{
     plan_id: string | null
     log_count: number | null
     last_date: string | null

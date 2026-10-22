@@ -28,6 +28,9 @@ export type OrgBilling = {
   canceled_at: string | null
   pending_invoice_url: string | null
   pending_due_date: string | null
+  // Pix gerado e não pago fora de assinatura em vigor (0052); ausente antes dela
+  pending_plan_id?: string | null
+  pending_cycle?: BillingCycle | null
   can_manage: boolean
   plans: BillingPlan[]
 }
@@ -107,7 +110,9 @@ export function billingBanner(b: OrgBilling, now: Date, subjectPlural: string): 
         : b.status === 'canceled'
           ? 'Sua assinatura terminou. Seus dados estão guardados; assine de novo para voltar a criar e editar.'
           : 'Sua assinatura está suspensa por falta de pagamento. Seus dados estão guardados; regularize para voltar a criar e editar.'
-    return { tone: 'danger', text, cta: b.status === 'past_due' ? 'Regularizar' : 'Assinar' }
+    // active bloqueado = renovação não paga, como past_due
+    const unpaid = b.status === 'past_due' || b.status === 'active'
+    return { tone: 'danger', text, cta: unpaid ? 'Regularizar' : 'Assinar' }
   }
 
   if (b.access === 'grace') {
@@ -148,6 +153,17 @@ export function billingBanner(b: OrgBilling, now: Date, subjectPlural: string): 
   }
 
   return null
+}
+
+// Assinatura em vigor no Asaas, a única que se troca ou cancela. O Pix gerado
+// e não pago não conta (antes da 0052 o banco o marcava como assinatura).
+export function hasLiveSubscription(b: OrgBilling): boolean {
+  return b.has_subscription && (b.status === 'active' || b.status === 'past_due')
+}
+
+// Pix gerado e não pago, fora de uma assinatura em vigor.
+export function hasPendingPix(b: OrgBilling): boolean {
+  return !hasLiveSubscription(b) && !!b.pending_invoice_url
 }
 
 export function statusLabel(b: OrgBilling): string {

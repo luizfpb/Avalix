@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
+import { useOrganization } from '../organization/context'
 import type { BillingCycle, OrgBilling } from './rules'
 
 export async function getOrgBilling(orgId: string): Promise<OrgBilling> {
@@ -16,6 +17,15 @@ export function useOrgBilling(orgId: string | null | undefined) {
     enabled: !!orgId,
     staleTime: 1000 * 60,
   })
+}
+
+// Conta em só leitura (assinatura vencida). O banco é quem recusa; aqui é só
+// para avisar antes de alguém preencher um formulário inteiro. Enquanto a
+// consulta carrega, ou se ela falhar, não bloqueia nada.
+export function useReadOnly(): { readOnly: boolean; canManage: boolean } {
+  const { organization } = useOrganization()
+  const { data } = useOrgBilling(organization?.id)
+  return { readOnly: data?.access === 'blocked', canManage: !!data?.can_manage }
 }
 
 export type BillingRequest =

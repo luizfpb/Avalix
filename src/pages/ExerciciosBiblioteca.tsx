@@ -19,6 +19,7 @@ import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
+import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 
 export default function ExerciciosBiblioteca() {
   const { organization, role } = useOrganization()
@@ -64,6 +65,7 @@ export default function ExerciciosBiblioteca() {
 
   return (
     <div className="max-w-5xl space-y-5">
+      <ReadOnlyNotice>Exercícios e vídeos novos não serão gravados até a assinatura ser regularizada.</ReadOnlyNotice>
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">

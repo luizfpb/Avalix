@@ -39,6 +39,7 @@ import { buildAssessmentSeriesPrompt, type AssessmentPromptPoint } from '../feat
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { QueryError } from '../components/QueryError'
+import { subjectTermLabels } from '../lib/subjectTerm'
 
 const LEAN = 'var(--color-chart-1)'
 const FAT = 'var(--color-chart-2)'
@@ -123,6 +124,7 @@ export default function Evolucao() {
         : null
       const blob = await generateEvolutionPdf({
         orgName: organization?.name ?? '',
+        subjectLabel: subjectTermLabels(organization?.subject_term).singularCap,
         subjectName: subjectQuery.data?.full_name ?? '',
         evaluatorName,
         logoUrl,

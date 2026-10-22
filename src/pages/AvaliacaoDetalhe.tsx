@@ -30,6 +30,7 @@ import { buildAssessmentPrompt } from '../features/prompts'
 import { normalizeDbError } from '../lib/errors'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
+import { subjectTermLabels } from '../lib/subjectTerm'
 
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -123,6 +124,7 @@ export default function AvaliacaoDetalhe() {
         .catch(() => null)
       const blob = await generateAssessmentPdf({
         orgName: organization?.name ?? '',
+        subjectLabel: subjectTermLabels(organization?.subject_term).singularCap,
         subjectName: subjectQuery.data?.full_name ?? '',
         evaluatorName,
         logoUrl,

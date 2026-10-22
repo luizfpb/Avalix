@@ -32,6 +32,8 @@ import {
 export type WorkoutPdfData = {
   orgName: string
   subjectName: string
+  // como a organização chama quem é avaliado (Aluno, Cliente...); padrão Avaliado
+  subjectLabel?: string
   // profissional responsavel, impresso no rodape de todas as paginas
   evaluatorName?: string | null
   plan: WorkoutPlanRow
@@ -734,7 +736,7 @@ function WorkoutDoc({ data }: { data: WorkoutPdfData }) {
     : ''
 
   const info: InfoItem[] = [
-    { label: 'Avaliado', value: data.subjectName },
+    { label: data.subjectLabel ?? 'Avaliado', value: data.subjectName },
     { label: 'Objetivo', value: goalLabel(plan.goal) },
     {
       label: 'Mesociclo',

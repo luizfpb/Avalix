@@ -154,6 +154,41 @@ describe('Plano', () => {
     expect(screen.getByRole('link', { name: /Pagar fatura/ }).getAttribute('href')).toBe('https://sandbox.asaas.com/i/pay_2')
   })
 
+  it('Pix gerado e não pago: dá para pagar, assinar de outro jeito ou desistir', async () => {
+    billingRequestMock.mockResolvedValue({ ok: true })
+    // antes da 0052 o banco marcava has_subscription no Pix pendente do teste
+    renderPage(
+      billing({
+        has_subscription: true,
+        billing_cycle: 'yearly',
+        pending_invoice_url: 'https://sandbox.asaas.com/i/pay_p1',
+        pending_due_date: '2026-10-21',
+        pending_plan_id: 'ate30',
+        pending_cycle: 'yearly',
+      })
+    )
+
+    expect(screen.getByText(/Pix gerado para o plano Até 30 \(anual\), vence em 21\/10\/2026/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Pagar fatura/ }).getAttribute('href')).toBe('https://sandbox.asaas.com/i/pay_p1')
+    // sem "Trocar plano" nem "Cancelar assinatura", que o servidor recusa
+    expect(screen.getByRole('heading', { name: 'Escolha seu plano' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Cancelar assinatura' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Assinar' }).length).toBe(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desistir deste Pix' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Desistir do Pix' }))
+    await waitFor(() => expect(billingRequestMock).toHaveBeenCalledWith('org-1', { action: 'cancel' }))
+  })
+
+  it('trocar de plano confirma sem botão de ação destrutiva', () => {
+    renderPage(
+      billing({ status: 'active', billing_cycle: 'monthly', has_subscription: true, current_period_end: '2026-11-17T03:00:00Z' })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar para este' }))
+    const confirm = screen.getByRole('button', { name: 'Trocar plano' })
+    expect(confirm.className).not.toMatch(/bg-destructive/)
+  })
+
   it('cortesia não oferece planos', () => {
     renderPage(billing({ status: 'courtesy', trial_ends_at: null }))
     expect(screen.getByText(/acesso de cortesia/)).toBeTruthy()

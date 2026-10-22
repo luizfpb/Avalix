@@ -179,17 +179,23 @@ export function mapCircumferences(
 // dashboard. A view last_assessment_by_subject (0016) agrega no banco com
 // distinct on, em vez de baixar todas as avaliações da org; security_invoker
 // mantém a RLS valendo.
+// Uma linha por avaliado: paginada, porque a API corta em 1000 linhas sem erro.
 export async function listLastAssessmentBySubject(orgId: string): Promise<Record<string, string>> {
-  const { data, error } = await supabase
-    .from('last_assessment_by_subject')
-    .select('subject_id, assessed_at')
-    .eq('org_id', orgId)
-  if (error) throw error
   const map: Record<string, string> = {}
-  for (const r of data ?? []) {
-    if (r.subject_id && r.assessed_at) map[r.subject_id] = r.assessed_at
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('last_assessment_by_subject')
+      .select('subject_id, assessed_at')
+      .eq('org_id', orgId)
+      .order('subject_id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) throw error
+    for (const r of data ?? []) {
+      if (r.subject_id && r.assessed_at) map[r.subject_id] = r.assessed_at
+    }
+    if ((data?.length ?? 0) < pageSize) return map
   }
-  return map
 }
 
 export async function listAssessments(subjectId: string): Promise<AssessmentRow[]> {

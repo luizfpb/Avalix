@@ -4,7 +4,9 @@ import {
   deleteAppointment,
   listAppointments,
   listUpcomingAppointments,
+  updateAppointment,
   type CreateAppointmentInput,
+  type UpdateAppointmentInput,
 } from './api'
 
 export function useAppointments(orgId: string | null | undefined) {
@@ -31,6 +33,16 @@ export function useCreateAppointment(orgId: string | null | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateAppointmentInput) => createAppointment(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments', orgId] })
+    },
+  })
+}
+
+export function useUpdateAppointment(orgId: string | null | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateAppointmentInput) => updateAppointment(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments', orgId] })
     },

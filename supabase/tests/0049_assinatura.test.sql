@@ -135,7 +135,7 @@ select lives_ok(
 select throws_ok(
   $$insert into public.subjects(org_id, full_name, birth_date, sex)
     values ((select id from t_org), 'Aluno 31', '1990-01-01', 'M')$$,
-  'P0001', 'Seu plano permite até 30 avaliados ativos. Inative um cadastro ou mude para o plano Ilimitado em Ajustes > Plano e cobrança.',
+  'P0001', 'Seu plano permite até 30 avaliados ativos. Inative um cadastro ou mude de plano em Ajustes > Plano e cobrança.',
   'o 31º ativo é recusado');
 select lives_ok(
   $$insert into public.subjects(org_id, full_name, birth_date, sex, is_active)

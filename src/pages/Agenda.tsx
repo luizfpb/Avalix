@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { CalendarPlus, Download, Trash2 } from 'lucide-react'
+import { CalendarPlus, Download, Pencil, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { useSubjects } from '../features/subjects/hooks'
@@ -8,6 +8,7 @@ import {
   useAppointments,
   useCreateAppointment,
   useDeleteAppointment,
+  useUpdateAppointment,
 } from '../features/appointments/hooks'
 import type { AppointmentWithSubject } from '../features/appointments/api'
 import {
@@ -28,15 +29,19 @@ import { controlClass } from '@/lib/ui'
 import { normalizeDbError } from '../lib/errors'
 import { QueryError } from '../components/QueryError'
 import { useClock } from '../lib/useClock'
+import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
+}
+function toLocalInput(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 function defaultLocal(): string {
   const d = new Date()
   d.setMinutes(0, 0, 0)
   d.setHours(d.getHours() + 1)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return toLocalInput(d)
 }
 function fmtDateTime(iso: string): string {
   const d = new Date(iso)
@@ -45,8 +50,8 @@ function fmtDateTime(iso: string): string {
     : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function toEvent(a: AppointmentWithSubject): CalendarEvent {
-  const details = [a.subjectName ? `Avaliado: ${a.subjectName}` : '', a.notes ?? '']
+function toEvent(a: AppointmentWithSubject, subjectLabel: string): CalendarEvent {
+  const details = [a.subjectName ? `${subjectLabel}: ${a.subjectName}` : '', a.notes ?? '']
     .filter(Boolean)
     .join('\n')
   return {
@@ -69,6 +74,9 @@ export default function Agenda() {
   const createMut = useCreateAppointment(orgId)
   const [confirmApptId, setConfirmApptId] = useState<string | null>(null)
   const deleteMut = useDeleteAppointment(orgId)
+  const updateMut = useUpdateAppointment(orgId)
+  // compromisso sendo corrigido no formulário (null = novo)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [subjectId, setSubjectId] = useState(params.get('subject') ?? '')
   const [when, setWhen] = useState(defaultLocal())
@@ -83,8 +91,9 @@ export default function Agenda() {
     const all = apptsQuery.data ?? []
     const up: AppointmentWithSubject[] = []
     const pa: AppointmentWithSubject[] = []
+    // em andamento continua em "Próximos" até terminar
     for (const a of all) {
-      if (new Date(a.starts_at).getTime() >= now) up.push(a)
+      if (new Date(a.starts_at).getTime() + a.duration_min * 60_000 > now) up.push(a)
       else pa.push(a)
     }
     pa.reverse() // passados: mais recente primeiro
@@ -97,7 +106,7 @@ export default function Agenda() {
   if (subjectsQuery.isError || apptsQuery.isError) {
     return (
       <QueryError
-        message="Não foi possível carregar a agenda ou a lista de avaliados."
+        message={`Não foi possível carregar a agenda ou a lista de ${labels.plural}.`}
         onRetry={() => void Promise.all([subjectsQuery.refetch(), apptsQuery.refetch()])}
       />
     )
@@ -113,6 +122,18 @@ export default function Agenda() {
     const dur = Number(duration)
     if (!(dur >= 5 && dur <= 1440)) return setError('Duração entre 5 e 1440 minutos.')
     try {
+      if (editingId) {
+        await updateMut.mutateAsync({
+          id: editingId,
+          title: title.trim() || 'Avaliação física',
+          startsAt: startsAt.toISOString(),
+          durationMin: dur,
+          location: location.trim() || null,
+          notes: notes.trim() || null,
+        })
+        resetForm()
+        return
+      }
       await createMut.mutateAsync({
         orgId,
         subjectId,
@@ -128,8 +149,30 @@ export default function Agenda() {
     }
   }
 
+  function startEdit(a: AppointmentWithSubject) {
+    setError(null)
+    setEditingId(a.id)
+    setSubjectId(a.subject_id)
+    setWhen(toLocalInput(new Date(a.starts_at)))
+    setDuration(String(a.duration_min))
+    setTitle(a.title)
+    setLocation(a.location ?? '')
+    setNotes(a.notes ?? '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function resetForm() {
+    setEditingId(null)
+    setError(null)
+    setWhen(defaultLocal())
+    setDuration('60')
+    setTitle('Avaliação física')
+    setLocation('')
+    setNotes('')
+  }
+
   function downloadIcs(a: AppointmentWithSubject) {
-    const ics = icsContent(toEvent(a), `${a.id}@avalix`)
+    const ics = icsContent(toEvent(a, labels.singularCap), `${a.id}@avalix`)
     downloadBlob(new Blob([ics], { type: 'text/calendar;charset=utf-8' }), `avaliacao-${a.id.slice(0, 8)}.ics`)
     logCalendarShare(a, 'SHARE_ICS')
   }
@@ -162,9 +205,10 @@ export default function Agenda() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:items-start xl:gap-8">
         <Card className="xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1">
           <CardHeader>
-            <CardTitle className="text-base">Novo agendamento</CardTitle>
+            <CardTitle className="text-base">{editingId ? 'Editar agendamento' : 'Novo agendamento'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <ReadOnlyNotice>Agendamentos novos não serão gravados até a assinatura ser regularizada.</ReadOnlyNotice>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="space-y-1.5">
                 <Label htmlFor="appointment-subject" className="text-xs">{labels.singularCap}</Label>
@@ -172,6 +216,7 @@ export default function Agenda() {
                   id="appointment-subject"
                   className={controlClass}
                   value={subjectId}
+                  disabled={editingId != null}
                   onChange={(e) => setSubjectId(e.target.value)}
                 >
                   <option value="">Selecione</option>
@@ -217,9 +262,20 @@ export default function Agenda() {
               </div>
             </div>
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-            <Button size="sm" onClick={create} disabled={createMut.isPending}>
-              <CalendarPlus /> {createMut.isPending ? 'Agendando...' : 'Agendar'}
-            </Button>
+            {editingId ? (
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={create} disabled={updateMut.isPending}>
+                  {updateMut.isPending ? 'Salvando...' : 'Salvar alterações'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={resetForm} disabled={updateMut.isPending}>
+                  Cancelar edição
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" onClick={create} disabled={createMut.isPending}>
+                <CalendarPlus /> {createMut.isPending ? 'Agendando...' : 'Agendar'}
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -243,6 +299,8 @@ export default function Agenda() {
                     key={a.id}
                     appt={a}
                     onDelete={() => setConfirmApptId(a.id)}
+                    onEdit={() => startEdit(a)}
+                    subjectLabel={labels.singularCap}
                     onIcs={() => downloadIcs(a)}
                     onGoogle={() => logCalendarShare(a, 'SHARE_GOOGLE_CALENDAR')}
                     deleting={deleteMut.isPending}
@@ -268,6 +326,8 @@ export default function Agenda() {
                       key={a.id}
                       appt={a}
                       onDelete={() => setConfirmApptId(a.id)}
+                      onEdit={() => startEdit(a)}
+                      subjectLabel={labels.singularCap}
                       onIcs={() => downloadIcs(a)}
                       onGoogle={() => logCalendarShare(a, 'SHARE_GOOGLE_CALENDAR')}
                       deleting={deleteMut.isPending}
@@ -286,6 +346,7 @@ export default function Agenda() {
         title="Excluir agendamento?"
         onConfirm={() => {
           if (confirmApptId) deleteMut.mutate(confirmApptId)
+          if (confirmApptId === editingId) resetForm()
           setConfirmApptId(null)
         }}
         onCancel={() => setConfirmApptId(null)}
@@ -297,6 +358,8 @@ export default function Agenda() {
 function AppointmentItem({
   appt,
   onDelete,
+  onEdit,
+  subjectLabel,
   onIcs,
   onGoogle,
   deleting,
@@ -304,6 +367,8 @@ function AppointmentItem({
 }: {
   appt: AppointmentWithSubject
   onDelete: () => void
+  onEdit: () => void
+  subjectLabel: string
   onIcs: () => void
   onGoogle: () => void
   deleting: boolean
@@ -335,19 +400,29 @@ function AppointmentItem({
             {appt.duration_min} min{appt.location ? ` · ${appt.location}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={deleting}
-          className="grid size-10 shrink-0 place-items-center rounded-md text-destructive hover:bg-destructive/10"
-          aria-label={`Excluir agendamento de ${appt.subjectName}`}
-        >
-          <Trash2 className="size-4" />
-        </button>
+        <div className="flex shrink-0">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="grid size-10 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label={`Editar agendamento de ${appt.subjectName}`}
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="grid size-10 place-items-center rounded-md text-destructive hover:bg-destructive/10"
+            aria-label={`Excluir agendamento de ${appt.subjectName}`}
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
         <a
-          href={googleCalendarUrl(toEvent(appt))}
+          href={googleCalendarUrl(toEvent(appt, subjectLabel))}
           target="_blank"
           rel="noreferrer"
           onClick={onGoogle}

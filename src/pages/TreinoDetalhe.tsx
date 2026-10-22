@@ -50,6 +50,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
 import { additionalPrimaryMuscles } from '../features/workout/exerciseMuscles'
+import { subjectTermLabels } from '../lib/subjectTerm'
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
@@ -232,6 +233,7 @@ export default function TreinoDetalhe() {
       .catch(() => null)
     return generateWorkoutPdf({
       orgName: organization?.name ?? '',
+      subjectLabel: subjectTermLabels(organization?.subject_term).singularCap,
       subjectName: subjectQuery.data?.full_name ?? '',
       evaluatorName,
       logoUrl,
@@ -694,6 +696,8 @@ function DuplicatePanel({
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const { organization } = useOrganization()
+  const labels = subjectTermLabels(organization?.subject_term)
   const subjectsQ = useSubjects(orgId)
   const exercisesQ = useExercises(orgId)
   const dupMut = useDuplicateWorkoutPlan()
@@ -722,7 +726,7 @@ function DuplicatePanel({
   if (subjectsQ.isError || exercisesQ.isError) {
     return (
       <QueryError
-        message="Não foi possível carregar avaliados ou exercícios. A duplicação foi bloqueada."
+        message={`Não foi possível carregar ${labels.plural} ou exercícios. A duplicação foi bloqueada.`}
         onRetry={() => void Promise.all([subjectsQ.refetch(), exercisesQ.refetch()])}
       />
     )
@@ -755,7 +759,7 @@ function DuplicatePanel({
           <Input id="duplicate-plan-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="duplicate-plan-subject">Para qual avaliado</Label>
+          <Label htmlFor="duplicate-plan-subject">Para qual {labels.singular}</Label>
           <select
             id="duplicate-plan-subject"
             className={controlClass}

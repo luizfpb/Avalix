@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppShell } from './AppShell'
+import { ReadOnlyNotice } from './ReadOnlyGate'
 
 const { signOutMock, useOrgBillingMock } = vi.hoisted(() => ({
   signOutMock: vi.fn(),
@@ -11,6 +12,10 @@ const { signOutMock, useOrgBillingMock } = vi.hoisted(() => ({
 
 vi.mock('../features/billing/api', () => ({
   useOrgBilling: useOrgBillingMock,
+  useReadOnly: () => {
+    const data = useOrgBillingMock().data as { access?: string; can_manage?: boolean } | undefined
+    return { readOnly: data?.access === 'blocked', canManage: !!data?.can_manage }
+  },
 }))
 
 vi.mock('../features/auth/context', () => ({
@@ -129,5 +134,54 @@ describe('AppShell — faixa da assinatura', () => {
       </MemoryRouter>
     )
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  function renderAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<p>formulário</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    )
+  }
+
+  it('só leitura: formulário de criação abre o aviso no lugar dos campos', () => {
+    useOrgBillingMock.mockReturnValue({ data: blocked })
+    renderAt('/avaliados/s-1/avaliacoes/nova')
+    expect(screen.getByRole('heading', { name: 'Conta em modo só leitura' })).toBeTruthy()
+    expect(screen.queryByText('formulário')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Ver plano e cobrança' }).getAttribute('href')).toBe('/configuracoes/plano')
+  })
+
+  it('só leitura: corrigir o cadastro e consultar continuam abrindo', () => {
+    useOrgBillingMock.mockReturnValue({ data: blocked })
+    renderAt('/avaliados/s-1/editar')
+    expect(screen.getByText('formulário')).toBeTruthy()
+    cleanup()
+    renderAt('/avaliados/s-1/avaliacoes/a-1')
+    expect(screen.getByText('formulário')).toBeTruthy()
+  })
+
+  it('com acesso, o formulário abre normalmente', () => {
+    useOrgBillingMock.mockReturnValue({ data: { ...blocked, access: 'full' } })
+    renderAt('/avaliados/s-1/treinos/nova')
+    expect(screen.getByText('formulário')).toBeTruthy()
+  })
+
+  it('só leitura: telas de consulta e registro abrem com o aviso', () => {
+    useOrgBillingMock.mockReturnValue({ data: blocked })
+    render(
+      <MemoryRouter initialEntries={['/avaliados/s-1/treinos/p-1/execucao']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<ReadOnlyNotice>O registro da sessão não será gravado.</ReadOnlyNotice>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(screen.getByText(/Conta em modo só leitura. O registro da sessão não será gravado./)).toBeTruthy()
   })
 })

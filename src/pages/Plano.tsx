@@ -11,6 +11,8 @@ import {
   formatBRL,
   formatDate,
   freeMonths,
+  hasLiveSubscription,
+  hasPendingPix,
   monthlyEquivalent,
   planLimitLabel,
   plural,
@@ -85,6 +87,9 @@ export default function Plano() {
       ) : (
         <>
           <CurrentPlan billing={billing} subjectPlural={terms.plural} />
+          {hasPendingPix(billing) && billing.can_manage ? (
+            <PendingPix billing={billing} orgId={orgId as string} />
+          ) : null}
           {billing.status === 'courtesy' ? null : billing.can_manage ? (
             <PlanPicker
               billing={billing}
@@ -217,7 +222,7 @@ function CurrentPlan({ billing, subjectPlural }: { billing: OrgBilling; subjectP
           </p>
         ) : null}
 
-        {billing.pending_invoice_url ? (
+        {billing.pending_invoice_url && !(hasPendingPix(billing) && billing.can_manage) ? (
           <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning/30 bg-warning/5 px-4 py-3">
             <span className="text-sm">
               Fatura em aberto
@@ -265,7 +270,7 @@ function PlanPicker({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
   const [chosen, setChosen] = useState<BillingPlan | null>(null)
-  const subscribed = billing.has_subscription
+  const subscribed = hasLiveSubscription(billing)
   const bestFreeMonths = Math.max(0, ...billing.plans.map(freeMonths))
 
   async function run(key: string, action: () => Promise<void>) {
@@ -421,6 +426,9 @@ function PlanPicker({
       {!subscribed ? (
         <p className="text-xs text-muted-foreground">
           A assinatura começa no dia do pagamento{billing.status === 'trial' ? ' e encerra o teste grátis' : ''}.
+          {hasPendingPix(billing)
+            ? ' Gerar outro Pix ou pagar com cartão substitui o Pix pendente.'
+            : ''}
         </p>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
@@ -452,10 +460,67 @@ function PlanPicker({
         }
         confirmLabel={pending?.kind === 'cancel' ? 'Cancelar assinatura' : 'Trocar plano'}
         cancelLabel="Voltar"
+        tone={pending?.kind === 'change' ? 'default' : 'destructive'}
         onConfirm={confirmPending}
         onCancel={() => setPending(null)}
       />
     </section>
+  )
+}
+
+// Pix gerado e não pago: pagar, ou desistir (a assinatura sai do Asaas, que
+// senão seguiria mandando uma fatura por ciclo).
+function PendingPix({ billing, orgId }: { billing: OrgBilling; orgId: string }) {
+  const queryClient = useQueryClient()
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const plan = billing.plans.find((p) => p.id === billing.pending_plan_id)
+  const cycle = billing.pending_cycle
+
+  async function discard() {
+    setConfirm(false)
+    setBusy(true)
+    setError(null)
+    try {
+      await billingRequest(orgId, { action: 'cancel' })
+      await queryClient.invalidateQueries({ queryKey: ['billing', orgId] })
+    } catch (e) {
+      setError(normalizeDbError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-warning/30 bg-warning/5 px-4 py-3">
+      <p className="text-sm">
+        Pix gerado
+        {plan ? ` para o plano ${plan.name}${cycle ? ` (${cycle === 'yearly' ? 'anual' : 'mensal'})` : ''}` : ''}
+        {billing.pending_due_date ? `, vence em ${formatDate(billing.pending_due_date)}` : ''}. A assinatura
+        começa quando o pagamento for confirmado.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <a href={billing.pending_invoice_url as string} target="_blank" rel="noopener noreferrer">
+            Pagar fatura <ExternalLink />
+          </a>
+        </Button>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setConfirm(true)}>
+          {busy ? 'Desistindo...' : 'Desistir deste Pix'}
+        </Button>
+      </div>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      <ConfirmDialog
+        open={confirm}
+        title="Desistir deste Pix?"
+        description="A fatura é cancelada e nada é cobrado. Você pode escolher outro plano ou pagar com cartão depois."
+        confirmLabel="Desistir do Pix"
+        cancelLabel="Voltar"
+        onConfirm={() => void discard()}
+        onCancel={() => setConfirm(false)}
+      />
+    </div>
   )
 }
 

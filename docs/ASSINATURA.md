@@ -62,8 +62,16 @@ testar no sandbox. Nada disso foi executado daqui.
   `app.org_access`, as travas (triggers `*_b9_billing`), `billing_events`
   (idempotência) e as RPCs `billing_*` (só service role), mais
   `get_org_billing` e `billing_manage_org` (usuário).
+- `supabase/migrations/0052_assinatura_pix_pendente_e_so_leitura.sql`: Pix
+  gerado e não pago deixa de contar como assinatura em vigor
+  (`has_subscription`), `get_org_billing` devolve o plano e o ciclo do Pix
+  pendente, `billing_discard_pending` (service role) limpa o pendente, e a
+  trava de só leitura passa a cobrir fotos e marcações posturais, edição de
+  anamnese, sessão postural e agendamento, sessões do profissional e
+  exercícios e vídeos personalizados.
 - `supabase/functions/billing`: assinar, trocar e cancelar (JWT do usuário,
-  owner/admin com 2FA em dia).
+  owner/admin com 2FA em dia). Sem assinatura em vigor, `cancel` desiste do
+  Pix pendente: remove a assinatura no Asaas e chama `billing_discard_pending`.
 - `supabase/functions/billing-webhook`: eventos do Asaas, autenticados pelo
   header `asaas-access-token`. Pagamento só ativa depois de reconsultado no
   Asaas.
@@ -80,8 +88,9 @@ pelo CMD:
 npx supabase gen types typescript --linked > src\lib\database.types.ts
 ```
 
-**Atenção:** o gate do deploy agora exige `0049`. Aplique a migration **antes**
-de dar push.
+**Atenção:** o gate do deploy exige a migration mais recente (hoje `0052`).
+Aplique as migrations **antes** de dar push. Depois da 0052, publique de novo a
+function `billing` (passo 5): o "Desistir deste Pix" depende dela.
 
 ### 2. Conta no sandbox do Asaas
 Crie a conta em https://sandbox.asaas.com (é separada da conta real) e gere a

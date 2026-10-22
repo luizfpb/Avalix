@@ -32,11 +32,11 @@ const ACTION_LABELS: Record<string, string> = {
   SHARE_GOOGLE_CALENDAR: 'abriu no Google Agenda',
   SHARE_ICS: 'exportou calendário',
   SHARE_WHATSAPP: 'compartilhou pelo WhatsApp',
-  SUBJECT_EXPORT: 'exportou todos os dados do avaliado',
+  SUBJECT_EXPORT: 'exportou todos os dados do cadastro',
 }
 
 const TABLE_LABELS: Record<string, string> = {
-  subjects: 'avaliado',
+  subjects: 'cadastro',
   assessments: 'avaliação',
   posture_sessions: 'sessão postural',
   posture_photos: 'foto postural',
