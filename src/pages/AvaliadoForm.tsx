@@ -72,6 +72,9 @@ function SubjectEditor({ id }: { id: string | undefined }) {
   const initialized = useRef(false)
   const active = useRef(true)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Identidade do cadastro novo, uma por abertura do formulário: a nova
+  // tentativa depois de uma resposta perdida devolve o mesmo aluno.
+  const [newId] = useState(() => crypto.randomUUID())
 
   const {
     register,
@@ -113,7 +116,7 @@ function SubjectEditor({ id }: { id: string | undefined }) {
         await updateMut.mutateAsync({ patch: formToUpdate(values), expectedUpdatedAt: version.base })
         if (active.current) navigate(`/avaliados/${id}`)
       } else {
-        const created = await createMut.mutateAsync(formToInsert(values, organization.id))
+        const created = await createMut.mutateAsync({ ...formToInsert(values, organization.id), id: newId })
         if (active.current) navigate(`/avaliados/${created.id}`)
       }
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -701,6 +701,9 @@ function DuplicatePanel({
   const subjectsQ = useSubjects(orgId)
   const exercisesQ = useExercises(orgId)
   const dupMut = useDuplicateWorkoutPlan()
+  // Uma identidade por destino (0053): repetir depois de uma resposta perdida
+  // devolve a mesma cópia; trocar o aluno de destino é outra cópia.
+  const copyIds = useRef(new Map<string, string>())
   const [name, setName] = useState(defaultName)
   const [targetSubjectId, setTargetSubjectId] = useState(currentSubjectId)
   const [error, setError] = useState<string | null>(null)
@@ -740,8 +743,13 @@ function DuplicatePanel({
     const editor = duplicatePlanEditor(detail, { name: name.trim(), keepSources })
     const snapshot = snapshotFromEditor(editor, metaById)
     const save = editorToSaveInput(editor, { orgId, subjectId: targetSubjectId }, snapshot)
+    let id = copyIds.current.get(targetSubjectId)
+    if (!id) {
+      id = crypto.randomUUID()
+      copyIds.current.set(targetSubjectId, id)
+    }
     try {
-      const created = await dupMut.mutateAsync(save)
+      const created = await dupMut.mutateAsync({ ...save, id })
       navigate(`/avaliados/${targetSubjectId}/treinos/${created.id}`)
     } catch (e) {
       setError(normalizeDbError(e))

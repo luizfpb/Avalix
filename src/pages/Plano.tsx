@@ -25,6 +25,7 @@ import {
 } from '../features/billing/rules'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { normalizeDbError } from '../lib/errors'
+import { onRadioKeyDown, radioTabIndex } from '../lib/radioGroup'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -37,6 +38,7 @@ import { QueryError } from '../components/QueryError'
 // tempo de o aluno pagar o Pix. A tela consulta de novo por até 3 minutos.
 const POLL_MS = 5_000
 const POLL_LIMIT_MS = 3 * 60_000
+const CYCLES = ['monthly', 'yearly'] as const
 
 export default function Plano() {
   const { organization } = useOrganization()
@@ -280,6 +282,10 @@ function PlanPicker({
       await action()
     } catch (e) {
       setError(normalizeDbError(e))
+      // A falha pode vir depois de o servidor já ter gravado algo (o Pix
+      // criado cuja fatura ainda não saiu, a troca desfeita): relê o estado
+      // em vez de deixar a tela com o de antes.
+      void queryClient.invalidateQueries({ queryKey: ['billing', orgId] })
     } finally {
       setBusy(null)
     }
@@ -329,13 +335,15 @@ function PlanPicker({
           {subscribed ? 'Trocar plano' : 'Escolha seu plano'}
         </h2>
         <div className="inline-flex rounded-md bg-muted p-1" role="radiogroup" aria-label="Ciclo de cobrança">
-          {(['monthly', 'yearly'] as const).map((c) => (
+          {CYCLES.map((c) => (
             <button
               key={c}
               type="button"
               role="radio"
               aria-checked={cycle === c}
+              tabIndex={radioTabIndex(cycle === c)}
               onClick={() => setCycle(c)}
+              onKeyDown={(e) => onRadioKeyDown(e, CYCLES, cycle, setCycle)}
               className={[
                 'rounded px-3 py-1.5 text-sm font-medium transition-colors',
                 cycle === c ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
@@ -487,6 +495,7 @@ function PendingPix({ billing, orgId }: { billing: OrgBilling; orgId: string }) 
       await queryClient.invalidateQueries({ queryKey: ['billing', orgId] })
     } catch (e) {
       setError(normalizeDbError(e))
+      void queryClient.invalidateQueries({ queryKey: ['billing', orgId] })
     } finally {
       setBusy(false)
     }

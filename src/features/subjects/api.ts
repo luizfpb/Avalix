@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { removePhotoObjectsVerified } from '../../lib/storage'
+import { isPrimaryKeyConflict } from '../../lib/errors'
 import type { Database } from '../../lib/database.types'
 
 export type SubjectRow = Database['public']['Tables']['subjects']['Row']
@@ -40,11 +41,22 @@ export async function getSubject(id: string): Promise<SubjectRow | null> {
 
 // evaluator_id é omitido de propósito: o default do banco (auth.uid()) assume,
 // e o trigger check_evaluator valida que é membro da org.
+//
+// O id vem da tela, um por ação de salvar (não por tentativa): se a resposta
+// se perde depois de o banco gravar, a nova tentativa bate na chave primária
+// e devolve o cadastro que já existe, em vez de criar outro aluno.
 export async function createSubject(input: SubjectInsert): Promise<SubjectRow> {
   const { data, error } = await supabase.from('subjects').insert(input).select('*').single()
-  if (error) throw error
+  if (error) {
+    if (input.id && isPrimaryKeyConflict(error, 'subjects_pkey')) {
+      const existing = await getSubject(input.id)
+      if (existing && existing.org_id === input.org_id) return existing
+    }
+    throw error
+  }
   return data
 }
+
 
 export async function updateSubject(
   id: string,

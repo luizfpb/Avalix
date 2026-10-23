@@ -4,7 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router'
 import Configuracoes from './Configuracoes'
 
-const { refreshMock, signedLogoUrlMock, uploadOrgLogoMock, updateMock, eqMock } = vi.hoisted(() => ({
+const { refreshMock, signedLogoUrlMock, uploadOrgLogoMock, updateMock, eqMock, setThemeMock, selectResult } = vi.hoisted(() => ({
+  setThemeMock: vi.fn(),
+  // a policy de update recusa em silêncio: 0 linhas, sem erro
+  selectResult: { rows: [{ id: 'org-1' }] as { id: string }[] },
   refreshMock: vi.fn(async () => {}),
   signedLogoUrlMock: vi.fn(),
   uploadOrgLogoMock: vi.fn(),
@@ -30,7 +33,7 @@ vi.mock('../features/auth/context', () => ({
 }))
 
 vi.mock('../features/theme/context', () => ({
-  useTheme: () => ({ theme: 'system', setTheme: vi.fn() }),
+  useTheme: () => ({ theme: 'system', setTheme: setThemeMock }),
 }))
 
 vi.mock('../features/organization/logo', () => ({
@@ -48,7 +51,8 @@ vi.mock('../lib/supabase', () => ({
         return {
           eq: (...args: unknown[]) => {
             eqMock(...args)
-            return { select: async () => ({ data: [{ id: 'org-1' }], error: null }) }
+            const result = { data: selectResult.rows, error: null }
+            return Object.assign(Promise.resolve({ error: null }), { select: async () => result })
           },
         }
       },
@@ -59,6 +63,7 @@ vi.mock('../lib/supabase', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  selectResult.rows = [{ id: 'org-1' }]
 })
 
 function renderPage() {
@@ -112,3 +117,55 @@ describe('Ajustes', () => {
     expect(updateMock).not.toHaveBeenCalled()
   })
 })
+
+describe('Ajustes: grupo de opções pelo teclado', () => {
+  // role="radio" promete o padrão do ARIA: as setas trocam a opção e só a
+  // marcada fica na ordem do Tab. Antes as setas não faziam nada.
+  it('as setas trocam o tema e levam o foco junto', () => {
+    renderPage()
+    const grupo = screen.getByRole('radiogroup', { name: 'Tema da interface' })
+    const sistema = screen.getByRole('radio', { name: /Sistema/ })
+    expect(sistema.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('radio', { name: /Claro/ }).getAttribute('tabindex')).toBe('-1')
+    sistema.focus()
+    fireEvent.keyDown(sistema, { key: 'ArrowRight' })
+    expect(setThemeMock).toHaveBeenLastCalledWith('light')
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: /Claro/ }))
+    fireEvent.keyDown(sistema, { key: 'ArrowLeft' })
+    expect(setThemeMock).toHaveBeenLastCalledWith('dark')
+    expect(grupo.contains(document.activeElement)).toBe(true)
+  })
+})
+
+describe('Ajustes: contato do controlador', () => {
+  it('não diz "Contato salvo" quando a policy recusa em silêncio (0 linhas)', async () => {
+    selectResult.rows = []
+    renderPage()
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'contato@estudio.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Não foi possível salvar/)
+    expect(screen.queryByText('Contato salvo.')).toBeNull()
+  })
+
+  it('telefone curto demais é recusado na tela, não pelo CHECK do banco em inglês', async () => {
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Telefone / WhatsApp'), { target: { value: '1234' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/entre 8 e 30/)
+    expect(updateMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Ajustes: envio do logo pelo teclado', () => {
+  // O input do logo era sr-only (alcançável), mas o botão visível não mudava
+  // com o foco: no Chrome 156, outline none e nenhuma sombra.
+  it('o texto visível do botão mostra o foco do input escondido', () => {
+    signedLogoUrlMock.mockResolvedValue(null)
+    renderPage()
+    const input = screen.getByLabelText(/Trocar logo|Enviar logo/) as HTMLInputElement
+    expect(input.type).toBe('file')
+    expect(input.className).toMatch(/\bpeer\b/)
+    expect(input.nextElementSibling?.className).toMatch(/peer-focus-visible:ring/)
+  })
+})
+

@@ -26,6 +26,9 @@ export type CreateAssessmentInput = {
   result: AssessmentResultSnapshot
   skinfolds: NewSkinfoldReading[]
   circumferences: NewCircumferenceReading[]
+  // Identidade da ação de criar, gerada uma vez pela tela (0053): a nova
+  // tentativa depois de uma resposta perdida devolve a mesma avaliação.
+  id?: string
 }
 
 function skinfoldPayload(input: CreateAssessmentInput): Json {
@@ -48,7 +51,12 @@ function circumferencePayload(input: CreateAssessmentInput): Json {
 // Cabeçalho e leituras nascem na mesma transação. Se qualquer leitura, trigger,
 // RLS ou consentimento falhar, nenhuma avaliação órfã fica persistida.
 export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
-  const { data: assessment, error } = await supabase.rpc('create_assessment', {
+  // Contrato restrito até regenerar database.types após a 0053 (p_id).
+  const client = supabase as unknown as {
+    rpc(name: 'create_assessment', args: Record<string, unknown>):
+      PromiseLike<{ data: AssessmentRow | null; error: unknown }>
+  }
+  const { data: assessment, error } = await client.rpc('create_assessment', {
     p_subject: input.subjectId,
     p_assessed_at: input.assessedAt,
     p_protocol_id: input.protocolId,
@@ -60,6 +68,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     p_circumferences: circumferencePayload(input),
     ...(input.medications != null ? { p_medications: input.medications } : {}),
     ...(input.notes != null ? { p_notes: input.notes } : {}),
+    ...(input.id ? { p_id: input.id } : {}),
   })
   if (error) throw error
   if (!assessment) throw new Error('A criação da avaliação não retornou o registro criado.')

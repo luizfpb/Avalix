@@ -51,10 +51,10 @@ function billing(patch: Partial<OrgBilling> = {}): OrgBilling {
   }
 }
 
-function renderPage(data: OrgBilling) {
+function renderPage(data: OrgBilling, client = new QueryClient()) {
   useOrgBillingMock.mockReturnValue({ data, isPending: false, isError: false, refetch: vi.fn() })
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/configuracoes/plano']}>
         <Plano />
       </MemoryRouter>
@@ -199,5 +199,35 @@ describe('Plano', () => {
     renderPage(billing({ can_manage: false }))
     expect(screen.getByText(/Só o dono ou um administrador/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Assinar' })).toBeNull()
+  })
+})
+
+describe('Plano: falhas e teclado', () => {
+  it('as setas trocam mensal e anual, como o role="radio" promete', () => {
+    renderPage(billing())
+    const mensal = screen.getByRole('radio', { name: /Mensal/ })
+    expect(mensal.getAttribute('tabindex')).toBe('0')
+    mensal.focus()
+    fireEvent.keyDown(mensal, { key: 'ArrowRight' })
+    expect(screen.getByRole('radio', { name: /Anual/ }).getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: /Anual/ }))
+    expect(screen.getByText('R$ 499,00')).toBeTruthy()
+  })
+
+  // A function cria a assinatura e grava o pendente antes de procurar a fatura;
+  // se a fatura demora, ela responde 502 dizendo que a fatura "aparece nesta
+  // tela em instantes". Sem reler o estado, a tela nunca mostrava o Pix.
+  it('depois de uma falha, relê o estado da assinatura', async () => {
+    const client = new QueryClient()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    billingRequestMock.mockRejectedValue(new Error('A fatura Pix ainda está sendo gerada. Ela aparece nesta tela em instantes.'))
+    renderPage(billing(), client)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Assinar' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Pagar com Pix' }))
+    fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Maria da Silva' } })
+    fireEvent.change(screen.getByLabelText('CPF ou CNPJ'), { target: { value: '529.982.247-25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Pix' }))
+    expect((await screen.findByRole('alert')).textContent).toMatch(/aparece nesta tela/)
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['billing', 'org-1'] }))
   })
 })

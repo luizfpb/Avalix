@@ -25,6 +25,8 @@ export default function PosturaSessaoNova() {
   const subjectQuery = useSubject(id)
   const consentQuery = useActiveConsent(id)
   const createMut = useCreateSession(id)
+  // uma identidade por abertura: a nova tentativa devolve a mesma sessão
+  const [newId] = useState(() => crypto.randomUUID())
   const [takenAt, setTakenAt] = useState(todayLocal)
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +57,7 @@ export default function PosturaSessaoNova() {
         subjectId: id,
         takenAt,
         notes: notes.trim() || null,
+        id: newId,
       })
       navigate(`/avaliados/${id}/postural/${session.id}`)
     } catch (e) {

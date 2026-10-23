@@ -103,4 +103,45 @@ describe('Agenda', () => {
     expect(createMock).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.getByText('Novo agendamento')).toBeTruthy())
   })
+
+  // A coluna é integer e o CHECK limita título e local: o que passava da tela
+  // voltava do banco como texto do Postgres em inglês.
+  it('duração fracionada é recusada na tela, antes de ir ao banco', async () => {
+    window.scrollTo = vi.fn()
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar agendamento de Ana Souza' }))
+    fireEvent.change(screen.getByLabelText('Duração (min)'), { target: { value: '7.5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect((await screen.findByText(/minutos inteiros/)).textContent).toMatch(/entre 5 e 1440/)
+    expect(updateMock).not.toHaveBeenCalled()
+  })
+
+  it('título e local têm o limite do banco no campo', () => {
+    renderPage()
+    expect((screen.getByLabelText('Título') as HTMLInputElement).maxLength).toBe(120)
+    expect((screen.getByLabelText('Local (opcional)') as HTMLInputElement).maxLength).toBe(200)
+  })
+
+  // Resposta perdida depois de gravar: o segundo toque marcava dois horários
+  // iguais. A nova tentativa leva a mesma identidade; o agendamento seguinte,
+  // feito no mesmo formulário, ganha outra.
+  it('a nova tentativa depois de uma resposta perdida leva a mesma identidade', async () => {
+    createMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue({ id: 'novo' })
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Aluno'), { target: { value: 's-1' } })
+    fireEvent.change(screen.getByLabelText('Data e hora'), { target: { value: '2026-11-03T09:00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar' }))
+    expect((await screen.findByText(/conexão/i)).textContent).toMatch(/tente de novo/)
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar' }))
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar' }))
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(3))
+    const ids = createMock.mock.calls.map((call) => (call[0] as { id?: string }).id)
+    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/)
+    expect(ids[1]).toBe(ids[0])
+    expect(ids[2]).not.toBe(ids[0])
+  })
 })
+

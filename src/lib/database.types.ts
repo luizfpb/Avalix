@@ -1950,6 +1950,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      billing_discard_pending: { Args: { p_org: string }; Returns: undefined }
       billing_find_org: {
         Args: {
           p_checkout_id: string
@@ -1968,6 +1969,7 @@ export type Database = {
           p_circumferences: Json
           p_engine_version: string
           p_height_cm: number
+          p_id?: string
           p_medications?: string
           p_notes?: string
           p_protocol_id: string
@@ -2039,6 +2041,7 @@ export type Database = {
         Args: {
           p_days: Json
           p_goal?: string
+          p_id?: string
           p_name: string
           p_notes?: string
           p_org: string

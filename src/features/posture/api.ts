@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { isPrimaryKeyConflict } from '../../lib/errors'
 import { removePhotoObjectsVerified } from '../../lib/storage'
 import type { Database, Json } from '../../lib/database.types'
 import type { ProcessedImage } from './image'
@@ -29,15 +30,19 @@ const BUCKET = 'photos'
 const SIGNED_TTL = 300
 const API_BATCH_SIZE = 100
 
+// id: identidade da ação de criar, gerada uma vez pela tela. A nova tentativa
+// depois de uma resposta perdida devolve a mesma sessão, sem uma vazia a mais.
 export async function createSession(input: {
   orgId: string
   subjectId: string
   takenAt: string
   notes: string | null
+  id?: string
 }): Promise<PostureSessionRow> {
   const { data, error } = await supabase
     .from('posture_sessions')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       subject_id: input.subjectId,
       taken_at: input.takenAt,
@@ -45,7 +50,13 @@ export async function createSession(input: {
     })
     .select('*')
     .single()
-  if (error) throw error
+  if (error) {
+    if (input.id && isPrimaryKeyConflict(error, 'posture_sessions_pkey')) {
+      const existing = await getSession(input.id)
+      if (existing && existing.subject_id === input.subjectId) return existing
+    }
+    throw error
+  }
   return data
 }
 

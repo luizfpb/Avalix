@@ -17,6 +17,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { roleLabel } from '../lib/roles'
 import { SUBJECT_TERMS, subjectTermLabels } from '../lib/subjectTerm'
 import { controlClass } from '@/lib/ui'
+import { onRadioKeyDown, radioTabIndex } from '../lib/radioGroup'
 
 type AreaLink = { to: string; title: string; hint: string; icon: LucideIcon }
 
@@ -193,6 +194,16 @@ function IdentitySettings() {
   )
 }
 
+function contactError(email: string, phone: string): string | null {
+  if (email && (email.length < 5 || email.length > 254 || email.indexOf('@') < 1)) {
+    return 'Informe um e-mail válido, como contato@seuestudio.com.br.'
+  }
+  if (phone && (phone.length < 8 || phone.length > 30)) {
+    return 'O telefone precisa ter entre 8 e 30 caracteres, com DDD.'
+  }
+  return null
+}
+
 // Canal de contato do Controlador (LGPD art. 9º, IV e art. 18): a quem o
 // titular dirige pedido de acesso, correção, portabilidade, revogação ou
 // eliminação. O termo já diz "dirija ao Controlador" e o código se recusa a
@@ -213,18 +224,25 @@ function ContactSettings() {
 
   async function save() {
     if (!organization) return
-    setBusy(true)
     setError(null)
     setSaved(false)
+    // os mesmos limites do CHECK do banco (0024); passar deles devolvia a
+    // mensagem crua do Postgres, em inglês
+    const invalid = contactError(email.trim(), phone.trim())
+    if (invalid) return setError(invalid)
+    setBusy(true)
     try {
-      const { error: err } = await supabase
+      const { data, error: err } = await supabase
         .from('organizations')
         .update({
           contact_email: email.trim() || null,
           contact_phone: phone.trim() || null,
         })
         .eq('id', organization.id)
+        .select('id')
       if (err) throw err
+      // a policy recusa em silêncio (0 linhas) quem não pode editar
+      if (!data?.length) throw new Error('Não foi possível salvar. Confira se a verificação em dois fatores está em dia.')
       await refresh()
       setSaved(true)
     } catch (e) {
@@ -248,6 +266,7 @@ function ContactSettings() {
             inputMode="email"
             autoComplete="email"
             placeholder="contato@seuestudio.com.br"
+            maxLength={254}
             value={email}
             disabled={!canManage || busy}
             onChange={(e) => setEmail(e.target.value)}
@@ -261,6 +280,7 @@ function ContactSettings() {
             inputMode="tel"
             autoComplete="tel"
             placeholder="+55 11 90000-0000"
+            maxLength={30}
             value={phone}
             disabled={!canManage || busy}
             onChange={(e) => setPhone(e.target.value)}
@@ -356,11 +376,12 @@ function LogoSettings() {
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
+                className="peer sr-only"
                 onChange={onFile}
                 disabled={busy !== null}
               />
-              <span className="inline-flex items-center rounded-md border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-accent">
+              {/* o input escondido recebe o foco; o anel aparece aqui (peer) */}
+              <span className="inline-flex items-center rounded-md border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-accent peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/35">
                 {busy === 'upload' ? 'Enviando...' : logoPath ? 'Trocar logo' : 'Enviar logo'}
               </span>
             </label>
@@ -417,7 +438,9 @@ function AppearanceCard() {
               type="button"
               role="radio"
               aria-checked={theme === o.v}
+              tabIndex={radioTabIndex(theme === o.v)}
               onClick={() => setTheme(o.v)}
+              onKeyDown={(e) => onRadioKeyDown(e, THEME_OPTS.map((t) => t.v), theme, setTheme)}
               className={[
                 'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors',
                 theme === o.v

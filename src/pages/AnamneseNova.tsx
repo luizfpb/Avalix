@@ -94,6 +94,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   const navigate = useNavigate()
   const isEdit = !!existing
   const createMut = useCreateAnamnese(subject.id)
+  // Identidade da anamnese nova, uma por abertura do formulário: a nova
+  // tentativa depois de uma resposta perdida devolve a mesma anamnese.
+  const [newId] = useState(() => crypto.randomUUID())
   const updateMut = useUpdateAnamnese(subject.id, existing?.id)
   // Versão que ESTA tela carregou, congelada — ver src/lib/baseVersion.ts. Vale
   // para o predicado de concorrência do update e para a chave do rascunho.
@@ -166,6 +169,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
             subjectId: subject.id,
             assessedAt,
             answers: a,
+            id: newId,
           })
       versao.adopt(row.updated_at)
       if (draftKey) clearDraft(draftKey)

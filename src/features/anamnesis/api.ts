@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { isPrimaryKeyConflict } from '../../lib/errors'
 import type { Database, Json } from '../../lib/database.types'
 import type { AnamnesisAnswers } from './spec'
 import { assertGateComplete, assertMedicamentosRespondidos } from './gate'
@@ -12,6 +13,9 @@ export type CreateAnamneseInput = {
   subjectId: string
   assessedAt: string
   answers: AnamnesisAnswers
+  // Identidade da ação de criar, gerada uma vez pela tela: a nova tentativa
+  // depois de uma resposta perdida devolve a mesma anamnese, sem outra igual.
+  id?: string
 }
 
 // O gate é recalculado aqui (fonte única) e gravado nas colunas; o payload
@@ -22,6 +26,7 @@ export async function createAnamnese(input: CreateAnamneseInput): Promise<Anamne
   const { data, error } = await supabase
     .from('anamneses')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       subject_id: input.subjectId,
       assessed_at: input.assessedAt,
@@ -33,7 +38,13 @@ export async function createAnamnese(input: CreateAnamneseInput): Promise<Anamne
     })
     .select('*')
     .single()
-  if (error) throw error
+  if (error) {
+    if (input.id && isPrimaryKeyConflict(error, 'anamneses_pkey')) {
+      const existing = await getAnamnese(input.id)
+      if (existing && existing.subject_id === input.subjectId) return existing
+    }
+    throw error
+  }
   return data
 }
 

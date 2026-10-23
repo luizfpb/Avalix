@@ -81,6 +81,9 @@ export default function Agenda() {
   const [subjectId, setSubjectId] = useState(params.get('subject') ?? '')
   const [when, setWhen] = useState(defaultLocal())
   const [duration, setDuration] = useState('60')
+  // Identidade do agendamento novo: a nova tentativa depois de uma resposta
+  // perdida devolve o mesmo, em vez de marcar dois iguais.
+  const [newId, setNewId] = useState(() => crypto.randomUUID())
   const [title, setTitle] = useState('Avaliação física')
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
@@ -120,7 +123,10 @@ export default function Agenda() {
     const startsAt = new Date(when)
     if (Number.isNaN(startsAt.getTime())) return setError('Data/hora inválida.')
     const dur = Number(duration)
-    if (!(dur >= 5 && dur <= 1440)) return setError('Duração entre 5 e 1440 minutos.')
+    // a coluna é integer: 7,5 min passava daqui e voltava como erro do banco
+    if (!Number.isInteger(dur) || dur < 5 || dur > 1440) {
+      return setError('Duração em minutos inteiros, entre 5 e 1440.')
+    }
     try {
       if (editingId) {
         await updateMut.mutateAsync({
@@ -142,7 +148,10 @@ export default function Agenda() {
         durationMin: dur,
         location: location.trim() || null,
         notes: notes.trim() || null,
+        id: newId,
       })
+      // o formulário continua aberto para o próximo: outra ação, outra identidade
+      setNewId(crypto.randomUUID())
       setNotes('')
     } catch (e) {
       setError(normalizeDbError(e))
@@ -238,17 +247,18 @@ export default function Agenda() {
                   type="number"
                   min={5}
                   max={1440}
+                  step={1}
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="appointment-title" className="text-xs">Título</Label>
-                <Input id="appointment-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Input id="appointment-title" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
               <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
                 <Label htmlFor="appointment-location" className="text-xs">Local (opcional)</Label>
-                <Input id="appointment-location" value={location} onChange={(e) => setLocation(e.target.value)} />
+                <Input id="appointment-location" maxLength={200} value={location} onChange={(e) => setLocation(e.target.value)} />
               </div>
               <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
                 <Label htmlFor="appointment-notes" className="text-xs">Observações (opcional)</Label>

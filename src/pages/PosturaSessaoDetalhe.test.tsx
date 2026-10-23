@@ -144,6 +144,20 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('PosturaSessaoDetalhe', () => {
+  // No Chrome 156, o input com display:none (classe hidden) ficava fora da
+  // ordem do Tab: pelo teclado não havia como adicionar foto. O jsdom não
+  // aplica CSS, então o teste fixa a estrutura provada no navegador.
+  it('o envio de foto é alcançável pelo teclado e mostra o foco', () => {
+    mocks.useSignedUrls.mockReturnValue({ data: {}, isPending: false, isError: false })
+    mocks.useAnnotatedPhotoIds.mockReturnValue({ data: new Set(), isPending: false, isError: false })
+    renderPage()
+    const input = screen.getByLabelText('Adicionar foto') as HTMLInputElement
+    expect(input.type).toBe('file')
+    expect(input.className.split(/\s+/)).not.toContain('hidden')
+    expect(input.className).toMatch(/\bsr-only\b/)
+    expect(input.nextElementSibling?.className).toMatch(/peer-focus-visible:ring/)
+  })
+
   it('não fica presa no carregamento quando a sessão não tem fotos', () => {
     mocks.useSignedUrls.mockReturnValue({ data: {}, isPending: true, isError: false })
     mocks.useAnnotatedPhotoIds.mockReturnValue({

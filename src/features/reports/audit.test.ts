@@ -63,3 +63,57 @@ describe('auditoria de dados', () => {
     })
   })
 })
+
+// O Postgres não promete ordem entre linhas empatadas, e com LIMIT/OFFSET cada
+// página é uma consulta nova: os gatilhos de auditoria gravam o now() da
+// transação, então excluir um aluno em cascata deixa dezenas de eventos com o
+// mesmo "at". Prova no banco descartável: 8 de 1000 eventos nunca apareciam.
+describe('paginação da trilha de auditoria', () => {
+  it('cada evento aparece uma única vez mesmo com horários empatados', async () => {
+    const rows = Array.from({ length: 130 }, (_, i) => ({
+      id: i + 1,
+      org_id: 'org-1',
+      at: i < 120 ? '2026-10-20T12:00:00.000Z' : `2026-10-20T11:${String(i - 100).padStart(2, '0')}:00.000Z`,
+    }))
+    let consulta = 0
+    // Ordena pelas colunas pedidas e embaralha o que sobrar empatado de um
+    // jeito diferente a cada consulta, como um plano por ordenação faria.
+    function builder() {
+      const orders: Array<{ column: string; ascending: boolean }> = []
+      const semente = ++consulta
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        order: (column: string, options: { ascending: boolean }) => {
+          orders.push({ column, ascending: options.ascending })
+          return chain
+        },
+        range: (from: number, to: number) => {
+          const embaralho = (id: number) => (id * 7919 * semente) % 104729
+          const sorted = [...rows].sort((a, b) => {
+            for (const { column, ascending } of orders) {
+              const x = a[column as keyof typeof a]
+              const y = b[column as keyof typeof b]
+              if (x < y) return ascending ? -1 : 1
+              if (x > y) return ascending ? 1 : -1
+            }
+            return embaralho(a.id) - embaralho(b.id)
+          })
+          return Promise.resolve({ data: sorted.slice(from, to + 1), error: null, count: rows.length })
+        },
+      }
+      return chain
+    }
+    const { supabase } = await import('../../lib/supabase')
+    ;(supabase as unknown as { from: () => unknown }).from = builder
+
+    const { listAuditLogs, AUDIT_PAGE_SIZE } = await import('./audit')
+    const vistos: number[] = []
+    for (let page = 0; page * AUDIT_PAGE_SIZE < rows.length; page += 1) {
+      const { rows: pagina } = await listAuditLogs('org-1', page)
+      vistos.push(...pagina.map((r) => r.id))
+    }
+    expect(vistos).toHaveLength(rows.length)
+    expect(new Set(vistos).size).toBe(rows.length)
+  })
+})

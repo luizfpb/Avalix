@@ -16,8 +16,10 @@
 /agenda               /   200
 /carteira            /   200
 /exercicios          /   200
+/termos              /   200
 
 # O Pages exige redirects estaticos antes dos dinamicos.
 /a/*                 /   200
 /avaliados/*         /   200
 /ferramentas/*       /   200
+/configuracoes/*     /   200

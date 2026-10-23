@@ -78,6 +78,18 @@ export function normalizeDbError(error: unknown): string {
       ? message
       : 'Este registro foi alterado em outro dispositivo. Recarregue a tela antes de salvar.'
   }
+  // CHECK, tipo e faixa numérica com o texto padrão do Postgres (inglês, com
+  // nome de tabela e de constraint). Só o texto padrão: os nossos gatilhos
+  // também usam 23514, com mensagem própria em pt-BR, que passa direto.
+  if (
+    text.includes('violates check constraint') ||
+    text.includes('invalid input syntax for type') ||
+    text.includes('out of range') ||
+    text.includes('numeric field overflow') ||
+    text.includes('value too long for type')
+  ) {
+    return 'Algum valor está fora do permitido. Confira os campos e tente de novo.'
+  }
   if (text.includes('jwt expired') || text.includes('jwt is expired')) {
     return 'Sessão expirada. Faça login de novo.'
   }
@@ -96,4 +108,12 @@ export function normalizeDbError(error: unknown): string {
   return message && message.trim().length > 0
     ? message
     : 'Algo deu errado. Tente novamente em instantes.'
+}
+
+// Nova tentativa de um insert cujo id veio da tela (a identidade da ação):
+// a primeira gravou e a resposta se perdeu. Só a chave primária indicada
+// conta; outro unique violado continua sendo erro de verdade.
+export function isPrimaryKeyConflict(error: unknown, constraint: string): boolean {
+  const e = error as { code?: unknown; message?: unknown } | null
+  return e?.code === '23505' && typeof e.message === 'string' && e.message.includes(`"${constraint}"`)
 }

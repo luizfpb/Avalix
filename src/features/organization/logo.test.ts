@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const { signed, calls, orgUpdate } = vi.hoisted(() => ({ signed: vi.fn(), calls: [] as string[], orgUpdate: vi.fn() }))
+const { signed, calls, orgUpdate, updated } = vi.hoisted(() => ({
+  signed: vi.fn(), calls: [] as string[], orgUpdate: vi.fn(),
+  // linhas que o update devolve; a policy recusa em silêncio com 0 linhas
+  updated: { rows: [{ id: 'org-1' }] as { id: string }[] },
+}))
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     storage: {
@@ -11,7 +15,13 @@ vi.mock('../../lib/supabase', () => ({
     },
     from: (table: string) => ({
       update: (values: unknown) => ({
-        eq: async (_col: string, id: string) => { calls.push(`update ${table} ${id}`); orgUpdate(values); return { error: null } },
+        eq: (_col: string, id: string) => {
+          calls.push(`update ${table} ${id}`)
+          orgUpdate(values)
+          return Object.assign(Promise.resolve({ error: null }), {
+            select: async () => ({ data: updated.rows, error: null }),
+          })
+        },
       }),
     }),
   },
@@ -138,7 +148,7 @@ describe('preparo do logo antes do envio', () => {
 })
 
 describe('remoção do logo', () => {
-  beforeEach(() => { calls.length = 0; orgUpdate.mockReset() })
+  beforeEach(() => { calls.length = 0; orgUpdate.mockReset(); updated.rows = [{ id: 'org-1' }] })
   it('desvincula a organização antes de apagar as três chaves canônicas', async () => {
     await removeOrgLogo('org-1')
     expect(orgUpdate).toHaveBeenCalledWith({ logo_path: null })
@@ -146,5 +156,12 @@ describe('remoção do logo', () => {
       'update organizations org-1',
       'remove org-1/logo.png,org-1/logo.jpg,org-1/logo.webp',
     ])
+  })
+  // Sem papel de dono/admin ou com o 2FA pendente, a policy não atualiza nada
+  // e não devolve erro: a tela ficava calada e o logo continuava lá.
+  it('recusa quando a organização não foi atualizada, sem mexer no Storage', async () => {
+    updated.rows = []
+    await expect(removeOrgLogo('org-1')).rejects.toThrow(/Não foi possível remover o logo/)
+    expect(calls).toEqual(['update organizations org-1'])
   })
 })

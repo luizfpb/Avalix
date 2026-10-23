@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { useReturnFocus } from '../../lib/useReturnFocus'
 import { SetRowFields } from './SetRowFields'
 import { updateLogRow, validateLogRows, type LogRow } from './logRows'
 
@@ -67,6 +68,8 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
     .filter((ex) => !exercises.some((existing) => existing.id === ex.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
+  // o pai desmonta o editor aberto, sem o close() que devolveria o foco
+  useReturnFocus(true)
   useEffect(() => { dialog.current?.showModal() }, [])
   useEffect(() => {
     if (!dirty && !saving) return

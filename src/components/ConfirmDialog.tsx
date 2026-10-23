@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { useReturnFocus } from '../lib/useReturnFocus'
 
 // Confirmação padronizada (substitui o window.confirm nativo, que exibe chrome
 // do navegador e destoa do app). Destrutiva por padrão; `tone="default"` para
@@ -31,6 +32,8 @@ export function ConfirmDialog({
   const titleId = useId()
   const descriptionId = useId()
   const cancelledRef = useRef(false)
+  // antes do showModal: lê quem abriu enquanto ele ainda tem o foco
+  useReturnFocus(open)
 
   // <dialog> nativo: showModal dá foco preso, camada própria e Esc de graça
   useEffect(() => {

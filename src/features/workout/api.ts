@@ -355,6 +355,9 @@ export type SaveWorkoutPlanInput = {
   days: PlanDayInput[] // ordem do array = position
   overrides: PlanWeekOverrideInput[]
   weeksMeta: PlanWeekMetaInput[]
+  // Só na criação: identidade da ação, gerada uma vez pela tela (0053). A nova
+  // tentativa depois de uma resposta perdida devolve o mesmo plano.
+  id?: string
 }
 
 // Regrava toda a estrutura filha (dias/exercicios/overrides/semanas) pela RPC
@@ -433,7 +436,12 @@ function planChildrenPayload(input: SaveWorkoutPlanInput) {
 // default do banco (auth.uid()) assume e o trigger check_evaluator valida.
 export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<WorkoutPlanRow> {
   const { days, overrides, weeks } = planChildrenPayload(input)
-  const { data, error } = await supabase.rpc('create_workout_plan', {
+  // Contrato restrito até regenerar database.types após a 0053 (p_id).
+  const client = supabase as unknown as {
+    rpc(name: 'create_workout_plan', args: Record<string, unknown>):
+      PromiseLike<{ data: WorkoutPlanRow | null; error: unknown }>
+  }
+  const { data, error } = await client.rpc('create_workout_plan', {
     p_org: input.orgId,
     p_subject: input.subjectId,
     p_name: input.name,
@@ -457,6 +465,7 @@ export async function createWorkoutPlan(input: SaveWorkoutPlanInput): Promise<Wo
     ...(input.sourcePostureSessionId != null
       ? { p_source_posture_session_id: input.sourcePostureSessionId }
       : {}),
+    ...(input.id ? { p_id: input.id } : {}),
   })
   if (error) throw error
   return data as unknown as WorkoutPlanRow

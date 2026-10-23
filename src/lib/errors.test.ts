@@ -50,4 +50,21 @@ describe('normalizeDbError', () => {
   it('tem fallback genérico', () => {
     expect(normalizeDbError(null)).toMatch(/errado/i)
   })
+  // Campo que a tela deixa passar e o banco recusa (telefone curto, título
+  // longo, duração fracionada) chegava ao usuário com o texto do Postgres.
+  it('traduz o CHECK e o tipo inválido do Postgres, sem nome de constraint', () => {
+    const check = normalizeDbError({
+      code: '23514',
+      message: 'new row for relation "appointments" violates check constraint "appointments_title_check"',
+    })
+    expect(check).toMatch(/fora do permitido/i)
+    expect(check).not.toMatch(/constraint|relation/i)
+    const tipo = normalizeDbError({ code: '22P02', message: 'invalid input syntax for type integer: "7.5"' })
+    expect(tipo).toMatch(/fora do permitido/i)
+    expect(normalizeDbError({ code: '22003', message: 'numeric field overflow' })).toMatch(/fora do permitido/i)
+  })
+  it('mantém a mensagem pt-BR que os nossos gatilhos levantam com 23514', () => {
+    const msg = 'A sequência semanal contém uma divisão que não existe neste plano.'
+    expect(normalizeDbError({ code: '23514', message: msg })).toBe(msg)
+  })
 })

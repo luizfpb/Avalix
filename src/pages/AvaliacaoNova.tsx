@@ -291,6 +291,9 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const isEdit = !!existing
   const ea = existing?.assessment
   const createMut = useCreateAssessment(subject.id)
+  // Identidade da avaliação nova, uma por abertura do formulário (0053): a
+  // nova tentativa depois de uma resposta perdida devolve a mesma avaliação.
+  const [newId] = useState(() => crypto.randomUUID())
   // A versao que ESTA tela carregou, CONGELADA (useBaseVersion). Se o educador
   // editar a mesma avaliacao pelo celular e depois salvar numa aba antiga do PC,
   // o banco recusa em vez de sobrescrever em silencio (migration 0023).
@@ -507,6 +510,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
         result: snapshot,
         skinfolds: skinfoldRows,
         circumferences: circRows,
+        ...(isEdit ? {} : { id: newId }),
       })
       versao.adopt(assessment.updated_at)
       if (draftKey) clearDraft(draftKey)

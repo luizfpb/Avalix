@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { FunctionsHttpError } from '@supabase/supabase-js'
+import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { useOrganization } from '../organization/context'
 import type { BillingCycle, OrgBilling } from './rules'
@@ -44,6 +44,9 @@ export type BillingRequest =
 
 // A Edge Function responde { error } em pt-BR; o supabase-js embrulha a
 // resposta não-2xx num FunctionsHttpError, então a mensagem é lida do corpo.
+// Sem esse corpo (503 do gateway, página de erro em HTML) ou sem rede, o SDK
+// só tem textos internos em inglês ("Edge Function returned a non-2xx status
+// code"), que iam direto para a tela.
 export async function billingRequest(
   orgId: string,
   request: BillingRequest
@@ -52,11 +55,19 @@ export async function billingRequest(
     body: { org_id: orgId, ...request },
   })
   if (error) {
-    if (error instanceof FunctionsHttpError) {
-      const body = await error.context.json().catch(() => null)
-      if (body && typeof body.error === 'string') throw new Error(body.error)
+    if (error instanceof FunctionsFetchError) {
+      throw new Error('Falha de conexão. Verifique sua internet e tente de novo.', { cause: error })
     }
-    throw error
+    if (error instanceof FunctionsHttpError) {
+      const response = error.context as Response
+      const body = await response.json().catch(() => null)
+      if (body && typeof body.error === 'string') throw new Error(body.error)
+      throw new Error(
+        `O serviço de pagamento não respondeu (erro ${response.status}). Tente de novo em instantes.`,
+        { cause: error }
+      )
+    }
+    throw new Error('O serviço de pagamento não respondeu. Tente de novo em instantes.', { cause: error })
   }
   return (data ?? {}) as { url?: string; ok?: boolean; method?: 'pix' }
 }

@@ -29,4 +29,16 @@ describe('Termos de Uso', () => {
     )
     if (!PROVIDER.document) expect(screen.queryByText(/CPF\/CNPJ/)).toBeNull()
   })
+
+  // Cláusula 5 contra a regra do banco (0049/0052, suíte pgTAP da 0052): no só
+  // leitura o profissional corrige o CADASTRO do aluno, inativa, revoga e
+  // exclui; avaliação, anamnese, sessão postural, agendamento e sessão de
+  // treino ficam travados. O texto prometia "corrigindo seus dados".
+  it('a cláusula do só leitura não promete corrigir o que o banco trava', () => {
+    const clausula = TERMS_SECTIONS.find((s) => s.title.startsWith('5.'))!.paragraphs.join(' ')
+    expect(clausula).not.toMatch(/corrigindo seus dados/)
+    expect(clausula).toMatch(/corrigir o cadastro/)
+    expect(clausula).toMatch(/excluir/)
+  })
 })
+

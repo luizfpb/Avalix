@@ -236,20 +236,23 @@ export default function PosturaSessaoDetalhe() {
             ))}
           </select>
         </div>
+        {/* sr-only, e não hidden: display:none tirava o input da ordem do Tab
+            e quem usa teclado não tinha como adicionar foto. O anel de foco
+            vai no texto visível (peer), como nos botões. */}
         <label className="inline-flex">
+          <input
+            type="file"
+            accept="image/*"
+            className="peer sr-only"
+            disabled={uploading}
+            onChange={onFile}
+          />
           <span
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary-solid px-4 text-sm font-medium text-primary-foreground hover:bg-primary-solid/90 aria-disabled:opacity-50"
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary-solid px-4 text-sm font-medium text-primary-foreground hover:bg-primary-solid/90 peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/35 aria-disabled:opacity-50"
             aria-disabled={uploading}
           >
             {uploading ? 'Enviando...' : 'Adicionar foto'}
           </span>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={uploading}
-            onChange={onFile}
-          />
         </label>
         <p className="text-xs text-muted-foreground">
           A foto é comprimida no dispositivo e tem a localização (GPS) removida antes do envio.

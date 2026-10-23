@@ -8,8 +8,8 @@
 // fornecedor em local de destaque. Preencha PROVIDER antes de divulgar; campo
 // vazio simplesmente não aparece na página.
 
-export const TERMS_VERSION = '1.0'
-export const TERMS_UPDATED_AT = '17/10/2026'
+export const TERMS_VERSION = '1.1'
+export const TERMS_UPDATED_AT = '23/10/2026'
 
 export const PROVIDER = {
   name: 'Luiz Felipe',
@@ -56,7 +56,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     title: '5. Atraso e acesso só leitura',
     paragraphs: [
       'Se uma cobrança não for paga no vencimento, você tem 5 dias de carência com acesso completo e um aviso no app.',
-      'Depois disso, ou ao fim do teste grátis sem assinatura, a conta fica só leitura: você continua vendo, exportando e corrigindo seus dados, mas não cria novos registros. Seus dados não são apagados por falta de pagamento. Os alunos continuam acessando o treino pelo link.',
+      'Depois disso, ou ao fim do teste grátis sem assinatura, a conta fica só leitura: você continua vendo e exportando seus dados, pode corrigir o cadastro dos alunos, inativá-los e excluir registros, mas não cria nem edita avaliações, anamneses, treinos, sessões posturais e agendamentos. Seus dados não são apagados por falta de pagamento. Os alunos continuam acessando o treino pelo link.',
       'Ao pagar, o acesso completo volta sozinho.',
     ],
   },

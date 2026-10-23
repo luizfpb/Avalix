@@ -16,6 +16,7 @@ const MIME_EXT: Record<string, string> = {
 export const LOGO_INPUT_MAX_BYTES = 10 * 1024 * 1024
 export const LOGO_STORED_MAX_BYTES = 1024 * 1024
 const LOGO_MAX_SIDES = [1024, 768, 512]
+const NOT_UPDATED = 'Não foi possível salvar o logo. Só o dono ou um administrador, com a verificação em dois fatores em dia, altera o logo.'
 
 // Reduz no navegador o que passar de 1024 px ou de 1 MB. JPEG continua JPEG
 // (não tem transparência); PNG e WebP viram PNG, que preserva o alpha e que
@@ -54,8 +55,10 @@ export async function uploadOrgLogo(orgId: string, file: File): Promise<string> 
     .from('logos')
     .upload(path, prepared, { upsert: true, contentType: prepared.type })
   if (up.error) throw up.error
-  const upd = await supabase.from('organizations').update({ logo_path: path }).eq('id', orgId)
+  const upd = await supabase.from('organizations').update({ logo_path: path }).eq('id', orgId).select('id')
   if (upd.error) throw upd.error
+  // a policy recusa em silêncio (0 linhas): papel trocado ou 2FA pendente
+  if (!upd.data?.length) throw new Error(NOT_UPDATED)
 
   // A policy da 0028 limita o namespace às três chaves canônicas. Depois de a
   // organização apontar para o arquivo novo, removemos as extensões antigas;
@@ -73,8 +76,9 @@ export async function uploadOrgLogo(orgId: string, file: File): Promise<string> 
 // falha na limpeza do Storage deixa só um órfão nas chaves canônicas, que o
 // próximo envio sobrescreve.
 export async function removeOrgLogo(orgId: string): Promise<void> {
-  const upd = await supabase.from('organizations').update({ logo_path: null }).eq('id', orgId)
+  const upd = await supabase.from('organizations').update({ logo_path: null }).eq('id', orgId).select('id')
   if (upd.error) throw upd.error
+  if (!upd.data?.length) throw new Error(NOT_UPDATED.replace('salvar', 'remover'))
   await supabase.storage
     .from('logos')
     .remove(Object.values(MIME_EXT).map((ext) => `${orgId}/logo.${ext}`))

@@ -48,7 +48,10 @@ export type ClientErrorRow = Database['public']['Tables']['client_errors']['Row'
 
 export const AUDIT_PAGE_SIZE = 50
 
-// página de eventos, mais recente primeiro. count exato pra paginação.
+// página de eventos, mais recente primeiro. count exato pra paginação. O id
+// desempata: os gatilhos gravam o now() da transação, então uma exclusão em
+// cascata deixa dezenas de eventos com o mesmo "at", e sem ordem total cada
+// página (uma consulta nova com OFFSET) podia repetir uns e pular outros.
 export async function listAuditLogs(
   orgId: string,
   page: number
@@ -59,6 +62,7 @@ export async function listAuditLogs(
     .select('*', { count: 'exact' })
     .eq('org_id', orgId)
     .order('at', { ascending: false })
+    .order('id', { ascending: false })
     .range(from, from + AUDIT_PAGE_SIZE - 1)
   if (error) throw error
   return { rows: data ?? [], total: count ?? 0 }

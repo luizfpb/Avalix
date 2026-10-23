@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { SessionEditForm, type EditableSessionSet, type SessionEditValues } from './SessionEditForm'
@@ -64,5 +65,33 @@ describe('SessionEditForm', () => {
     fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
     await waitFor(() => expect(onSave).toHaveBeenCalled())
     expect(onSave.mock.calls[0][0].sets).toHaveLength(61)
+  })
+})
+
+// O editor é desmontado pelo pai com o <dialog> aberto, sem passar pelo
+// close() que devolveria o foco: quem usa teclado voltava ao topo da página.
+describe('SessionEditForm e o foco', () => {
+  it('devolve o foco ao botão "Editar" ao cancelar', () => {
+    function Historico() {
+      const [editing, setEditing] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setEditing(true)}>Editar sessão de 08/09</button>
+          {editing ? (
+            <SessionEditForm sets={series} performedAt="2026-09-08" notes={null}
+              onSave={async () => {}} onCancel={() => setEditing(false)} />
+          ) : null}
+        </>
+      )
+    }
+    render(<Historico />)
+    const gatilho = screen.getByRole('button', { name: 'Editar sessão de 08/09' })
+    gatilho.focus()
+    fireEvent.click(gatilho)
+    const cancelar = within(screen.getByRole('dialog', { name: 'Editar treino' })).getByRole('button', { name: 'Cancelar' })
+    cancelar.focus()
+    fireEvent.click(cancelar)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(gatilho)
   })
 })

@@ -496,22 +496,21 @@ select ok(
   'indice valido e UNIQUE garante um exercicio por divisao'
 );
 
+-- Pelo nome: a 0053 acrescentou p_id (idempotência), como a 0039 fez com o envio.
 select ok(
-  to_regprocedure(
-    'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)'
-  ) is not null,
+  (select p.oid from pg_proc p where p.proname = 'create_assessment' and p.pronamespace = 'public'::regnamespace) is not null,
   'RPC atomica de criacao de avaliacao existe'
 );
 
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)',
+    (select p.oid from pg_proc p where p.proname = 'create_assessment' and p.pronamespace = 'public'::regnamespace),
     'execute'
   )
   and not has_function_privilege(
     'anon',
-    'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)',
+    (select p.oid from pg_proc p where p.proname = 'create_assessment' and p.pronamespace = 'public'::regnamespace),
     'execute'
   ),
   'create_assessment e exclusiva do usuario autenticado'
@@ -519,9 +518,9 @@ select ok(
 
 select ok(
   not (select p.prosecdef from pg_proc p
-        where p.oid = 'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)'::regprocedure)
+        where p.oid = (select p.oid from pg_proc p where p.proname = 'create_assessment' and p.pronamespace = 'public'::regnamespace))
   and position('replace_assessment_readings' in pg_get_functiondef(
-        'public.create_assessment(uuid,date,text,numeric,numeric,jsonb,text,jsonb,jsonb,text,text)'::regprocedure
+        (select p.oid from pg_proc p where p.proname = 'create_assessment' and p.pronamespace = 'public'::regnamespace)
       )) > 0,
   'create_assessment preserva RLS e grava leituras na mesma transacao'
 );

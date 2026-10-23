@@ -207,6 +207,9 @@ function Builder({
   const navigate = useNavigate()
   const isEdit = !!planId
   const createMut = useCreateWorkoutPlan(subjectId)
+  // Identidade do plano novo, uma por abertura do editor (0053): a nova
+  // tentativa depois de uma resposta perdida devolve o mesmo plano.
+  const [newId] = useState(() => crypto.randomUUID())
   // Versão-base CONGELADA: a revalidação por foco/reconexão do React Query
   // trocava `planUpdatedAt` sem trocar o `plan` em edição (que vem de
   // useState(initial)), e a aba antiga passava a enviar a versão nova com a
@@ -783,7 +786,7 @@ function Builder({
     }
     try {
       const save = editorToSaveInput(plan, { orgId, subjectId }, snapshot)
-      const saved = await mut.mutateAsync(save)
+      const saved = await mut.mutateAsync(isEdit ? save : { ...save, id: newId })
       versao.adopt(saved.updated_at)
       if (draftKey) clearDraft(draftKey)
       // salvou: a navegação seguinte não pode perguntar "descartar alterações?"

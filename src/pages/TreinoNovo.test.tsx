@@ -408,3 +408,24 @@ describe('TreinoNovo — montagem', () => {
     expect(enviado.days[1].exercises.map((e) => e.exerciseId)).toEqual(['ex-1', 'ex-2'])
   })
 })
+
+// Resposta perdida depois de o banco criar o plano: o segundo "Salvar" criava
+// outro plano igual, que ainda arquivava o primeiro. As duas tentativas levam
+// a mesma identidade, e a 0053 devolve o plano já criado.
+describe('TreinoNovo — resposta perdida ao criar', () => {
+  it('a nova tentativa leva a mesma identidade da primeira', async () => {
+    criarMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({ id: 'plan-1', updated_at: '2026-10-23T12:00:00Z' })
+    abrir()
+    montarDivisaoComDoisExercicios()
+    salvar()
+    expect((await screen.findByText(/conexão/i)).textContent).toMatch(/tente de novo/)
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar plano' }))
+    await vi.waitFor(() => expect(criarMock).toHaveBeenCalledTimes(2))
+    const primeira = criarMock.mock.calls[0][0] as SaveWorkoutPlanInput
+    const segunda = criarMock.mock.calls[1][0] as SaveWorkoutPlanInput
+    expect(primeira.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(segunda.id).toBe(primeira.id)
+  })
+})

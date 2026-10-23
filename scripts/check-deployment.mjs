@@ -75,7 +75,9 @@ const entryPath = rootHtml.match(
 )?.[1]
 if (!entryPath) throw new Error('smoke HTTP: entry JS não encontrado em /')
 
-for (const path of ['/login', '/dashboard', '/a/smoke-token-inexistente', '/t', '/t/']) {
+// /termos e o retorno do checkout do Asaas (/configuracoes/plano) abrem sem
+// service worker; já ficaram em 404 por faltar no _redirects (auditoria 23/10).
+for (const path of ['/login', '/dashboard', '/a/smoke-token-inexistente', '/t', '/t/', '/termos', '/configuracoes/plano']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)

@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { isPrimaryKeyConflict } from '../../lib/errors'
 import type { Database } from '../../lib/database.types'
 
 export type AppointmentRow = Database['public']['Tables']['appointments']['Row']
@@ -12,6 +13,9 @@ export type CreateAppointmentInput = {
   durationMin: number
   location: string | null
   notes: string | null
+  // identidade da ação de criar: a nova tentativa depois de uma resposta
+  // perdida devolve o mesmo agendamento, sem outro igual na agenda
+  id?: string
 }
 
 type AppointmentJoinRow = AppointmentRow & {
@@ -69,6 +73,7 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   const { data, error } = await supabase
     .from('appointments')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       subject_id: input.subjectId,
       title: input.title,
@@ -79,7 +84,13 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
     })
     .select('*')
     .single()
-  if (error) throw error
+  if (error) {
+    if (input.id && isPrimaryKeyConflict(error, 'appointments_pkey')) {
+      const existing = await supabase.from('appointments').select('*').eq('id', input.id).maybeSingle()
+      if (existing.data && existing.data.subject_id === input.subjectId) return existing.data
+    }
+    throw error
+  }
   return data
 }
 

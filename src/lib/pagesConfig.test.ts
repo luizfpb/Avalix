@@ -31,9 +31,11 @@ describe('configuracao do Cloudflare Pages', () => {
       ['/agenda', '/', '200'],
       ['/carteira', '/', '200'],
       ['/exercicios', '/', '200'],
+      ['/termos', '/', '200'],
       ['/a/*', '/', '200'],
       ['/avaliados/*', '/', '200'],
       ['/ferramentas/*', '/', '200'],
+      ['/configuracoes/*', '/', '200'],
     ])
   })
 
@@ -71,6 +73,28 @@ describe('configuracao do Cloudflare Pages', () => {
       expect(sources.filter((s) => s.startsWith('https://cdn.jsdelivr.net'))).toEqual([liberado])
     }
     expect(directive('connect-src').split(/\s+/)).not.toContain('https://storage.googleapis.com')
+  })
+
+  // A lista acima é escrita à mão, e as rotas novas da 0049 (/termos e
+  // /configuracoes/plano) ficaram de fora: em produção as duas respondiam 404
+  // para quem chegava sem o service worker — inclusive o retorno do checkout
+  // do Asaas e o link dos Termos no cadastro. Aqui a fonte é o próprio App.tsx.
+  it('toda rota declarada no App.tsx chega ao shell pelo _redirects', async () => {
+    const app = await readFile(new URL('../App.tsx', import.meta.url), 'utf8')
+    const paths = [...app.matchAll(/path=["']([^"']+)["']/g)]
+      .map((m) => m[1])
+      .filter((path) => path !== '/' && path !== '*')
+    expect(paths.length).toBeGreaterThan(20)
+    const rules = await readRedirectRules()
+    const coberta = (path: string) => {
+      const concreta = path.replace(/:[^/]+/g, 'x')
+      return rules.some(([source, destination, status]) => {
+        if (destination !== '/' || status !== '200') return false
+        if (source.endsWith('/*')) return concreta.startsWith(source.slice(0, -1))
+        return source === concreta
+      })
+    }
+    expect(paths.filter((path) => !coberta(path))).toEqual([])
   })
 
   it('mantem 404 real para caminhos que nao pertencem a SPA', async () => {
