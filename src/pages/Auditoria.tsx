@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ScrollText, Bug, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
@@ -67,9 +67,7 @@ export default function Auditoria() {
   if (!canView) {
     return (
       <div className="space-y-3">
-        <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Ajustes
-        </Link>
+        <PageTrail steps={[{ label: 'Ajustes', to: '/configuracoes' }]} current="Auditoria" />
         <h1 className="text-xl font-semibold">Auditoria</h1>
         <p className="text-sm text-muted-foreground">
           A trilha de auditoria é visível apenas para donos e administradores da organização.
@@ -81,9 +79,7 @@ export default function Auditoria() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Ajustes
-        </Link>
+        <PageTrail steps={[{ label: 'Ajustes', to: '/configuracoes' }]} current="Auditoria" />
         <h1 className="mt-2 text-xl font-semibold">Auditoria</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Quem fez o quê e quando. A trilha é imutável: nem administradores conseguem editar ou

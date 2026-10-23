@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useSubject } from '../features/subjects/hooks'
 import { useAssessment, useAssessments } from '../features/assessment/hooks'
 import { buildComparison, type ComparePoint, type CompareRow } from '../features/assessment/compare'
@@ -32,6 +34,7 @@ function assessmentOptionLabel(assessment: {
 // da penúltima pra última. O cálculo é puro (buildComparison, testado).
 export default function AvaliacoesComparar() {
   const { id } = useParams()
+  const trail = useSubjectTrail(id)
   const subjectQuery = useSubject(id)
   const assessmentsQuery = useAssessments(id)
 
@@ -45,9 +48,7 @@ export default function AvaliacoesComparar() {
   const [toId, setToId] = useState<string | null>(null)
 
   const back = (
-    <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-      ← Voltar
-    </Link>
+    <PageTrail steps={trail} current="Comparar avaliações" />
   )
 
   if (subjectQuery.isPending || assessmentsQuery.isPending) {

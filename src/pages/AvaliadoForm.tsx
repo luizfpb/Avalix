@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
@@ -61,6 +63,7 @@ export default function AvaliadoForm() {
 
 function SubjectEditor({ id }: { id: string | undefined }) {
   const isEdit = !!id
+  const trail = useSubjectTrail(id)
   const navigate = useNavigate()
   const { organization, role } = useOrganization()
   const labels = subjectTermLabels(organization?.subject_term)
@@ -131,9 +134,7 @@ function SubjectEditor({ id }: { id: string | undefined }) {
   if (isEdit && !subjectQuery.data) {
     return (
       <div className="max-w-xl space-y-4">
-        <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar
-        </Link>
+        <PageTrail steps={trail} current={isEdit ? 'Editar cadastro' : `Novo ${labels.singular}`} />
         <QueryError
           message={`Não foi possível carregar este ${labels.singular}. O formulário foi bloqueado para evitar sobrescrever o cadastro com campos vazios.`}
           onRetry={() => void subjectQuery.refetch()}
@@ -147,9 +148,7 @@ function SubjectEditor({ id }: { id: string | undefined }) {
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <Link to={backTo} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar
-        </Link>
+        <PageTrail steps={trail} current={isEdit ? 'Editar cadastro' : `Novo ${labels.singular}`} />
         <h1 className="mt-2 text-xl font-semibold">
           {isEdit ? `Editar ${labels.singular}` : `Novo ${labels.singular}`}
         </h1>

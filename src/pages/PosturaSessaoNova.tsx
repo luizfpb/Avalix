@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useActiveConsent } from '../features/consent/hooks'
@@ -20,6 +22,7 @@ function todayLocal(): string {
 
 export default function PosturaSessaoNova() {
   const { id } = useParams()
+  const trail = useSubjectTrail(id)
   const navigate = useNavigate()
   const { organization } = useOrganization()
   const subjectQuery = useSubject(id)
@@ -68,9 +71,7 @@ export default function PosturaSessaoNova() {
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {subjectQuery.data?.full_name ?? 'Voltar'}
-        </Link>
+        <PageTrail steps={trail} current="Nova sessão postural" />
         <h1 className="mt-2 text-xl font-semibold">Nova sessão postural</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Crie a sessão e depois adicione as fotos.

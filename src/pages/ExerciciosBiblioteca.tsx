@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
 import { Plus, Pencil, Trash2, Clapperboard } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useExercises, useDeleteCustomExercise } from '../features/workout/hooks'
@@ -68,9 +68,7 @@ export default function ExerciciosBiblioteca() {
       <ReadOnlyNotice>Exercícios e vídeos novos não serão gravados até a assinatura ser regularizada.</ReadOnlyNotice>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link to="/configuracoes" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Ajustes
-          </Link>
+          <PageTrail steps={[{ label: 'Ajustes', to: '/configuracoes' }]} current="Biblioteca de exercícios" />
           <h1 className="mt-2 text-xl font-semibold">Biblioteca de exercícios</h1>
           <p className="text-sm text-muted-foreground">
             Catálogo global + {customCount} {customCount === 1 ? 'exercício seu' : 'exercícios seus'}.

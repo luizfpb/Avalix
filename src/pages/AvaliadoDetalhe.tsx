@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -47,7 +49,6 @@ import {
 import { consentText } from '../features/consent/text'
 import type { SignerKind } from '../features/consent/api'
 import { Pencil, TrendingUp, CalendarPlus, Send, Copy, MessageCircle, Download, ClipboardList } from 'lucide-react'
-import { subjectTermLabels } from '../lib/subjectTerm'
 import { ageFromBirthDate } from '../lib/age'
 import { formatPhone } from '../lib/phone'
 import { Initials } from '../components/Initials'
@@ -95,8 +96,8 @@ export default function AvaliadoDetalhe() {
 
 function AvaliadoDetalheContent() {
   const { id } = useParams()
+  const trail = useSubjectTrail(undefined)
   const { organization } = useOrganization()
-  const labels = subjectTermLabels(organization?.subject_term)
   const subjectQuery = useSubject(id)
   const [exportBusy, setExportBusy] = useState(false)
   const [exportProgress, setExportProgress] = useState<SubjectExportProgress | null>(null)
@@ -140,9 +141,7 @@ function AvaliadoDetalheContent() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <div>
-        <Link to="/avaliados" className="text-sm text-muted-foreground hover:text-foreground">
-          ← {labels.pluralCap}
-        </Link>
+        <PageTrail steps={trail} current={s.full_name} />
         {/* Empilhado no celular: com as ações em `shrink-0` na mesma linha, o
             `truncate` do nome engolia o nome inteiro — sobrava o avatar. */}
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

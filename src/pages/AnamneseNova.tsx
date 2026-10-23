@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useOrganization } from '../features/organization/context'
 import { subjectTermLabels } from '../lib/subjectTerm'
 import { useSubject } from '../features/subjects/hooks'
@@ -94,6 +96,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   const navigate = useNavigate()
   const isEdit = !!existing
   const createMut = useCreateAnamnese(subject.id)
+  const subjectTrail = useSubjectTrail(subject.id)
   // Identidade da anamnese nova, uma por abertura do formulário: a nova
   // tentativa depois de uma resposta perdida devolve a mesma anamnese.
   const [newId] = useState(() => crypto.randomUUID())
@@ -187,9 +190,12 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: AnamneseR
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link to={backTo} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {isEdit ? 'Voltar' : subject.full_name}
-        </Link>
+        <PageTrail
+          steps={existing
+            ? [...subjectTrail, { label: `Anamnese de ${existing.assessed_at.split('-').reverse().join('/')}`, to: backTo }]
+            : subjectTrail}
+          current={isEdit ? 'Editar anamnese' : 'Nova anamnese'}
+        />
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
           {isEdit ? 'Editar anamnese e triagem' : 'Anamnese e triagem'}
         </h1>

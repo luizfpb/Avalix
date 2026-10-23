@@ -1,4 +1,6 @@
 import { Link, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { Pencil } from 'lucide-react'
 import { useAnamnese } from '../features/anamnesis/hooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
@@ -24,6 +26,7 @@ function formatDateTime(iso: string): string {
 
 export default function AnamneseDetalhe() {
   const { id, anamneseId } = useParams()
+  const trail = useSubjectTrail(id)
   const query = useAnamnese(anamneseId)
   // o prompt precisa de idade e sexo; o nome entra abreviado
   const subjectQuery = useSubject(id)
@@ -52,9 +55,7 @@ export default function AnamneseDetalhe() {
     <div className="max-w-4xl space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-            ← Voltar
-          </Link>
+          <PageTrail steps={trail} current={`Anamnese de ${formatDate(row.assessed_at)}`} />
           <h1 className="mt-2 text-xl font-semibold">Anamnese de {formatDate(row.assessed_at)}</h1>
           {edited ? (
             <p className="text-sm text-muted-foreground">

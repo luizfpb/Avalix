@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { GitCompareArrows } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -67,6 +69,7 @@ type SeriesPoint = { id: string; date: string; value: number | null }
 
 export default function Evolucao() {
   const { id } = useParams()
+  const trail = useSubjectTrail(id)
   const subjectQuery = useSubject(id)
   const assessmentsQuery = useAssessments(id)
   const circsQuery = useSubjectCircumferences(id)
@@ -168,9 +171,7 @@ export default function Evolucao() {
 
   const subject = subjectQuery.data
   const back = (
-    <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-      ← Voltar
-    </Link>
+    <PageTrail steps={trail} current="Evolução e gráficos" />
   )
 
   if (assessments.length === 0) {

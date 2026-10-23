@@ -24,6 +24,10 @@ const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listar
   listarSeriesMock: vi.fn(),
 }))
 
+// A trilha (nome do aluno) não é o assunto destes testes.
+vi.mock('../lib/subjectTrail', () => ({
+  useSubjectTrail: () => [{ label: 'Alunos', to: '/avaliados' }, { label: 'Aluno', to: '/avaliados/x' }],
+}))
 vi.mock('../features/workout/api', async (original) => ({
   ...(await original<typeof import('../features/workout/api')>()),
   listWorkoutLogSets: (id: string) => listarSeriesMock(id),

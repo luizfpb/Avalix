@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
   useSignedUrls: vi.fn(),
 }))
 
+// A trilha (nome do aluno) não é o assunto destes testes.
+vi.mock('../lib/subjectTrail', () => ({
+  useSubjectTrail: () => [{ label: 'Alunos', to: '/avaliados' }, { label: 'Aluno', to: '/avaliados/x' }],
+}))
 vi.mock('../features/posture/api', () => ({
   signedUrls: mocks.signedUrls,
   categoryLabel: (category: string) =>

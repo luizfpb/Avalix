@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
 import { BrandLogo, BrandMark } from '../components/BrandLogo'
 import { PROVIDER, TERMS_SECTIONS, TERMS_UPDATED_AT, TERMS_VERSION } from '../features/legal/terms'
 
@@ -50,9 +51,7 @@ export default function Termos() {
           </section>
         </div>
 
-        <Link to="/" className="mt-10 inline-block text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar ao Avalix
-        </Link>
+        <PageTrail className="mt-10" steps={[{ label: 'Ir para o Avalix', to: '/' }]} />
       </main>
     </div>
   )

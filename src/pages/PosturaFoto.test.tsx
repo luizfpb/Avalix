@@ -10,6 +10,10 @@ const m = vi.hoisted(() => ({
   row: { id: 'foto', session_id: 'sessao', storage_path: 'foto.webp', category: 'frente' },
   session: { id: 'sessao', subject_id: 'aluno' },
 }))
+// A trilha (nome do aluno) não é o assunto destes testes.
+vi.mock('../lib/subjectTrail', () => ({
+  useSubjectTrail: () => [{ label: 'Alunos', to: '/avaliados' }, { label: 'Aluno', to: '/avaliados/x' }],
+}))
 vi.mock('react-router', async (importOriginal) => ({ ...await importOriginal<typeof import('react-router')>(), useParams: () => ({ id: 'aluno', sessionId: 'sessao', photoId: 'foto' }), useBlocker: () => ({ state: 'unblocked' }) }))
 vi.mock('../features/organization/context', () => ({ useOrganization: () => ({ organization: { id: 'org' } }) }))
 vi.mock('../features/posture/hooks', () => ({

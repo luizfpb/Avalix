@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { useIntake, useAcceptIntake, useRejectIntake } from '../features/anamnesis/intakeHooks'
 import { AnamneseResumo } from '../features/anamnesis/AnamneseResumo'
 import { parseAnswers } from '../features/anamnesis/parse'
@@ -30,6 +32,7 @@ function formatBirthDate(s: string | undefined): string {
 
 export default function AnamneseRevisar() {
   const { id, intakeId } = useParams()
+  const subjectTrail = useSubjectTrail(id)
   const navigate = useNavigate()
   const { organization } = useOrganization()
   const query = useIntake(intakeId)
@@ -43,6 +46,8 @@ export default function AnamneseRevisar() {
   const [error, setError] = useState<string | null>(null)
 
   const backTo = id ? `/avaliados/${id}` : '/dashboard'
+  // sem aluno ainda (link de cadastro), quem revisa veio do Início
+  const trail = id ? subjectTrail : [{ label: 'Início', to: '/dashboard' }]
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Carregando...</p>
   if (query.isError || !query.data) {
@@ -75,9 +80,7 @@ export default function AnamneseRevisar() {
     const subjectForLink = intake.subject_id ?? intake.resulting_subject_id
     return (
       <div className="max-w-2xl space-y-3">
-        <Link to={backTo} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar
-        </Link>
+        <PageTrail steps={trail} current={isCadastro ? 'Revisar cadastro e anamnese' : 'Revisar resposta'} />
         <p className="text-sm text-muted-foreground">
           {intake.status === 'accepted'
             ? 'Esta resposta já foi aceita.'
@@ -153,9 +156,7 @@ export default function AnamneseRevisar() {
   return (
     <div className="max-w-4xl space-y-5">
       <div>
-        <Link to={backTo} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Voltar
-        </Link>
+        <PageTrail steps={trail} current={isCadastro ? 'Revisar cadastro e anamnese' : 'Revisar resposta'} />
         <h1 className="mt-2 text-xl font-semibold">
           {isCadastro ? 'Revisar cadastro e anamnese' : 'Revisar resposta do aluno'}
         </h1>

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { Pill, Pencil, Trash2 } from 'lucide-react'
 import { useAssessment, useAssessments, useDeleteAssessment } from '../features/assessment/hooks'
 import { useSubject } from '../features/subjects/hooks'
@@ -48,6 +50,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function AvaliacaoDetalhe() {
   const { id, assessmentId } = useParams()
+  const trail = useSubjectTrail(id)
   const query = useAssessment(assessmentId)
   const subjectQuery = useSubject(id)
   const assessmentsQuery = useAssessments(id)
@@ -166,12 +169,7 @@ export default function AvaliacaoDetalhe() {
     <div className="max-w-6xl space-y-6 lg:space-y-8">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <Link
-            to={`/avaliados/${id}`}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← Voltar
-          </Link>
+          <PageTrail steps={trail} current={`Avaliação de ${formatDate(assessment.assessed_at)}`} />
           <h1 className="mt-2 text-xl font-semibold lg:text-2xl">
             Avaliação de {formatDate(assessment.assessed_at)}
           </h1>

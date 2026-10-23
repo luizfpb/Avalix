@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { PenLine } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
@@ -38,6 +40,7 @@ function formatDate(iso: string): string {
 
 export default function PosturaSessaoDetalhe() {
   const { id, sessionId } = useParams()
+  const trail = useSubjectTrail(id)
   const navigate = useNavigate()
   const { organization } = useOrganization()
   const sessionQuery = useSession(sessionId)
@@ -169,12 +172,7 @@ export default function PosturaSessaoDetalhe() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link
-            to={`/avaliados/${id}`}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← Voltar
-          </Link>
+          <PageTrail steps={trail} current={`Sessão postural de ${formatDate(session.taken_at)}`} />
           <h1 className="mt-2 text-xl font-semibold">
             Sessão postural de {formatDate(session.taken_at)}
           </h1>

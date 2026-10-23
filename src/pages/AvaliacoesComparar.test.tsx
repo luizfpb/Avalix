@@ -27,6 +27,10 @@ const { assessments } = vi.hoisted(() => ({
   ],
 }))
 
+// A trilha (nome do aluno) não é o assunto destes testes.
+vi.mock('../lib/subjectTrail', () => ({
+  useSubjectTrail: () => [{ label: 'Alunos', to: '/avaliados' }, { label: 'Aluno', to: '/avaliados/x' }],
+}))
 vi.mock('../features/subjects/hooks', () => ({
   useSubject: () => ({ data: { full_name: 'Pessoa Teste' }, isPending: false }),
 }))

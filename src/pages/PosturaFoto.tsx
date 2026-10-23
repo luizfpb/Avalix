@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useBlocker, useParams } from 'react-router'
+import { useBlocker, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import {
   MousePointer2,
   Dot,
@@ -44,6 +46,7 @@ export default function PosturaFoto() {
 
 function PosturaFotoEditor() {
   const { id, sessionId, photoId } = useParams()
+  const trail = useSubjectTrail(id)
   const { organization } = useOrganization()
   const photoQuery = usePhoto(photoId)
   const sessionQuery = useSession(sessionId)
@@ -165,9 +168,10 @@ function PosturaFotoEditor() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link to={backTo} className="text-sm text-muted-foreground hover:text-foreground">
-            ← Voltar à sessão
-          </Link>
+          <PageTrail
+            steps={[...trail, { label: sessionQuery.data?.taken_at ? `Sessão de ${sessionQuery.data.taken_at.slice(0, 10).split('-').reverse().join('/')}` : 'Sessão postural', to: backTo }]}
+            current={photo ? `Anotações · ${categoryLabel(photo.category)}` : 'Anotações'}
+          />
           <h1 className="mt-2 text-xl font-semibold">
             Anotações{photo ? ` · ${categoryLabel(photo.category)}` : ''}
           </h1>

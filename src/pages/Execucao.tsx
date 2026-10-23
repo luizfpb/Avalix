@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { Trash2, Plus, X, ChevronDown, ChevronRight, ChevronUp, GripVertical } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import {
@@ -98,6 +100,7 @@ function formatDate(iso: string): string {
 
 export default function Execucao() {
   const { id, planId } = useParams()
+  const trail = useSubjectTrail(id)
   const { organization } = useOrganization()
   const planQuery = useWorkoutPlan(planId)
   const exercisesQuery = useExercises(organization?.id)
@@ -200,9 +203,7 @@ export default function Execucao() {
   if (exercisesQuery.isError) {
     return (
       <div className="max-w-2xl space-y-4">
-        <Link to={`/avaliados/${id}/treinos/${plan.id}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← {plan.name}
-        </Link>
+        <PageTrail steps={[...trail, { label: plan.name, to: `/avaliados/${id}/treinos/${plan.id}` }]} current="Execução do treino" />
         <QueryError
           message="Não foi possível carregar a lista de exercícios, então o registro da sessão não pode ser montado."
           onRetry={() => void exercisesQuery.refetch()}
@@ -221,12 +222,7 @@ export default function Execucao() {
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          to={`/avaliados/${id}/treinos/${plan.id}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← {plan.name}
-        </Link>
+        <PageTrail steps={[...trail, { label: plan.name, to: `/avaliados/${id}/treinos/${plan.id}` }]} current="Execução do treino" />
         <h1 className="mt-2 text-xl font-semibold lg:text-2xl">Execução do treino</h1>
       </div>
 

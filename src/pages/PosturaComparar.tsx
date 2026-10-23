@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { PenLine } from 'lucide-react'
 import { useSubjectPhotos, useSignedUrls, useAnnotation } from '../features/posture/hooks'
 import { categoryLabel, type SubjectPhoto } from '../features/posture/api'
@@ -21,6 +23,7 @@ function photoLabel(p: SubjectPhoto): string {
 
 export default function PosturaComparar() {
   const { id } = useParams()
+  const trail = useSubjectTrail(id)
   const photosQuery = useSubjectPhotos(id)
   const photos = useMemo(() => photosQuery.data ?? [], [photosQuery.data])
   const urlsQuery = useSignedUrls(photos.map((p) => p.storage_path))
@@ -61,9 +64,7 @@ export default function PosturaComparar() {
   }
 
   const back = (
-    <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-      ← Voltar
-    </Link>
+    <PageTrail steps={trail} current="Comparar fotos" />
   )
 
   if (photos.length < 2) {

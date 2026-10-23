@@ -1,5 +1,7 @@
 import { cloneElement, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { Plus, Trash2 } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
@@ -290,6 +292,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   const navigate = useNavigate()
   const isEdit = !!existing
   const ea = existing?.assessment
+  const trail = useSubjectTrail(subject.id)
   const createMut = useCreateAssessment(subject.id)
   // Identidade da avaliação nova, uma por abertura do formulário (0053): a
   // nova tentativa depois de uma resposta perdida devolve a mesma avaliação.
@@ -524,12 +527,7 @@ function Form({ subject, existing }: { subject: SubjectRow; existing?: ExistingA
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <Link
-          to={`/avaliados/${subject.id}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← {subject.full_name}
-        </Link>
+        <PageTrail steps={trail} current={isEdit ? 'Editar avaliação' : 'Nova avaliação'} />
         <h1 className="mt-2 text-xl font-semibold lg:text-2xl">
           {isEdit ? 'Editar avaliação' : 'Nova avaliação'}
         </h1>

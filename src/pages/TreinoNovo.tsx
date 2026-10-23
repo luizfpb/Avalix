@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import {
   Plus,
   Trash2,
@@ -174,7 +176,6 @@ export default function TreinoNovo() {
       // entre duas edições manteria o estado do plano anterior (useState(initial))
       key={planId ?? 'novo'}
       subjectId={subjectQuery.data.id}
-      subjectName={subjectQuery.data.full_name}
       orgId={organization?.id ?? ''}
       exercises={exercisesQuery.data ?? []}
       initial={initial}
@@ -186,7 +187,6 @@ export default function TreinoNovo() {
 
 function Builder({
   subjectId,
-  subjectName,
   orgId,
   exercises,
   initial,
@@ -194,7 +194,6 @@ function Builder({
   planUpdatedAt,
 }: {
   subjectId: string
-  subjectName: string
   orgId: string
   exercises: ExerciseRow[]
   initial: EditorPlan
@@ -206,6 +205,7 @@ function Builder({
 }) {
   const navigate = useNavigate()
   const isEdit = !!planId
+  const trail = useSubjectTrail(subjectId)
   const createMut = useCreateWorkoutPlan(subjectId)
   // Identidade do plano novo, uma por abertura do editor (0053): a nova
   // tentativa depois de uma resposta perdida devolve o mesmo plano.
@@ -814,12 +814,10 @@ function Builder({
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <Link
-          to={`/avaliados/${subjectId}`}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← {subjectName}
-        </Link>
+        <PageTrail
+          steps={trail}
+          current={isEdit ? 'Editar plano' : 'Novo plano de treino'}
+        />
         <h1 className="mt-2 text-xl font-semibold">{isEdit ? 'Editar plano' : 'Novo plano de treino'}</h1>
       </div>
 

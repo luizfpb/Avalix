@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { PageTrail } from '../components/PageTrail'
+import { useSubjectTrail } from '../lib/subjectTrail'
 import { Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
@@ -84,6 +86,7 @@ function exerciseMeta(ex: WorkoutExerciseRow): string {
 
 export default function TreinoDetalhe() {
   const { id, planId } = useParams()
+  const trail = useSubjectTrail(id)
   const query = useWorkoutPlan(planId)
   const subjectQuery = useSubject(id)
   const { organization } = useOrganization()
@@ -362,9 +365,7 @@ export default function TreinoDetalhe() {
           sequência ficavam espremidos numa coluna de uma palavra. */}
       <div className="flex flex-col gap-3">
         <div className="min-w-0">
-          <Link to={`/avaliados/${id}`} className="text-sm text-muted-foreground hover:text-foreground">
-            ← Voltar
-          </Link>
+          <PageTrail steps={trail} current={plan.name} />
           <h1 className="mt-2 text-xl font-semibold lg:text-2xl">{plan.name}</h1>
           <p className="text-sm text-muted-foreground">
             {goalLabel(plan.goal)} · {plan.weeks} {plan.weeks === 1 ? 'semana' : 'semanas'}
