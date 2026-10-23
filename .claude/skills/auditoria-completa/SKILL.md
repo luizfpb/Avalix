@@ -105,7 +105,7 @@ CSV/PDF, backup (90 dias), fila offline (IndexedDB), rascunhos (`lib/draft.ts`),
 logs da Edge Function, e-mails. Para cada chave de armazenamento local: é por
 usuário (`userId:orgId`) ou por aparelho? Quem escolhe a chave? É limpa no
 logout (`clientPrivacy.ts`)? Para cada correção recente: onde mais o padrão
-aparece (ex.: rota nova sem `_redirects`; checagem de 0 linhas em um update e
+aparece (ex.: rota nova sem `_redirects` ou sem o `no-store` do `_headers`; checagem de 0 linhas em um update e
 não no vizinho; idempotência num create e não nos outros).
 
 ### 4. Entradas fora do formato

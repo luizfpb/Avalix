@@ -26,9 +26,10 @@ pt-BR; commits sem cara de IA; acentuação e pontuação corretas).
   avalixfit.com.br), seguido do smoke HTTP. Migration nova que sobe o
   carimbo precisa estar aplicada ANTES do push, senão o deploy para no gate.
   Quem dá o push é o usuário.
-- Rota nova no `App.tsx` precisa entrar em `public/_redirects` (o
-  `pagesConfig.test.ts` cruza os dois); sem isso ela responde 404 para quem
-  chega sem o service worker.
+- Rota nova no `App.tsx` precisa entrar em `public/_redirects` (sem isso
+  responde 404 para quem chega sem o service worker) E em `public/_headers`
+  com `no-store` (sem isso o smoke do deploy reprova). O
+  `pagesConfig.test.ts` cruza as rotas com os dois arquivos.
 - Auditoria completa: seguir a skill `.claude/skills/auditoria-completa`
   (registro da última rodada em `docs/AUDITORIA_2026-10-23.md`).
 - PDFs gerados (`@react-pdf/renderer`): renderizar e **olhar a imagem**

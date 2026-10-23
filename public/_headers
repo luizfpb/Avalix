@@ -98,6 +98,14 @@
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
 
+/configuracoes/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
+/termos
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store

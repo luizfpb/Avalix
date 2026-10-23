@@ -97,6 +97,29 @@ describe('configuracao do Cloudflare Pages', () => {
     expect(paths.filter((path) => !coberta(path))).toEqual([])
   })
 
+  // Irmão do teste acima: o _headers também tem lista por rota (o HTML do
+  // shell nunca fica em cache). /termos e /configuracoes/plano passaram a ser
+  // servidas pelo _redirects em 23/10, mas ficaram sem o no-store, e o smoke
+  // do deploy reprovou ("public, max-age=0, must-revalidate").
+  it('toda rota declarada no App.tsx serve o shell sem cache', async () => {
+    const app = await readFile(new URL('../App.tsx', import.meta.url), 'utf8')
+    const headers = await readFile(new URL('../../public/_headers', import.meta.url), 'utf8')
+    const semCache = headers
+      .split(/\r?\n(?=\S)/)
+      .filter((bloco) => /Cache-Control: [^\n]*no-store/.test(bloco))
+      .map((bloco) => bloco.split(/\r?\n/)[0].trim())
+    const paths = [...app.matchAll(/path=["']([^"']+)["']/g)]
+      .map((m) => m[1])
+      .filter((path) => path !== '*')
+    const coberta = (path: string) => {
+      const concreta = path.replace(/:[^/]+/g, 'x')
+      return semCache.some((source) =>
+        source.endsWith('/*') ? concreta.startsWith(source.slice(0, -1)) : source === concreta
+      )
+    }
+    expect(paths.filter((path) => !coberta(path))).toEqual([])
+  })
+
   it('mantem 404 real para caminhos que nao pertencem a SPA', async () => {
     const rules = await readRedirectRules()
     const notFound = await readFile(new URL('../../public/404.html', import.meta.url), 'utf8')
