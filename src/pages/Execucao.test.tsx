@@ -7,6 +7,12 @@ import Execucao from './Execucao'
 import { setPrivateDraftScope } from '../lib/draft'
 import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/workout/api'
 
+// A linha "última:" tem o descanso num trecho à parte (não quebra no meio),
+// então a busca compara o texto da linha inteira.
+const linhaUltima = (texto: string) => (_: string, el: Element | null) =>
+  el?.tagName === 'SPAN' && el.textContent === texto && !!el.textContent?.startsWith('última:')
+
+
 // Registrar o treino que ACONTECEU, e não só o que estava no papel: aparelho
 // ocupado, dor no dia e troca combinada na hora são rotina de academia. O banco
 // sempre permitiu (workout_log_sets aponta para o catálogo, não para o
@@ -274,9 +280,9 @@ describe('Execucao — exercício fora do plano', () => {
         ] },
     ] })
     abrir()
-    expect(screen.getByText('última: 55 kg × 8, RIR 1')).toBeTruthy()
+    expect(screen.getByText(linhaUltima('última: 55 kg × 8, RIR 1'))).toBeTruthy()
     // 0054: o descanso realizado daquela série vem junto
-    expect(screen.getByText('última: 50 kg × 12, falha · descanso 120s')).toBeTruthy()
+    expect(screen.getByText(linhaUltima('última: 50 kg × 12, falha · descanso 120s'))).toBeTruthy()
   })
 
   it('não oferece exercício que já está na divisão do dia', () => {
@@ -776,6 +782,40 @@ describe('semana digitada', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Estender para 6 semanas' }))
     expect(estenderMock).toHaveBeenCalledWith(6, expect.anything())
     expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  it('confirma a extensão e some quando a semana muda de novo', async () => {
+    estenderMock.mockImplementation((_n: number, opts: { onSuccess?: () => void }) => opts.onSuccess?.())
+    abrir()
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Estender para 5 semanas' }))
+    // o plano só cresce quando o React Query relê; aqui o aviso já confirma
+    planoMock.mockReturnValue({ data: { ...plano(), plan: { ...plano().plan!, weeks: 5 } }, isPending: false, isError: false })
+    act(() => refazerLeituraDoPlano())
+    expect(screen.getByRole('status').textContent).toBe('Mesociclo estendido para 5 semanas.')
+    expect(screen.queryByRole('button', { name: /Estender para/ })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '4' } })
+    expect(screen.queryByText(/Mesociclo estendido/)).toBeNull()
+  })
+
+  it('falha ao estender aparece como erro e o plano continua igual', async () => {
+    estenderMock.mockImplementation((_n: number, opts: { onError?: (e: unknown) => void }) =>
+      opts.onError?.(new Error('Failed to fetch')))
+    abrir()
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Estender para 5 semanas' }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Estender para 5 semanas' })).toBeTruthy()
+    expect(screen.queryByText(/Mesociclo estendido/)).toBeNull()
+  })
+
+  it('semana 52 é o teto do plano: num plano de 52 não oferece estender', () => {
+    const detail = plano()
+    detail.plan!.weeks = 52
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir()
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '53' } })
+    expect(screen.queryByRole('button', { name: /Estender para/ })).toBeNull()
   })
 
   it('depois de estendido, a semana nova grava normalmente', async () => {

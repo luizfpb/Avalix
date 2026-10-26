@@ -69,14 +69,24 @@ export function previousSetAt(last: LastLoad | null | undefined, index: number):
   return last?.sets?.find((s) => s.setNumber === index + 1) ?? null
 }
 
-// "55 kg × 8, RIR 1 · descanso 90s" / "20 reps" / "50 kg × 10, falha"
-export function previousSetText(p: PreviousSet): string | null {
+// Em duas partes porque a tela não deixa o descanso quebrar no meio: no
+// celular a linha tem duas ou três colunas, e "90s" sozinho numa terceira
+// linha ficava solto.
+// { serie: "55 kg × 8, RIR 1", descanso: "descanso 90s" } / { "20 reps", null }
+export function previousSetParts(p: PreviousSet): { serie: string; descanso: string | null } | null {
   if (p.weightKg == null && p.reps == null) return null
   const carga = p.weightKg != null
     ? `${kg(p.weightKg)} kg${p.reps != null ? ` × ${p.reps}` : ''}`
     : `${p.reps} reps`
   const esforco = p.reachedFailure ? ', falha' : p.rir != null ? `, RIR ${kg(p.rir)}` : ''
-  const descanso = p.restSeconds == null ? ''
-    : p.restSeconds === 0 ? ' · sem descanso' : ` · descanso ${p.restSeconds}s`
-  return carga + esforco + descanso
+  const descanso = p.restSeconds == null ? null
+    : p.restSeconds === 0 ? 'sem descanso' : `descanso ${p.restSeconds}s`
+  return { serie: carga + esforco, descanso }
+}
+
+// "55 kg × 8, RIR 1 · descanso 90s" / "20 reps" / "50 kg × 10, falha"
+export function previousSetText(p: PreviousSet): string | null {
+  const partes = previousSetParts(p)
+  if (!partes) return null
+  return partes.descanso ? `${partes.serie} · ${partes.descanso}` : partes.serie
 }

@@ -675,6 +675,8 @@ function LogForm({
   )
   const createMut = useCreateWorkoutLog(planId)
   const extendMut = useExtendWorkoutPlanWeeks(planId)
+  // Confirma a extensão até o educador mexer de novo na semana.
+  const [estendido, setEstendido] = useState<number | null>(null)
   const totalWeeks = planWeeks(detail)
   const today = dateIso(useClock())
   const [dayKey, setDayKey] = useState(days[0]?.id ?? '')
@@ -1594,6 +1596,7 @@ function LogForm({
               value={week}
               onChange={(e) => {
                 setWeekTouched(true)
+                setEstendido(null)
                 setWeek(e.target.value)
               }}
             />
@@ -1646,23 +1649,34 @@ function LogForm({
         ) : null}
 
         {semanaAlem != null ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-3 py-2 text-xs text-muted-foreground">
-            <span className="min-w-0 flex-1">
+          // No celular o texto ocupa a largura e o botão vai embaixo: lado a
+          // lado, o botão não encolhe e o texto virava uma palavra por linha.
+          <div className="flex flex-col items-start gap-2 rounded-md border px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
+            <span className="min-w-0 sm:flex-1">
               O mesociclo tem {totalWeeks} {totalWeeks === 1 ? 'semana' : 'semanas'}. Estendendo, a semana{' '}
               {semanaAlem} entra no plano com a prescrição base, que dá para ajustar no editor.
             </span>
             <Button
               size="sm"
               variant="outline"
+              className="shrink-0"
               disabled={extendMut.isPending}
               onClick={() => {
                 setError(null)
-                extendMut.mutate(semanaAlem, { onError: (e) => setError(normalizeDbError(e)) })
+                const alvo = semanaAlem
+                extendMut.mutate(alvo, {
+                  onSuccess: () => setEstendido(alvo),
+                  onError: (e) => setError(normalizeDbError(e)),
+                })
               }}
             >
               {extendMut.isPending ? 'Estendendo…' : `Estender para ${semanaAlem} semanas`}
             </Button>
           </div>
+        ) : estendido != null ? (
+          <p role="status" className="text-xs text-success">
+            Mesociclo estendido para {estendido} semanas.
+          </p>
         ) : null}
 
         <ReadOnlyNotice>O registro da sessão não será gravado até a assinatura ser regularizada.</ReadOnlyNotice>

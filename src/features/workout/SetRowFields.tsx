@@ -2,7 +2,7 @@ import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
 import type { LogRow } from './logRows'
-import { previousSetText, type PreviousSet } from './lastLoad'
+import { previousSetParts, type PreviousSet } from './lastLoad'
 
 // Uma série da sessão em execução. É o componente que a mão suada usa no meio
 // da academia, então os alvos são de 44 px e o número da série é, ele mesmo, o
@@ -26,14 +26,15 @@ export function SetRowFields({
    */
   markable?: boolean
   /**
-   * A série de mesmo número da última sessão (0048). Fica na linha de baixo,
-   * à esquerda do "Falha", que já existia: a linha não cresce por causa dela.
+   * A série de mesmo número da última sessão (0048), com o descanso (0054).
+   * Fica na linha de baixo, nas três colunas à esquerda do "Falha", que já
+   * existia: com duas colunas o descanso quebrava em três linhas no celular.
    */
   previous?: PreviousSet | null
 }) {
   const number = index + 1
   const done = row.done === true
-  const anterior = previous ? previousSetText(previous) : null
+  const anterior = previous ? previousSetParts(previous) : null
   return (
     <div
       className={`grid grid-cols-[2.5rem_repeat(4,minmax(0,1fr))] items-center gap-x-1.5 gap-y-0.5 rounded-md sm:gap-x-2 ${
@@ -70,11 +71,17 @@ export function SetRowFields({
         type="number" inputMode="numeric" min={0} max={3600} step={1} placeholder={restPlaceholder}
         value={row.rest ?? ''} disabled={disabled} onChange={(e) => onChange('rest', e.target.value)} />
       {anterior ? (
-        <span className="col-span-2 col-start-2 row-start-2 text-xs leading-tight text-muted-foreground">
-          última: {anterior}
+        <span className="col-span-3 col-start-2 row-start-2 text-xs leading-tight text-muted-foreground">
+          última: {anterior.serie}
+          {anterior.descanso ? (
+            <>
+              {' '}
+              <span className="whitespace-nowrap">· {anterior.descanso}</span>
+            </>
+          ) : null}
         </span>
       ) : null}
-      <label className="col-span-2 col-start-4 row-start-2 flex min-h-11 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+      <label className="col-start-5 row-start-2 flex min-h-11 cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
         <input type="checkbox" className="size-5 accent-primary" checked={row.failure === true}
           aria-label={`Falha na série ${number} de ${name}`} disabled={disabled}
           onChange={(e) => onChange('failure', e.target.checked)} />

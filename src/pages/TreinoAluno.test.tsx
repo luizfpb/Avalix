@@ -6,10 +6,16 @@ import { reconciliarRascunho, type PlanoVigente } from '../features/workout/stud
 import { writeCachedHistory } from '../features/workout/studentStore'
 import { captureStudentStorageAccess, STUDENT_TOKEN_KEY, StudentStorageError } from '../features/workout/studentStore'
 import type {
+
   StudentHistorySession,
   StudentPlanDetail,
   StudentWorkout,
 } from '../features/workout/studentApi'
+
+// A linha "última:" tem o descanso num trecho à parte (não quebra no meio),
+// então a busca compara o texto da linha inteira.
+const linhaUltima = (texto: string) => (_: string, el: Element | null) =>
+  el?.tagName === 'SPAN' && el.textContent === texto && !!el.textContent?.startsWith('última:')
 
 // A página do aluno é a única superfície de escrita anônima do app, e a que
 // tem de funcionar dentro da academia. Estes testes fixam o que não pode
@@ -559,7 +565,24 @@ describe('TreinoAluno', () => {
     }))
     await abrir()
     await campoCarga()
-    expect(screen.getByText('última: 40 kg × 12, RIR 2')).toBeTruthy()
+    expect(screen.getByText(linhaUltima('última: 40 kg × 12, RIR 2'))).toBeTruthy()
+  })
+
+  // 0054: o aluno vê também quanto descansou em cada série da última vez.
+  it('mostra o descanso de cada série da última vez', async () => {
+    getWorkoutMock.mockResolvedValue(pacote({
+      last_sets: [{ exercise_id: 'x1', performed_at: '2026-09-30', weight_kg: 40, reps: 12, rir: 2,
+        sets: [
+          { set_number: 1, weight_kg: 40, reps: 12, rir: 2, rest_seconds: 75, reached_failure: false },
+          { set_number: 2, weight_kg: 40, reps: 10, rir: 1, rest_seconds: 0, reached_failure: false },
+          { set_number: 3, weight_kg: 37.5, reps: 10, rir: 1, rest_seconds: null, reached_failure: false },
+        ] }],
+    }))
+    await abrir()
+    await campoCarga()
+    expect(screen.getByText(linhaUltima('última: 40 kg × 12, RIR 2 · descanso 75s'))).toBeTruthy()
+    expect(screen.getByText(linhaUltima('última: 40 kg × 10, RIR 1 · sem descanso'))).toBeTruthy()
+    expect(screen.getByText(linhaUltima('última: 37,5 kg × 10, RIR 1'))).toBeTruthy()
   })
 
   it('carga com vírgula do teclado brasileiro chega com a casa decimal', async () => {

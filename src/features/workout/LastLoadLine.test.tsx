@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { LastLoadLine } from './LastLoadLine'
-import { lastLoadFromServer, previousSetAt, previousSetText } from './lastLoad'
+import { lastLoadFromServer, previousSetAt, previousSetParts, previousSetText } from './lastLoad'
+import { SetRowFields } from './SetRowFields'
 
 afterEach(cleanup)
 
@@ -67,6 +68,20 @@ describe('última vez por série (0048)', () => {
     expect(previousSetText(previousSetAt(comDescanso, 2)!)).toBe('50 kg × 9, RIR 2')
     // pacote da 0048, sem o campo: nada de descanso inventado
     expect(previousSetAt(last, 0)?.restSeconds).toBeNull()
+  })
+
+  // No celular a linha tem três colunas estreitas: "90s" sozinho numa terceira
+  // linha ficava solto. O descanso vai inteiro, sem quebrar no meio.
+  it('o descanso fica num trecho que não quebra no meio', () => {
+    const p = { setNumber: 1, weightKg: 26, reps: 10, rir: 2, restSeconds: 90, reachedFailure: false }
+    expect(previousSetParts(p)).toEqual({ serie: '26 kg × 10, RIR 2', descanso: 'descanso 90s' })
+    expect(previousSetParts({ ...p, restSeconds: null })).toEqual({ serie: '26 kg × 10, RIR 2', descanso: null })
+    expect(previousSetParts({ ...p, weightKg: null, reps: null })).toBeNull()
+    render(<SetRowFields name="Supino" index={0} previous={p} onChange={() => {}}
+      row={{ weight: '', reps: '', rir: '', rest: '', failure: false }} />)
+    const trecho = screen.getByText('· descanso 90s')
+    expect(trecho.className).toContain('whitespace-nowrap')
+    expect(trecho.parentElement?.textContent).toBe('última: 26 kg × 10, RIR 2 · descanso 90s')
   })
 
   it('pacote de antes da 0048 vem sem séries e não quebra', () => {
