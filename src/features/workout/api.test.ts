@@ -11,7 +11,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { rpc: mocks.rpc, from: mocks.from },
 }))
 
-import { createWorkoutLog, createWorkoutPlan, saveTrainerSession, updateWorkoutLog } from './api'
+import { createWorkoutLog, createWorkoutPlan, extendWorkoutPlanWeeks, saveTrainerSession, updateWorkoutLog } from './api'
 import type { SaveWorkoutPlanInput } from './api'
 
 function entrada(patch: Partial<SaveWorkoutPlanInput> = {}): SaveWorkoutPlanInput {
@@ -197,5 +197,28 @@ describe('updateWorkoutLog', () => {
     })).rejects.toEqual(error)
     expect(mocks.rpc).toHaveBeenCalledTimes(1)
     expect(mocks.from).not.toHaveBeenCalled()
+  })
+})
+
+// Estender o mesociclo pela Execução só aumenta: dois cliques, ou duas abas
+// com números diferentes, não encolhem o plano.
+describe('extendWorkoutPlanWeeks', () => {
+  it('atualiza só as semanas, e só se o plano tiver menos', async () => {
+    const chamadas: [string, ...unknown[]][] = []
+    const builder: Record<string, (...args: unknown[]) => unknown> = {}
+    for (const metodo of ['update', 'eq', 'lt', 'select']) {
+      builder[metodo] = (...args: unknown[]) => { chamadas.push([metodo, ...args]); return builder }
+    }
+    builder.maybeSingle = async () => ({ data: null, error: null })
+    mocks.from.mockReturnValue(builder)
+
+    expect(await extendWorkoutPlanWeeks('plan-1', 6)).toBeNull()
+    expect(mocks.from).toHaveBeenCalledWith('workout_plans')
+    expect(chamadas).toEqual([
+      ['update', { weeks: 6 }],
+      ['eq', 'id', 'plan-1'],
+      ['lt', 'weeks', 6],
+      ['select', '*'],
+    ])
   })
 })

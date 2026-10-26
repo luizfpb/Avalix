@@ -7,6 +7,7 @@ import { useOrganization } from '../features/organization/context'
 import {
   useCreateWorkoutLog,
   useDeleteWorkoutLog,
+  useExtendWorkoutPlanWeeks,
   useExercises,
   usePlanSetHistory,
   useSaveTrainerSession,
@@ -673,6 +674,7 @@ function LogForm({
     [detail.days]
   )
   const createMut = useCreateWorkoutLog(planId)
+  const extendMut = useExtendWorkoutPlanWeeks(planId)
   const totalWeeks = planWeeks(detail)
   const today = dateIso(useClock())
   const [dayKey, setDayKey] = useState(days[0]?.id ?? '')
@@ -723,6 +725,10 @@ function LogForm({
   const overrides = useMemo(() => overrideIndex(detail.overrides), [detail.overrides])
   const weekNumber = week.trim() ? Number(week) : null
   const semanaDaTela = weekNumber != null ? detail.weeks.find((w) => w.week_number === weekNumber) ?? null : null
+  // Semana digitada além do mesociclo: em vez de recusar, a tela oferece
+  // estender o plano até ela.
+  const semanaAlem = weekNumber != null && Number.isInteger(weekNumber) &&
+    weekNumber > totalWeeks && weekNumber <= MAX_PLAN_WEEKS ? weekNumber : null
 
   const suggestedWeek = weekSuggestion?.week ?? null
   useEffect(() => {
@@ -1069,7 +1075,9 @@ function LogForm({
     }
     const weekValue = parseWeekInput(week, totalWeeks)
     if (weekValue === 'invalid') {
-      setError(`Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
+      setError(semanaAlem != null
+        ? `O mesociclo tem ${totalWeeks} semanas. Estenda o plano até a semana ${semanaAlem} ou corrija o número.`
+        : `Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
       return null
     }
 
@@ -1581,7 +1589,7 @@ function LogForm({
               id="workout-week"
               type="number"
               min={1}
-              max={totalWeeks}
+              max={MAX_PLAN_WEEKS}
               placeholder="—"
               value={week}
               onChange={(e) => {
@@ -1622,8 +1630,39 @@ function LogForm({
               >
                 Repetir a semana {weekSuggestion.lastLoggedWeek}
               </button>
+            ) : weekSuggestion.basis === 'end' && totalWeeks < MAX_PLAN_WEEKS && semanaAlem == null ? (
+              <button
+                type="button"
+                className="rounded text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setWeekTouched(true)
+                  setWeek(String(totalWeeks + 1))
+                }}
+              >
+                Fazer mais uma semana
+              </button>
             ) : null}
           </p>
+        ) : null}
+
+        {semanaAlem != null ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-3 py-2 text-xs text-muted-foreground">
+            <span className="min-w-0 flex-1">
+              O mesociclo tem {totalWeeks} {totalWeeks === 1 ? 'semana' : 'semanas'}. Estendendo, a semana{' '}
+              {semanaAlem} entra no plano com a prescrição base, que dá para ajustar no editor.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={extendMut.isPending}
+              onClick={() => {
+                setError(null)
+                extendMut.mutate(semanaAlem, { onError: (e) => setError(normalizeDbError(e)) })
+              }}
+            >
+              {extendMut.isPending ? 'Estendendo…' : `Estender para ${semanaAlem} semanas`}
+            </Button>
+          </div>
         ) : null}
 
         <ReadOnlyNotice>O registro da sessão não será gravado até a assinatura ser regularizada.</ReadOnlyNotice>
@@ -1771,8 +1810,11 @@ function LogForm({
   )
 }
 
+// workout_plans.weeks: check (weeks between 1 and 52), desde a 0006
+const MAX_PLAN_WEEKS = 52
+
 function planWeeks(detail: WorkoutPlanDetail): number {
-  return detail.plan?.weeks ?? 52
+  return detail.plan?.weeks ?? MAX_PLAN_WEEKS
 }
 
 // Explica o número que está no campo Semana. Frases separadas da tela do

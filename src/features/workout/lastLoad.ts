@@ -1,6 +1,6 @@
 // A "última vez" que a Execução e a página do aluno mostram: a melhor série da
-// sessão mais recente (0044) e, desde a 0048, cada série daquela sessão. As
-// regras ficam aqui; LastLoadLine e SetRowFields só desenham.
+// sessão mais recente (0044) e, desde a 0048, cada série daquela sessão, com o
+// descanso realizado desde a 0054. As regras ficam aqui; LastLoadLine e SetRowFields só desenham.
 
 export function kg(value: number): string {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
@@ -22,6 +22,8 @@ export type PreviousSet = {
   weightKg: number | null
   reps: number | null
   rir: number | null
+  // descanso realizado depois da série (0054); null = não informado
+  restSeconds: number | null
   reachedFailure: boolean
 }
 
@@ -30,6 +32,7 @@ type RawPreviousSet = {
   weight_kg: number | null
   reps: number | null
   rir: number | null
+  rest_seconds?: number | null
   reached_failure?: boolean | null
 }
 
@@ -54,6 +57,7 @@ export function lastLoadFromServer(s: {
       weightKg: x.weight_kg,
       reps: x.reps,
       rir: x.rir,
+      restSeconds: x.rest_seconds ?? null,
       reachedFailure: x.reached_failure === true,
     })),
   }
@@ -65,12 +69,14 @@ export function previousSetAt(last: LastLoad | null | undefined, index: number):
   return last?.sets?.find((s) => s.setNumber === index + 1) ?? null
 }
 
-// "55 kg × 8, RIR 1" / "20 reps" / "50 kg × 10, falha"
+// "55 kg × 8, RIR 1 · descanso 90s" / "20 reps" / "50 kg × 10, falha"
 export function previousSetText(p: PreviousSet): string | null {
   if (p.weightKg == null && p.reps == null) return null
   const carga = p.weightKg != null
     ? `${kg(p.weightKg)} kg${p.reps != null ? ` × ${p.reps}` : ''}`
     : `${p.reps} reps`
   const esforco = p.reachedFailure ? ', falha' : p.rir != null ? `, RIR ${kg(p.rir)}` : ''
-  return carga + esforco
+  const descanso = p.restSeconds == null ? ''
+    : p.restSeconds === 0 ? ' · sem descanso' : ` · descanso ${p.restSeconds}s`
+  return carga + esforco + descanso
 }

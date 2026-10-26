@@ -84,7 +84,8 @@ select is(
   '1:55.00×8 2:50.00×12 3:50.00×10',
   'cada série da última sessão, em ordem, sem a vazia e sem a sessão antiga');
 select is(
-  pg_temp.item('48000000-0000-0000-0000-000000000005')->'sets'->2,
+  -- a 0054 acrescenta rest_seconds; aqui só o que a 0048 garante
+  (pg_temp.item('48000000-0000-0000-0000-000000000005')->'sets'->2) - 'rest_seconds',
   '{"set_number": 3, "weight_kg": 50.00, "reps": 10, "rir": 0, "reached_failure": true}'::jsonb,
   'a série leva RIR e falha');
 select is(
@@ -93,8 +94,8 @@ select is(
   '50.00×12',
   'a melhor série (1RM estimado) continua no item, para a sugestão de carga');
 select is(
-  pg_temp.item('48000000-0000-0000-0000-000000000006')->'sets',
-  '[{"set_number": 1, "weight_kg": null, "reps": 20, "rir": null, "reached_failure": false}]'::jsonb,
+  (pg_temp.item('48000000-0000-0000-0000-000000000006')->'sets'->0) - 'rest_seconds',
+  '{"set_number": 1, "weight_kg": null, "reps": 20, "rir": null, "reached_failure": false}'::jsonb,
   'peso corporal também tem as séries');
 
 set local role anon;

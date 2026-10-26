@@ -12,8 +12,9 @@ import type { WorkoutPlanDetail, WorkoutWeekOverrideRow } from '../features/work
 // sempre permitiu (workout_log_sets aponta para o catálogo, não para o
 // exercício do plano — 0009); estes testes fixam o caminho na tela.
 
-const { criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock, ultimasMock, lerSessaoMock } = vi.hoisted(() => ({
+const { estenderMock, criarMock, planoMock, logsMock, setsMock, updateMock, salvarMock, listarSeriesMock, ultimasMock, lerSessaoMock } = vi.hoisted(() => ({
   lerSessaoMock: vi.fn(),
+  estenderMock: vi.fn(),
   ultimasMock: vi.fn(),
   criarMock: vi.fn(),
   planoMock: vi.fn(),
@@ -76,6 +77,7 @@ vi.mock('../features/workout/hooks', () => ({
   useUpdateWorkoutLog: () => ({ mutateAsync: updateMock, isPending: false }),
   useSaveTrainerSession: () => ({ mutateAsync: salvarMock, isPending: false }),
   useDeleteWorkoutLog: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
+  useExtendWorkoutPlanWeeks: () => ({ mutate: estenderMock, isPending: false }),
 }))
 
 function plano(): WorkoutPlanDetail {
@@ -133,6 +135,7 @@ function adicionarCrucifixo() {
 
 beforeEach(() => {
   criarMock.mockReset().mockResolvedValue({ id: 'log-1' })
+  estenderMock.mockReset()
   planoMock.mockReset().mockReturnValue({ data: plano(), isPending: false, isError: false })
   logsMock.mockReset().mockReturnValue({ data: [], isPending: false, isError: false, refetch: vi.fn() })
   setsMock.mockReset().mockReturnValue({ data: [], isPending: false, isError: false })
@@ -267,12 +270,13 @@ describe('Execucao — exercício fora do plano', () => {
       { exercise_id: 'ex-1', performed_at: '2026-09-30', weight_kg: 55, reps: 8, rir: 1, reached_failure: false,
         sets: [
           { set_number: 1, weight_kg: 55, reps: 8, rir: 1, reached_failure: false },
-          { set_number: 2, weight_kg: 50, reps: 12, rir: null, reached_failure: true },
+          { set_number: 2, weight_kg: 50, reps: 12, rir: null, rest_seconds: 120, reached_failure: true },
         ] },
     ] })
     abrir()
     expect(screen.getByText('última: 55 kg × 8, RIR 1')).toBeTruthy()
-    expect(screen.getByText('última: 50 kg × 12, falha')).toBeTruthy()
+    // 0054: o descanso realizado daquela série vem junto
+    expect(screen.getByText('última: 50 kg × 12, falha · descanso 120s')).toBeTruthy()
   })
 
   it('não oferece exercício que já está na divisão do dia', () => {
@@ -745,7 +749,7 @@ describe('cronômetro de descanso', () => {
 
 // A semana gravada escolhe o override e segue para o histórico e o PDF.
 describe('semana digitada', () => {
-  it.each(['9', '0', '2.5'])('recusa semana fora do mesociclo (%s) sem apagar o preenchido', async (valor) => {
+  it.each(['0', '2.5', '53'])('recusa semana fora do mesociclo (%s) sem apagar o preenchido', async (valor) => {
     abrir() // plano de 4 semanas
     fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
     fireEvent.change(screen.getByLabelText('Semana'), { target: { value: valor } })
@@ -754,6 +758,50 @@ describe('semana digitada', () => {
       'Informe a semana com um número inteiro de 1 a 4, ou deixe em branco.')
     expect(criarMock).not.toHaveBeenCalled()
     expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  // Às vezes o aluno precisa de semanas além das planejadas: a semana 6 de
+  // um plano de 4 não é erro de digitação, é o plano que precisa crescer.
+  it('semana além do mesociclo oferece estender o plano até ela', async () => {
+    abrir() // plano de 4 semanas
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '6' } })
+    expect(screen.getByText(/O mesociclo tem 4 semanas\. Estendendo, a semana 6 entra no plano/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent',
+      'O mesociclo tem 4 semanas. Estenda o plano até a semana 6 ou corrija o número.')
+    expect(criarMock).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Estender para 6 semanas' }))
+    expect(estenderMock).toHaveBeenCalledWith(6, expect.anything())
+    expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
+  })
+
+  it('depois de estendido, a semana nova grava normalmente', async () => {
+    const detail = plano()
+    detail.plan!.weeks = 6
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '6' } })
+    expect(screen.queryByRole('button', { name: /Estender para/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(criarMock.mock.calls[0][0].weekNumber).toBe(6)
+  })
+
+  it('mesociclo encerrado oferece mais uma semana', () => {
+    const detail = plano()
+    detail.plan!.weeks = 1
+    planoMock.mockReturnValue({ data: detail, isPending: false, isError: false })
+    carregarSessao() // a única semana já fechou
+    abrir()
+    expect(screen.getByText(/era a última do mesociclo e já fechou/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Fazer mais uma semana' }))
+    expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('2')
+    expect(screen.getByRole('button', { name: 'Estender para 2 semanas' })).toBeTruthy()
+    expect(estenderMock).not.toHaveBeenCalled()
   })
 
   it('semana em branco continua permitida', async () => {

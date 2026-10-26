@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createCustomExercise,
   createWorkoutLog,
+  extendWorkoutPlanWeeks,
   createWorkoutPlan,
   clearExerciseVideo,
   deleteCustomExercise,
@@ -270,6 +271,18 @@ export function useSetWorkoutPlanStatus(
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
+    },
+  })
+}
+
+export function useExtendWorkoutPlanWeeks(planId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (weeks: number) => extendWorkoutPlanWeeks(planId as string, weeks),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
+      qc.invalidateQueries({ queryKey: ['workout-plans'] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }

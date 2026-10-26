@@ -723,7 +723,7 @@ export type SubjectLastSet = {
   rir: number | null
   reached_failure?: boolean | null
   // séries da mesma sessão (0048)
-  sets?: { set_number: number; weight_kg: number | null; reps: number | null; rir: number | null; reached_failure?: boolean | null }[] | null
+  sets?: { set_number: number; weight_kg: number | null; reps: number | null; rir: number | null; rest_seconds?: number | null; reached_failure?: boolean | null }[] | null
 }
 
 export async function listSubjectLastSets(subjectId: string): Promise<SubjectLastSet[]> {
@@ -900,6 +900,23 @@ export async function setWorkoutPlanStatus(id: string, status: string): Promise<
     .eq('id', id)
     .select('*')
     .single()
+  if (error) throw error
+  return data
+}
+
+// Mais semanas no mesociclo, direto da Execução: às vezes o aluno precisa de
+// uma ou duas além das planejadas. Só aumenta (`lt`): dois cliques, ou duas
+// abas, não encolhem o plano. As semanas novas usam a prescrição base, sem
+// override, e se ajustam no editor. Devolve null quando o plano já tinha
+// essas semanas.
+export async function extendWorkoutPlanWeeks(id: string, weeks: number): Promise<WorkoutPlanRow | null> {
+  const { data, error } = await supabase
+    .from('workout_plans')
+    .update({ weeks })
+    .eq('id', id)
+    .lt('weeks', weeks)
+    .select('*')
+    .maybeSingle()
   if (error) throw error
   return data
 }

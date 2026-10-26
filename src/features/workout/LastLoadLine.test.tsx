@@ -53,6 +53,22 @@ describe('última vez por série (0048)', () => {
     expect(previousSetText(previousSetAt(last, 3)!)).toBe('20 reps')
   })
 
+  it('descanso da última vez (0054): segundos, zero e não informado', () => {
+    const comDescanso = lastLoadFromServer({
+      weight_kg: 55, reps: 8, rir: 1, performed_at: '2026-09-30',
+      sets: [
+        { set_number: 1, weight_kg: 55, reps: 8, rir: 1, rest_seconds: 90 },
+        { set_number: 2, weight_kg: 50, reps: 10, rir: null, rest_seconds: 0, reached_failure: true },
+        { set_number: 3, weight_kg: 50, reps: 9, rir: 2, rest_seconds: null },
+      ],
+    })
+    expect(previousSetText(previousSetAt(comDescanso, 0)!)).toBe('55 kg × 8, RIR 1 · descanso 90s')
+    expect(previousSetText(previousSetAt(comDescanso, 1)!)).toBe('50 kg × 10, falha · sem descanso')
+    expect(previousSetText(previousSetAt(comDescanso, 2)!)).toBe('50 kg × 9, RIR 2')
+    // pacote da 0048, sem o campo: nada de descanso inventado
+    expect(previousSetAt(last, 0)?.restSeconds).toBeNull()
+  })
+
   it('pacote de antes da 0048 vem sem séries e não quebra', () => {
     const antigo = lastLoadFromServer({ weight_kg: 40, reps: 12, rir: 2, performed_at: '2026-09-30' })
     expect(antigo.sets).toEqual([])
