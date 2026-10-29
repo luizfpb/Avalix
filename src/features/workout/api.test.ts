@@ -185,7 +185,16 @@ describe('updateWorkoutLog', () => {
     })
     const args = mocks.rpc.mock.calls[0][1]
     expect(args).not.toHaveProperty('p_notes')
+    expect(args).not.toHaveProperty('p_week_number')
     expect(args.p_sets[0]).toMatchObject({ rir: 0, rest_seconds: null, reached_failure: null })
+  })
+
+  it('manda a semana corrigida quando ela mudou', async () => {
+    await updateWorkoutLog({
+      id: 'log-1', expectedUpdatedAt: '2026-09-08T10:00:00Z', performedAt: '2026-09-08', notes: null,
+      weekNumber: 2, sets: [{ exerciseId: 'ex-1', setNumber: 1, weightKg: 40, reps: 10, rir: 1 }],
+    })
+    expect(mocks.rpc.mock.calls[0][1]).toMatchObject({ p_week_number: 2 })
   })
 
   it('propaga conflito de edição sem criar outra sessão ou tentar sobrescrever', async () => {

@@ -20,6 +20,8 @@ export type EditableSessionSet = {
 }
 export type SessionEditValues = {
   performedAt: string
+  // Só vem quando mudou; ausente mantém a semana registrada (0055).
+  weekNumber?: number
   notes: string | null
   sets: EditableSessionSet[]
 }
@@ -44,9 +46,12 @@ function initialExercises(sets: EditableSessionSet[]): Exercise[] {
 
 const numberOrNull = (value: string | undefined) => value?.trim() ? Number(value) : null
 
-export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, exerciseOptions = [] }: {
+export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeeks = null, notes, onSave, onCancel, exerciseOptions = [] }: {
   sets: EditableSessionSet[]
   performedAt: string
+  weekNumber?: number | null
+  // Total do mesociclo do plano da sessão; sem ele o banco confere sozinho.
+  planWeeks?: number | null
   notes: string | null
   onSave: (value: SessionEditValues) => Promise<void>
   onCancel: () => void
@@ -56,6 +61,7 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
   const dialog = useRef<HTMLDialogElement>(null)
   const [exercises, setExercises] = useState(() => initialExercises(sets))
   const [date, setDate] = useState(performedAt)
+  const [week, setWeek] = useState(weekNumber == null ? '' : String(weekNumber))
   const [text, setText] = useState(notes ?? '')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -64,6 +70,9 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
   const [choice, setChoice] = useState('')
   const maxSets = Math.max(60, sets.length)
   const maxNotes = Math.max(600, notes?.length ?? 0)
+  // A semana já gravada continua válida mesmo se o plano encolheu depois.
+  const maxWeek = planWeeks == null ? null : Math.max(planWeeks, weekNumber ?? 0)
+  const showWeek = weekNumber != null || planWeeks != null
   const available = [...new Map(exerciseOptions.map((ex) => [ex.id, ex])).values()]
     .filter((ex) => !exercises.some((existing) => existing.id === ex.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
@@ -118,9 +127,17 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
     }
     if (parsed.length === 0 || parsed.length > maxSets) return setError(`Mantenha entre 1 e ${maxSets} séries no treino.`)
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('Informe a data do treino.')
+    const weekValue = numberOrNull(week)
+    if (weekValue == null && weekNumber != null) return setError('Informe a semana do mesociclo.')
+    if (weekValue != null && (!Number.isInteger(weekValue) || weekValue < 1 || (maxWeek != null && weekValue > maxWeek))) {
+      return setError(maxWeek != null
+        ? `Informe uma semana entre 1 e ${maxWeek}, o total do mesociclo.`
+        : 'Informe uma semana inteira a partir de 1.')
+    }
     setSaving(true)
     try {
-      await onSave({ performedAt: date, notes: text.trim() || null, sets: parsed })
+      await onSave({ performedAt: date, notes: text.trim() || null, sets: parsed,
+        ...(weekValue != null && weekValue !== weekNumber ? { weekNumber: weekValue } : {}) })
       setDirty(false)
     } catch (cause) {
       setError(cause && typeof cause === 'object' && 'message' in cause && !(cause instanceof TypeError)
@@ -141,10 +158,21 @@ export function SessionEditForm({ sets, performedAt, notes, onSave, onCancel, ex
             <p className="mt-1 text-xs text-muted-foreground">As correções são salvas nesta sessão.</p>
           </div>
           <fieldset disabled={saving} className="min-w-0 space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor={`${id}-date`}>Data do treino</Label>
-              <Input id={`${id}-date`} type="date" value={date}
-                onChange={(event) => { setDate(event.target.value); setDirty(true) }} />
+            <div className="flex flex-wrap gap-3">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label htmlFor={`${id}-date`}>Data do treino</Label>
+                <Input id={`${id}-date`} type="date" value={date}
+                  onChange={(event) => { setDate(event.target.value); setDirty(true) }} />
+              </div>
+              {showWeek ? (
+                <div className="w-36 space-y-1.5">
+                  <Label htmlFor={`${id}-week`}>Semana do mesociclo</Label>
+                  <Input id={`${id}-week`} type="number" inputMode="numeric" min={1} max={maxWeek ?? undefined} step={1}
+                    value={week} aria-describedby={maxWeek != null ? `${id}-week-hint` : undefined}
+                    onChange={(event) => { setWeek(event.target.value); setDirty(true) }} />
+                  {maxWeek != null ? <p id={`${id}-week-hint`} className="text-xs text-muted-foreground">de {maxWeek}</p> : null}
+                </div>
+              ) : null}
             </div>
             <p className="text-xs text-muted-foreground">RIR 0: não faria outra repetição. Marque Falha se tentou e não conseguiu completá-la.</p>
             {exercises.map((ex) => (

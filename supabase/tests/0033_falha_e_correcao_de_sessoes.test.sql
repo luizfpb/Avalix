@@ -13,13 +13,13 @@ select plan(54);
 select col_type_is('public', 'workout_log_sets', 'reached_failure', 'boolean', 'falha é boolean explícito');
 select col_is_null('public', 'workout_log_sets', 'reached_failure', 'falha desconhecida continua NULL');
 select ok(
-  not has_function_privilege('anon', 'public.update_workout_log(uuid,timestamptz,jsonb,date,text)', 'execute')
-  and has_function_privilege('authenticated', 'public.update_workout_log(uuid,timestamptz,jsonb,date,text)', 'execute')
-  and not (select prosecdef from pg_proc where oid = 'public.update_workout_log(uuid,timestamptz,jsonb,date,text)'::regprocedure),
+  not has_function_privilege('anon', 'public.update_workout_log(uuid,timestamptz,jsonb,date,text,int)', 'execute')
+  and has_function_privilege('authenticated', 'public.update_workout_log(uuid,timestamptz,jsonb,date,text,int)', 'execute')
+  and not (select prosecdef from pg_proc where oid = 'public.update_workout_log(uuid,timestamptz,jsonb,date,text,int)'::regprocedure),
   'edição profissional preserva invoker/RLS e é fechada para anon'
 );
 select ok(
-  has_function_privilege('anon', 'public.update_workout_session_for_link(text,uuid,timestamptz,jsonb,date,text)', 'execute')
+  has_function_privilege('anon', 'public.update_workout_session_for_link(text,uuid,timestamptz,jsonb,date,text,int)', 'execute')
   -- pelo nome: 0038 e 0039 recriam o helper com mais argumentos
   and not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

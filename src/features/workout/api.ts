@@ -559,6 +559,8 @@ export type UpdateWorkoutLogInput = {
   id: string
   expectedUpdatedAt: string
   performedAt: string
+  // Ausente mantém a semana registrada (0055).
+  weekNumber?: number | null
   notes: string | null
   sets: NewLogSet[]
 }
@@ -602,7 +604,7 @@ export async function createWorkoutLog(input: CreateWorkoutLogInput): Promise<Wo
 // versão com que o editor abriu. Uma consulta atualizada em segundo plano não
 // pode autorizar a sobreposição de dados que o profissional ainda não viu.
 export async function updateWorkoutLog(input: UpdateWorkoutLogInput): Promise<WorkoutLogRow> {
-  // Contrato restrito da RPC nova até regenerar database.types após a 0033.
+  // Contrato restrito da RPC até regenerar database.types após a 0055.
   const client = supabase as unknown as {
     rpc(name: 'update_workout_log', args: {
       p_log: string
@@ -610,6 +612,7 @@ export async function updateWorkoutLog(input: UpdateWorkoutLogInput): Promise<Wo
       p_performed_at: string
       p_sets: Json
       p_notes?: string
+      p_week_number?: number
     }): PromiseLike<{ data: WorkoutLogRow | null; error: unknown }>
   }
   const { data, error } = await client.rpc('update_workout_log', {
@@ -618,6 +621,7 @@ export async function updateWorkoutLog(input: UpdateWorkoutLogInput): Promise<Wo
     p_performed_at: input.performedAt,
     p_sets: logSetsPayload(input.sets),
     ...(input.notes != null ? { p_notes: input.notes } : {}),
+    ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
   })
   if (error) throw error
   if (!data) throw new Error('Não foi possível confirmar a edição do treino.')

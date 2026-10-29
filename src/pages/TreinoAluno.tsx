@@ -740,6 +740,10 @@ export default function TreinoAluno() {
       {aba === 'historico' ? (
         <Historico token={token} scope={scope} access={storageAccess.current!} onLinkInvalid={invalidarAcesso}
           planId={pacote.plan?.id ?? null}
+          planWeeks={Object.fromEntries([
+            ...pacote.history_plans.map((p) => [p.id, p.weeks] as const),
+            ...(pacote.plan ? [[pacote.plan.id, pacote.plan.weeks] as const] : []),
+          ])}
           exerciseOptions={pacote.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))}
           onEdited={async () => {
             const epoch = accessEpoch.current
@@ -2257,6 +2261,7 @@ function Historico({
   onLinkInvalid,
   onEdited,
   planId,
+  planWeeks,
   exerciseOptions,
 }: {
   token: string
@@ -2265,6 +2270,8 @@ function Historico({
   onLinkInvalid: () => Promise<void>
   onEdited: () => Promise<void>
   planId: string | null
+  // Total do mesociclo por plano, para a correção limitar a semana.
+  planWeeks: Record<string, number>
   exerciseOptions: { id: string; name: string }[]
 }) {
   const [sessoes, setSessoes] = useState<StudentHistorySession[] | null>(null)
@@ -2360,6 +2367,7 @@ function Historico({
         logId: editing.id,
         expectedUpdatedAt: editing.updated_at,
         performedAt: value.performedAt,
+        weekNumber: value.weekNumber,
         notes: value.notes,
         sets: value.sets.map((s) => ({ exercise_id: s.exerciseId, set_number: s.setNumber,
           weight_kg: s.weightKg, reps: s.reps, rir: s.rir,
@@ -2432,6 +2440,8 @@ function Historico({
       {savedMessage ? <p role="status" className="text-sm text-primary">{savedMessage}</p> : null}
       {editing ? (
         <SessionEditForm performedAt={editing.performed_at} notes={editing.notes}
+          weekNumber={editing.week_number}
+          planWeeks={editing.plan_id ? planWeeks[editing.plan_id] ?? null : null}
           exerciseOptions={editingOptions}
           sets={editing.sets.map((s) => ({ exerciseId: s.exercise_id, exerciseName: s.exercise_name,
             setNumber: s.set_number, weightKg: s.weight_kg, reps: s.reps, rir: s.rir,

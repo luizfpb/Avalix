@@ -302,6 +302,8 @@ export type UpdateSessionForLinkInput = {
   logId: string
   expectedUpdatedAt: string
   performedAt: string
+  // Ausente mantém a semana registrada (0055).
+  weekNumber?: number | null
   notes: string | null
   sets: SubmitSet[]
 }
@@ -319,6 +321,7 @@ export async function updateSessionForLink(
       p_sets: SubmitSet[]
       p_performed_at: string
       p_notes?: string
+      p_week_number?: number
     }): { abortSignal(signal: AbortSignal): PromiseLike<{ data: unknown; error: unknown }> }
   }
   const { data, error } = await client.rpc('update_workout_session_for_link', {
@@ -328,6 +331,7 @@ export async function updateSessionForLink(
     p_sets: input.sets,
     p_performed_at: input.performedAt,
     ...(input.notes != null ? { p_notes: input.notes } : {}),
+    ...(input.weekNumber != null ? { p_week_number: input.weekNumber } : {}),
   }).abortSignal(deadline(WRITE_TIMEOUT_MS))
   if (error) throw error
   if (!data) throw new Error('Não foi possível confirmar a edição deste treino.')

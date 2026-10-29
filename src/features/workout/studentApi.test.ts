@@ -136,6 +136,14 @@ describe('falha e correção de treino salvo', () => {
     }))
   })
 
+  it('inclui a semana na correção quando ela mudou', async () => {
+    mocks.rpc.mockResolvedValue({ data: edited, error: null })
+    await updateSessionForLink({ ...input, weekNumber: 2 })
+    expect(mocks.rpc).toHaveBeenCalledWith('update_workout_session_for_link', expect.objectContaining({
+      p_week_number: 2,
+    }))
+  })
+
   it('propaga conflito de versão e nunca confirma uma resposta vazia como sucesso', async () => {
     const conflict = { message: 'Este treino foi alterado. Atualize e tente novamente.' }
     mocks.rpc.mockResolvedValueOnce({ data: null, error: conflict })

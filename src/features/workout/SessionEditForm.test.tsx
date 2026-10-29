@@ -66,6 +66,52 @@ describe('SessionEditForm', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalled())
     expect(onSave.mock.calls[0][0].sets).toHaveLength(61)
   })
+  it('corrige a semana do mesociclo marcada errado', async () => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={3} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    const week = editor.getByLabelText('Semana do mesociclo')
+    expect(week).toHaveProperty('value', '3')
+    fireEvent.change(week, { target: { value: '2' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0].weekNumber).toBe(2)
+  })
+
+  it('não manda a semana quando ela não mudou', async () => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={3} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    fireEvent.change(editor.getByLabelText('Observações'), { target: { value: 'Só a nota' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('weekNumber')
+  })
+
+  it.each(['0', '5', '2.5', ''])('recusa semana fora do mesociclo (%s) sem perder o preenchido', async (valor) => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={3} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    fireEvent.change(editor.getByLabelText('Semana do mesociclo'), { target: { value: valor } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    expect((await editor.findByRole('alert')).textContent).toMatch(/semana/)
+    expect(onSave).not.toHaveBeenCalled()
+    expect(editor.getByLabelText('Semana do mesociclo')).toHaveProperty('value', valor)
+  })
+
+  it('mantém válida a semana gravada além de um plano que encolheu', async () => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={6} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    fireEvent.change(editor.getByLabelText('Observações'), { target: { value: 'Corrigido' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+  })
+
+  it('sessão sem semana e sem plano conhecido não mostra o campo', () => {
+    open()
+    expect(screen.queryByLabelText('Semana do mesociclo')).toBeNull()
+  })
 })
 
 // O editor é desmontado pelo pai com o <dialog> aberto, sem passar pelo

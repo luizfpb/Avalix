@@ -1240,6 +1240,17 @@ describe('TreinoAluno — editar sessão enviada', () => {
     expect(enqueueMock).not.toHaveBeenCalled()
   })
 
+  it('corrige a semana do mesociclo marcada errado', async () => {
+    const editor = await abrirEditor()
+    const week = editor.getByLabelText('Semana do mesociclo')
+    expect(week).toHaveProperty('value', '1')
+    expect(week).toHaveProperty('max', '8')
+    fireEvent.change(week, { target: { value: '2' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(updateSessionMock).toHaveBeenCalled())
+    expect(updateSessionMock.mock.calls[0][0]).toMatchObject({ logId: 'h1', weekNumber: 2 })
+  })
+
   it.each([
     { message: 'registro de treino alterado por outra pessoa; recarregue antes de salvar' },
     new TypeError('Failed to fetch'),

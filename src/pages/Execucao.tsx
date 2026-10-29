@@ -329,6 +329,7 @@ export default function Execucao() {
                     key={log.id}
                     log={log}
                     names={names}
+                    planWeeks={plan.weeks}
                     aberto={openLogId === log.id}
                     onAlternar={() => setOpenLogId(openLogId === log.id ? null : log.id)}
                     onExcluir={() => setConfirmLogId(log.id)}
@@ -410,6 +411,7 @@ export default function Execucao() {
 function LogRowItem({
   log,
   names,
+  planWeeks,
   aberto,
   onAlternar,
   onExcluir,
@@ -417,6 +419,7 @@ function LogRowItem({
 }: {
   log: WorkoutLogRow
   names: Record<string, string>
+  planWeeks: number
   aberto: boolean
   onAlternar: () => void
   onExcluir: () => void
@@ -450,6 +453,7 @@ function LogRowItem({
       id: log.id,
       expectedUpdatedAt: editing.expectedUpdatedAt,
       performedAt: value.performedAt,
+      weekNumber: value.weekNumber,
       notes: value.notes,
       sets: value.sets.map((set) => ({
         exerciseId: set.exerciseId,
@@ -529,6 +533,8 @@ function LogRowItem({
             <SessionEditForm
               sets={editing.sets}
               performedAt={editing.performedAt}
+              weekNumber={log.week_number}
+              planWeeks={planWeeks}
               notes={editing.notes}
               exerciseOptions={Object.entries(names).map(([id, name]) => ({ id, name }))}
               onSave={saveEdit}

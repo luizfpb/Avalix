@@ -580,6 +580,24 @@ describe('Execucao — editar sessão enviada', () => {
     expect(screen.queryByRole('dialog', { name: 'Editar treino' })).toBeNull()
   })
 
+  it('corrige a semana do mesociclo marcada errado, dentro do total do plano', async () => {
+    carregarSessao()
+    abrir()
+    const editor = editarSessao()
+    const week = editor.getByLabelText('Semana do mesociclo')
+    expect(week).toHaveProperty('value', '1')
+    fireEvent.change(week, { target: { value: '5' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    expect((await editor.findByRole('alert')).textContent).toMatch(/entre 1 e 4/)
+    expect(updateMock).not.toHaveBeenCalled()
+
+    fireEvent.change(week, { target: { value: '2' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await screen.findByText('Treino atualizado!')
+    expect(updateMock.mock.calls[0][0]).toMatchObject({ id: 'log-1', weekNumber: 2 })
+    expect(criarMock).not.toHaveBeenCalled()
+  })
+
   it('mantém a versão de abertura após atualizar a lista e preserva correções recusadas', async () => {
     carregarSessao()
     const router = abrir()
