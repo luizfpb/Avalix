@@ -44,6 +44,20 @@ function temConteudo(rows: DraftRow[] | undefined): boolean {
   return (rows ?? []).some((r) => !isEmptyLogRow(r))
 }
 
+// Exercício avulso tirado do CATÁLOGO (0056), e não de outra divisão do plano.
+// A chave de `rows`/`extras` carrega o id do catálogo, que não muda quando o
+// plano é regravado: a reconciliação mantém essas linhas como estão.
+export const CHAVE_CATALOGO = 'cat:'
+
+export function chaveDoCatalogo(exerciseId: string): string {
+  return `${CHAVE_CATALOGO}${exerciseId}`
+}
+
+/** id do catálogo de uma chave `cat:<id>`, ou null para linha do plano */
+export function exercicioDaChave(chave: string): string | null {
+  return chave.startsWith(CHAVE_CATALOGO) ? chave.slice(CHAVE_CATALOGO.length) || null : null
+}
+
 function preenchidas(rows: DraftRow[] | undefined): number {
   return (rows ?? []).filter((r) => !isEmptyLogRow(r)).length
 }
@@ -111,6 +125,11 @@ export function reconciliarRascunho(
   let remapeado = draft.dayId !== dayId
 
   for (const [chave, linhas] of Object.entries(draft.rows ?? {})) {
+    if (exercicioDaChave(chave)) {
+      rows[chave] = linhas
+      destinoDe.set(chave, chave)
+      continue
+    }
     const catalogo = identity?.rowExercises?.[chave]
     const alvo = catalogo
       ? (noDia.get(catalogo) ?? noPlano.get(catalogo))
@@ -134,7 +153,7 @@ export function reconciliarRascunho(
   //    passaram a estar fora dela por causa da edição do plano.
   const extras = new Set<string>()
   for (const antigo of draft.extras ?? []) {
-    const novo = destinoDe.get(antigo)
+    const novo = exercicioDaChave(antigo) ? antigo : destinoDe.get(antigo)
     if (novo) extras.add(novo)
   }
   for (const [antigo, novo] of destinoDe) {

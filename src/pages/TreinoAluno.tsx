@@ -66,7 +66,10 @@ import {
   type StudentStorageAccess,
   type DraftSession,
 } from '../features/workout/studentStore'
-import { identidadeDaSessao } from '../features/workout/studentDraft'
+import { chaveDoCatalogo, exercicioDaChave, identidadeDaSessao } from '../features/workout/studentDraft'
+import { StudentExtraPicker, type StudentExtraOption } from '../features/workout/StudentExtraPicker'
+import { MUSCLE_LABELS } from '../features/workout/volume/labels'
+import type { MuscleGroup } from '../features/workout/volume/types'
 import { applyStudentManifest } from '../features/workout/studentPwa'
 import {
   effectivePrescription,
@@ -675,7 +678,10 @@ export default function TreinoAluno() {
         sincronizadoEm={sincronizadoEm}
         fila={fila}
         erro={erroFila}
-        nomes={Object.fromEntries(pacote.exercises.map((ex) => [ex.exercise_id, ex.name]))}
+        nomes={Object.fromEntries([
+          ...(pacote.catalog ?? []).map((ex) => [ex.id, ex.name]),
+          ...pacote.exercises.map((ex) => [ex.exercise_id, ex.name]),
+        ])}
         onEnviar={() => void enviarFila(true)}
         onDescartar={(clientRef) => {
           if (!scope) return
@@ -1154,12 +1160,12 @@ function TreinoDoDia({
   // continua do lado, para quem tem algo a contar.
   const [sensacao, setSensacao] = useState<number | null>(null)
   const [linhas, setLinhas] = useState<Record<string, Linha[]>>({})
-  // Exercícios de outra divisão do plano feitos nesta sessão: equipamento
-  // ocupado, dor no dia, troca combinada na hora. Guardamos o id do exercício
-  // DO PLANO — é a mesma chave de `linhas` e o buildSets já sabe traduzir para
-  // o exercício do catálogo.
+  // Exercícios fora da prescrição do dia feitos nesta sessão: equipamento
+  // ocupado, dor no dia, troca combinada na hora, um exercício a mais. A chave
+  // é o id do exercício DO PLANO (quando veio de outra divisão) ou
+  // `cat:<id do catálogo>` (0056) — é a mesma chave de `linhas`, e o buildSets
+  // traduz as duas para o exercício do catálogo.
   const [extras, setExtras] = useState<string[]>([])
-  const [escolhaExtra, setEscolhaExtra] = useState('')
   const [clientRef, setClientRef] = useState<string>(() => crypto.randomUUID())
   const revision = useRef(0)
   const revisions = useRef(new Map<string, number>())
@@ -1202,29 +1208,62 @@ function TreinoDoDia({
     [pacote.exercises, dayId]
   )
 
+  const catalogo = useMemo(() => pacote.catalog ?? [], [pacote.catalog])
+
   // Um plano editado pode ter perdido o exercício que estava no rascunho; o
-  // filter é o que impede a tela de quebrar nesse caso.
+  // filter é o que impede a tela de quebrar nesse caso. O do catálogo vira uma
+  // linha sem prescrição: 3 séries para começar, e o aluno acrescenta ou deixa
+  // em branco o que não fez.
   const exerciciosExtras = useMemo(
     () =>
       extras
-        .map((id) => pacote.exercises.find((e) => e.id === id))
+        .map((id): StudentExercise | undefined => {
+          const doCatalogo = exercicioDaChave(id)
+          if (!doCatalogo) return pacote.exercises.find((e) => e.id === id)
+          const item = catalogo.find((e) => e.id === doCatalogo)
+          if (!item) return undefined
+          return {
+            id, day_id: '', exercise_id: item.id, name: item.name, position: 0,
+            sets: 3, reps: null, rir: null, rest_seconds: null, tempo: null, notes: null,
+          }
+        })
         .filter((e): e is StudentExercise => e != null),
-    [extras, pacote.exercises]
+    [extras, pacote.exercises, catalogo]
   )
 
-  // Só exercícios de OUTRAS divisões, e nenhum movimento repetido na sessão: o
-  // mesmo exercício duas vezes faria as duas grades numerarem a série 1 e o
-  // servidor recusaria o envio inteiro por série repetida.
-  const opcoesExtras = useMemo(() => {
+  // Nenhum movimento repetido na sessão: o mesmo exercício duas vezes faria as
+  // duas grades numerarem a série 1 e o servidor recusaria o envio inteiro por
+  // série repetida. O que está em outra divisão do plano entra pela linha do
+  // plano (traz a prescrição de lá); o resto do catálogo, pela chave `cat:`.
+  const opcoesExtras = useMemo((): StudentExtraOption[] => {
     const usados = new Set([
       ...exerciciosDoDia.map((e) => e.exercise_id),
       ...exerciciosExtras.map((e) => e.exercise_id),
     ])
-    return pacote.exercises
-      .filter((e) => e.day_id !== dayId && !usados.has(e.exercise_id))
+    const opcoes: StudentExtraOption[] = []
+    const doPlano = new Set<string>()
+    for (const e of pacote.exercises
+      .filter((x) => x.day_id !== dayId)
       .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-  }, [pacote.exercises, dayId, exerciciosDoDia, exerciciosExtras])
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
+      if (usados.has(e.exercise_id) || doPlano.has(e.exercise_id)) continue
+      doPlano.add(e.exercise_id)
+      const origem = dias.find((d) => d.id === e.day_id)
+      const apelidos = catalogo.find((c) => c.id === e.exercise_id)?.aliases
+      opcoes.push({
+        key: e.id, name: e.name, aliases: apelidos,
+        detail: origem ? `treino ${origem.label}` : null, fromPlan: true,
+      })
+    }
+    for (const c of catalogo) {
+      if (usados.has(c.id) || doPlano.has(c.id)) continue
+      opcoes.push({
+        key: chaveDoCatalogo(c.id), name: c.name, aliases: c.aliases,
+        detail: MUSCLE_LABELS[c.primary_muscle as MuscleGroup] ?? null, fromPlan: false,
+      })
+    }
+    return opcoes
+  }, [pacote.exercises, catalogo, dias, dayId, exerciciosDoDia, exerciciosExtras])
 
   const indice = useMemo(
     () => overrideIndex(pacote.overrides as unknown as WorkoutWeekOverrideRow[]),
@@ -1428,7 +1467,6 @@ function TreinoDoDia({
     if (!exId) return
     setDirty(true)
     setExtras((anterior) => (anterior.includes(exId) ? anterior : [...anterior, exId]))
-    setEscolhaExtra('')
   }
 
   function removerExtra(exId: string) {
@@ -1523,7 +1561,6 @@ function TreinoDoDia({
       setSensacao(target?.feel ?? null)
       setLinhas(target?.rows ?? {})
       setExtras(target?.extras ?? [])
-      setEscolhaExtra('')
       setClientRef(target?.clientRef ?? crypto.randomUUID())
       revision.current = target?.revision ?? 0
       if (target) revisions.current.set(target.clientRef, revision.current)
@@ -1741,7 +1778,6 @@ function TreinoDoDia({
     setSensacao(null)
     setLinhas({})
     setExtras([])
-    setEscolhaExtra('')
     setDirty(false)
     setCronometro(null)
     setPlanoMudou(null)
@@ -2018,7 +2054,7 @@ function TreinoDoDia({
                 <span className="text-sm font-medium">
                   {ex.name}
                   <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                    trocado{origem ? ` · do treino ${origem.label}` : ''}
+                    fora do treino de hoje{origem ? ` · do treino ${origem.label}` : ''}
                   </span>
                 </span>
                 <button
@@ -2064,42 +2100,11 @@ function TreinoDoDia({
           dor no dia, fila. Sem esta saída, o que foi feito de verdade ficava
           fora do registro — ou pior, digitado na linha do exercício errado. */}
       {opcoesExtras.length > 0 ? (
-        <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
-          <Label htmlFor="aluno-extra" className="text-xs">
-            Trocou algum exercício?
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Escolha o que você fez no lugar. A lista traz os exercícios das outras divisões do seu
-            treino.
-          </p>
-          <div className="flex gap-2">
-            <select
-              id="aluno-extra"
-              className={controlClass}
-              value={escolhaExtra}
-              disabled={switchingSession || salvando !== null}
-              onChange={(e) => setEscolhaExtra(e.target.value)}
-            >
-              <option value="">Escolher exercício...</option>
-              {opcoesExtras.map((e) => {
-                const origem = dias.find((d) => d.id === e.day_id)
-                return (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                    {origem ? ` (treino ${origem.label})` : ''}
-                  </option>
-                )
-              })}
-            </select>
-            <Button
-              variant="outline"
-              disabled={!escolhaExtra || switchingSession || salvando !== null}
-              onClick={() => adicionarExtra(escolhaExtra)}
-            >
-              Adicionar
-            </Button>
-          </div>
-        </div>
+        <StudentExtraPicker
+          options={opcoesExtras}
+          disabled={switchingSession || salvando !== null}
+          onPick={adicionarExtra}
+        />
       ) : null}
 
       {/* Um toque no lugar de digitar. O texto livre quase nunca era

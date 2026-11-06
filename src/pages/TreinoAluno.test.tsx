@@ -1037,10 +1037,8 @@ describe('TreinoAluno', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       await abrir()
-      fireEvent.change(screen.getByLabelText('Trocou algum exercício?'), {
-        target: { value: 'we2' },
-      })
-      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar exercício' }))
+      fireEvent.click(screen.getByRole('button', { name: /Agachamento/ }))
       await screen.findByLabelText(/Carga da série 1 de Agachamento/)
 
       // só o debounce do autosave, sem passar por "Salvar progresso"
@@ -1317,9 +1315,9 @@ describe('TreinoAluno — editar sessão enviada', () => {
 })
 
 // Aparelho ocupado, dor no dia, fila na academia: a troca acontece e precisa
-// caber no registro. Sem link para o catálogo, o aluno escolhe entre os
-// exercícios das OUTRAS divisões do próprio plano — o pacote já os traz, então
-// funciona offline como o resto da tela.
+// caber no registro. Sem busca, o seletor mostra os exercícios das OUTRAS
+// divisões do próprio plano; digitando, procura no catálogo da academia que
+// vem no pacote (0056). Os dois funcionam offline, como o resto da tela.
 describe('TreinoAluno — troca de exercício', () => {
   function pacoteDoisDias() {
     const base = pacote()
@@ -1348,11 +1346,20 @@ describe('TreinoAluno — troca de exercício', () => {
   }
 
   async function trocar() {
-    fireEvent.change(screen.getByLabelText('Trocou algum exercício?'), {
-      target: { value: 'we2' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar exercício' }))
+    fireEvent.click(screen.getByRole('button', { name: /Leg press/ }))
     return screen.findByLabelText(/Carga da série 1 de Leg press/)
+  }
+
+  const catalogo = [
+    { id: 'x1', name: 'Supino reto', primary_muscle: 'chest', aliases: [] },
+    { id: 'x2', name: 'Leg press', primary_muscle: 'quads', aliases: [] },
+    { id: 'x9', name: 'Rosca direta', primary_muscle: 'biceps', aliases: ['rosca com barra'] },
+  ]
+
+  function buscar(texto: string) {
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar exercício' }))
+    fireEvent.change(screen.getByLabelText('Adicionar exercício'), { target: { value: texto } })
   }
 
   it('envia o exercício trocado junto com o do dia, numerado por exercício', async () => {
@@ -1395,17 +1402,66 @@ describe('TreinoAluno — troca de exercício', () => {
     await abrir()
     await trocar()
 
-    expect(screen.queryByRole('option', { name: /Leg press/ })).toBeNull()
+    // sem outro exercício para oferecer, o seletor nem aparece
+    expect(screen.queryByRole('button', { name: 'Adicionar exercício' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Tirar Leg press deste treino' }))
-    await waitFor(() =>
-      expect(screen.getByRole('option', { name: /Leg press/ })).toBeTruthy()
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Adicionar exercício' }))
+    expect(screen.getByRole('button', { name: /Leg press/ })).toBeTruthy()
     expect(screen.queryByLabelText(/Carga da série 1 de Leg press/)).toBeNull()
   })
 
-  it('plano de uma divisão só não mostra a troca', async () => {
+  it('pacote sem catálogo (guardado antes da 0056) e de uma divisão só não mostra o seletor', async () => {
     await abrir()
-    expect(screen.queryByLabelText('Trocou algum exercício?')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Adicionar exercício' })).toBeNull()
+  })
+
+  it('plano de uma divisão só busca no catálogo e envia com o id do catálogo', async () => {
+    getWorkoutMock.mockResolvedValue(pacote({ catalog: catalogo }))
+    await abrir()
+    // "re" bate no supino e na rosca, mas o supino já está no dia e não é
+    // oferecido de novo
+    buscar('re')
+    const lista = screen.getByRole('list', { name: 'Exercícios encontrados' })
+    expect(within(lista).queryByRole('button', { name: /Supino reto/ })).toBeNull()
+    fireEvent.click(within(lista).getByRole('button', { name: /Rosca direta/ }))
+
+    fireEvent.change(await screen.findByLabelText(/Carga da série 1 de Rosca direta/), {
+      target: { value: '12' },
+    })
+    fireEvent.change(screen.getByLabelText(/Repetições da série 1 de Rosca direta/), {
+      target: { value: '10' },
+    })
+    expect(screen.getByLabelText(/Carga da série 3 de Rosca direta/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir treino' }))
+
+    await waitFor(() => expect(submitMock).toHaveBeenCalled())
+    expect(submitMock.mock.calls[0][0].sets).toEqual([
+      { exercise_id: 'x9', set_number: 1, weight_kg: 12, reps: 10, rir: null, rest_seconds: null, reached_failure: false },
+    ])
+  })
+
+  it('acha pelo apelido e guarda a escolha do catálogo no rascunho', async () => {
+    getWorkoutMock.mockResolvedValue(pacote({ catalog: catalogo }))
+    await abrir()
+    fireEvent.change(await campoCarga(), { target: { value: '40' } })
+    buscar('barra')
+    fireEvent.click(screen.getByRole('button', { name: /Rosca direta/ }))
+    await screen.findByLabelText(/Carga da série 1 de Rosca direta/)
+    fireEvent.click(screen.getByRole('button', { name: /Parar por aqui/ }))
+
+    await waitFor(() => expect(reserveDraftRevisionMock).toHaveBeenCalled())
+    expect(reserveDraftRevisionMock.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ extras: ['cat:x9'] })
+    )
+  })
+
+  it('o exercício de outra divisão aparece uma vez só, pela linha do plano', async () => {
+    getWorkoutMock.mockResolvedValue({ ...pacoteDoisDias(), catalog: catalogo })
+    await abrir()
+    buscar('leg')
+    expect(screen.getAllByRole('button', { name: /Leg press/ })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /Leg press/ }))
+    expect(await screen.findByText(/do treino B/)).toBeTruthy()
   })
 })
 

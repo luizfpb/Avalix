@@ -113,6 +113,17 @@ export type StudentWorkout = {
   overrides: StudentOverride[]
   last_sets: StudentLastSet[]
   history_plans: StudentHistoryPlan[]
+  // Catálogo que a org enxerga (0056), para o aluno registrar exercício fora
+  // da prescrição. Opcional: pacote guardado no aparelho antes da 0056 não
+  // tem o campo, e a tela cai nos exercícios das outras divisões do plano.
+  catalog?: StudentCatalogExercise[]
+}
+
+export type StudentCatalogExercise = {
+  id: string
+  name: string
+  primary_muscle: string
+  aliases?: string[] | null
 }
 
 // Um plano anterior aberto sob demanda: mesma forma, sem histórico agregado.

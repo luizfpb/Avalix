@@ -43,6 +43,36 @@ function rascunho(patch: Partial<DraftSession> = {}): DraftSession {
 }
 
 describe('reconciliarRascunho', () => {
+  // 0056: o avulso tirado do catálogo tem chave `cat:<id>`, que não depende
+  // dos ids do plano. A regravação do plano não pode levar essas séries.
+  it('mantém o avulso do catálogo quando o plano é regravado', () => {
+    const draft = rascunho({
+      rows: {
+        we1: [{ weight: '40', reps: '10', rir: '2' }],
+        'cat:cat-rosca': [{ weight: '12', reps: '10', rir: '' }],
+      },
+      extras: ['cat:cat-rosca'],
+    })
+    const plano: PlanoVigente = {
+      days: [{ ...DIA_A, id: 'd1-novo' }],
+      exercises: [ex({ id: 'we1-novo', day_id: 'd1-novo', exercise_id: 'cat-supino' })],
+    }
+
+    const r = reconciliarRascunho(draft, plano)!
+
+    expect(r.draft.extras).toEqual(['cat:cat-rosca'])
+    expect(r.draft.rows['cat:cat-rosca'][0].weight).toBe('12')
+    expect(r.perdidas).toBe(0)
+  })
+
+  it('mantém o avulso do catálogo escolhido e ainda sem série', () => {
+    const r = reconciliarRascunho(rascunho({ extras: ['cat:cat-rosca'] }), {
+      days: [DIA_A],
+      exercises: [ex({ id: 'we1', exercise_id: 'cat-supino' })],
+    })!
+    expect(r.draft.extras).toEqual(['cat:cat-rosca'])
+  })
+
   it('reencontra divisão e linhas pelos ids novos depois de o plano ser regravado', () => {
     const plano: PlanoVigente = {
       // mesma divisão A, mesmo supino do catálogo — ids todos novos
