@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de 1RM grátis (Epley e Brzycki) · Avalix</title>
+    <meta name="description" content="Calcule a carga máxima estimada (1RM) a partir da carga e das repetições, pelas fórmulas de Epley ou Brzycki, com a tabela de percentuais para prescrever o treino." />
+    <link rel="canonical" href="https://avalixfit.com.br/calculadora-1rm" />
+    <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/manrope-700.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/site/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Avalix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://avalixfit.com.br/calculadora-1rm" />
+    <meta property="og:title" content="Calculadora de 1RM grátis (Epley e Brzycki) · Avalix" />
+    <meta property="og:description" content="Calcule a carga máxima estimada (1RM) a partir da carga e das repetições, pelas fórmulas de Epley ou Brzycki, com a tabela de percentuais para prescrever o treino." />
+    <meta property="og:image" content="https://avalixfit.com.br/og-avalix.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://avalixfit.com.br/"},{"@type":"ListItem","position":2,"name":"Calculadora de 1RM","item":"https://avalixfit.com.br/calculadora-1rm"}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"O que é 1RM?","acceptedAnswer":{"@type":"Answer","text":"É a maior carga que a pessoa consegue levantar uma única vez, com execução correta. Serve de referência para prescrever a intensidade do treino em percentual."}},{"@type":"Question","name":"Qual fórmula usar, Epley ou Brzycki?","acceptedAnswer":{"@type":"Answer","text":"As duas dão resultados próximos até cerca de 10 repetições. Epley tende a estimar um pouco mais alto em séries longas. O importante é usar sempre a mesma fórmula para acompanhar o mesmo aluno."}},{"@type":"Question","name":"Até quantas repetições a estimativa é confiável?","acceptedAnswer":{"@type":"Answer","text":"A precisão é boa entre 2 e 10 repetições e cai acima de 12. Para estimar a 1RM, use uma série levada perto da falha, com 3 a 8 repetições."}}]}</script>
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    <header class="topo">
+      <div class="envoltorio">
+        <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+        <nav class="menu" aria-label="Principal">
+          <a href="/avaliacao-fisica">Avaliação física</a>
+          <a href="/avaliacao-postural">Avaliação postural</a>
+          <a href="/app-para-personal-trainer">Treino e app do aluno</a>
+          <a href="/#ferramentas">Ferramentas grátis</a>
+          <a href="/#precos">Preços</a>
+        </nav>
+        <a class="entrar" href="/login">Entrar</a>
+        <a class="botao" href="/cadastro">Testar grátis</a>
+      </div>
+    </header>
+    <main id="conteudo">
+      <nav class="migalha envoltorio" aria-label="Você está em">
+        <a href="/">Início</a> › Calculadora de 1RM
+      </nav>
+      <header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de 1RM</h1>
+        <p class="lide">Informe a carga e quantas repetições o aluno fez até perto da falha. A carga máxima estimada e a tabela de percentuais aparecem na hora.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-1rm" novalidate>
+            <div class="campos">
+              <div class="campo">
+                <label for="carga">Carga (kg)</label>
+                <input id="carga" name="carga" inputmode="decimal" autocomplete="off" placeholder="80" />
+              </div>
+              <div class="campo">
+                <label for="reps">Repetições</label>
+                <input id="reps" name="reps" inputmode="numeric" autocomplete="off" placeholder="8" />
+              </div>
+              <fieldset class="campo inteiro">
+                <legend>Fórmula</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="formula" value="epley" checked /> Epley</label>
+                  <label><input type="radio" name="formula" value="brzycki" /> Brzycki</label>
+                </div>
+              </fieldset>
+            </div>
+            <p class="aviso-calc">Epley: 1RM = carga × (1 + reps ÷ 30). Brzycki: 1RM = carga × 36 ÷ (37 − reps).</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">1RM estimada</span>
+              <span class="valor numero" id="valor-1rm">—</span>
+              <p class="aviso-calc" id="nota-1rm">Preencha a carga e as repetições.</p>
+            </div>
+            <div class="rolagem">
+              <table class="tabela" id="tabela-1rm" hidden>
+                <caption class="rotulo" style="text-align:left;padding-bottom:6px">Carga por percentual, arredondada para 2,5 kg</caption>
+                <thead><tr><th scope="col">% da 1RM</th><th scope="col">Carga</th><th scope="col">Repetições aproximadas</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Como usar a tabela no treino</h2>
+          <p>Faixas comuns de prescrição: força máxima entre 85% e 100% da 1RM, hipertrofia entre 65% e 85%, e resistência abaixo de 65%. As repetições aproximadas de cada linha saem do inverso da fórmula de Epley e servem de ponto de partida, não de regra.</p>
+          <p>Reavalie a 1RM a cada mesociclo. Com o aluno ganhando força, a mesma porcentagem passa a significar mais carga.</p>
+        </div>
+      </section>
+
+      <section class="secao" aria-labelledby="perguntas">
+        <div class="envoltorio">
+          <div class="cabeca-secao"><h2 id="perguntas">Perguntas frequentes</h2></div>
+          <div class="perguntas">
+            <details>
+              <summary>O que é 1RM?</summary>
+              <p>É a maior carga que a pessoa consegue levantar uma única vez, com execução correta. Serve de referência para prescrever a intensidade do treino em percentual.</p>
+            </details>
+            <details>
+              <summary>Qual fórmula usar, Epley ou Brzycki?</summary>
+              <p>As duas dão resultados próximos até cerca de 10 repetições. Epley tende a estimar um pouco mais alto em séries longas. O importante é usar sempre a mesma fórmula para acompanhar o mesmo aluno.</p>
+            </details>
+            <details>
+              <summary>Até quantas repetições a estimativa é confiável?</summary>
+              <p>A precisão é boa entre 2 e 10 repetições e cai acima de 12. Para estimar a 1RM, use uma série levada perto da falha, com 3 a 8 repetições.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio">
+          <div class="chamada">
+            <div>
+              <h2>Prescreva o treino com essas cargas no Avalix</h2>
+              <p>O aluno vê a carga da última vez em cada série e registra o que fez, no celular.</p>
+            </div>
+            <div class="acoes">
+              <a class="botao" href="/cadastro">Testar 14 dias grátis</a>
+              <span class="nota">Sem cartão de crédito</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="rodape">
+      <div class="envoltorio">
+        <div class="marca-rodape">
+          <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+          <p>Avaliação física, postural e treino para profissionais de Educação Física.</p>
+        </div>
+        <div>
+          <h2>Produto</h2>
+          <ul>
+            <li><a href="/avaliacao-fisica">Avaliação física</a></li>
+            <li><a href="/avaliacao-postural">Avaliação postural</a></li>
+            <li><a href="/app-para-personal-trainer">Treino e app do aluno</a></li>
+            <li><a href="/#precos">Preços</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Ferramentas grátis</h2>
+          <ul>
+            <li><a href="/calculadora-1rm">Calculadora de 1RM</a></li>
+            <li><a href="/calculadora-percentual-de-gordura">Percentual de gordura</a></li>
+            <li><a href="/modelo-de-anamnese">Modelo de anamnese</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Avalix</h2>
+          <ul>
+            <li><a href="/cadastro">Testar 14 dias grátis</a></li>
+            <li><a href="/login">Entrar</a></li>
+            <li><a href="/termos">Termos de uso</a></li>
+            <li><a href="mailto:contato@avalixfit.com.br">contato@avalixfit.com.br</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/site/calculadora-1rm.js"></script>
+  </body>
+</html>

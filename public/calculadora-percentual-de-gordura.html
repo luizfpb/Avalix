@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de percentual de gordura: Pollock e US Navy · Avalix</title>
+    <meta name="description" content="Calcule o percentual de gordura por Jackson &amp; Pollock de 3 ou 7 dobras ou pelo protocolo US Navy, com massa gorda e massa magra. Grátis e sem cadastro." />
+    <link rel="canonical" href="https://avalixfit.com.br/calculadora-percentual-de-gordura" />
+    <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/manrope-700.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/site/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Avalix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://avalixfit.com.br/calculadora-percentual-de-gordura" />
+    <meta property="og:title" content="Calculadora de percentual de gordura: Pollock e US Navy · Avalix" />
+    <meta property="og:description" content="Calcule o percentual de gordura por Jackson &amp; Pollock de 3 ou 7 dobras ou pelo protocolo US Navy, com massa gorda e massa magra. Grátis e sem cadastro." />
+    <meta property="og:image" content="https://avalixfit.com.br/og-avalix.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://avalixfit.com.br/"},{"@type":"ListItem","position":2,"name":"Calculadora de percentual de gordura","item":"https://avalixfit.com.br/calculadora-percentual-de-gordura"}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Qual protocolo de dobras usar?","acceptedAnswer":{"@type":"Answer","text":"Jackson &amp; Pollock de 7 dobras é o mais completo e serve para homens e mulheres. O de 3 dobras é mais rápido e usa pontos diferentes para cada sexo. Para acompanhar a evolução, repita sempre o mesmo protocolo, com o mesmo avaliador."}},{"@type":"Question","name":"Como converter densidade corporal em percentual de gordura?","acceptedAnswer":{"@type":"Answer","text":"Esta calculadora usa a equação de Siri: percentual de gordura = 495 ÷ densidade − 450."}},{"@type":"Question","name":"O US Navy é confiável?","acceptedAnswer":{"@type":"Answer","text":"É uma estimativa por circunferências, útil quando não há adipômetro. Costuma variar mais que as dobras, mas é bem reprodutível para acompanhar a mesma pessoa ao longo do tempo."}},{"@type":"Question","name":"Para qual faixa de idade as equações valem?","acceptedAnswer":{"@type":"Answer","text":"As equações de Jackson &amp; Pollock foram desenvolvidas com adultos de 18 a 61 anos. Fora dessa faixa o resultado é menos preciso."}}]}</script>
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    <header class="topo">
+      <div class="envoltorio">
+        <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+        <nav class="menu" aria-label="Principal">
+          <a href="/avaliacao-fisica">Avaliação física</a>
+          <a href="/avaliacao-postural">Avaliação postural</a>
+          <a href="/app-para-personal-trainer">Treino e app do aluno</a>
+          <a href="/#ferramentas">Ferramentas grátis</a>
+          <a href="/#precos">Preços</a>
+        </nav>
+        <a class="entrar" href="/login">Entrar</a>
+        <a class="botao" href="/cadastro">Testar grátis</a>
+      </div>
+    </header>
+    <main id="conteudo">
+      <nav class="migalha envoltorio" aria-label="Você está em">
+        <a href="/">Início</a> › Calculadora de percentual de gordura
+      </nav>
+      <header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de percentual de gordura</h1>
+        <p class="lide">Escolha o protocolo, informe as medidas e veja o percentual de gordura, a massa gorda e a massa magra.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-gordura" novalidate>
+            <div class="campos">
+              <fieldset class="campo inteiro">
+                <legend>Sexo</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="sexo" value="F" checked /> Feminino</label>
+                  <label><input type="radio" name="sexo" value="M" /> Masculino</label>
+                </div>
+              </fieldset>
+              <div class="campo inteiro">
+                <label for="protocolo">Protocolo</label>
+                <select id="protocolo" name="protocolo">
+                  <option value="jp7">Jackson &amp; Pollock 7 dobras</option>
+                  <option value="jp3">Jackson &amp; Pollock 3 dobras</option>
+                  <option value="navy">US Navy (circunferências)</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="idade">Idade (anos)</label>
+                <input id="idade" name="idade" inputmode="numeric" autocomplete="off" placeholder="34" />
+              </div>
+              <div class="campo">
+                <label for="peso">Peso (kg, opcional)</label>
+                <input id="peso" name="peso" inputmode="decimal" autocomplete="off" placeholder="62,4" />
+              </div>
+            </div>
+            <div class="campos" id="medidas"></div>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">Gordura corporal</span>
+              <span class="valor numero" id="valor-gordura">—</span>
+              <p class="aviso-calc" id="nota-gordura">Preencha as medidas.</p>
+            </div>
+            <table class="tabela" id="detalhe-gordura" hidden>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Onde medir cada dobra</h2>
+          <p>Meça do lado direito do corpo, com o aluno em pé e relaxado. Pince a dobra com o polegar e o indicador, coloque o adipômetro 1 cm abaixo dos dedos e leia em 2 segundos. Faça duas ou três medidas por ponto e use a média.</p>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">Dobra</th><th scope="col">Direção</th><th scope="col">Local</th></tr></thead>
+              <tbody>
+                <tr><td>Peitoral</td><td>Diagonal</td><td>Metade da distância entre a linha axilar anterior e o mamilo nos homens; um terço nas mulheres</td></tr>
+                <tr><td>Axilar média</td><td>Vertical</td><td>Linha axilar média, na altura do processo xifoide</td></tr>
+                <tr><td>Tríceps</td><td>Vertical</td><td>Face posterior do braço, no ponto médio entre o acrômio e o olécrano</td></tr>
+                <tr><td>Subescapular</td><td>Diagonal</td><td>1 a 2 cm abaixo do ângulo inferior da escápula</td></tr>
+                <tr><td>Abdominal</td><td>Vertical</td><td>2 cm à direita da cicatriz umbilical</td></tr>
+                <tr><td>Supra-ilíaca</td><td>Diagonal</td><td>Logo acima da crista ilíaca, na linha axilar anterior</td></tr>
+                <tr><td>Coxa</td><td>Vertical</td><td>Face anterior, no ponto médio entre a prega inguinal e a borda superior da patela</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h2>Medidas do US Navy</h2>
+          <ul>
+            <li><strong>Pescoço:</strong> logo abaixo da laringe, com a fita levemente inclinada para a frente.</li>
+            <li><strong>Abdômen (homens):</strong> na altura do umbigo, ao fim de uma expiração normal.</li>
+            <li><strong>Cintura (mulheres):</strong> no ponto mais estreito do tronco.</li>
+            <li><strong>Quadril (mulheres):</strong> na maior circunferência dos glúteos.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="secao" aria-labelledby="perguntas">
+        <div class="envoltorio">
+          <div class="cabeca-secao"><h2 id="perguntas">Perguntas frequentes</h2></div>
+          <div class="perguntas">
+            <details>
+              <summary>Qual protocolo de dobras usar?</summary>
+              <p>Jackson &amp; Pollock de 7 dobras é o mais completo e serve para homens e mulheres. O de 3 dobras é mais rápido e usa pontos diferentes para cada sexo. Para acompanhar a evolução, repita sempre o mesmo protocolo, com o mesmo avaliador.</p>
+            </details>
+            <details>
+              <summary>Como converter densidade corporal em percentual de gordura?</summary>
+              <p>Esta calculadora usa a equação de Siri: percentual de gordura = 495 ÷ densidade − 450.</p>
+            </details>
+            <details>
+              <summary>O US Navy é confiável?</summary>
+              <p>É uma estimativa por circunferências, útil quando não há adipômetro. Costuma variar mais que as dobras, mas é bem reprodutível para acompanhar a mesma pessoa ao longo do tempo.</p>
+            </details>
+            <details>
+              <summary>Para qual faixa de idade as equações valem?</summary>
+              <p>As equações de Jackson &amp; Pollock foram desenvolvidas com adultos de 18 a 61 anos. Fora dessa faixa o resultado é menos preciso.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio">
+          <div class="chamada">
+            <div>
+              <h2>Guarde cada avaliação e veja a evolução</h2>
+              <p>No Avalix o percentual sai na hora, fica no cadastro do aluno e vira laudo em PDF com a sua marca.</p>
+            </div>
+            <div class="acoes">
+              <a class="botao" href="/cadastro">Testar 14 dias grátis</a>
+              <span class="nota">Sem cartão de crédito</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="rodape">
+      <div class="envoltorio">
+        <div class="marca-rodape">
+          <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+          <p>Avaliação física, postural e treino para profissionais de Educação Física.</p>
+        </div>
+        <div>
+          <h2>Produto</h2>
+          <ul>
+            <li><a href="/avaliacao-fisica">Avaliação física</a></li>
+            <li><a href="/avaliacao-postural">Avaliação postural</a></li>
+            <li><a href="/app-para-personal-trainer">Treino e app do aluno</a></li>
+            <li><a href="/#precos">Preços</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Ferramentas grátis</h2>
+          <ul>
+            <li><a href="/calculadora-1rm">Calculadora de 1RM</a></li>
+            <li><a href="/calculadora-percentual-de-gordura">Percentual de gordura</a></li>
+            <li><a href="/modelo-de-anamnese">Modelo de anamnese</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Avalix</h2>
+          <ul>
+            <li><a href="/cadastro">Testar 14 dias grátis</a></li>
+            <li><a href="/login">Entrar</a></li>
+            <li><a href="/termos">Termos de uso</a></li>
+            <li><a href="mailto:contato@avalixfit.com.br">contato@avalixfit.com.br</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/site/calculadora-gordura.js"></script>
+  </body>
+</html>

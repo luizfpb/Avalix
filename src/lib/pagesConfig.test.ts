@@ -16,6 +16,8 @@ async function readRedirectRules() {
 describe('configuracao do Cloudflare Pages', () => {
   it('serve todas as rotas conhecidas pelo shell sem redirect canonico', async () => {
     expect(await readRedirectRules()).toEqual([
+      // a raiz é a landing estática; as regras não encadeiam (sitePublico.test)
+      ['/', '/inicio', '200'],
       ['/a', '/', '200'],
       ['/t', '/', '200'],
       ['/t/', '/', '200'],

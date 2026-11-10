@@ -1,6 +1,11 @@
 # Rotas conhecidas da SPA. O destino deve ser a raiz: no Cloudflare Pages,
 # /index.html e canonicalizado para / e quebra o rewrite. Nao use fallback
 # global: um JS inexistente precisa responder 404, nunca o shell com status 200.
+# A raiz serve a landing estática (public/inicio.html, gerada por
+# scripts/gerar-site.mjs). As regras não encadeiam: as rotas abaixo continuam
+# servindo o shell da SPA. Quem tem sessão salva vai para /dashboard
+# (public/site/entrar.js).
+/                    /inicio   200
 /a                   /   200
 /t                   /   200
 /t/                  /   200

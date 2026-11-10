@@ -56,6 +56,8 @@ function expectHeader(response, name, pattern, path) {
   }
 }
 
+// "/" é a landing estática (public/inicio.html via _redirects); o shell do
+// app é conferido em /login, e as demais rotas precisam servir o mesmo shell.
 const root = await request('/')
 expectStatus(root, 200, '/')
 expectHeader(root, 'content-type', /^text\/html\b/i, '/')
@@ -64,28 +66,55 @@ expectHeader(root, 'strict-transport-security', /max-age=31536000/i, '/')
 expectHeader(root, 'x-content-type-options', /^nosniff$/i, '/')
 expectHeader(root, 'x-frame-options', /^DENY$/i, '/')
 expectHeader(root, 'content-security-policy', /frame-ancestors 'none'/i, '/')
-
 const rootHtml = await root.text()
-if (!rootHtml.includes('<div id="root"></div>')) {
-  throw new Error('smoke HTTP: / não contém o shell do aplicativo')
+if (!rootHtml.includes('<link rel="canonical" href="https://avalixfit.com.br/" />')) {
+  throw new Error('smoke HTTP: / não serviu a landing')
 }
 
-const entryPath = rootHtml.match(
+const shell = await request('/login')
+expectStatus(shell, 200, '/login')
+expectHeader(shell, 'content-type', /^text\/html\b/i, '/login')
+expectHeader(shell, 'cache-control', /(?:no-store|no-cache)/i, '/login')
+expectHeader(shell, 'x-robots-tag', /noindex/i, '/login')
+const shellHtml = await shell.text()
+if (!shellHtml.includes('<div id="root"></div>')) {
+  throw new Error('smoke HTTP: /login não contém o shell do aplicativo')
+}
+
+const entryPath = shellHtml.match(
   /<script\b(?=[^>]*\btype=["']module["'])(?=[^>]*\bsrc=["']([^"']+\.js)["'])[^>]*>/i
 )?.[1]
-if (!entryPath) throw new Error('smoke HTTP: entry JS não encontrado em /')
+if (!entryPath) throw new Error('smoke HTTP: entry JS não encontrado em /login')
 
 // /termos e o retorno do checkout do Asaas (/configuracoes/plano) abrem sem
 // service worker; já ficaram em 404 por faltar no _redirects (auditoria 23/10).
-for (const path of ['/login', '/dashboard', '/a/smoke-token-inexistente', '/t', '/t/', '/termos', '/configuracoes/plano']) {
+for (const path of ['/dashboard', '/a/smoke-token-inexistente', '/t', '/t/', '/termos', '/configuracoes/plano']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)
   expectHeader(response, 'cache-control', /(?:no-store|no-cache)/i, path)
   const html = await response.text()
   if (!html.includes(entryPath)) {
-    throw new Error(`smoke HTTP: ${path} não serviu o mesmo shell de /`)
+    throw new Error(`smoke HTTP: ${path} não serviu o mesmo shell de /login`)
   }
+}
+
+// Páginas públicas (scripts/gerar-site.mjs), robots e sitemap. O noindex não
+// é conferido aqui: a URL de deploy do pages.dev pode receber um da própria
+// Cloudflare; o que vale é o public/_headers, coberto pelo pagesConfig.test.
+for (const path of ['/avaliacao-fisica', '/avaliacao-postural', '/app-para-personal-trainer',
+  '/calculadora-1rm', '/calculadora-percentual-de-gordura', '/modelo-de-anamnese']) {
+  const response = await request(path)
+  expectStatus(response, 200, path)
+  expectHeader(response, 'content-type', /^text\/html\b/i, path)
+  const html = await response.text()
+  if (!html.includes(`<link rel="canonical" href="https://avalixfit.com.br${path}" />`)) {
+    throw new Error(`smoke HTTP: ${path} não serviu a página pública`)
+  }
+}
+for (const path of ['/robots.txt', '/sitemap.xml']) {
+  const response = await request(path)
+  expectStatus(response, 200, path)
 }
 
 const studentManifest = await request('/treino.webmanifest')

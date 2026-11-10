@@ -22,9 +22,50 @@
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
 
+# Raiz e páginas públicas (scripts/gerar-site.mjs): indexáveis. O "!" tira o
+# X-Robots-Tag: noindex herdado de /*. /inicio continua noindex: é a mesma
+# landing de "/", que tem a URL canônica.
 /
+  ! X-Robots-Tag
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
+
+/avaliacao-fisica
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/avaliacao-postural
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/app-para-personal-trainer
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/calculadora-1rm
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/calculadora-percentual-de-gordura
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/modelo-de-anamnese
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/robots.txt
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600
+
+/sitemap.xml
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600
+
+# CSS e JS das páginas públicas não têm hash no nome: revalidam sempre (ETag),
+# senão um deploy que muda o HTML chega com o CSS antigo do cache.
+/site/*
+  Cache-Control: no-cache
 
 /login
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0

@@ -1,0 +1,10 @@
+# Páginas públicas do Avalix (landing, recursos e ferramentas) ficam abertas.
+# O app responde X-Robots-Tag: noindex (public/_headers). Os links do aluno
+# (/a/<token> da anamnese e /t do treino) nem são rastreados.
+User-agent: *
+Disallow: /a/
+Disallow: /a$
+Disallow: /t/
+Disallow: /t$
+
+Sitemap: https://avalixfit.com.br/sitemap.xml
