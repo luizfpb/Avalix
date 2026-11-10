@@ -92,7 +92,7 @@ function parseWeekInput(text: string, max: number): number | null | 'invalid' {
   const t = text.trim()
   if (!t) return null
   const n = Number(t)
-  return Number.isInteger(n) && n >= 1 && n <= max ? n : 'invalid'
+  return Number.isInteger(n) && n >= 0 && n <= max ? n : 'invalid'
 }
 function formatDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
@@ -489,7 +489,7 @@ function LogRowItem({
             {log.day_label ? (
               <span className="text-muted-foreground"> · Treino {log.day_label}</span>
             ) : null}
-            {log.week_number ? (
+            {log.week_number != null ? (
               <span className="text-muted-foreground"> · semana {log.week_number}</span>
             ) : null}
             {/* Sensação relatada pelo aluno (0038). */}
@@ -1085,7 +1085,7 @@ function LogForm({
     if (weekValue === 'invalid') {
       setError(semanaAlem != null
         ? `O mesociclo tem ${totalWeeks} semanas. Estenda o plano até a semana ${semanaAlem} ou corrija o número.`
-        : `Informe a semana com um número inteiro de 1 a ${totalWeeks}, ou deixe em branco.`)
+        : `Informe a semana com um número inteiro de 0 a ${totalWeeks}, ou deixe em branco.`)
       return null
     }
 
@@ -1596,7 +1596,7 @@ function LogForm({
             <Input
               id="workout-week"
               type="number"
-              min={1}
+              min={0}
               max={MAX_PLAN_WEEKS}
               placeholder="—"
               value={week}

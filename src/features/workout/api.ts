@@ -369,9 +369,10 @@ export type SaveWorkoutPlanInput = {
 // replace_workout_plan_children) e pelo de edição (RPC save_workout_plan, que
 // chama a mesma função dentro da própria transação).
 function planChildrenPayload(input: SaveWorkoutPlanInput) {
-  // descarta overrides/semanas fora do mesociclo (defesa; o b2 também barraria)
+  // descarta overrides/semanas fora do mesociclo (defesa; o b2 também barraria).
+  // A semana 0 (adaptação, 0057) fica fora da contagem e vale em todo plano.
   const overrides = input.overrides
-    .filter((o) => o.week >= 1 && o.week <= input.weeks)
+    .filter((o) => o.week >= 0 && o.week <= input.weeks)
     .map((o) => ({
       week: o.week,
       exercise_key: o.exerciseKey,
@@ -383,7 +384,7 @@ function planChildrenPayload(input: SaveWorkoutPlanInput) {
       notes: o.notes,
     }))
   const weeks = input.weeksMeta
-    .filter((w) => w.week >= 1 && w.week <= input.weeks)
+    .filter((w) => w.week >= 0 && w.week <= input.weeks)
     .map((w) => ({
       week: w.week,
       label: w.label,

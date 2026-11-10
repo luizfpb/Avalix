@@ -129,10 +129,10 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('Informe a data do treino.')
     const weekValue = numberOrNull(week)
     if (weekValue == null && weekNumber != null) return setError('Informe a semana do mesociclo.')
-    if (weekValue != null && (!Number.isInteger(weekValue) || weekValue < 1 || (maxWeek != null && weekValue > maxWeek))) {
+    if (weekValue != null && (!Number.isInteger(weekValue) || weekValue < 0 || (maxWeek != null && weekValue > maxWeek))) {
       return setError(maxWeek != null
-        ? `Informe uma semana entre 1 e ${maxWeek}, o total do mesociclo.`
-        : 'Informe uma semana inteira a partir de 1.')
+        ? `Informe uma semana entre 0 (adaptação) e ${maxWeek}.`
+        : 'Informe uma semana inteira a partir de 0.')
     }
     setSaving(true)
     try {
@@ -167,10 +167,10 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
               {showWeek ? (
                 <div className="w-36 space-y-1.5">
                   <Label htmlFor={`${id}-week`}>Semana do mesociclo</Label>
-                  <Input id={`${id}-week`} type="number" inputMode="numeric" min={1} max={maxWeek ?? undefined} step={1}
+                  <Input id={`${id}-week`} type="number" inputMode="numeric" min={0} max={maxWeek ?? undefined} step={1}
                     value={week} aria-describedby={maxWeek != null ? `${id}-week-hint` : undefined}
                     onChange={(event) => { setWeek(event.target.value); setDirty(true) }} />
-                  {maxWeek != null ? <p id={`${id}-week-hint`} className="text-xs text-muted-foreground">de {maxWeek}</p> : null}
+                  {maxWeek != null ? <p id={`${id}-week-hint`} className="text-xs text-muted-foreground">0 (adaptação) a {maxWeek}</p> : null}
                 </div>
               ) : null}
             </div>

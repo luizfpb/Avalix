@@ -99,9 +99,9 @@ select is(
 
 set local role anon;
 select throws_ok(
-  $$ select public.update_workout_session_for_link('pgtap-token-0055', log_id, version, (select value from _sets), current_date - 1, null, 0)
+  $$ select public.update_workout_session_for_link('pgtap-token-0055', log_id, version, (select value from _sets), current_date - 1, null, -1)
        from _state where name = 'student' $$,
-  '23514', 'semana fora do mesociclo', 'aluno não grava semana zero');
+  '23514', 'semana fora do mesociclo', 'aluno não grava semana negativa (a 0 vale desde a 0057)');
 select lives_ok(
   $$ update _state set version = (public.update_workout_session_for_link('pgtap-token-0055', log_id, version,
        (select value from _sets), current_date - 1, null, 4)->>'updated_at')::timestamptz where name = 'student' $$,

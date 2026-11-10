@@ -82,6 +82,22 @@ describe('createWorkoutPlan', () => {
     expect((args.p_days as unknown[]).length).toBe(1)
   })
 
+  // Semana 0 = adaptação antes da semana 1 (0057), fora da contagem do mesociclo.
+  it('mantém a semana 0 e descarta só o que passa do mesociclo', async () => {
+    const ajuste = { exerciseKey: 'k1', sets: 2, reps: null, rir: null, restSeconds: null, isSkipped: false, notes: null }
+    await createWorkoutPlan(entrada({
+      overrides: [{ week: 0, ...ajuste }, { week: 5, ...ajuste }, { week: -1, ...ajuste }],
+      weeksMeta: [
+        { week: 0, label: 'Adaptação', isDeload: false, notes: null },
+        { week: 5, label: 'Fora', isDeload: false, notes: null },
+      ],
+    }))
+
+    const args = mocks.rpc.mock.calls[0][1] as Record<string, { week: number }[]>
+    expect(args.p_overrides.map((o) => o.week)).toEqual([0])
+    expect(args.p_weeks_meta.map((w) => w.week)).toEqual([0])
+  })
+
   it('omite os argumentos opcionais nulos, em vez de mandá-los explícitos', async () => {
     await createWorkoutPlan(entrada())
 

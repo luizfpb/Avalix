@@ -28,7 +28,9 @@ export function WeeksCard({
   onOverride: (week: number, exKey: string, patch: Partial<EditorOverride>) => void
 }) {
   const [openWeek, setOpenWeek] = useState<number | null>(null)
-  const weeks = Array.from({ length: plan.weeks }, (_, i) => i + 1)
+  // A semana 0 (adaptação, 0057) vem antes da 1 e fica fora da contagem do
+  // mesociclo: plan.weeks continua sendo o total de semanas 1..N.
+  const weeks = Array.from({ length: plan.weeks + 1 }, (_, i) => i)
 
   function metaOf(week: number) {
     return plan.weeksMeta.find((w) => w.week === week)
@@ -56,6 +58,7 @@ export function WeeksCard({
                 >
                   {isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                   Semana {week}
+                  {week === 0 ? <span className="font-normal text-muted-foreground">(adaptação, opcional)</span> : null}
                 </button>
                 <label className="flex items-center gap-1.5 text-xs">
                   <input

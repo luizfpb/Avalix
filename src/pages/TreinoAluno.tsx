@@ -1870,7 +1870,7 @@ function TreinoDoDia({
             }}
           >
             <option value="">—</option>
-            {Array.from({ length: plano.weeks }, (_, i) => i + 1).map((n) => (
+            {Array.from({ length: plano.weeks + 1 }, (_, i) => i).map((n) => (
               <option key={n} value={n}>
                 Semana {n}
                 {pacote.weeks.find((w) => w.week_number === n)?.is_deload ? ' (deload)' : ''}

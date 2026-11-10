@@ -1483,6 +1483,16 @@ describe('TreinoAluno — semana do mesociclo', () => {
     expect(screen.getByText('Semana 3 em andamento: 1 de 3 treinos feitos.')).toBeTruthy()
   })
 
+  // Semana 0 = adaptação antes da semana 1 (0057): continua e depois avança para a 1.
+  it('semana 0 de adaptação aparece na lista e conduz à semana 1', async () => {
+    getWorkoutMock.mockResolvedValue(tresPorSemana([{ performed_at: '2026-09-08', week_number: 0 }]))
+    await abrir()
+    const select = screen.getByLabelText('Semana') as HTMLSelectElement
+    expect(select.value).toBe('0')
+    expect([...select.options].map((o) => o.value).slice(0, 3)).toEqual(['', '0', '1'])
+    expect(screen.getByText('Semana 0 em andamento: 1 de 3 treinos feitos.')).toBeTruthy()
+  })
+
   it('semana fechada oferece a próxima e deixa repetir em um clique', async () => {
     getWorkoutMock.mockResolvedValue(
       tresPorSemana([

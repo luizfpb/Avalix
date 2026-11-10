@@ -78,6 +78,19 @@ describe('SessionEditForm', () => {
     expect(onSave.mock.calls[0][0].weekNumber).toBe(2)
   })
 
+  // Semana 0 = adaptação antes da semana 1 (0057).
+  it('aceita a semana 0 de adaptação', async () => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={1} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    const week = editor.getByLabelText('Semana do mesociclo')
+    expect(week).toHaveProperty('min', '0')
+    fireEvent.change(week, { target: { value: '0' } })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0].weekNumber).toBe(0)
+  })
+
   it('não manda a semana quando ela não mudou', async () => {
     const onSave = vi.fn(async (_value: SessionEditValues) => {})
     render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={3} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
@@ -88,7 +101,7 @@ describe('SessionEditForm', () => {
     expect(onSave.mock.calls[0][0]).not.toHaveProperty('weekNumber')
   })
 
-  it.each(['0', '5', '2.5', ''])('recusa semana fora do mesociclo (%s) sem perder o preenchido', async (valor) => {
+  it.each(['-1', '5', '2.5', ''])('recusa semana fora do mesociclo (%s) sem perder o preenchido', async (valor) => {
     const onSave = vi.fn(async (_value: SessionEditValues) => {})
     render(<SessionEditForm sets={series} performedAt="2026-09-08" weekNumber={3} planWeeks={4} notes={null} onSave={onSave} onCancel={vi.fn()} />)
     const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))

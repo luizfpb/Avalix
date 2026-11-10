@@ -588,7 +588,7 @@ describe('Execucao — editar sessão enviada', () => {
     expect(week).toHaveProperty('value', '1')
     fireEvent.change(week, { target: { value: '5' } })
     fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
-    expect((await editor.findByRole('alert')).textContent).toMatch(/entre 1 e 4/)
+    expect((await editor.findByRole('alert')).textContent).toMatch(/entre 0 \(adaptação\) e 4/)
     expect(updateMock).not.toHaveBeenCalled()
 
     fireEvent.change(week, { target: { value: '2' } })
@@ -773,13 +773,13 @@ describe('cronômetro de descanso', () => {
 
 // A semana gravada escolhe o override e segue para o histórico e o PDF.
 describe('semana digitada', () => {
-  it.each(['0', '2.5', '53'])('recusa semana fora do mesociclo (%s) sem apagar o preenchido', async (valor) => {
+  it.each(['-1', '2.5', '53'])('recusa semana fora do mesociclo (%s) sem apagar o preenchido', async (valor) => {
     abrir() // plano de 4 semanas
     fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
     fireEvent.change(screen.getByLabelText('Semana'), { target: { value: valor } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
     expect(await screen.findByRole('alert')).toHaveProperty('textContent',
-      'Informe a semana com um número inteiro de 1 a 4, ou deixe em branco.')
+      'Informe a semana com um número inteiro de 0 a 4, ou deixe em branco.')
     expect(criarMock).not.toHaveBeenCalled()
     expect((screen.getByLabelText('Carga da série 1 de Supino reto') as HTMLInputElement).value).toBe('40')
   })
@@ -860,6 +860,17 @@ describe('semana digitada', () => {
     expect((screen.getByLabelText('Semana') as HTMLInputElement).value).toBe('2')
     expect(screen.getByRole('button', { name: 'Estender para 2 semanas' })).toBeTruthy()
     expect(estenderMock).not.toHaveBeenCalled()
+  })
+
+  // Semana 0 = adaptação antes da semana 1 (0057), fora da contagem do mesociclo.
+  it('semana 0 grava como semana de adaptação', async () => {
+    abrir()
+    fireEvent.change(screen.getByLabelText('Carga da série 1 de Supino reto'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '0' } })
+    expect(screen.queryByRole('button', { name: /Estender para/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar treino' }))
+    await screen.findByText('Treino registrado!')
+    expect(criarMock.mock.calls[0][0].weekNumber).toBe(0)
   })
 
   it('semana em branco continua permitida', async () => {
