@@ -5,6 +5,19 @@ código, das 57 migrations e das duas Edge Functions, mais a suíte vitest
 (hermética). Nenhum arquivo do projeto foi alterado além deste relatório.
 Nenhuma migration foi aplicada e nada foi instalado.
 
+## Estado das correções (11/11/2026)
+
+Os 5 achados do topo foram corrigidos no código: migration
+`0058_cobranca_plano_pago.sql`, handlers das functions em
+`supabase/functions/*/handler.ts` com 23 testes, `npm run test:db` e o
+workflow `.github/workflows/db-tests.yml`. pgTAP 0001–0058 no PostgreSQL 18
+descartável: 641 verificações em 32 suítes, todas verdes. **Só valem em
+produção depois de aplicar a 0058 e publicar `billing` e `billing-webhook`**
+(ver `docs/ASSINATURA.md`). O workflow do banco ainda não rodou no GitHub. Os
+achados médios e baixos fora do topo (teste grátis ao recriar a organização,
+chave de idempotência no Asaas, rebaixamento em paralelo com cadastro,
+refatoração do `TreinoAluno.tsx`) seguem em aberto.
+
 ## Os 5 achados de maior risco
 
 | # | Achado | Risco | Onde |

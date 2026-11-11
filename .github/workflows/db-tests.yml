@@ -1,0 +1,40 @@
+name: banco
+
+# Suítes pgTAP (supabase/tests) num PostgreSQL 18 descartável criado dentro do
+# runner por scripts/test-db.mjs: aplica o stub do Supabase e todas as
+# migrations, roda os testes e descarta. Não usa segredo nenhum e nunca
+# conecta no banco de produção. Roda em paralelo ao deploy; depois do
+# primeiro verde, vale torná-lo obrigatório (branch protection ou `needs`).
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalix-db-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pgtap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+      - name: PostgreSQL 18 e pgTAP (repositório oficial do PostgreSQL)
+        run: |
+          set -euo pipefail
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-18 postgresql-18-pgtap
+      - name: Suítes pgTAP
+        env:
+          PG_BIN: /usr/lib/postgresql/18/bin
+        run: node scripts/test-db.mjs

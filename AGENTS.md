@@ -16,6 +16,10 @@ pt-BR; commits sem cara de IA; acentuação e pontuação corretas).
 
 - Validação padrão de toda entrega: `npm run lint` → `npm run test`
   (vitest) → `npm run build` (tsc + vite). Tudo verde antes de entregar.
+  Migration nova ou mudança em RPC: também `npm run test:db` (pgTAP num
+  PostgreSQL descartável criado pelo `scripts/test-db.mjs`; no Windows, com
+  `PGTAP_SQL` apontando para um `pgtap.sql` se a extensão não estiver
+  instalada). Nunca aponta para o banco de produção.
 - Supabase: a IA escreve a migration numerada; **o usuário aplica no
   dashboard e regenera `database.types`**. O estado do banco em produção
   não é visível daqui.

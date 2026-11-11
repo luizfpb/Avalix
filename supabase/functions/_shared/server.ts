@@ -2,13 +2,10 @@
 // ao Asaas. Sem supabase-js: duas chamadas fetch bastam e não há dependência
 // para baixar no deploy.
 
-export class HttpError extends Error {
-  readonly status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
+import { HttpError, json } from './http.ts'
+import type { AsaasMethod } from './deps.ts'
+
+export { HttpError, json }
 
 export function env(name: string, fallback?: string): string {
   const value = Deno.env.get(name)?.trim() || fallback
@@ -82,7 +79,7 @@ export function asaasCheckoutUrl(id: string): string {
 }
 
 export async function asaas<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: AsaasMethod,
   path: string,
   body?: unknown
 ): Promise<T> {
@@ -114,11 +111,4 @@ export async function asaas<T>(
       detail ? `Asaas recusou: ${detail}` : 'O serviço de pagamento não respondeu. Tente de novo em instantes.')
   }
   return data as T
-}
-
-export function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers },
-  })
 }

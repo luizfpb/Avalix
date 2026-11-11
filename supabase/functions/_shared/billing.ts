@@ -181,7 +181,8 @@ export const PAID_EVENTS = new Set(['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'])
 export const PAID_STATUSES = new Set(['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH'])
 
 // O que vai para o banco: só os campos que a regra usa. Nome, CPF e cartão
-// do pagador nunca saem do Asaas.
+// do pagador nunca saem do Asaas. subscription, externalReference e value
+// do pagamento RECONSULTADO são os que decidem organização e plano (0058).
 export type PaymentFields = {
   id: string | null
   status: string | null
@@ -189,10 +190,22 @@ export type PaymentFields = {
   dueDate: string | null
   invoiceUrl: string | null
   customer: string | null
+  subscription: string | null
+  externalReference: string | null
+  value: number | null
 }
 
 function str(value: unknown, max = 300): string | null {
   return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null
+}
+
+function money(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value < 1e8 ? value : null
+}
+
+// Mesmo valor em reais, tolerando o arredondamento de ponto flutuante.
+export function sameMoney(a: unknown, b: number): boolean {
+  return typeof a === 'number' && Math.abs(a - b) < 0.005
 }
 
 function obj(value: unknown): Record<string, unknown> | null {
@@ -210,6 +223,9 @@ export function paymentFields(payment: Record<string, unknown>): PaymentFields {
     dueDate: str(payment.dueDate),
     invoiceUrl: invoiceUrl && invoiceUrl.startsWith('https://') ? invoiceUrl : null,
     customer: str(payment.customer),
+    subscription: str(payment.subscription),
+    externalReference: str(payment.externalReference, 200),
+    value: money(payment.value),
   }
 }
 

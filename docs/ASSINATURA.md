@@ -62,6 +62,14 @@ testar no sandbox. Nada disso foi executado daqui.
   `app.org_access`, as travas (triggers `*_b9_billing`), `billing_events`
   (idempotência) e as RPCs `billing_*` (só service role), mais
   `get_org_billing` e `billing_manage_org` (usuário).
+- `supabase/migrations/0058_cobranca_plano_pago.sql`: o primeiro pagamento
+  libera o plano do checkout que foi pago (`billing_checkouts`, com o valor
+  conferido), a assinatura substituída vai para a fila
+  `billing_pending_cancellations` (cancelada no Asaas com retentativa) e
+  `billing_try_lock`/`billing_unlock` deixam um pedido por organização de cada
+  vez.
+- `supabase/functions/*/handler.ts`: a regra das duas functions, testada no
+  vitest com dublês (`handler.test.ts`); o `index.ts` só liga ao Deno.
 - `supabase/migrations/0052_assinatura_pix_pendente_e_so_leitura.sql`: Pix
   gerado e não pago deixa de contar como assinatura em vigor
   (`has_subscription`), `get_org_billing` devolve o plano e o ciclo do Pix
@@ -88,9 +96,11 @@ pelo CMD:
 npx supabase gen types typescript --linked > src\lib\database.types.ts
 ```
 
-**Atenção:** o gate do deploy exige a migration mais recente (hoje `0052`).
+**Atenção:** o gate do deploy exige a migration mais recente (hoje `0058`).
 Aplique as migrations **antes** de dar push. Depois da 0052, publique de novo a
-function `billing` (passo 5): o "Desistir deste Pix" depende dela.
+function `billing` (passo 5): o "Desistir deste Pix" depende dela. Depois da
+0058, publique de novo **as duas** functions (passo 5): elas usam a trava por
+organização e a fila de cancelamento, que só existem a partir da 0058.
 
 ### 2. Conta no sandbox do Asaas
 Crie a conta em https://sandbox.asaas.com (é separada da conta real) e gere a

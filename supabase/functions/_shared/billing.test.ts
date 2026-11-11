@@ -7,6 +7,7 @@ import {
   planValue,
   validCpfCnpj,
   safeEqual,
+  sameMoney,
   saoPauloDate,
 } from './billing'
 
@@ -141,8 +142,26 @@ describe('parseWebhook', () => {
         dueDate: '2026-10-17',
         invoiceUrl: 'https://www.asaas.com/i/pay_1',
         customer: 'cus_1',
+        subscription: 'sub_1',
+        externalReference: 'org',
+        value: null,
       },
     })
+  })
+
+  it('lê o valor do pagamento só quando é número de verdade', () => {
+    const read = (value: unknown) =>
+      parseWebhook({ id: 'e', event: 'PAYMENT_RECEIVED', payment: { id: 'p', value } })?.payment?.value
+    expect(read(19.9)).toBe(19.9)
+    expect(read('19.90')).toBeNull()
+    expect(read(-1)).toBeNull()
+    expect(read(Number.NaN)).toBeNull()
+  })
+
+  it('compara dinheiro sem tropeçar no ponto flutuante', () => {
+    expect(sameMoney(0.1 + 0.2, 0.3)).toBe(true)
+    expect(sameMoney(19.9, 39.9)).toBe(false)
+    expect(sameMoney('19.9', 19.9)).toBe(false)
   })
 
   it('descarta link de fatura que não é https', () => {
