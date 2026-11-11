@@ -15,7 +15,7 @@
 //   PGTAP_SQL  arquivo SQL do pgTAP, usado quando a extensão pgtap não está
 //              instalada no PostgreSQL (no CI ela vem do pacote postgresql-18-pgtap)
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -68,9 +68,20 @@ let started = false
 let failed = false
 try {
   run(bin('initdb'), ['-D', data, '-U', 'postgres', '-A', 'trust', '--encoding=UTF8', '--locale=C'])
-  run(bin('pg_ctl'), ['-D', data, '-l', join(dir, 'postgres.log'), '-o', `-p ${port} -h 127.0.0.1`, '-w', 'start'], {
-    detached: true,
-  })
+  // No Linux o postgres do pgdg cria o socket em /var/run/postgresql, que é do
+  // usuário postgres: no runner do GitHub a subida morre com "Permission
+  // denied". O socket vai para a pasta descartável (a conexão é por TCP).
+  const socket = process.platform === 'win32' ? '' : ` -k ${dir}`
+  const log = join(dir, 'postgres.log')
+  try {
+    run(bin('pg_ctl'), ['-D', data, '-l', log, '-o', `-p ${port} -h 127.0.0.1${socket}`, '-w', 'start'], {
+      detached: true,
+    })
+  } catch (error) {
+    // com stdio ignorado, o motivo real só aparece no log do servidor
+    const tail = existsSync(log) ? readFileSync(log, 'utf8').slice(-3000) : '(sem postgres.log)'
+    throw new Error(`${error.message}\n--- postgres.log ---\n${tail}`)
+  }
   started = true
 
   psqlFile(BOOTSTRAP)
