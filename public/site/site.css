@@ -484,8 +484,13 @@ p {
 
 .ferramentas {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+@media (max-width: 1100px) {
+  .ferramentas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .ferramenta {
   border: 1px solid var(--linha);
@@ -803,6 +808,57 @@ fieldset.campo {
   }
 }
 
+/* ------------------------------------------------------------ modelos para imprimir */
+
+/* Ficha e PAR-Q: tabela na largura da página (o .texto limita a linha de
+   leitura, que não serve para tabela de preencher). */
+.texto > .largo {
+  max-width: none;
+}
+.preencher {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 10px 24px;
+}
+.preencher span {
+  display: block;
+  border-bottom: 1px solid var(--linha-forte);
+  padding: 18px 0 4px;
+  font-size: 0.85rem;
+  color: var(--texto-2);
+}
+.tabela.em-branco td {
+  height: 38px;
+  border-right: 1px solid var(--linha);
+  padding-left: 8px;
+}
+.tabela.em-branco td:last-child,
+.tabela.em-branco th:last-child {
+  border-right: 0;
+}
+.tabela.em-branco th {
+  padding-left: 8px;
+  border-right: 1px solid var(--linha);
+}
+.tabela .caixa {
+  width: 4.5rem;
+  text-align: center;
+}
+.caixa::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--grafite);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.tabela .caixa-titulo {
+  width: 4.5rem;
+  text-align: center;
+  padding-right: 0;
+}
+
 /* ------------------------------------------------------------ rodapé */
 
 .rodape {
@@ -869,5 +925,59 @@ fieldset.campo {
   body {
     background: #fff;
     color: #000;
+  }
+  .migalha,
+  section[aria-labelledby="perguntas"] {
+    display: none !important;
+  }
+  /* papel: sem os respiros da tela, para o PAR-Q caber numa folha e cada
+     treino da ficha ficar inteiro na mesma página */
+  body {
+    font-size: 10.5pt;
+    line-height: 1.4;
+  }
+  .cabeca-pagina {
+    padding: 0 0 6px;
+    gap: 6px;
+  }
+  .secao {
+    padding: 6px 0;
+  }
+  .secao + .secao {
+    border-top: 0;
+  }
+  /* grade não fragmenta bem entre páginas: no papel o bloco vira fluxo normal */
+  .texto {
+    display: block;
+  }
+  .texto > * + * {
+    margin-top: 10px;
+  }
+  .texto h2 {
+    margin-top: 14px;
+    margin-bottom: 0;
+    break-after: avoid;
+  }
+  .rolagem {
+    overflow: visible;
+  }
+  .tabela tr,
+  .preencher,
+  .rolagem.largo {
+    break-inside: avoid;
+  }
+  .tabela.em-branco td {
+    height: 30px;
+  }
+  .preencher span {
+    padding-top: 12px;
+  }
+  .tabela.em-branco td,
+  .tabela.em-branco th,
+  .preencher span {
+    border-color: #777 !important;
+  }
+  .caixa::before {
+    border-color: #000;
   }
 }

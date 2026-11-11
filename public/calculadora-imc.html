@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de IMC, cintura e relação cintura-quadril · Avalix</title>
+    <meta name="description" content="Calcule o IMC com a classificação da OMS e, com a cintura e o quadril, a relação cintura-quadril e a relação cintura-estatura. Grátis e sem cadastro." />
+    <link rel="canonical" href="https://avalixfit.com.br/calculadora-imc" />
+    <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/manrope-700.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/site/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Avalix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://avalixfit.com.br/calculadora-imc" />
+    <meta property="og:title" content="Calculadora de IMC, cintura e relação cintura-quadril · Avalix" />
+    <meta property="og:description" content="Calcule o IMC com a classificação da OMS e, com a cintura e o quadril, a relação cintura-quadril e a relação cintura-estatura. Grátis e sem cadastro." />
+    <meta property="og:image" content="https://avalixfit.com.br/og-avalix.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://avalixfit.com.br/"},{"@type":"ListItem","position":2,"name":"Calculadora de IMC","item":"https://avalixfit.com.br/calculadora-imc"}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"O IMC serve para avaliar a composição corporal?","acceptedAnswer":{"@type":"Answer","text":"Não sozinho. O IMC não separa massa magra de massa gorda: um aluno musculoso pode cair em sobrepeso sem excesso de gordura. Use junto com a cintura e, quando der, com o percentual de gordura por dobras."}},{"@type":"Question","name":"Quais são as faixas de IMC da OMS?","acceptedAnswer":{"@type":"Answer","text":"Para adultos: abaixo de 18,5 é abaixo do peso; de 18,5 a 24,9, peso normal; de 25 a 29,9, sobrepeso; de 30 a 34,9, obesidade grau I; de 35 a 39,9, grau II; a partir de 40, grau III."}},{"@type":"Question","name":"E para menores de 18 anos?","acceptedAnswer":{"@type":"Answer","text":"As faixas de adulto não valem. Dos 5 aos 19 anos a OMS classifica o IMC pela curva de idade e sexo (IMC para idade). Por isso a calculadora não classifica abaixo de 18 anos."}},{"@type":"Question","name":"Onde medir a cintura e o quadril?","acceptedAnswer":{"@type":"Answer","text":"A OMS mede a cintura no ponto médio entre a última costela e a crista ilíaca, ao fim de uma expiração normal, e o quadril na maior circunferência dos glúteos. Use sempre os mesmos pontos para acompanhar o mesmo aluno."}}]}</script>
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    <header class="topo">
+      <div class="envoltorio">
+        <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+        <nav class="menu" aria-label="Principal">
+          <a href="/avaliacao-fisica">Avaliação física</a>
+          <a href="/avaliacao-postural">Avaliação postural</a>
+          <a href="/app-para-personal-trainer">Treino e app do aluno</a>
+          <a href="/#ferramentas">Ferramentas grátis</a>
+          <a href="/#precos">Preços</a>
+        </nav>
+        <a class="entrar" href="/login">Entrar</a>
+        <a class="botao" href="/cadastro">Testar grátis</a>
+      </div>
+    </header>
+    <main id="conteudo">
+      <nav class="migalha envoltorio" aria-label="Você está em">
+        <a href="/">Início</a> › Calculadora de IMC
+      </nav>
+      <header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de IMC</h1>
+        <p class="lide">Informe peso e altura para o IMC com a faixa da OMS. Com a cintura e o quadril, a calculadora mostra também a relação cintura-quadril e a cintura-estatura, que dizem mais sobre a gordura abdominal.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-imc" novalidate>
+            <div class="campos">
+              <fieldset class="campo inteiro">
+                <legend>Sexo</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="sexo" value="F" checked /> Feminino</label>
+                  <label><input type="radio" name="sexo" value="M" /> Masculino</label>
+                </div>
+              </fieldset>
+              <div class="campo">
+                <label for="peso">Peso (kg)</label>
+                <input id="peso" name="peso" inputmode="decimal" autocomplete="off" placeholder="72,5" />
+              </div>
+              <div class="campo">
+                <label for="altura">Altura (cm)</label>
+                <input id="altura" name="altura" inputmode="decimal" autocomplete="off" placeholder="170" />
+              </div>
+              <div class="campo inteiro">
+                <label for="idade">Idade (anos)</label>
+                <input id="idade" name="idade" inputmode="numeric" autocomplete="off" placeholder="34" />
+              </div>
+              <div class="campo">
+                <label for="cintura">Cintura (cm, opcional)</label>
+                <input id="cintura" name="cintura" inputmode="decimal" autocomplete="off" placeholder="82" />
+              </div>
+              <div class="campo">
+                <label for="quadril">Quadril (cm, opcional)</label>
+                <input id="quadril" name="quadril" inputmode="decimal" autocomplete="off" placeholder="100" />
+              </div>
+            </div>
+            <p class="aviso-calc">IMC = peso ÷ altura², com a altura em metros.</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">IMC</span>
+              <span class="valor numero" id="valor-imc">—</span>
+              <p class="aviso-calc" id="nota-imc">Preencha o peso e a altura.</p>
+            </div>
+            <table class="tabela" id="detalhe-imc" hidden>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Faixas de IMC para adultos (OMS)</h2>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">IMC (kg/m²)</th><th scope="col">Classificação</th></tr></thead>
+              <tbody>
+                <tr><td>Abaixo de 18,5</td><td>Abaixo do peso</td></tr>
+                <tr><td>18,5 a 24,9</td><td>Peso normal</td></tr>
+                <tr><td>25 a 29,9</td><td>Sobrepeso</td></tr>
+                <tr><td>30 a 34,9</td><td>Obesidade grau I</td></tr>
+                <tr><td>35 a 39,9</td><td>Obesidade grau II</td></tr>
+                <tr><td>40 ou mais</td><td>Obesidade grau III</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2>Cintura e relação cintura-quadril</h2>
+          <p>A gordura acumulada no abdômen pesa mais no risco cardiometabólico do que o peso total. Por isso a OMS usa a cintura e a relação cintura-quadril junto com o IMC.</p>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">Medida</th><th scope="col">Homens</th><th scope="col">Mulheres</th><th scope="col">Indica</th></tr></thead>
+              <tbody>
+                <tr><td>Cintura</td><td>Acima de 94 cm</td><td>Acima de 80 cm</td><td>Risco aumentado</td></tr>
+                <tr><td>Cintura</td><td>Acima de 102 cm</td><td>Acima de 88 cm</td><td>Risco muito aumentado</td></tr>
+                <tr><td>Cintura ÷ quadril</td><td>0,90 ou mais</td><td>0,85 ou mais</td><td>Risco muito aumentado</td></tr>
+                <tr><td>Cintura ÷ altura</td><td>0,5 ou mais</td><td>0,5 ou mais</td><td>Cintura acima da metade da altura</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Os pontos de corte de cintura da OMS foram derivados principalmente de populações europeias, e a própria OMS reconhece valores diferentes para outras etnias. Use-os como triagem e acompanhe a evolução do mesmo aluno, não como diagnóstico.</p>
+          <p class="nota">Fontes: OMS, <em>Obesity: preventing and managing the global epidemic</em> (2000); OMS, <em>Waist circumference and waist–hip ratio: report of a WHO expert consultation</em> (2008); Ashwell e Hsieh, <em>International Journal of Food Sciences and Nutrition</em> (2005).</p>
+        </div>
+      </section>
+
+      <section class="secao" aria-labelledby="perguntas">
+        <div class="envoltorio">
+          <div class="cabeca-secao"><h2 id="perguntas">Perguntas frequentes</h2></div>
+          <div class="perguntas">
+            <details>
+              <summary>O IMC serve para avaliar a composição corporal?</summary>
+              <p>Não sozinho. O IMC não separa massa magra de massa gorda: um aluno musculoso pode cair em sobrepeso sem excesso de gordura. Use junto com a cintura e, quando der, com o percentual de gordura por dobras.</p>
+            </details>
+            <details>
+              <summary>Quais são as faixas de IMC da OMS?</summary>
+              <p>Para adultos: abaixo de 18,5 é abaixo do peso; de 18,5 a 24,9, peso normal; de 25 a 29,9, sobrepeso; de 30 a 34,9, obesidade grau I; de 35 a 39,9, grau II; a partir de 40, grau III.</p>
+            </details>
+            <details>
+              <summary>E para menores de 18 anos?</summary>
+              <p>As faixas de adulto não valem. Dos 5 aos 19 anos a OMS classifica o IMC pela curva de idade e sexo (IMC para idade). Por isso a calculadora não classifica abaixo de 18 anos.</p>
+            </details>
+            <details>
+              <summary>Onde medir a cintura e o quadril?</summary>
+              <p>A OMS mede a cintura no ponto médio entre a última costela e a crista ilíaca, ao fim de uma expiração normal, e o quadril na maior circunferência dos glúteos. Use sempre os mesmos pontos para acompanhar o mesmo aluno.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio">
+          <div class="chamada">
+            <div>
+              <h2>Acompanhe o IMC e a cintura de cada aluno</h2>
+              <p>No Avalix as medidas ficam no cadastro do aluno, a evolução aparece lado a lado e o laudo sai em PDF com a sua marca.</p>
+            </div>
+            <div class="acoes">
+              <a class="botao" href="/cadastro">Testar 14 dias grátis</a>
+              <span class="nota">Sem cartão de crédito</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="rodape">
+      <div class="envoltorio">
+        <div class="marca-rodape">
+          <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+          <p>Avaliação física, postural e treino para profissionais de Educação Física.</p>
+        </div>
+        <div>
+          <h2>Produto</h2>
+          <ul>
+            <li><a href="/avaliacao-fisica">Avaliação física</a></li>
+            <li><a href="/avaliacao-postural">Avaliação postural</a></li>
+            <li><a href="/app-para-personal-trainer">Treino e app do aluno</a></li>
+            <li><a href="/#precos">Preços</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Ferramentas grátis</h2>
+          <ul>
+            <li><a href="/calculadora-1rm">Calculadora de 1RM</a></li>
+            <li><a href="/calculadora-percentual-de-gordura">Percentual de gordura</a></li>
+            <li><a href="/calculadora-imc">IMC e cintura</a></li>
+            <li><a href="/calculadora-frequencia-cardiaca">Frequência cardíaca de treino</a></li>
+            <li><a href="/modelo-de-anamnese">Modelo de anamnese</a></li>
+            <li><a href="/questionario-par-q">Questionário PAR-Q</a></li>
+            <li><a href="/modelo-de-ficha-de-treino">Ficha de treino</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Avalix</h2>
+          <ul>
+            <li><a href="/cadastro">Testar 14 dias grátis</a></li>
+            <li><a href="/login">Entrar</a></li>
+            <li><a href="/termos">Termos de uso</a></li>
+            <li><a href="mailto:contato@avalixfit.com.br">contato@avalixfit.com.br</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/site/calculadora-imc.js"></script>
+  </body>
+</html>

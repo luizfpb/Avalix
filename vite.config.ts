@@ -67,7 +67,8 @@ export default defineConfig({
           "avaliacao-*.html",
           "app-para-personal-trainer.html",
           "calculadora-*.html",
-          "modelo-de-anamnese.html",
+          "modelo-de-*.html",
+          "questionario-*.html",
           "site/**",
           // Termos de Uso: texto lido online (cadastro, assinatura); não
           // precisa ocupar a instalação de quem usa o app no dia a dia.

@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://avalixfit.com.br/</loc>
-    <lastmod>2026-11-10</lastmod>
+    <lastmod>2026-11-11</lastmod>
   </url>
   <url>
     <loc>https://avalixfit.com.br/avaliacao-fisica</loc>
@@ -27,5 +27,21 @@
   <url>
     <loc>https://avalixfit.com.br/modelo-de-anamnese</loc>
     <lastmod>2026-11-10</lastmod>
+  </url>
+  <url>
+    <loc>https://avalixfit.com.br/calculadora-imc</loc>
+    <lastmod>2026-11-11</lastmod>
+  </url>
+  <url>
+    <loc>https://avalixfit.com.br/calculadora-frequencia-cardiaca</loc>
+    <lastmod>2026-11-11</lastmod>
+  </url>
+  <url>
+    <loc>https://avalixfit.com.br/questionario-par-q</loc>
+    <lastmod>2026-11-11</lastmod>
+  </url>
+  <url>
+    <loc>https://avalixfit.com.br/modelo-de-ficha-de-treino</loc>
+    <lastmod>2026-11-11</lastmod>
   </url>
 </urlset>

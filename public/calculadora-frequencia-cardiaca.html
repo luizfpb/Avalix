@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de frequência cardíaca de treino (Karvonen) · Avalix</title>
+    <meta name="description" content="Calcule a frequência cardíaca máxima (Tanaka ou 220 − idade) e as cinco zonas de treino, pela FC de reserva (Karvonen) ou em percentual da FC máxima. Grátis." />
+    <link rel="canonical" href="https://avalixfit.com.br/calculadora-frequencia-cardiaca" />
+    <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/manrope-700.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/site/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Avalix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://avalixfit.com.br/calculadora-frequencia-cardiaca" />
+    <meta property="og:title" content="Calculadora de frequência cardíaca de treino (Karvonen) · Avalix" />
+    <meta property="og:description" content="Calcule a frequência cardíaca máxima (Tanaka ou 220 − idade) e as cinco zonas de treino, pela FC de reserva (Karvonen) ou em percentual da FC máxima. Grátis." />
+    <meta property="og:image" content="https://avalixfit.com.br/og-avalix.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://avalixfit.com.br/"},{"@type":"ListItem","position":2,"name":"Calculadora de frequência cardíaca","item":"https://avalixfit.com.br/calculadora-frequencia-cardiaca"}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Qual fórmula de FC máxima usar?","acceptedAnswer":{"@type":"Answer","text":"A de Tanaka (208 − 0,7 × idade) saiu de uma grande revisão de estudos e erra menos que 220 − idade, principalmente em adultos mais velhos. As duas são estimativas e podem errar em 10 batimentos ou mais para uma pessoa. Quando houver teste de esforço, use a FC máxima medida."}},{"@type":"Question","name":"O que é a frequência cardíaca de reserva?","acceptedAnswer":{"@type":"Answer","text":"É a diferença entre a FC máxima e a de repouso. O método de Karvonen aplica o percentual de intensidade sobre essa reserva e soma a FC de repouso: FC alvo = FC de repouso + (FC máxima − FC de repouso) × percentual."}},{"@type":"Question","name":"Quem toma remédio para pressão pode usar as zonas?","acceptedAnswer":{"@type":"Answer","text":"Betabloqueadores e outros remédios que mexem na frequência cardíaca deixam as zonas estimadas sem sentido. Nesses casos, oriente pela percepção de esforço e siga a liberação médica."}}]}</script>
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    <header class="topo">
+      <div class="envoltorio">
+        <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+        <nav class="menu" aria-label="Principal">
+          <a href="/avaliacao-fisica">Avaliação física</a>
+          <a href="/avaliacao-postural">Avaliação postural</a>
+          <a href="/app-para-personal-trainer">Treino e app do aluno</a>
+          <a href="/#ferramentas">Ferramentas grátis</a>
+          <a href="/#precos">Preços</a>
+        </nav>
+        <a class="entrar" href="/login">Entrar</a>
+        <a class="botao" href="/cadastro">Testar grátis</a>
+      </div>
+    </header>
+    <main id="conteudo">
+      <nav class="migalha envoltorio" aria-label="Você está em">
+        <a href="/">Início</a> › Calculadora de frequência cardíaca
+      </nav>
+      <header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de frequência cardíaca de treino</h1>
+        <p class="lide">Informe a idade para estimar a FC máxima. Com a FC de repouso, as zonas saem pela frequência cardíaca de reserva (Karvonen), que considera o condicionamento do aluno.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-fc" novalidate>
+            <div class="campos">
+              <div class="campo">
+                <label for="idade">Idade (anos)</label>
+                <input id="idade" name="idade" inputmode="numeric" autocomplete="off" placeholder="34" />
+              </div>
+              <div class="campo">
+                <label for="repouso">FC de repouso (bpm, opcional)</label>
+                <input id="repouso" name="repouso" inputmode="numeric" autocomplete="off" placeholder="62" />
+              </div>
+              <fieldset class="campo inteiro">
+                <legend>FC máxima estimada por</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="formula" value="tanaka" checked /> Tanaka</label>
+                  <label><input type="radio" name="formula" value="fox" /> 220 − idade</label>
+                </div>
+              </fieldset>
+              <div class="campo inteiro">
+                <label for="medida">FC máxima medida em teste (bpm, opcional)</label>
+                <input id="medida" name="medida" inputmode="numeric" autocomplete="off" placeholder="Substitui a estimativa" />
+              </div>
+            </div>
+            <p class="aviso-calc">Tanaka: 208 − 0,7 × idade. Karvonen: FC de repouso + (FC máxima − FC de repouso) × percentual.</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">FC máxima</span>
+              <span class="valor numero" id="valor-fc">—</span>
+              <p class="aviso-calc" id="nota-fc">Preencha a idade.</p>
+            </div>
+            <div class="rolagem">
+              <table class="tabela" id="tabela-fc" hidden>
+                <caption class="rotulo" style="text-align:left;padding-bottom:6px">Zonas de treino</caption>
+                <thead><tr><th scope="col">Zona</th><th scope="col">Intensidade</th><th scope="col">Percentual</th><th scope="col">Frequência</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Como medir a FC de repouso</h2>
+          <p>Ao acordar, ainda deitado e antes de levantar, conte o pulso por 60 segundos no punho ou no pescoço, ou use o relógio. Repita em três manhãs e use a média. Café, má noite de sono e estresse elevam o valor.</p>
+          <h2>Como usar as zonas</h2>
+          <ul>
+            <li><strong>Zonas 1 e 2:</strong> aquecimento, recuperação e treino aeróbio longo. O aluno consegue conversar.</li>
+            <li><strong>Zona 3:</strong> ritmo moderado, sustentável por bastante tempo, com a fala mais curta.</li>
+            <li><strong>Zonas 4 e 5:</strong> intervalos intensos, de duração curta, para quem já tem base aeróbia.</li>
+          </ul>
+          <p>A FC demora a subir no começo de cada estímulo e muda com calor, hidratação e cansaço. Use as zonas como referência, junto com a percepção de esforço do aluno.</p>
+          <p class="nota">Fontes: Tanaka, Monahan e Seals, <em>Journal of the American College of Cardiology</em> (2001); Karvonen, Kentala e Mustala, <em>Annales Medicinae Experimentalis et Biologiae Fenniae</em> (1957).</p>
+        </div>
+      </section>
+
+      <section class="secao" aria-labelledby="perguntas">
+        <div class="envoltorio">
+          <div class="cabeca-secao"><h2 id="perguntas">Perguntas frequentes</h2></div>
+          <div class="perguntas">
+            <details>
+              <summary>Qual fórmula de FC máxima usar?</summary>
+              <p>A de Tanaka (208 − 0,7 × idade) saiu de uma grande revisão de estudos e erra menos que 220 − idade, principalmente em adultos mais velhos. As duas são estimativas e podem errar em 10 batimentos ou mais para uma pessoa. Quando houver teste de esforço, use a FC máxima medida.</p>
+            </details>
+            <details>
+              <summary>O que é a frequência cardíaca de reserva?</summary>
+              <p>É a diferença entre a FC máxima e a de repouso. O método de Karvonen aplica o percentual de intensidade sobre essa reserva e soma a FC de repouso: FC alvo = FC de repouso + (FC máxima − FC de repouso) × percentual.</p>
+            </details>
+            <details>
+              <summary>Quem toma remédio para pressão pode usar as zonas?</summary>
+              <p>Betabloqueadores e outros remédios que mexem na frequência cardíaca deixam as zonas estimadas sem sentido. Nesses casos, oriente pela percepção de esforço e siga a liberação médica.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio">
+          <div class="chamada">
+            <div>
+              <h2>Prescreva e acompanhe o treino no Avalix</h2>
+              <p>Monte o treino semana a semana, mande por link e veja cada sessão registrada pelo aluno.</p>
+            </div>
+            <div class="acoes">
+              <a class="botao" href="/cadastro">Testar 14 dias grátis</a>
+              <span class="nota">Sem cartão de crédito</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="rodape">
+      <div class="envoltorio">
+        <div class="marca-rodape">
+          <a class="logo" href="/" aria-label="Avalix, página inicial"><span></span></a>
+          <p>Avaliação física, postural e treino para profissionais de Educação Física.</p>
+        </div>
+        <div>
+          <h2>Produto</h2>
+          <ul>
+            <li><a href="/avaliacao-fisica">Avaliação física</a></li>
+            <li><a href="/avaliacao-postural">Avaliação postural</a></li>
+            <li><a href="/app-para-personal-trainer">Treino e app do aluno</a></li>
+            <li><a href="/#precos">Preços</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Ferramentas grátis</h2>
+          <ul>
+            <li><a href="/calculadora-1rm">Calculadora de 1RM</a></li>
+            <li><a href="/calculadora-percentual-de-gordura">Percentual de gordura</a></li>
+            <li><a href="/calculadora-imc">IMC e cintura</a></li>
+            <li><a href="/calculadora-frequencia-cardiaca">Frequência cardíaca de treino</a></li>
+            <li><a href="/modelo-de-anamnese">Modelo de anamnese</a></li>
+            <li><a href="/questionario-par-q">Questionário PAR-Q</a></li>
+            <li><a href="/modelo-de-ficha-de-treino">Ficha de treino</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Avalix</h2>
+          <ul>
+            <li><a href="/cadastro">Testar 14 dias grátis</a></li>
+            <li><a href="/login">Entrar</a></li>
+            <li><a href="/termos">Termos de uso</a></li>
+            <li><a href="mailto:contato@avalixfit.com.br">contato@avalixfit.com.br</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="/site/calculadora-fc.js"></script>
+  </body>
+</html>

@@ -54,6 +54,22 @@
   ! X-Robots-Tag
   Cache-Control: no-cache
 
+/calculadora-imc
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/calculadora-frequencia-cardiaca
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/questionario-par-q
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
+/modelo-de-ficha-de-treino
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
 /robots.txt
   ! X-Robots-Tag
   Cache-Control: public, max-age=3600

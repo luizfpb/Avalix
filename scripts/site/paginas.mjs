@@ -7,6 +7,8 @@ export const SITE = {
 }
 
 const ATUALIZADA = '2026-11-10'
+// IMC, frequência cardíaca, PAR-Q e ficha de treino; a landing ganhou os cartões
+const NOVAS = '2026-11-11'
 
 function esc(texto) {
   return String(texto)
@@ -175,7 +177,7 @@ const PERGUNTAS_LANDING = [
 const landing = {
   arquivo: 'inicio.html',
   rota: '/',
-  atualizada: ATUALIZADA,
+  atualizada: NOVAS,
   titulo: 'Avalix · Avaliação física, postural e treino para personal trainer',
   tituloSocial: 'Avalix · Avaliação física e postural',
   descricao:
@@ -296,6 +298,26 @@ const landing = {
               <h3>Modelo de anamnese</h3>
               <p>Roteiro completo para a primeira conversa com o aluno, com PAR-Q e sinais de alerta. Dá para imprimir.</p>
               <span class="mais">Ver o modelo →</span>
+            </a>
+            <a class="ferramenta" href="/calculadora-imc">
+              <h3>IMC e cintura</h3>
+              <p>IMC com a faixa da OMS, relação cintura-quadril e cintura-estatura.</p>
+              <span class="mais">Calcular IMC →</span>
+            </a>
+            <a class="ferramenta" href="/calculadora-frequencia-cardiaca">
+              <h3>Frequência cardíaca de treino</h3>
+              <p>FC máxima por Tanaka ou 220 − idade e as cinco zonas pela FC de reserva (Karvonen).</p>
+              <span class="mais">Calcular zonas →</span>
+            </a>
+            <a class="ferramenta" href="/questionario-par-q">
+              <h3>Questionário PAR-Q</h3>
+              <p>As 7 perguntas de prontidão para atividade física, com sim, não e assinatura. Para imprimir.</p>
+              <span class="mais">Ver o PAR-Q →</span>
+            </a>
+            <a class="ferramenta" href="/modelo-de-ficha-de-treino">
+              <h3>Modelo de ficha de treino</h3>
+              <p>Ficha em branco com treinos A, B e C, séries, repetições, carga e descanso.</p>
+              <span class="mais">Ver a ficha →</span>
             </a>
           </div>
         </div>
@@ -767,5 +789,338 @@ const modeloAnamnese = {
       ${chamada('Mande este modelo por link e receba tudo organizado', 'No Avalix o aluno responde a anamnese no celular, aceita o termo de consentimento, e os sinais de alerta chegam destacados para você.')}`,
 }
 
-export const PAGINAS = [landing, avaliacaoFisica, avaliacaoPostural, appPersonal, calc1rm, calcGordura, modeloAnamnese]
+// ------------------------------------------------------------------ IMC e cintura
+
+const calcImc = {
+  arquivo: 'calculadora-imc.html',
+  rota: '/calculadora-imc',
+  atualizada: NOVAS,
+  migalha: 'Calculadora de IMC',
+  titulo: 'Calculadora de IMC, cintura e relação cintura-quadril · Avalix',
+  descricao:
+    'Calcule o IMC com a classificação da OMS e, com a cintura e o quadril, a relação cintura-quadril e a relação cintura-estatura. Grátis e sem cadastro.',
+  scripts: ['/site/calculadora-imc.js'],
+  perguntas: [
+    ['O IMC serve para avaliar a composição corporal?',
+      'Não sozinho. O IMC não separa massa magra de massa gorda: um aluno musculoso pode cair em sobrepeso sem excesso de gordura. Use junto com a cintura e, quando der, com o percentual de gordura por dobras.'],
+    ['Quais são as faixas de IMC da OMS?',
+      'Para adultos: abaixo de 18,5 é abaixo do peso; de 18,5 a 24,9, peso normal; de 25 a 29,9, sobrepeso; de 30 a 34,9, obesidade grau I; de 35 a 39,9, grau II; a partir de 40, grau III.'],
+    ['E para menores de 18 anos?',
+      'As faixas de adulto não valem. Dos 5 aos 19 anos a OMS classifica o IMC pela curva de idade e sexo (IMC para idade). Por isso a calculadora não classifica abaixo de 18 anos.'],
+    ['Onde medir a cintura e o quadril?',
+      'A OMS mede a cintura no ponto médio entre a última costela e a crista ilíaca, ao fim de uma expiração normal, e o quadril na maior circunferência dos glúteos. Use sempre os mesmos pontos para acompanhar o mesmo aluno.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de IMC</h1>
+        <p class="lide">Informe peso e altura para o IMC com a faixa da OMS. Com a cintura e o quadril, a calculadora mostra também a relação cintura-quadril e a cintura-estatura, que dizem mais sobre a gordura abdominal.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-imc" novalidate>
+            <div class="campos">
+              <fieldset class="campo inteiro">
+                <legend>Sexo</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="sexo" value="F" checked /> Feminino</label>
+                  <label><input type="radio" name="sexo" value="M" /> Masculino</label>
+                </div>
+              </fieldset>
+              <div class="campo">
+                <label for="peso">Peso (kg)</label>
+                <input id="peso" name="peso" inputmode="decimal" autocomplete="off" placeholder="72,5" />
+              </div>
+              <div class="campo">
+                <label for="altura">Altura (cm)</label>
+                <input id="altura" name="altura" inputmode="decimal" autocomplete="off" placeholder="170" />
+              </div>
+              <div class="campo inteiro">
+                <label for="idade">Idade (anos)</label>
+                <input id="idade" name="idade" inputmode="numeric" autocomplete="off" placeholder="34" />
+              </div>
+              <div class="campo">
+                <label for="cintura">Cintura (cm, opcional)</label>
+                <input id="cintura" name="cintura" inputmode="decimal" autocomplete="off" placeholder="82" />
+              </div>
+              <div class="campo">
+                <label for="quadril">Quadril (cm, opcional)</label>
+                <input id="quadril" name="quadril" inputmode="decimal" autocomplete="off" placeholder="100" />
+              </div>
+            </div>
+            <p class="aviso-calc">IMC = peso ÷ altura², com a altura em metros.</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">IMC</span>
+              <span class="valor numero" id="valor-imc">—</span>
+              <p class="aviso-calc" id="nota-imc">Preencha o peso e a altura.</p>
+            </div>
+            <table class="tabela" id="detalhe-imc" hidden>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Faixas de IMC para adultos (OMS)</h2>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">IMC (kg/m²)</th><th scope="col">Classificação</th></tr></thead>
+              <tbody>
+                <tr><td>Abaixo de 18,5</td><td>Abaixo do peso</td></tr>
+                <tr><td>18,5 a 24,9</td><td>Peso normal</td></tr>
+                <tr><td>25 a 29,9</td><td>Sobrepeso</td></tr>
+                <tr><td>30 a 34,9</td><td>Obesidade grau I</td></tr>
+                <tr><td>35 a 39,9</td><td>Obesidade grau II</td></tr>
+                <tr><td>40 ou mais</td><td>Obesidade grau III</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2>Cintura e relação cintura-quadril</h2>
+          <p>A gordura acumulada no abdômen pesa mais no risco cardiometabólico do que o peso total. Por isso a OMS usa a cintura e a relação cintura-quadril junto com o IMC.</p>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">Medida</th><th scope="col">Homens</th><th scope="col">Mulheres</th><th scope="col">Indica</th></tr></thead>
+              <tbody>
+                <tr><td>Cintura</td><td>Acima de 94 cm</td><td>Acima de 80 cm</td><td>Risco aumentado</td></tr>
+                <tr><td>Cintura</td><td>Acima de 102 cm</td><td>Acima de 88 cm</td><td>Risco muito aumentado</td></tr>
+                <tr><td>Cintura ÷ quadril</td><td>0,90 ou mais</td><td>0,85 ou mais</td><td>Risco muito aumentado</td></tr>
+                <tr><td>Cintura ÷ altura</td><td>0,5 ou mais</td><td>0,5 ou mais</td><td>Cintura acima da metade da altura</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Os pontos de corte de cintura da OMS foram derivados principalmente de populações europeias, e a própria OMS reconhece valores diferentes para outras etnias. Use-os como triagem e acompanhe a evolução do mesmo aluno, não como diagnóstico.</p>
+          <p class="nota">Fontes: OMS, <em>Obesity: preventing and managing the global epidemic</em> (2000); OMS, <em>Waist circumference and waist–hip ratio: report of a WHO expert consultation</em> (2008); Ashwell e Hsieh, <em>International Journal of Food Sciences and Nutrition</em> (2005).</p>
+        </div>
+      </section>
+
+      PERGUNTAS
+
+      ${chamada('Acompanhe o IMC e a cintura de cada aluno', 'No Avalix as medidas ficam no cadastro do aluno, a evolução aparece lado a lado e o laudo sai em PDF com a sua marca.')}`,
+}
+
+// ------------------------------------------------------------------ frequência cardíaca
+
+const calcFc = {
+  arquivo: 'calculadora-frequencia-cardiaca.html',
+  rota: '/calculadora-frequencia-cardiaca',
+  atualizada: NOVAS,
+  migalha: 'Calculadora de frequência cardíaca',
+  titulo: 'Calculadora de frequência cardíaca de treino (Karvonen) · Avalix',
+  descricao:
+    'Calcule a frequência cardíaca máxima (Tanaka ou 220 − idade) e as cinco zonas de treino, pela FC de reserva (Karvonen) ou em percentual da FC máxima. Grátis.',
+  scripts: ['/site/calculadora-fc.js'],
+  perguntas: [
+    ['Qual fórmula de FC máxima usar?',
+      'A de Tanaka (208 − 0,7 × idade) saiu de uma grande revisão de estudos e erra menos que 220 − idade, principalmente em adultos mais velhos. As duas são estimativas e podem errar em 10 batimentos ou mais para uma pessoa. Quando houver teste de esforço, use a FC máxima medida.'],
+    ['O que é a frequência cardíaca de reserva?',
+      'É a diferença entre a FC máxima e a de repouso. O método de Karvonen aplica o percentual de intensidade sobre essa reserva e soma a FC de repouso: FC alvo = FC de repouso + (FC máxima − FC de repouso) × percentual.'],
+    ['Quem toma remédio para pressão pode usar as zonas?',
+      'Betabloqueadores e outros remédios que mexem na frequência cardíaca deixam as zonas estimadas sem sentido. Nesses casos, oriente pela percepção de esforço e siga a liberação médica.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de frequência cardíaca de treino</h1>
+        <p class="lide">Informe a idade para estimar a FC máxima. Com a FC de repouso, as zonas saem pela frequência cardíaca de reserva (Karvonen), que considera o condicionamento do aluno.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-fc" novalidate>
+            <div class="campos">
+              <div class="campo">
+                <label for="idade">Idade (anos)</label>
+                <input id="idade" name="idade" inputmode="numeric" autocomplete="off" placeholder="34" />
+              </div>
+              <div class="campo">
+                <label for="repouso">FC de repouso (bpm, opcional)</label>
+                <input id="repouso" name="repouso" inputmode="numeric" autocomplete="off" placeholder="62" />
+              </div>
+              <fieldset class="campo inteiro">
+                <legend>FC máxima estimada por</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="formula" value="tanaka" checked /> Tanaka</label>
+                  <label><input type="radio" name="formula" value="fox" /> 220 − idade</label>
+                </div>
+              </fieldset>
+              <div class="campo inteiro">
+                <label for="medida">FC máxima medida em teste (bpm, opcional)</label>
+                <input id="medida" name="medida" inputmode="numeric" autocomplete="off" placeholder="Substitui a estimativa" />
+              </div>
+            </div>
+            <p class="aviso-calc">Tanaka: 208 − 0,7 × idade. Karvonen: FC de repouso + (FC máxima − FC de repouso) × percentual.</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">FC máxima</span>
+              <span class="valor numero" id="valor-fc">—</span>
+              <p class="aviso-calc" id="nota-fc">Preencha a idade.</p>
+            </div>
+            <div class="rolagem">
+              <table class="tabela" id="tabela-fc" hidden>
+                <caption class="rotulo" style="text-align:left;padding-bottom:6px">Zonas de treino</caption>
+                <thead><tr><th scope="col">Zona</th><th scope="col">Intensidade</th><th scope="col">Percentual</th><th scope="col">Frequência</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Como medir a FC de repouso</h2>
+          <p>Ao acordar, ainda deitado e antes de levantar, conte o pulso por 60 segundos no punho ou no pescoço, ou use o relógio. Repita em três manhãs e use a média. Café, má noite de sono e estresse elevam o valor.</p>
+          <h2>Como usar as zonas</h2>
+          <ul>
+            <li><strong>Zonas 1 e 2:</strong> aquecimento, recuperação e treino aeróbio longo. O aluno consegue conversar.</li>
+            <li><strong>Zona 3:</strong> ritmo moderado, sustentável por bastante tempo, com a fala mais curta.</li>
+            <li><strong>Zonas 4 e 5:</strong> intervalos intensos, de duração curta, para quem já tem base aeróbia.</li>
+          </ul>
+          <p>A FC demora a subir no começo de cada estímulo e muda com calor, hidratação e cansaço. Use as zonas como referência, junto com a percepção de esforço do aluno.</p>
+          <p class="nota">Fontes: Tanaka, Monahan e Seals, <em>Journal of the American College of Cardiology</em> (2001); Karvonen, Kentala e Mustala, <em>Annales Medicinae Experimentalis et Biologiae Fenniae</em> (1957).</p>
+        </div>
+      </section>
+
+      PERGUNTAS
+
+      ${chamada('Prescreva e acompanhe o treino no Avalix', 'Monte o treino semana a semana, mande por link e veja cada sessão registrada pelo aluno.')}`,
+}
+
+// ------------------------------------------------------------------ PAR-Q
+
+const parq = {
+  arquivo: 'questionario-par-q.html',
+  rota: '/questionario-par-q',
+  atualizada: NOVAS,
+  migalha: 'Questionário PAR-Q',
+  titulo: 'Questionário PAR-Q para imprimir, com as 7 perguntas · Avalix',
+  descricao:
+    'Questionário PAR-Q em português, com as 7 perguntas de prontidão para atividade física, campos de sim e não e assinatura. Grátis para imprimir e aplicar com o aluno.',
+  scripts: ['/site/imprimir.js'],
+  perguntas: [
+    ['O que é o PAR-Q?',
+      'É um questionário curto de prontidão para atividade física. As respostas indicam se a pessoa pode começar a se exercitar ou se precisa conversar com um médico antes. Esta versão traz as 7 perguntas gerais do PAR-Q+.'],
+    ['O que fazer quando o aluno responde sim?',
+      'Converse sobre a resposta e, em geral, peça avaliação ou liberação médica antes de começar ou de aumentar a intensidade. Anote a conduta junto com o questionário.'],
+    ['Com que frequência refazer o PAR-Q?',
+      'A cada reavaliação e sempre que a saúde do aluno mudar: diagnóstico novo, remédio novo, cirurgia, gestação ou sintoma durante o treino.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Questionário PAR-Q</h1>
+        <p class="lide">As 7 perguntas de prontidão para atividade física, para o aluno responder antes de começar. Imprima, preencha com ele e guarde junto com a anamnese.</p>
+        <div class="acoes nao-imprimir"><button class="botao secundario" type="button" data-imprimir hidden>Imprimir o questionário</button></div>
+      </header>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <div class="preencher largo">
+            <span>Nome</span>
+            <span>Data de nascimento</span>
+            <span>Data</span>
+          </div>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Pergunta</th><th scope="col" class="caixa-titulo">Sim</th><th scope="col" class="caixa-titulo">Não</th></tr></thead>
+              <tbody>
+                ${PARQ.map((q, i) => `<tr><td>${i + 1}. ${q}</td><td class="caixa" aria-label="Sim"></td><td class="caixa" aria-label="Não"></td></tr>`).join('\n                ')}
+              </tbody>
+            </table>
+          </div>
+
+          <h2>Respondeu não a todas</h2>
+          <p>O aluno pode começar a se exercitar, de forma gradual. Refaça o questionário a cada reavaliação ou quando a saúde dele mudar.</p>
+
+          <h2>Respondeu sim a alguma</h2>
+          <p>Converse sobre a resposta e, em geral, peça avaliação ou liberação médica antes de começar ou de aumentar a intensidade. Febre, gripe ou outra doença passageira: espere melhorar. Gestantes: liberação do obstetra.</p>
+
+          <div class="preencher largo">
+            <span>Assinatura do aluno ou do responsável legal</span>
+            <span>Profissional e CREF</span>
+          </div>
+          <p class="nota">Versão em português das perguntas gerais do PAR-Q+ (<em>Physical Activity Readiness Questionnaire for Everyone</em>). Não substitui a avaliação médica.</p>
+        </div>
+      </section>
+
+      PERGUNTAS
+
+      ${chamada('Mande o PAR-Q por link e receba a resposta pronta', 'No Avalix o PAR-Q faz parte da anamnese que o aluno responde no celular, e cada “sim” chega destacado para você.')}`,
+}
+
+// ------------------------------------------------------------------ ficha de treino
+
+function treinoEmBranco(letra) {
+  const linhas = Array.from({ length: 8 }, () => '<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>')
+  return `<h2>Treino ${letra}</h2>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Exercício</th><th scope="col">Séries</th><th scope="col">Repetições</th><th scope="col">Carga</th><th scope="col">Descanso</th><th scope="col">Observações</th></tr></thead>
+              <tbody>
+                ${linhas.join('\n                ')}
+              </tbody>
+            </table>
+          </div>`
+}
+
+const fichaTreino = {
+  arquivo: 'modelo-de-ficha-de-treino.html',
+  rota: '/modelo-de-ficha-de-treino',
+  atualizada: NOVAS,
+  migalha: 'Modelo de ficha de treino',
+  titulo: 'Modelo de ficha de treino para imprimir (A, B e C) · Avalix',
+  descricao:
+    'Modelo de ficha de treino em branco, com treinos A, B e C, séries, repetições, carga e descanso. Grátis para imprimir e preencher com o aluno.',
+  scripts: ['/site/imprimir.js'],
+  perguntas: [
+    ['Qual divisão de treino escolher?',
+      'Com 2 ou 3 treinos por semana, trabalhar o corpo inteiro em cada sessão costuma render mais. Com 4 ou mais, divisões A e B ou A, B e C permitem mais volume por grupo muscular sem alongar a sessão.'],
+    ['Quanto tempo de descanso entre as séries?',
+      'Nos exercícios multiarticulares com carga alta, de 2 a 3 minutos; nos demais, de 1 a 2 minutos costumam bastar, segundo o posicionamento do American College of Sports Medicine (2009).'],
+    ['Quando trocar a ficha?',
+      'Não há prazo fixo. Troque quando o aluno parar de progredir ou ao fim do mesociclo, em geral entre 4 e 8 semanas, e sempre depois de uma reavaliação.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Modelo de ficha de treino</h1>
+        <p class="lide">Ficha em branco com treinos A, B e C. Imprima, preencha os exercícios e entregue ao aluno, ou use como roteiro para montar o treino.</p>
+        <div class="acoes nao-imprimir"><button class="botao secundario" type="button" data-imprimir hidden>Imprimir a ficha</button></div>
+      </header>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <div class="preencher largo">
+            <span>Aluno</span>
+            <span>Objetivo</span>
+            <span>Início</span>
+            <span>Treinos por semana</span>
+            <span>Profissional e CREF</span>
+          </div>
+          ${['A', 'B', 'C'].map(treinoEmBranco).join('\n\n          ')}
+        </div>
+      </section>
+
+      <section class="secao nao-imprimir">
+        <div class="envoltorio texto">
+          <h2>Como preencher</h2>
+          <ul>
+            <li><strong>Ordem:</strong> exercícios multiarticulares (agachamento, supino, remada) antes dos isolados, enquanto o aluno está descansado.</li>
+            <li><strong>Repetições e carga:</strong> escreva a faixa de repetições e a carga que leva o aluno perto da falha nessa faixa. A <a href="/calculadora-1rm">calculadora de 1RM</a> ajuda a partir de um teste.</li>
+            <li><strong>Progressão:</strong> quando o aluno passar do topo da faixa em todas as séries, aumente a carga na sessão seguinte.</li>
+            <li><strong>Observações:</strong> ajuste de máquina, amplitude, cadência, e o que a anamnese pede para evitar.</li>
+          </ul>
+          <p>Antes de montar o primeiro treino, aplique o <a href="/questionario-par-q">PAR-Q</a> e a <a href="/modelo-de-anamnese">anamnese</a>.</p>
+        </div>
+      </section>
+
+      PERGUNTAS
+
+      ${chamada('Troque a ficha de papel pelo celular do aluno', 'No Avalix o aluno abre o treino por link, vê a carga da última vez em cada série e registra o que fez. O registro volta para você.')}`,
+}
+
+export const PAGINAS = [
+  landing, avaliacaoFisica, avaliacaoPostural, appPersonal,
+  calc1rm, calcGordura, modeloAnamnese,
+  calcImc, calcFc, parq, fichaTreino,
+]
   .map((p) => ({ ...p, corpo: p.corpo.replace('PERGUNTAS', p.perguntas?.length && p.rota !== '/' ? perguntasHtml(p.perguntas) : '') }))

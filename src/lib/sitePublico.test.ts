@@ -8,6 +8,7 @@ import {
   usNavyBodyFatPct,
 } from '../features/assessment/protocols/equations'
 import { siriBodyFatPct } from '../features/assessment/protocols/bodyComposition'
+import { bmiCategory, computeBmi } from '../features/assessment/bmi'
 
 // Páginas públicas (landing, recursos e ferramentas grátis): HTML estático
 // gerado por scripts/gerar-site.mjs, fora da SPA, para o Google indexar.
@@ -23,6 +24,13 @@ type Calculos = {
   jpWardFemaleBodyDensity: typeof jpWardFemaleBodyDensity
   siriBodyFatPct: typeof siriBodyFatPct
   usNavyBodyFatPct: typeof usNavyBodyFatPct
+  computeBmi: typeof computeBmi
+  bmiCategory: typeof bmiCategory
+  waistRisk: (sex: 'M' | 'F', waistCm: number) => string
+  waistHipRisk: (sex: 'M' | 'F', ratio: number) => string
+  waistHeightRisk: (ratio: number) => string
+  hrMax: (ageYears: number, formula?: 'tanaka' | 'fox') => number
+  hrZones: (maxHr: number, restHr?: number | null) => { zona: number; de: number; ate: number; min: number; max: number }[]
   lerNumero: (texto: string) => number | null
 }
 
@@ -38,6 +46,10 @@ const PUBLICAS = [
   '/calculadora-1rm',
   '/calculadora-percentual-de-gordura',
   '/modelo-de-anamnese',
+  '/calculadora-imc',
+  '/calculadora-frequencia-cardiaca',
+  '/questionario-par-q',
+  '/modelo-de-ficha-de-treino',
 ]
 
 function blocosDeHeaders(texto: string) {
@@ -146,6 +158,56 @@ describe('fórmulas das ferramentas grátis', () => {
     const landing = await ler('public/inicio.html')
     expect(landing).toContain('<strong>22,8%</strong>')
     expect(landing).toContain('massa magra 48,2 kg')
+  })
+
+  it('IMC e faixas da OMS iguais ao app, inclusive sem classificar menor de 18', async () => {
+    const c = await importar<Calculos>('public/site/calculos.js')
+    for (const [peso, altura] of [[72.5, 170], [45, 168], [130, 180], [62.4, 165.5]]) {
+      expect(c.computeBmi(peso, altura)).toBe(computeBmi(peso, altura))
+    }
+    for (const imc of [18.49, 18.5, 24.99, 25, 29.99, 30, 34.99, 35, 39.99, 40, 52]) {
+      for (const idade of [17, 18, 45, null, Number.NaN]) {
+        expect(c.bmiCategory(imc, idade)).toEqual(bmiCategory(imc, idade))
+      }
+    }
+  })
+
+  it('cintura e relação cintura-quadril nos pontos de corte da OMS (2008)', async () => {
+    const c = await importar<Calculos>('public/site/calculos.js')
+    expect(c.waistRisk('M', 94)).toBe('baixo')
+    expect(c.waistRisk('M', 95)).toBe('aumentado')
+    expect(c.waistRisk('M', 103)).toBe('muito aumentado')
+    expect(c.waistRisk('F', 80)).toBe('baixo')
+    expect(c.waistRisk('F', 81)).toBe('aumentado')
+    expect(c.waistRisk('F', 89)).toBe('muito aumentado')
+    expect(c.waistHipRisk('M', 0.89)).toBe('abaixo do ponto de corte')
+    expect(c.waistHipRisk('M', 0.9)).toBe('muito aumentado')
+    expect(c.waistHipRisk('F', 0.84)).toBe('abaixo do ponto de corte')
+    expect(c.waistHipRisk('F', 0.85)).toBe('muito aumentado')
+    expect(c.waistHeightRisk(0.49)).toBe('abaixo de 0,5')
+    expect(c.waistHeightRisk(0.5)).toBe('acima de 0,5')
+  })
+
+  it('FC máxima de Tanaka e de 220 − idade, e zonas por Karvonen', async () => {
+    const c = await importar<Calculos>('public/site/calculos.js')
+    expect(c.hrMax(40)).toBe(180)
+    expect(c.hrMax(40, 'fox')).toBe(180)
+    expect(c.hrMax(20)).toBe(194)
+    expect(c.hrMax(60, 'fox')).toBe(160)
+    // sem repouso: percentual da FC máxima
+    const simples = c.hrZones(180)
+    expect(simples.map((z) => [z.min, z.max])).toEqual([[90, 108], [108, 126], [126, 144], [144, 162], [162, 180]])
+    // Karvonen: repouso + (máx − repouso) × %
+    const reserva = c.hrZones(180, 60)
+    expect(reserva[0]).toMatchObject({ zona: 1, min: 120, max: 132 })
+    expect(reserva[4]).toMatchObject({ zona: 5, min: 168, max: 180 })
+  })
+
+  it('o PAR-Q imprimível tem as 7 perguntas, com sim e não em cada uma', async () => {
+    const html = await ler('public/questionario-par-q.html')
+    expect(html.match(/<td class="caixa" aria-label="Sim"><\/td>/g)).toHaveLength(7)
+    expect(html.match(/<td class="caixa" aria-label="Não"><\/td>/g)).toHaveLength(7)
+    for (let i = 1; i <= 7; i++) expect(html).toContain(`<tr><td>${i}. `)
   })
 
   it('lê número no formato brasileiro', async () => {
