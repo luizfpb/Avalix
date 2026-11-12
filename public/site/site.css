@@ -859,6 +859,12 @@ fieldset.campo {
   padding-right: 0;
 }
 
+/* Anamnese: linhas de resposta, Sim/Não e assinatura só no papel. Na tela a
+   página continua um guia de leitura. */
+.so-impressao {
+  display: none !important;
+}
+
 /* ------------------------------------------------------------ rodapé */
 
 .rodape {
@@ -979,5 +985,44 @@ fieldset.campo {
   }
   .caixa::before {
     border-color: #000;
+  }
+  /* bordas em vez de fundo: o Chrome não imprime fundo sem "gráficos de
+     segundo plano" marcado */
+  .so-impressao {
+    display: block !important;
+  }
+  .sim-nao.so-impressao {
+    display: flex !important;
+    gap: 22px;
+    margin-top: 3px;
+  }
+  .sim-nao .caixa::before {
+    margin-right: 6px;
+  }
+  .resposta span {
+    display: block;
+    height: 24px;
+    border-bottom: 1px solid #777;
+  }
+  .preencher.so-impressao {
+    display: grid !important;
+    margin-top: 18px;
+  }
+  .texto li {
+    break-inside: avoid;
+  }
+  ul.marcar {
+    list-style: none;
+    padding-left: 0;
+  }
+  ul.marcar li::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #000;
+    border-radius: 3px;
+    vertical-align: -2px;
+    margin-right: 8px;
   }
 }

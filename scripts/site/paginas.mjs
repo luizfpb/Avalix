@@ -696,10 +696,18 @@ const PARQ = [
   'Algum médico já disse que você só deve fazer atividade física sob supervisão médica?',
 ]
 
+// Espaço de resposta: só aparece no papel (.so-impressao). Na tela a página
+// segue como guia de leitura; impressa, vira ficha para preencher à mão.
+function linhas(n) {
+  return `<span class="resposta so-impressao" aria-hidden="true">${'<span></span>'.repeat(n)}</span>`
+}
+const SIM_NAO = '<span class="sim-nao so-impressao" aria-hidden="true"><span class="caixa">Sim</span><span class="caixa">Não</span></span>'
+const itens = (lista) => lista.map(([t, n]) => `<li>${t}${linhas(n)}</li>`).join('\n            ')
+
 const modeloAnamnese = {
   arquivo: 'modelo-de-anamnese.html',
   rota: '/modelo-de-anamnese',
-  atualizada: ATUALIZADA,
+  atualizada: NOVAS,
   migalha: 'Modelo de anamnese',
   titulo: 'Modelo de anamnese para personal trainer, com PAR-Q · Avalix',
   descricao:
@@ -723,21 +731,23 @@ const modeloAnamnese = {
         <div class="envoltorio texto">
           <h2>1. Identificação</h2>
           <ul>
-            <li>Nome, data de nascimento e sexo</li>
-            <li>Telefone e contato de emergência</li>
-            <li>Profissão e rotina de trabalho (sentado, em pé, carga física)</li>
-            <li>Lateralidade: destro, canhoto ou ambidestro</li>
+            ${itens([
+              ['Nome, data de nascimento e sexo', 1],
+              ['Telefone e contato de emergência', 1],
+              ['Profissão e rotina de trabalho (sentado, em pé, carga física)', 2],
+              ['Lateralidade: destro, canhoto ou ambidestro', 1],
+            ])}
           </ul>
 
           <h2>2. Prontidão para atividade física (PAR-Q)</h2>
           <p>Responda sim ou não. Qualquer “sim” pede conversa e, em geral, liberação médica antes de começar.</p>
           <ol>
-            ${PARQ.map((q) => `<li>${q}</li>`).join('\n            ')}
+            ${PARQ.map((q) => `<li>${q}${SIM_NAO}</li>`).join('\n            ')}
           </ol>
 
           <h2>3. Sinais de alerta</h2>
           <p>Algum destes nos últimos meses? Sinal presente: encaminhe ao médico antes de iniciar o treino.</p>
-          <ul>
+          <ul class="marcar">
             <li>Dor ou desconforto no peito</li>
             <li>Falta de ar anormal ao esforço ou em repouso, ou ao deitar</li>
             <li>Tontura ou desmaio</li>
@@ -749,38 +759,52 @@ const modeloAnamnese = {
 
           <h2>4. Histórico de saúde</h2>
           <ul>
-            <li>Doenças diagnosticadas: hipertensão, diabetes tipo 1 ou 2, dislipidemia, cardiopatia, doença renal, pulmonar (asma, DPOC), tireoidiana, reumática, osteoporose, neurológica, câncer atual ou prévio</li>
-            <li>Medicamentos em uso, com dose</li>
-            <li>Cirurgias e internações</li>
-            <li>Gestação atual ou recente</li>
-            <li>Alteração postural já diagnosticada: escoliose, hipercifose, hiperlordose</li>
+            ${itens([
+              ['Doenças diagnosticadas: hipertensão, diabetes tipo 1 ou 2, dislipidemia, cardiopatia, doença renal, pulmonar (asma, DPOC), tireoidiana, reumática, osteoporose, neurológica, câncer atual ou prévio', 2],
+              ['Medicamentos em uso, com dose', 2],
+              ['Cirurgias e internações', 2],
+              ['Gestação atual ou recente', 1],
+              ['Alteração postural já diagnosticada: escoliose, hipercifose, hiperlordose', 1],
+            ])}
           </ul>
 
           <h2>5. Dores e lesões</h2>
           <ul>
-            <li>Região da dor (cervical, ombro, dorsal, lombar, quadril, joelho, tornozelo, cotovelo ou punho, lado direito ou esquerdo) e intensidade de 0 a 10</li>
-            <li>Há quanto tempo: aguda (menos de 6 semanas), subaguda (6 a 12) ou crônica (mais de 12)</li>
-            <li>Lesões anteriores: ligamento cruzado, menisco, manguito rotador, luxação recidivante, fratura no último ano, hérnia de disco, tendinopatia, estiramento grave</li>
-            <li>Na dor de coluna, investigue: dor noturna que não alivia com repouso, perda de peso sem explicação, formigamento ou perda de força, febre, alteração no controle da bexiga ou do intestino, trauma recente</li>
+            ${itens([
+              ['Região da dor (cervical, ombro, dorsal, lombar, quadril, joelho, tornozelo, cotovelo ou punho, lado direito ou esquerdo) e intensidade de 0 a 10', 2],
+              ['Há quanto tempo: aguda (menos de 6 semanas), subaguda (6 a 12) ou crônica (mais de 12)', 1],
+              ['Lesões anteriores: ligamento cruzado, menisco, manguito rotador, luxação recidivante, fratura no último ano, hérnia de disco, tendinopatia, estiramento grave', 2],
+              ['Na dor de coluna, investigue: dor noturna que não alivia com repouso, perda de peso sem explicação, formigamento ou perda de força, febre, alteração no controle da bexiga ou do intestino, trauma recente', 2],
+            ])}
           </ul>
 
           <h2>6. Hábitos</h2>
           <ul>
-            <li>Experiência com treino: nunca treinou, menos de 6 meses, 6 a 24 meses, mais de 2 anos</li>
-            <li>Atividade física atual e intensidade (leve, moderada, vigorosa)</li>
-            <li>Sono (boa, regular, ruim), nível de estresse, tabagismo e consumo de álcool</li>
+            ${itens([
+              ['Experiência com treino: nunca treinou, menos de 6 meses, 6 a 24 meses, mais de 2 anos', 1],
+              ['Atividade física atual e intensidade (leve, moderada, vigorosa)', 1],
+              ['Sono (boa, regular, ruim), nível de estresse, tabagismo e consumo de álcool', 2],
+            ])}
           </ul>
 
           <h2>7. Objetivos e rotina de treino</h2>
           <ul>
-            <li>Objetivo principal: hipertrofia, composição corporal, saúde, performance, dor e reabilitação, correção postural, condicionamento, mobilidade, disposição</li>
-            <li>Quantas vezes por semana e quanto tempo por sessão</li>
-            <li>Onde vai treinar: academia, em casa, condomínio, ao ar livre</li>
-            <li>Preferência: sessões curtas e intensas ou mais longas, com mais descanso</li>
+            ${itens([
+              ['Objetivo principal: hipertrofia, composição corporal, saúde, performance, dor e reabilitação, correção postural, condicionamento, mobilidade, disposição', 2],
+              ['Quantas vezes por semana e quanto tempo por sessão', 1],
+              ['Onde vai treinar: academia, em casa, condomínio, ao ar livre', 1],
+              ['Preferência: sessões curtas e intensas ou mais longas, com mais descanso', 1],
+            ])}
           </ul>
 
           <h2>8. Consentimento</h2>
           <p>Dados de saúde são dados sensíveis pela LGPD. Registre o consentimento do aluno para a coleta e o uso das informações, com data e a versão do texto que ele leu.</p>
+          <div class="preencher so-impressao" aria-hidden="true"><span>Assinatura do aluno</span><span>Data</span></div>
+
+          <div class="so-impressao" aria-hidden="true">
+            <h2>Observações do profissional</h2>
+            ${linhas(8)}
+          </div>
         </div>
       </section>
 
