@@ -9,6 +9,9 @@ export const SITE = {
 const ATUALIZADA = '2026-11-10'
 // IMC, frequência cardíaca, PAR-Q e ficha de treino; a landing ganhou os cartões
 const NOVAS = '2026-11-11'
+// Testes físicos (cardiorrespiratórios e neuromotores) entraram na landing e
+// na página de avaliação física.
+const TESTES_FISICOS = '2026-11-13'
 
 function esc(texto) {
   return String(texto)
@@ -177,11 +180,11 @@ const PERGUNTAS_LANDING = [
 const landing = {
   arquivo: 'inicio.html',
   rota: '/',
-  atualizada: NOVAS,
+  atualizada: TESTES_FISICOS,
   titulo: 'Avalix · Avaliação física, postural e treino para personal trainer',
   tituloSocial: 'Avalix · Avaliação física e postural',
   descricao:
-    'Anamnese por link, avaliação física por dobras e circunferências, avaliação postural por foto, treino no celular do aluno e laudo em PDF com a sua marca. 14 dias grátis, sem cartão.',
+    'Anamnese por link, avaliação física por dobras e circunferências, testes de VO2máx, força e flexibilidade, avaliação postural por foto, treino no celular do aluno e laudo em PDF com a sua marca. 14 dias grátis, sem cartão.',
   perguntas: PERGUNTAS_LANDING,
   scripts: ['/site/precos.js'],
   jsonLd: [
@@ -194,7 +197,7 @@ const landing = {
       operatingSystem: 'Web, Android, iOS',
       inLanguage: 'pt-BR',
       description:
-        'Software de avaliação física e postural, anamnese e prescrição de treino para profissionais de Educação Física.',
+        'Software de avaliação física e postural, testes físicos, anamnese e prescrição de treino para profissionais de Educação Física.',
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: 'BRL',
@@ -235,7 +238,7 @@ const landing = {
           </div>
           <ol class="fluxo">
             <li><h3>Anamnese por link</h3><p>Você manda o link pelo WhatsApp. O aluno responde PAR-Q, histórico de saúde, dores e objetivos no celular, e os sinais de alerta chegam destacados para você.</p></li>
-            <li><h3>Avaliação física</h3><p>Peso, altura, dobras e circunferências. Escolha o protocolo e o percentual de gordura, a massa magra e o IMC saem na hora.</p></li>
+            <li><h3>Avaliação física</h3><p>Peso, altura, dobras e circunferências. Escolha o protocolo e o percentual de gordura, a massa magra e o IMC saem na hora. Nos testes físicos, o VO2máx estimado e a classificação de força e flexibilidade também.</p></li>
             <li><h3>Avaliação postural</h3><p>Fotos de frente, costas e perfil. Um toque marca os pontos do corpo; você ajusta, mede e anota o que viu.</p></li>
             <li><h3>Treino</h3><p>Monte o mesociclo semana a semana. O Avalix soma o volume por músculo e aponta os exercícios que a anamnese pede para revisar.</p></li>
             <li><h3>Execução e reavaliação</h3><p>O aluno registra cargas e repetições no celular. Você acompanha a adesão, e o painel lembra quem está há 90 dias sem reavaliar.</p></li>
@@ -251,7 +254,7 @@ const landing = {
           <div class="recursos">
             <article class="recurso">
               <h3>Avaliação física com os protocolos de sempre</h3>
-              <p>Jackson &amp; Pollock de 3 e 7 dobras, Durnin-Womersley e US Navy, com a equação de Siri. As fórmulas são conferidas contra as fontes publicadas.</p>
+              <p>Jackson &amp; Pollock de 3 e 7 dobras, Durnin-Womersley e US Navy, com a equação de Siri. Testes de Cooper, Rockport e banco de Queens, flexão de braço, abdominal, sentar e alcançar e preensão manual. As fórmulas e as tabelas são conferidas contra as fontes publicadas.</p>
               <a class="mais" href="/avaliacao-fisica">Avaliação física no Avalix →</a>
             </article>
             <article class="recurso">
@@ -350,16 +353,18 @@ const landing = {
 const avaliacaoFisica = {
   arquivo: 'avaliacao-fisica.html',
   rota: '/avaliacao-fisica',
-  atualizada: ATUALIZADA,
+  atualizada: TESTES_FISICOS,
   migalha: 'Avaliação física',
   titulo: 'Software de avaliação física para personal trainer · Avalix',
   descricao:
-    'Avaliação física com Jackson & Pollock 3 e 7 dobras, Durnin-Womersley e US Navy. Percentual de gordura, massa magra, comparação entre avaliações e laudo em PDF com a sua marca.',
+    'Avaliação física com Jackson & Pollock 3 e 7 dobras, Durnin-Womersley e US Navy, e testes de VO2máx (Cooper, Rockport, banco de Queens), flexão, sentar e alcançar e preensão manual. Comparação entre avaliações e laudo em PDF com a sua marca.',
   perguntas: [
     ['Quais protocolos de dobras cutâneas o Avalix tem?',
       'Jackson &amp; Pollock de 7 dobras, Jackson &amp; Pollock de 3 dobras para homens, Jackson, Pollock &amp; Ward de 3 dobras para mulheres e Durnin-Womersley de 4 dobras. A densidade corporal vira percentual de gordura pela equação de Siri.'],
     ['Dá para avaliar sem adipômetro?',
       'Sim. O protocolo da US Navy usa só circunferências (pescoço, abdômen ou cintura e, nas mulheres, quadril) e a altura.'],
+    ['Quais testes físicos o Avalix tem?',
+      'Cardiorrespiratórios: corrida de 12 minutos (Cooper), caminhada de 1 milha (Rockport) e banco de Queens, com o VO2máx estimado e classificado pela tabela brasileira de Herdy e Caixeta (2016). Neuromotores: flexão de braço e sentar e alcançar, classificados pelas tabelas do CSEP, preensão manual com o ponto de corte de força baixa do EWGSOP2 e abdominal em 1 minuto para acompanhar a evolução.'],
     ['O aluno recebe o resultado?',
       'Você gera o laudo em PDF com a sua logo e manda para ele. O laudo mostra as medidas, o percentual de gordura e a evolução desde a avaliação anterior.'],
   ],
@@ -385,6 +390,24 @@ const avaliacaoFisica = {
             </table>
           </div>
           <p>Os coeficientes de cada equação foram conferidos contra as publicações originais e são testados com valores de referência a cada versão do app.</p>
+
+          <h2>Testes físicos: cardiorrespiratórios e neuromotores</h2>
+          <p>Os testes de campo ficam num registro próprio, no dia em que você aplicou. Preencha só os que fez: o resultado e a classificação aparecem enquanto você digita, e a próxima bateria mostra quanto o aluno melhorou em cada um.</p>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">Teste</th><th scope="col">Resultado</th><th scope="col">Classificação</th></tr></thead>
+              <tbody>
+                <tr><td>Corrida de 12 minutos (Cooper)</td><td>VO2máx estimado</td><td>Herdy e Caixeta (2016), de 15 a 74 anos</td></tr>
+                <tr><td>Caminhada de 1 milha (Rockport)</td><td>VO2máx estimado</td><td>Herdy e Caixeta (2016)</td></tr>
+                <tr><td>Banco de Queens (3 minutos)</td><td>VO2máx estimado</td><td>Herdy e Caixeta (2016)</td></tr>
+                <tr><td>Flexão de braço</td><td>Repetições</td><td>CSEP, de 15 a 69 anos</td></tr>
+                <tr><td>Sentar e alcançar (banco de Wells)</td><td>Alcance em cm, com o banco de 23 ou 26 cm</td><td>CSEP, de 20 a 69 anos</td></tr>
+                <tr><td>Preensão manual</td><td>Maior medida e diferença entre as mãos</td><td>Força baixa pelo EWGSOP2</td></tr>
+                <tr><td>Abdominal em 1 minuto</td><td>Repetições</td><td>Evolução</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>A classificação do VO2máx usa a tabela brasileira, feita com testes cardiopulmonares de adultos ativos. Quando o aluno está fora da faixa de idade da tabela, ou a flexão foi feita numa posição diferente da do protocolo, o Avalix mostra o número e diz por que não classificou, em vez de forçar uma faixa.</p>
 
           <h2>Evolução que o aluno entende</h2>
           <p>Cada avaliação nova fica ao lado da anterior. Você vê, medida por medida, o que subiu e o que desceu, e o Avalix só compara o que é comparável: protocolos diferentes não viram uma linha de gráfico enganosa.</p>

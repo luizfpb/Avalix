@@ -15,6 +15,8 @@ export const READ_ONLY_ROUTES = [
   '/avaliados/:id/treinos/nova',
   '/avaliados/:id/treinos/:planId/editar',
   '/avaliados/:id/postural/nova',
+  '/avaliados/:id/testes/novo',
+  '/avaliados/:id/testes/:testId/editar',
 ] as const
 
 export function isReadOnlyRoute(pathname: string): boolean {

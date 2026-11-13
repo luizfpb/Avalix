@@ -32,6 +32,10 @@ const PosturaSessaoNova = lazy(() => import('./pages/PosturaSessaoNova'))
 const PosturaSessaoDetalhe = lazy(() => import('./pages/PosturaSessaoDetalhe'))
 const PosturaFoto = lazy(() => import('./pages/PosturaFoto'))
 const PosturaComparar = lazy(() => import('./pages/PosturaComparar'))
+const TestesFisicosForm = lazy(() => import('./pages/TestesFisicos').then((m) => ({ default: m.TestesFisicosForm })))
+const TestesFisicosDetalhe = lazy(() =>
+  import('./pages/TestesFisicos').then((m) => ({ default: m.TestesFisicosDetalhe }))
+)
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Plano = lazy(() => import('./pages/Plano'))
 const Termos = lazy(() => import('./pages/Termos'))
@@ -99,6 +103,9 @@ export default function App() {
             <Route path="/avaliados/:id/treinos/:planId" element={<TreinoDetalhe />} />
             <Route path="/avaliados/:id/treinos/:planId/editar" element={<TreinoNovo />} />
             <Route path="/avaliados/:id/treinos/:planId/execucao" element={<Execucao />} />
+            <Route path="/avaliados/:id/testes/novo" element={<TestesFisicosForm />} />
+            <Route path="/avaliados/:id/testes/:testId" element={<TestesFisicosDetalhe />} />
+            <Route path="/avaliados/:id/testes/:testId/editar" element={<TestesFisicosForm />} />
             <Route path="/avaliados/:id/postural/nova" element={<PosturaSessaoNova />} />
             <Route path="/avaliados/:id/postural/comparar" element={<PosturaComparar />} />
             <Route

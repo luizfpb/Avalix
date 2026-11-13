@@ -37,6 +37,8 @@ import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
 import { buildBriefingPrompt, type AssessmentPromptPoint } from '../features/prompts'
 import type { SubjectRow } from '../features/subjects/api'
 import { useSessions } from '../features/posture/hooks'
+import { useFitnessTests } from '../features/fitness/hooks'
+import { fitnessSummary } from '../features/fitness/summary'
 import { assessmentCsvRecord, buildAssessmentsCsv, type CsvDialect } from '../features/reports/csv'
 import { csvBlob, downloadBlob } from '../features/reports/download'
 import { logExport } from '../features/reports/audit'
@@ -239,6 +241,8 @@ function AvaliadoDetalheContent() {
 
         <div className="min-w-0 space-y-6 lg:space-y-8">
           <AssessmentsSection subjectId={s.id} />
+
+          <FitnessSection subjectId={s.id} />
 
           <BriefingSection subject={s} />
 
@@ -511,6 +515,61 @@ function WorkoutSection({
       )}
 
       <WorkoutLinkCard subjectId={subjectId} subjectName={subjectName} orgName={orgName} />
+    </section>
+  )
+}
+
+// Testes físicos (0059): cardiorrespiratórios e neuromotores, um registro por
+// dia de testes. Criar exige consentimento, como a avaliação e a postural.
+function FitnessSection({ subjectId }: { subjectId: string }) {
+  const consentQuery = useActiveConsent(subjectId)
+  const testsQuery = useFitnessTests(subjectId)
+  const hasConsent = !!consentQuery.data
+
+  if (consentQuery.isError || testsQuery.isError) {
+    return (
+      <QueryError
+        message="Não foi possível confirmar o consentimento ou carregar os testes físicos."
+        onRetry={() => void Promise.all([consentQuery.refetch(), testsQuery.refetch()])}
+      />
+    )
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Testes físicos</h2>
+        {hasConsent ? (
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/avaliados/${subjectId}/testes/novo`}>Novos testes</Link>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">Registre o consentimento para aplicar testes</span>
+        )}
+      </div>
+      {testsQuery.isPending ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : testsQuery.data && testsQuery.data.length > 0 ? (
+        <ul className="divide-y rounded-md border bg-card">
+          {testsQuery.data.map((t) => (
+            <li key={t.id}>
+              <Link
+                to={`/avaliados/${subjectId}/testes/${t.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent"
+              >
+                <span className="shrink-0">{formatDate(t.tested_at)}</span>
+                <span className="min-w-0 truncate text-right text-muted-foreground">
+                  {fitnessSummary(t.measures)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Nenhum teste físico ainda. Cooper, Rockport, banco, flexão, abdominal, sentar e alcançar e preensão.
+        </p>
+      )}
     </section>
   )
 }

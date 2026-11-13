@@ -17,3 +17,11 @@ export function ageFromBirthDate(birthDate: string, today: Date = new Date()): n
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) age--
   return age
 }
+
+// Idade em anos completos numa data ISO (YYYY-MM-DD), como a idade do aluno
+// no dia de um teste. Data malformada cai na idade de hoje.
+export function ageOnDate(birthDate: string, isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!m) return ageFromBirthDate(birthDate)
+  return ageFromBirthDate(birthDate, new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+}

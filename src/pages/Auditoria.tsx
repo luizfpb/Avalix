@@ -39,6 +39,7 @@ const TABLE_LABELS: Record<string, string> = {
   subjects: 'cadastro',
   assessments: 'avaliação',
   posture_sessions: 'sessão postural',
+  fitness_tests: 'testes físicos',
   posture_photos: 'foto postural',
   consent_records: 'consentimento',
   anamneses: 'anamnese',
