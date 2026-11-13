@@ -1,7 +1,6 @@
 // Resumo de uma linha ("Cooper, flexão, preensão") para a ficha do aluno.
-// Fica separado de measures/engine de propósito: a ficha está no pré-cache e
-// as telas de testes não (vite.config.ts). Importar o motor daqui levaria o
-// código delas para dentro do pré-cache.
+// Fica separado de measures/engine de propósito: a ficha abre sem carregar o
+// cálculo e as tabelas, que só as telas de testes usam.
 
 const ORDER: [string, string][] = [
   ['cooper', 'Cooper'],

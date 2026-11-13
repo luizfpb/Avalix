@@ -19,7 +19,11 @@ const DIST = path.resolve('dist')
 // (auth e necessaria no boot), TanStack Query e react-router. Conferido.
 const MAX_ENTRY_RAW = 680_000
 const MAX_ENTRY_GZIP = 205_000
-const MAX_PRECACHE = 2_000_000
+// Pré-cache: o que o service worker baixa na primeira visita (inclusive do
+// aluno pelo link). Era 2 MB e ficou meses colado no teto, obrigando cada
+// entrega a tirar uma tela; subiu para 3 MB em 13/11/2026. O que pesa de
+// verdade continua barrado por nome (FORBIDDEN_PRECACHE).
+const MAX_PRECACHE = 3_000_000
 const MAX_LAZY_CHUNK_RAW = 1_600_000
 
 // Marcadores de bibliotecas que NUNCA podem estar no entry: todas sao

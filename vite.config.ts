@@ -81,13 +81,8 @@ export default defineConfig({
           // Agenda idem (lista e grava no servidor): a auditoria de 23/10/2026
           // somou ~3 KB às telas pré-cacheadas e o total passou do teto.
           "**/Agenda-*.js",
-          // Testes físicos (13/11/2026): gravar e ler os testes depende do
-          // servidor, como a Agenda. As duas telas e o chunk do cálculo somavam
-          // ~31 KB, acima do teto. A ficha do aluno só usa summary.ts.
-          "**/TestesFisicos*.js",
-          // Faltavam ~5 KB (a ficha do aluno cresceu com a seção nova).
           // Onboarding cria a organização e Recuperar senha manda o e-mail:
-          // sem internet nenhuma das duas faz nada.
+          // sem internet nenhuma das duas faz nada (13/11/2026).
           "**/Onboarding-*.js",
           "**/RecuperarSenha-*.js",
           "**/pdfTheme-*.js",
