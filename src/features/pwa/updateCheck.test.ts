@@ -22,10 +22,10 @@ describe('verificação da publicação do PWA', () => {
     expect(hasExpectedContentType('/assets/app.js', 'application/javascript')).toBe(true)
   })
 
-  it('só aprova quando HTML, JS e CSS têm os tipos corretos', async () => {
+  it('só aprova quando HTML, JS e CSS têm os tipos corretos (consultando /login, pois /index.html redireciona para a landing em /)', async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
-      if (url.startsWith('/index.html')) {
+      if (url.startsWith('/login')) {
         return new Response(
           '<script src="/assets/app.js"></script><link href="/assets/app.css" rel="stylesheet">',
           { headers: { 'content-type': 'text/html' } }
@@ -38,12 +38,13 @@ describe('verificação da publicação do PWA', () => {
     })
 
     expect(await verifyPublishedShell(fetcher as typeof fetch, 1)).toBe(true)
+    expect(fetcher).toHaveBeenCalledWith('/login?pwa-check=1', { cache: 'no-store' })
   })
 
   it('bloqueia fallback HTML com status 200 no lugar do JS', async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
-      if (url.startsWith('/index.html')) {
+      if (url.startsWith('/login')) {
         return new Response('<script src="/assets/app.js"></script>', {
           headers: { 'content-type': 'text/html' },
         })

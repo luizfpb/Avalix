@@ -24,12 +24,15 @@ function withCheckParam(url: string, nonce: number): string {
 }
 
 // Status 200 não basta: o fallback SPA pode devolver HTML para um JS ausente.
+// Confere o shell em /login (como o check-deployment.mjs): no Cloudflare Pages,
+// /index.html redireciona (308) para /, e / serve a landing estática
+// (public/inicio.html), que não tem os assets /assets/*.js da SPA.
 export async function verifyPublishedShell(
   fetcher: typeof fetch = fetch,
   nonce = Date.now()
 ): Promise<boolean> {
   try {
-    const htmlResponse = await fetcher(withCheckParam('/index.html', nonce), {
+    const htmlResponse = await fetcher(withCheckParam('/login', nonce), {
       cache: 'no-store',
     })
     if (!htmlResponse.ok || !htmlResponse.headers.get('content-type')?.includes('text/html')) {
