@@ -52,6 +52,86 @@ function chamada(titulo, texto) {
       </section>`
 }
 
+function ctaCalc(texto = 'Quer guardar este resultado no cadastro do aluno e gerar o PDF com a sua marca?') {
+  return `<div class="cta-calc">
+              <p>${texto}</p>
+              <a href="/cadastro">Testar o Avalix por 14 dias grátis →</a>
+            </div>`
+}
+
+const CATALOGO_FERRAMENTAS = {
+  '/calculadora-1rm': {
+    titulo: 'Calculadora de 1RM',
+    desc: 'Carga máxima estimada por Epley ou Brzycki, com a tabela de percentuais para montar o treino.',
+    acao: 'Calcular 1RM →',
+  },
+  '/calculadora-percentual-de-gordura': {
+    titulo: 'Percentual de gordura',
+    desc: 'Jackson &amp; Pollock 3 ou 7 dobras e US Navy, com massa gorda e massa magra.',
+    acao: 'Calcular percentual →',
+  },
+  '/calculadora-imc': {
+    titulo: 'IMC e cintura',
+    desc: 'IMC com a faixa da OMS, relação cintura-quadril e cintura-estatura.',
+    acao: 'Calcular IMC →',
+  },
+  '/calculadora-tmb': {
+    titulo: 'TMB e gasto calórico',
+    desc: 'Taxa metabólica basal por Mifflin-St Jeor, Harris-Benedict ou Cunningham e gasto diário.',
+    acao: 'Calcular TMB →',
+  },
+  '/calculadora-frequencia-cardiaca': {
+    titulo: 'Frequência cardíaca de treino',
+    desc: 'FC máxima por Tanaka ou 220 − idade e as cinco zonas pela FC de reserva (Karvonen).',
+    acao: 'Calcular zonas →',
+  },
+  '/calculadora-vo2max': {
+    titulo: 'Calculadora de VO2máx',
+    desc: 'Cooper 12 min, Rockport 1 milha e banco de Queens, com a classificação brasileira (Herdy &amp; Caixeta).',
+    acao: 'Calcular VO2máx →',
+  },
+  '/planilha-de-avaliacao-fisica': {
+    titulo: 'Ficha de avaliação física',
+    desc: 'Dobras cutâneas (3 medidas), circunferências bilaterais e testes físicos prontos para imprimir.',
+    acao: 'Ver a ficha →',
+  },
+  '/modelo-de-anamnese': {
+    titulo: 'Modelo de anamnese',
+    desc: 'Roteiro completo para a primeira conversa com o aluno, com PAR-Q e sinais de alerta. Dá para imprimir.',
+    acao: 'Ver o modelo →',
+  },
+  '/questionario-par-q': {
+    titulo: 'Questionário PAR-Q',
+    desc: 'As 7 perguntas de prontidão para atividade física, com sim, não e assinatura. Para imprimir.',
+    acao: 'Ver o PAR-Q →',
+  },
+  '/modelo-de-ficha-de-treino': {
+    titulo: 'Modelo de ficha de treino',
+    desc: 'Ficha em branco com treinos A, B e C, séries, repetições, carga e descanso.',
+    acao: 'Ver a ficha →',
+  },
+}
+
+function cartaoFerramenta(rota) {
+  const f = CATALOGO_FERRAMENTAS[rota]
+  return `<a class="ferramenta" href="${rota}">
+              <h3>${f.titulo}</h3>
+              <p>${f.desc}</p>
+              <span class="mais">${f.acao}</span>
+            </a>`
+}
+
+function relacionadasHtml(rotas) {
+  return `<section class="secao nao-imprimir" aria-labelledby="relacionadas-titulo">
+        <div class="envoltorio">
+          <div class="cabeca-secao"><h2 id="relacionadas-titulo">Outras ferramentas grátis</h2></div>
+          <div class="ferramentas">
+            ${rotas.map(cartaoFerramenta).join('\n            ')}
+          </div>
+        </div>
+      </section>`
+}
+
 // ------------------------------------------------------------------ planos
 
 const PLANOS = [
@@ -287,46 +367,7 @@ const landing = {
             <p class="lide">Sem cadastro, direto no navegador. As mesmas fórmulas que o Avalix usa.</p>
           </div>
           <div class="ferramentas">
-            <a class="ferramenta" href="/calculadora-1rm">
-              <h3>Calculadora de 1RM</h3>
-              <p>Carga máxima estimada por Epley ou Brzycki, com a tabela de percentuais para montar o treino.</p>
-              <span class="mais">Calcular 1RM →</span>
-            </a>
-            <a class="ferramenta" href="/calculadora-percentual-de-gordura">
-              <h3>Percentual de gordura</h3>
-              <p>Jackson &amp; Pollock 3 ou 7 dobras e US Navy, com massa gorda e massa magra.</p>
-              <span class="mais">Calcular percentual →</span>
-            </a>
-            <a class="ferramenta" href="/modelo-de-anamnese">
-              <h3>Modelo de anamnese</h3>
-              <p>Roteiro completo para a primeira conversa com o aluno, com PAR-Q e sinais de alerta. Dá para imprimir.</p>
-              <span class="mais">Ver o modelo →</span>
-            </a>
-            <a class="ferramenta" href="/calculadora-imc">
-              <h3>IMC e cintura</h3>
-              <p>IMC com a faixa da OMS, relação cintura-quadril e cintura-estatura.</p>
-              <span class="mais">Calcular IMC →</span>
-            </a>
-            <a class="ferramenta" href="/calculadora-frequencia-cardiaca">
-              <h3>Frequência cardíaca de treino</h3>
-              <p>FC máxima por Tanaka ou 220 − idade e as cinco zonas pela FC de reserva (Karvonen).</p>
-              <span class="mais">Calcular zonas →</span>
-            </a>
-            <a class="ferramenta" href="/calculadora-vo2max">
-              <h3>Calculadora de VO2máx</h3>
-              <p>Cooper 12 min, Rockport 1 milha e banco de Queens, com a classificação brasileira (Herdy &amp; Caixeta).</p>
-              <span class="mais">Calcular VO2máx →</span>
-            </a>
-            <a class="ferramenta" href="/questionario-par-q">
-              <h3>Questionário PAR-Q</h3>
-              <p>As 7 perguntas de prontidão para atividade física, com sim, não e assinatura. Para imprimir.</p>
-              <span class="mais">Ver o PAR-Q →</span>
-            </a>
-            <a class="ferramenta" href="/modelo-de-ficha-de-treino">
-              <h3>Modelo de ficha de treino</h3>
-              <p>Ficha em branco com treinos A, B e C, séries, repetições, carga e descanso.</p>
-              <span class="mais">Ver a ficha →</span>
-            </a>
+            ${Object.keys(CATALOGO_FERRAMENTAS).map(cartaoFerramenta).join('\n            ')}
           </div>
         </div>
       </section>
@@ -593,6 +634,7 @@ const calc1rm = {
                 <tbody></tbody>
               </table>
             </div>
+            ${ctaCalc('Quer salvar a evolução de carga de cada aluno e prescrever por série?')}
           </div>
         </div>
       </section>
@@ -604,6 +646,8 @@ const calc1rm = {
           <p>Reavalie a 1RM a cada mesociclo. Com o aluno ganhando força, a mesma porcentagem passa a significar mais carga.</p>
         </div>
       </section>
+
+      ${relacionadasHtml(['/modelo-de-ficha-de-treino', '/calculadora-frequencia-cardiaca', '/calculadora-vo2max', '/calculadora-percentual-de-gordura'])}
 
       PERGUNTAS
 
@@ -675,6 +719,7 @@ const calcGordura = {
             <table class="tabela" id="detalhe-gordura" hidden>
               <tbody></tbody>
             </table>
+            ${ctaCalc('Quer comparar com a avaliação anterior e emitir o laudo em PDF com a sua marca?')}
           </div>
         </div>
       </section>
@@ -706,6 +751,8 @@ const calcGordura = {
           </ul>
         </div>
       </section>
+
+      ${relacionadasHtml(['/planilha-de-avaliacao-fisica', '/calculadora-imc', '/calculadora-tmb', '/calculadora-vo2max'])}
 
       PERGUNTAS
 
@@ -836,6 +883,8 @@ const modeloAnamnese = {
         </div>
       </section>
 
+      ${relacionadasHtml(['/questionario-par-q', '/planilha-de-avaliacao-fisica', '/modelo-de-ficha-de-treino', '/calculadora-percentual-de-gordura'])}
+
       PERGUNTAS
 
       ${chamada('Mande este modelo por link e receba tudo organizado', 'No Avalix o aluno responde a anamnese no celular, aceita o termo de consentimento, e os sinais de alerta chegam destacados para você.')}`,
@@ -910,6 +959,7 @@ const calcImc = {
             <table class="tabela" id="detalhe-imc" hidden>
               <tbody></tbody>
             </table>
+            ${ctaCalc('Quer guardar o IMC, a cintura e as dobras no histórico do aluno e emitir o PDF?')}
           </div>
         </div>
       </section>
@@ -948,6 +998,8 @@ const calcImc = {
           <p class="nota">Fontes: OMS, <em>Obesity: preventing and managing the global epidemic</em> (2000); OMS, <em>Waist circumference and waist–hip ratio: report of a WHO expert consultation</em> (2008); Ashwell e Hsieh, <em>International Journal of Food Sciences and Nutrition</em> (2005).</p>
         </div>
       </section>
+
+      ${relacionadasHtml(['/calculadora-percentual-de-gordura', '/calculadora-tmb', '/planilha-de-avaliacao-fisica', '/calculadora-vo2max'])}
 
       PERGUNTAS
 
@@ -1017,6 +1069,7 @@ const calcFc = {
                 <tbody></tbody>
               </table>
             </div>
+            ${ctaCalc('Quer salvar a FC de repouso e os testes cardiorrespiratórios no cadastro do aluno?')}
           </div>
         </div>
       </section>
@@ -1035,6 +1088,8 @@ const calcFc = {
           <p class="nota">Fontes: Tanaka, Monahan e Seals, <em>Journal of the American College of Cardiology</em> (2001); Karvonen, Kentala e Mustala, <em>Annales Medicinae Experimentalis et Biologiae Fenniae</em> (1957).</p>
         </div>
       </section>
+
+      ${relacionadasHtml(['/calculadora-vo2max', '/calculadora-1rm', '/modelo-de-ficha-de-treino', '/questionario-par-q'])}
 
       PERGUNTAS
 
@@ -1095,6 +1150,8 @@ const parq = {
           <p class="nota">Versão em português das perguntas gerais do PAR-Q+ (<em>Physical Activity Readiness Questionnaire for Everyone</em>). Não substitui a avaliação médica.</p>
         </div>
       </section>
+
+      ${relacionadasHtml(['/modelo-de-anamnese', '/planilha-de-avaliacao-fisica', '/calculadora-frequencia-cardiaca', '/modelo-de-ficha-de-treino'])}
 
       PERGUNTAS
 
@@ -1165,6 +1222,8 @@ const fichaTreino = {
         </div>
       </section>
 
+      ${relacionadasHtml(['/calculadora-1rm', '/modelo-de-anamnese', '/questionario-par-q', '/planilha-de-avaliacao-fisica'])}
+
       PERGUNTAS
 
       ${chamada('Troque a ficha de papel pelo celular do aluno', 'No Avalix o aluno abre o treino por link, vê a carga da última vez em cada série e registra o que fez. O registro volta para você.')}`,
@@ -1227,6 +1286,7 @@ const calcVo2 = {
             <table class="tabela" id="detalhe-vo2" hidden>
               <tbody></tbody>
             </table>
+            ${ctaCalc('Quer salvar Cooper, Rockport, flexão, Wells e preensão manual e emitir o PDF?')}
           </div>
         </div>
       </section>
@@ -1257,14 +1317,252 @@ const calcVo2 = {
         </div>
       </section>
 
+      ${relacionadasHtml(['/calculadora-frequencia-cardiaca', '/planilha-de-avaliacao-fisica', '/calculadora-percentual-de-gordura', '/calculadora-tmb'])}
+
       PERGUNTAS
 
       ${chamada('Registre os testes físicos e acompanhe a evolução', 'No Avalix você salva Cooper, Rockport, Queens, flexão, abdominal, banco de Wells e dinamometria no histórico do aluno e emite o PDF com a sua marca.')}`,
 }
 
+// ------------------------------------------------------------------ TMB e gasto calórico (TDEE)
+
+const calcTmb = {
+  arquivo: 'calculadora-tmb.html',
+  rota: '/calculadora-tmb',
+  atualizada: TESTES_FISICOS,
+  migalha: 'Calculadora de TMB e gasto calórico',
+  titulo: 'Calculadora de TMB e gasto calórico diário (Mifflin, Harris-Benedict e Cunningham) · Avalix',
+  descricao:
+    'Calcule a taxa metabólica basal (TMB) pelas equações de Mifflin-St Jeor, Harris-Benedict revisada e Cunningham (por massa magra), com o gasto energético total diário (TDEE) por nível de atividade.',
+  scripts: ['/site/calculadora-tmb.js'],
+  perguntas: [
+    ['Qual fórmula de TMB escolher: Mifflin-St Jeor, Harris-Benedict ou Cunningham?',
+      'Para adultos em geral, a equação de Mifflin-St Jeor (1990) costuma ter menor erro médio do que a de Harris-Benedict. Quando você já calculou a massa magra do aluno por dobras cutâneas, a equação de Cunningham (1980) leva vantagem em praticantes de musculação e atletas porque usa diretamente a massa livre de gordura.'],
+    ['O que é a diferença entre TMB e TDEE?',
+      'A Taxa Metabólica Basal (TMB) é a energia gasta em repouso absoluto para manter as funções vitais. O Gasto Energético Total Diário (TDEE) multiplica a TMB por um fator de atividade física que soma o gasto da rotina diária e do exercício.'],
+    ['O personal trainer pode prescrever dieta com base no TDEE?',
+      'A prescrição dietética individualizada é atribuição privativa do nutricionista. Na educação física, a TMB e o gasto estimado servem de referência educativa para contextualizar a composição corporal e conversar em conjunto com o nutricionista do aluno.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de TMB e gasto calórico</h1>
+        <p class="lide">Estime a taxa metabólica basal por Mifflin-St Jeor, Harris-Benedict revisada ou Cunningham (pela massa magra da avaliação física) e veja o gasto diário estimado em cada nível de atividade.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-tmb" novalidate>
+            <div class="campos">
+              <fieldset class="campo inteiro">
+                <legend>Equação</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="formula" value="mifflin" checked /> Mifflin-St Jeor</label>
+                  <label><input type="radio" name="formula" value="harris" /> Harris-Benedict</label>
+                  <label><input type="radio" name="formula" value="cunningham" /> Cunningham (massa magra)</label>
+                </div>
+              </fieldset>
+              <fieldset class="campo inteiro" data-campo-padrao>
+                <legend>Sexo</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="sexo" value="F" checked /> Feminino</label>
+                  <label><input type="radio" name="sexo" value="M" /> Masculino</label>
+                </div>
+              </fieldset>
+              <div class="campo" data-campo-padrao>
+                <label for="peso-tmb">Peso (kg)</label>
+                <input id="peso-tmb" name="peso" inputmode="decimal" autocomplete="off" placeholder="68,5" />
+              </div>
+              <div class="campo" data-campo-padrao>
+                <label for="altura-tmb">Altura (cm)</label>
+                <input id="altura-tmb" name="altura" inputmode="decimal" autocomplete="off" placeholder="168" />
+              </div>
+              <div class="campo inteiro" data-campo-padrao>
+                <label for="idade-tmb">Idade (anos)</label>
+                <input id="idade-tmb" name="idade" inputmode="numeric" autocomplete="off" placeholder="32" />
+              </div>
+              <div class="campo inteiro" data-campo-cunningham hidden>
+                <label for="massa-magra-tmb">Massa livre de gordura (kg)</label>
+                <input id="massa-magra-tmb" name="massaMagra" inputmode="decimal" autocomplete="off" placeholder="52,4" />
+              </div>
+            </div>
+            <p class="aviso-calc">Não sabe a massa magra? Calcule antes na <a href="/calculadora-percentual-de-gordura">calculadora de percentual de gordura</a>.</p>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">Taxa metabólica basal (TMB)</span>
+              <span class="valor numero" id="valor-tmb">—</span>
+              <p class="aviso-calc" id="nota-tmb">Preencha peso, altura e idade.</p>
+            </div>
+            <div class="rolagem">
+              <table class="tabela" id="tabela-tmb" hidden>
+                <caption class="rotulo" style="text-align:left;padding-bottom:6px">Gasto energético total diário (TDEE)</caption>
+                <thead><tr><th scope="col">Nível de atividade</th><th scope="col">Fator</th><th scope="col">Gasto estimado</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            ${ctaCalc('Quer calcular massa magra, massa gorda e evolução automaticamente na avaliação física?')}
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>As três equações de taxa metabólica basal</h2>
+          <ul>
+            <li><strong>Mifflin-St Jeor (1990):</strong> <code>10 × peso (kg) + 6,25 × altura (cm) − 5 × idade (anos) + 5</code> nos homens, ou <code>− 161</code> nas mulheres. Recomendada pela Academy of Nutrition and Dietetics quando não se conhece a composição corporal.</li>
+            <li><strong>Harris-Benedict revisada por Roza &amp; Shizgal (1984):</strong> <code>88,362 + 13,397 × peso + 4,799 × altura − 5,677 × idade</code> nos homens; <code>447,593 + 9,247 × peso + 3,098 × altura − 4,330 × idade</code> nas mulheres.</li>
+            <li><strong>Cunningham (1980):</strong> <code>500 + 22 × massa livre de gordura (kg)</code>, independente de sexo e idade. Como o tecido muscular responde pela maior parte da variação entre pessoas do mesmo peso, ela evita subestimar a TMB de alunos com bastante massa magra.</li>
+          </ul>
+          <p class="nota">Fontes: Mifflin et al., <em>American Journal of Clinical Nutrition</em> (1990); Roza e Shizgal, <em>American Journal of Clinical Nutrition</em> (1984); Cunningham, <em>American Journal of Clinical Nutrition</em> (1980).</p>
+        </div>
+      </section>
+
+      ${relacionadasHtml(['/calculadora-percentual-de-gordura', '/calculadora-imc', '/planilha-de-avaliacao-fisica', '/calculadora-vo2max'])}
+
+      PERGUNTAS
+
+      ${chamada('Calcule a massa magra e o laudo completo no Avalix', 'As dobras e circunferências entram na avaliação e saem prontas com percentual de gordura, massa magra e evolução.')}`,
+}
+
+// ------------------------------------------------------------------ planilha / ficha de avaliação física
+
+const DOBRAS_FICHA = [
+  'Peitoral',
+  'Axilar média',
+  'Tríceps',
+  'Subescapular',
+  'Abdominal',
+  'Supra-ilíaca',
+  'Coxa',
+  'Bíceps (Durnin-Womersley)',
+]
+
+const PERIMETROS_TRONCO = [
+  'Pescoço (cm)',
+  'Ombro (cm)',
+  'Tórax (cm)',
+  'Cintura (cm)',
+  'Abdômen (cm)',
+  'Quadril (cm)',
+]
+
+const PERIMETROS_MEMBROS = [
+  'Braço relaxado (cm)',
+  'Braço contraído (cm)',
+  'Antebraço (cm)',
+  'Coxa proximal (cm)',
+  'Coxa medial (cm)',
+  'Panturrilha (cm)',
+]
+
+const planilhaAvaliacao = {
+  arquivo: 'planilha-de-avaliacao-fisica.html',
+  rota: '/planilha-de-avaliacao-fisica',
+  atualizada: TESTES_FISICOS,
+  migalha: 'Ficha de avaliação física',
+  titulo: 'Ficha e planilha de avaliação física para imprimir (dobras, medidas e testes) · Avalix',
+  descricao:
+    'Ficha de avaliação física completa para imprimir: peso, altura, 7 dobras cutâneas (3 coletas e média), circunferências de tronco e membros (direito e esquerdo) e testes físicos de Cooper, Rockport, Queens, flexão, abdominal, banco de Wells e preensão.',
+  scripts: ['/site/imprimir.js'],
+  perguntas: [
+    ['Quantas medidas fazer em cada dobra cutânea?',
+      'Faça duas ou três coletas não consecutivas (percorra todos os pontos em circuito e repita) do lado direito do corpo. Use a média das medidas em cada ponto para entrar na equação de Jackson & Pollock ou Durnin-Womersley.'],
+    ['Como transformar as medidas desta ficha em percentual de gordura e VO2máx?',
+      'Você pode lançar as médias gratuitamente na calculadora de percentual de gordura e na calculadora de VO2máx aqui do site, ou cadastrar a avaliação direto no Avalix para que o cálculo, o comparativo com a avaliação anterior e o laudo em PDF saiam prontos.'],
+    ['De quanto em quanto tempo reavaliar o aluno?',
+      'Em média a cada 8 a 12 semanas (60 a 90 dias), mantendo o mesmo protocolo, o mesmo avaliador e condições semelhantes de horário e hidratação.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Ficha de avaliação física para imprimir</h1>
+        <p class="lide">Roteiro em branco para anotar dobras cutâneas (3 medidas por ponto), circunferências bilaterais e testes físicos durante o atendimento presencial.</p>
+        <div class="acoes nao-imprimir"><button class="botao secundario" type="button" data-imprimir hidden>Imprimir a ficha</button><a class="botao" href="/cadastro">Fazer pelo celular no Avalix</a></div>
+      </header>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <div class="preencher largo">
+            <span>Aluno</span>
+            <span>Data de nascimento / Idade</span>
+            <span>Data da avaliação</span>
+            <span>Peso (kg)</span>
+            <span>Altura (cm)</span>
+            <span>FC de repouso (bpm) / PA (mmHg)</span>
+          </div>
+
+          <h2>1. Dobras cutâneas (mm — lado direito)</h2>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Ponto anatômico</th><th scope="col">1ª medida</th><th scope="col">2ª medida</th><th scope="col">3ª medida</th><th scope="col">Média (mm)</th></tr></thead>
+              <tbody>
+                ${DOBRAS_FICHA.map((d) => `<tr><td>${d}</td><td></td><td></td><td></td><td></td></tr>`).join('\n                ')}
+              </tbody>
+            </table>
+          </div>
+
+          <h2>2. Circunferências de tronco (cm)</h2>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Região</th><th scope="col">Medida (cm)</th><th scope="col">Observações / ponto de referência</th></tr></thead>
+              <tbody>
+                ${PERIMETROS_TRONCO.map((p) => `<tr><td>${p}</td><td></td><td></td></tr>`).join('\n                ')}
+              </tbody>
+            </table>
+          </div>
+
+          <h2>3. Circunferências de membros (cm — direito e esquerdo)</h2>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Segmento</th><th scope="col">Direito (cm)</th><th scope="col">Esquerdo (cm)</th><th scope="col">Diferença</th></tr></thead>
+              <tbody>
+                ${PERIMETROS_MEMBROS.map((p) => `<tr><td>${p}</td><td></td><td></td><td></td></tr>`).join('\n                ')}
+              </tbody>
+            </table>
+          </div>
+
+          <h2>4. Testes físicos (cardiorrespiratórios e neuromotores)</h2>
+          <div class="rolagem largo">
+            <table class="tabela em-branco">
+              <thead><tr><th scope="col">Teste</th><th scope="col">Medida anotada</th><th scope="col">Resultado / classificação</th></tr></thead>
+              <tbody>
+                <tr><td>Cooper (12 min) — distância (m)</td><td></td><td></td></tr>
+                <tr><td>Rockport (1.609 m) — tempo (min:s) e FC final (bpm)</td><td></td><td></td></tr>
+                <tr><td>Banco de Queens (3 min) — FC de recuperação (bpm)</td><td></td><td></td></tr>
+                <tr><td>Flexão de braço — repetições e apoio</td><td></td><td></td></tr>
+                <tr><td>Abdominal em 1 minuto — repetições</td><td></td><td></td></tr>
+                <tr><td>Sentar e alcançar (banco de Wells) — cm (3 tentativas)</td><td></td><td></td></tr>
+                <tr><td>Preensão manual (dinamômetro) — mão D / mão E (kgf)</td><td></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="preencher largo">
+            <span>Protocolo utilizado (JP7, JP3, Durnin-Womersley ou US Navy)</span>
+            <span>Avaliador e CREF</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao nao-imprimir">
+        <div class="envoltorio texto">
+          <h2>Como calcular os resultados depois da coleta</h2>
+          <ul>
+            <li><strong>Percentual de gordura, massa gorda e massa magra:</strong> digite as médias das dobras ou as circunferências na <a href="/calculadora-percentual-de-gordura">calculadora de percentual de gordura</a>.</li>
+            <li><strong>IMC, relação cintura-quadril e cintura-estatura:</strong> confira os pontos de corte da OMS na <a href="/calculadora-imc">calculadora de IMC e cintura</a>.</li>
+            <li><strong>VO2máx e classificação brasileira:</strong> lance o teste de Cooper, Rockport ou Queens na <a href="/calculadora-vo2max">calculadora de VO2máx</a>.</li>
+            <li><strong>Taxa metabólica basal por massa magra:</strong> use a massa livre de gordura obtida na avaliação na <a href="/calculadora-tmb">calculadora de TMB (Cunningham)</a>.</li>
+          </ul>
+        </div>
+      </section>
+
+      ${relacionadasHtml(['/calculadora-percentual-de-gordura', '/calculadora-vo2max', '/calculadora-imc', '/modelo-de-anamnese'])}
+
+      PERGUNTAS
+
+      ${chamada('Troque a planilha pelo laudo pronto em PDF', 'No Avalix você digita as medidas uma vez no celular, o percentual de gordura e o VO2máx saem na hora com a comparação da última avaliação, e o PDF sai com a sua marca.')}`,
+}
+
 export const PAGINAS = [
   landing, avaliacaoFisica, avaliacaoPostural, appPersonal,
   calc1rm, calcGordura, modeloAnamnese,
-  calcImc, calcFc, calcVo2, parq, fichaTreino,
+  calcImc, calcFc, calcVo2, calcTmb, parq, fichaTreino, planilhaAvaliacao,
 ]
   .map((p) => ({ ...p, corpo: p.corpo.replace('PERGUNTAS', p.perguntas?.length && p.rota !== '/' ? perguntasHtml(p.perguntas) : '') }))

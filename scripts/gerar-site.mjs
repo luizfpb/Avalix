@@ -84,8 +84,10 @@ function rodape() {
             <li><a href="/calculadora-1rm">Calculadora de 1RM</a></li>
             <li><a href="/calculadora-percentual-de-gordura">Percentual de gordura</a></li>
             <li><a href="/calculadora-imc">IMC e cintura</a></li>
+            <li><a href="/calculadora-tmb">TMB e gasto calórico</a></li>
             <li><a href="/calculadora-frequencia-cardiaca">Frequência cardíaca de treino</a></li>
             <li><a href="/calculadora-vo2max">Calculadora de VO2máx</a></li>
+            <li><a href="/planilha-de-avaliacao-fisica">Ficha de avaliação física</a></li>
             <li><a href="/modelo-de-anamnese">Modelo de anamnese</a></li>
             <li><a href="/questionario-par-q">Questionário PAR-Q</a></li>
             <li><a href="/modelo-de-ficha-de-treino">Ficha de treino</a></li>
@@ -121,6 +123,29 @@ function dadosEstruturados(p) {
         { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE.origem}/` },
         { '@type': 'ListItem', position: 2, name: p.migalha, item: urlDe(p) },
       ],
+    })
+  }
+  if (
+    p.rota.startsWith('/calculadora-') ||
+    p.rota.startsWith('/modelo-de-') ||
+    p.rota.startsWith('/questionario-') ||
+    p.rota.startsWith('/planilha-')
+  ) {
+    blocos.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      name: p.migalha ?? p.titulo,
+      url: urlDe(p),
+      applicationCategory: 'HealthApplication',
+      operatingSystem: 'All',
+      inLanguage: 'pt-BR',
+      isAccessibleForFree: true,
+      description: p.descricao,
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'BRL',
+      },
     })
   }
   for (const extra of p.jsonLd ?? []) blocos.push(extra)

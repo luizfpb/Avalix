@@ -69,6 +69,7 @@ export default defineConfig({
           "calculadora-*.html",
           "modelo-de-*.html",
           "questionario-*.html",
+          "planilha-*.html",
           "site/**",
           // Termos de Uso: texto lido online (cadastro, assinatura); não
           // precisa ocupar a instalação de quem usa o app no dia a dia.

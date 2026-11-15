@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
-import { UserPlus } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
+import { Sparkles, UserPlus } from 'lucide-react'
+import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
+import { normalizeDbError } from '../lib/errors'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
 import { useUpcomingAppointments } from '../features/appointments/hooks'
 import { useLastAssessmentBySubject } from '../features/assessment/hooks'
@@ -54,12 +56,42 @@ const FILTROS: {
 ]
 
 export default function Dashboard() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const { organization } = useOrganization()
   const orgId = organization?.id
   const labels = subjectTermLabels(organization?.subject_term)
   const subjectsQ = useSubjects(orgId)
   const { data: subjects, isPending } = subjectsQ
   const isEmpty = !isPending && (subjects?.length ?? 0) === 0
+  const [creatingDemo, setCreatingDemo] = useState(false)
+  const [demoError, setDemoError] = useState<string | null>(null)
+
+  async function handleCreateDemo() {
+    if (!orgId || !user?.id || creatingDemo) return
+    setCreatingDemo(true)
+    setDemoError(null)
+    try {
+      const { createDemoSubject } = await import('../features/subjects/demoSubject')
+      const demo = await createDemoSubject({
+        orgId,
+        orgName: organization?.name ?? null,
+        userId: user.id,
+        now,
+      })
+      await Promise.all([
+        subjectsQ.refetch(),
+        lastAssessQ.refetch(),
+        plansQ.refetch(),
+        logsQ.refetch(),
+      ])
+      navigate(`/avaliados/${demo.id}`)
+    } catch (err) {
+      setDemoError(normalizeDbError(err))
+    } finally {
+      setCreatingDemo(false)
+    }
+  }
 
   const intakesQ = usePendingIntakes(orgId)
   const pendingIntakes = intakesQ.data ?? []
@@ -153,7 +185,33 @@ export default function Dashboard() {
             <h2 className="text-base font-semibold">Comece pelo primeiro {labels.singular}</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Cadastre os dados básicos; depois o Avalix orienta consentimento, anamnese e avaliação.
+              Se preferir conhecer o app primeiro, crie um {labels.singular} de exemplo já com
+              anamnese, duas avaliações físicas, testes e treino pronto.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link to="/avaliados/novo">
+                  <UserPlus /> Cadastrar primeiro {labels.singular}
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={creatingDemo}
+                onClick={() => void handleCreateDemo()}
+              >
+                <Sparkles />
+                {creatingDemo
+                  ? `Criando ${labels.singular} de exemplo...`
+                  : `Explorar com ${labels.singular} de exemplo`}
+              </Button>
+            </div>
+            {demoError ? (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {demoError}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

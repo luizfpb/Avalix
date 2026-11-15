@@ -794,6 +794,17 @@ export default function TreinoAluno() {
         >
           Sair deste aparelho
         </button>
+        <p className="mt-3 text-[11px] text-muted-foreground/80">
+          Feito no{' '}
+          <a
+            href="https://avalixfit.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Avalix · avalixfit.com.br
+          </a>
+        </p>
         <ConfirmDialog
           open={confirmarSaida}
           title="Sair deste aparelho?"

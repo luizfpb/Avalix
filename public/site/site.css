@@ -797,6 +797,19 @@ fieldset.campo {
   border-left: 3px solid var(--medida);
   padding-left: 10px;
 }
+.cta-calc {
+  border-top: 1px solid var(--linha);
+  padding-top: 14px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.cta-calc p {
+  color: var(--texto-2);
+}
+.cta-calc a {
+  font-weight: 600;
+}
 @media (max-width: 860px) {
   .calculadora {
     grid-template-columns: minmax(0, 1fr);

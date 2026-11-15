@@ -195,6 +195,39 @@ export function rateVo2(vo2, sex, ageYears) {
   return { label: HERDY_LABELS[level], level, levels: 5, source: HERDY_SOURCE }
 }
 
+// Mifflin et al. (Am J Clin Nutr, 1990): 10 × peso + 6,25 × altura − 5 × idade + s
+export function bmrMifflin(sex, weightKg, heightCm, ageYears) {
+  return 10 * weightKg + 6.25 * heightCm - 5 * ageYears + (sex === 'M' ? 5 : -161)
+}
+
+// Harris-Benedict revisada por Roza & Shizgal (Am J Clin Nutr, 1984)
+export function bmrHarrisBenedict(sex, weightKg, heightCm, ageYears) {
+  if (sex === 'M') {
+    return 88.362 + 13.397 * weightKg + 4.799 * heightCm - 5.677 * ageYears
+  }
+  return 447.593 + 9.247 * weightKg + 3.098 * heightCm - 4.330 * ageYears
+}
+
+// Cunningham (Am J Clin Nutr, 1980): 500 + 22 × massa livre de gordura (kg)
+export function bmrCunningham(leanMassKg) {
+  return 500 + 22 * leanMassKg
+}
+
+export const TDEE_FACTORS = [
+  { fator: 1.2, nome: 'Sedentário', rotina: 'Pouco ou nenhum exercício' },
+  { fator: 1.375, nome: 'Levemente ativo', rotina: '1 a 3 treinos por semana' },
+  { fator: 1.55, nome: 'Moderadamente ativo', rotina: '3 a 5 treinos por semana' },
+  { fator: 1.725, nome: 'Muito ativo', rotina: '6 a 7 treinos intensos por semana' },
+  { fator: 1.9, nome: 'Extremamente ativo', rotina: 'Treino diário intenso ou trabalho físico' },
+]
+
+export function tdeeTable(bmr) {
+  return TDEE_FACTORS.map((f) => ({
+    ...f,
+    kcal: Math.round(bmr * f.fator),
+  }))
+}
+
 // Número digitado no formato brasileiro ("72,5") ou com ponto.
 export function lerNumero(texto) {
   const t = String(texto ?? '').trim().replace(/\s/g, '').replace(',', '.')

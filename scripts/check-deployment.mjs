@@ -105,7 +105,8 @@ for (const path of ['/dashboard', '/a/smoke-token-inexistente', '/t', '/t/', '/t
 for (const path of ['/avaliacao-fisica', '/avaliacao-postural', '/app-para-personal-trainer',
   '/calculadora-1rm', '/calculadora-percentual-de-gordura', '/modelo-de-anamnese',
   '/calculadora-imc', '/calculadora-frequencia-cardiaca', '/calculadora-vo2max',
-  '/questionario-par-q', '/modelo-de-ficha-de-treino']) {
+  '/calculadora-tmb', '/questionario-par-q', '/modelo-de-ficha-de-treino',
+  '/planilha-de-avaliacao-fisica']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)

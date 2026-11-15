@@ -249,7 +249,7 @@ export function ReportRunningHeader({ title, subject }: { title: string; subject
 // lê semanas depois precisa saber de quando é aquela versão.
 export function issueNote(now: Date = new Date()): string {
   const data = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now)
-  return `Gerado no Avalix em ${data}`
+  return `Gerado no Avalix (avalixfit.com.br) em ${data}`
 }
 
 export function ReportFooter({ note, evaluator, evaluatorLabel = 'Responsável' }: {

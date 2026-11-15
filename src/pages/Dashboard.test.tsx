@@ -243,4 +243,10 @@ describe('Dashboard', () => {
     fireEvent.click(within(alert).getByRole('button', { name: 'Tentar novamente' }))
     expect(retryAppointments).toHaveBeenCalledTimes(1)
   })
+
+  it('oferece criar aluno de exemplo quando a conta ainda não tem cadastros', () => {
+    useSubjectsMock.mockReturnValue(query([]))
+    renderDashboard()
+    expect(screen.getByRole('button', { name: /Explorar com aluno de exemplo/i })).toBeTruthy()
+  })
 })

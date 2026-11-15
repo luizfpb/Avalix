@@ -473,8 +473,19 @@ function Form({
         <Button className="w-full" onClick={handleSubmit} disabled={!canSubmit || submit.isPending}>
           {submit.isPending ? 'Enviando...' : isCadastro ? 'Enviar cadastro e respostas' : 'Enviar respostas'}
         </Button>
-        <p className="pb-2 text-center text-xs text-muted-foreground">
+        <p className="pb-1 text-center text-xs text-muted-foreground">
           Ao enviar, guardamos a versão do termo, quem aceitou e quando.
+        </p>
+        <p className="pb-2 text-center text-[11px] text-muted-foreground/80">
+          Feito no{' '}
+          <a
+            href="https://avalixfit.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Avalix · avalixfit.com.br
+          </a>
         </p>
 
         <PendenciasBar answers={a} />

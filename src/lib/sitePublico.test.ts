@@ -39,6 +39,10 @@ type Calculos = {
   herdyReferenceMean: typeof herdyReferenceMean
   herdyCutoffs: typeof herdyCutoffs
   rateVo2: typeof rateVo2
+  bmrMifflin: (sex: 'M' | 'F', weightKg: number, heightCm: number, ageYears: number) => number
+  bmrHarrisBenedict: (sex: 'M' | 'F', weightKg: number, heightCm: number, ageYears: number) => number
+  bmrCunningham: (leanMassKg: number) => number
+  tdeeTable: (bmr: number) => { fator: number; nome: string; detalhe: string; kcal: number }[]
   lerNumero: (texto: string) => number | null
 }
 
@@ -57,8 +61,10 @@ const PUBLICAS = [
   '/calculadora-imc',
   '/calculadora-frequencia-cardiaca',
   '/calculadora-vo2max',
+  '/calculadora-tmb',
   '/questionario-par-q',
   '/modelo-de-ficha-de-treino',
+  '/planilha-de-avaliacao-fisica',
 ]
 
 function blocosDeHeaders(texto: string) {
@@ -241,5 +247,35 @@ describe('fórmulas das ferramentas grátis', () => {
       }
     }
     expect(c.herdyCutoffs(47.4)).toEqual(herdyCutoffs(47.4))
+  })
+
+  it('TMB (Mifflin-St Jeor, Harris-Benedict revisada e Cunningham) e TDEE', async () => {
+    const c = await importar<Calculos>('public/site/calculos.js')
+    // Mifflin-St Jeor: 10*peso + 6.25*altura - 5*idade + (5 M / -161 F)
+    expect(c.bmrMifflin('M', 80, 180, 30)).toBeCloseTo(1780, 5)
+    expect(c.bmrMifflin('F', 60, 165, 30)).toBeCloseTo(1320.25, 5)
+    // Harris-Benedict revisada (Roza & Shizgal 1984)
+    expect(c.bmrHarrisBenedict('M', 80, 180, 30)).toBeCloseTo(88.362 + 13.397 * 80 + 4.799 * 180 - 5.677 * 30, 5)
+    expect(c.bmrHarrisBenedict('F', 60, 165, 30)).toBeCloseTo(447.593 + 9.247 * 60 + 3.098 * 165 - 4.33 * 30, 5)
+    // Cunningham (1980): 500 + 22 * massa magra
+    expect(c.bmrCunningham(50)).toBe(1600)
+    const tdee = c.tdeeTable(1600)
+    expect(tdee).toHaveLength(5)
+    expect(tdee[0]).toMatchObject({ nome: 'Sedentário', fator: 1.2, kcal: 1920 })
+    expect(tdee[2]).toMatchObject({ nome: 'Moderadamente ativo', fator: 1.55, kcal: 2480 })
+  })
+
+  it('calculadoras e ferramentas grátis expõem JSON-LD WebApplication e CTA contextual', async () => {
+    for (const rota of ['/calculadora-1rm', '/calculadora-percentual-de-gordura', '/calculadora-imc', '/calculadora-frequencia-cardiaca', '/calculadora-vo2max', '/calculadora-tmb']) {
+      const html = await ler(`public${rota}.html`)
+      expect(html).toContain('"@type":"WebApplication"')
+      expect(html).toContain('class="cta-calc"')
+      expect(html).toContain('Outras ferramentas grátis')
+    }
+    for (const rota of ['/modelo-de-anamnese', '/questionario-par-q', '/modelo-de-ficha-de-treino', '/planilha-de-avaliacao-fisica']) {
+      const html = await ler(`public${rota}.html`)
+      expect(html).toContain('"@type":"WebApplication"')
+      expect(html).toContain('Outras ferramentas grátis')
+    }
   })
 })
