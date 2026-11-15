@@ -1,15 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { PageTrail } from '../components/PageTrail'
 import { useSubjectTrail } from '../lib/subjectTrail'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubject } from '../features/subjects/hooks'
-import {
-  useAssessment,
-  useAssessments,
-  useSubjectCircumferences,
-} from '../features/assessment/hooks'
+import { useAssessments } from '../features/assessment/hooks'
+import { getAssessment, listSubjectCircumferences } from '../features/assessment/api'
 import { useAnamneses } from '../features/anamnesis/hooks'
 import { parseAnswers } from '../features/anamnesis/parse'
 import { computeGate } from '../features/anamnesis/gate'
@@ -34,7 +32,7 @@ import {
   sortAssessmentsChronologically,
 } from '../features/assessment/timeline'
 import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
-import { buildBriefingPrompt, type AssessmentPromptPoint } from '../features/prompts'
+import type { AssessmentPromptPoint } from '../features/prompts'
 import type { SubjectRow } from '../features/subjects/api'
 import { useSessions } from '../features/posture/hooks'
 import { useFitnessTests } from '../features/fitness/hooks'
@@ -101,6 +99,15 @@ function AvaliadoDetalheContent() {
   const trail = useSubjectTrail(undefined)
   const { organization } = useOrganization()
   const subjectQuery = useSubject(id)
+  // Dispara as consultas das seções em paralelo com useSubject(id), sem esperar
+  // o cadastro resolver primeiro para começar a buscar o resto da ficha.
+  useActiveConsent(id)
+  useAssessments(id)
+  useAnamneses(id)
+  useSubjectIntakes(id)
+  useWorkoutPlans(id)
+  useFitnessTests(id)
+  useSessions(id)
   const [exportBusy, setExportBusy] = useState(false)
   const [exportProgress, setExportProgress] = useState<SubjectExportProgress | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -359,52 +366,69 @@ function FatTrend({ values }: { values: number[] }) {
 function BriefingSection({ subject }: { subject: SubjectRow }) {
   const { organization } = useOrganization()
   const { user } = useAuth()
+  const qc = useQueryClient()
   const anamnesesQuery = useAnamneses(subject.id)
   const assessmentsQuery = useAssessments(subject.id)
-  const circsQuery = useSubjectCircumferences(subject.id)
+  const fitnessQuery = useFitnessTests(subject.id)
 
-  // listAnamneses já vem da mais recente para a mais antiga
+  // listAnamneses e listFitnessTests já vêm da mais recente para a mais antiga
   const anamneseRow = (anamnesesQuery.data ?? [])[0] ?? null
+  const lastFitness = (fitnessQuery.data ?? [])[0] ?? null
 
   const assessments = useMemo(
     () => sortAssessmentsChronologically(assessmentsQuery.data ?? []),
     [assessmentsQuery.data]
   )
   const lastAssessment = assessments.length > 0 ? assessments[assessments.length - 1] : null
-  // as dobras cruas só existem na consulta por avaliação; useAssessment fica
-  // desabilitado enquanto não há avaliação nenhuma
-  const lastDetailQuery = useAssessment(lastAssessment?.id)
 
-  const points: AssessmentPromptPoint[] = useMemo(() => {
-    const byAssessment = groupCircumferencesByAssessment(circsQuery.data ?? [])
-    return assessments.map((a) => ({
-      assessedAt: a.assessed_at,
-      protocolId: a.protocol_id,
-      engineVersion: a.engine_version,
-      weightKg: a.weight_kg,
-      heightCm: a.height_cm,
-      results: a.results as AssessmentResultSnapshot | null,
-      circumferences: byAssessment.get(a.id) ?? [],
-    }))
-  }, [assessments, circsQuery.data])
-
-  // Sem anamnese e sem avaliação não há material nenhum para cruzar.
-  if (!anamneseRow && assessments.length === 0) return null
+  // Sem anamnese, sem avaliação e sem teste físico não há material para cruzar.
+  if (!anamneseRow && assessments.length === 0 && !lastFitness) return null
 
   return (
     <section className="space-y-3">
       <div>
         <h2 className="text-base font-semibold">Briefing para IA</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Anamnese e avaliações físicas num prompt só, para pedir a leitura cruzada antes de
-          prescrever.
+          Anamnese, avaliações e testes físicos num prompt só, para pedir a leitura cruzada antes
+          de prescrever.
         </p>
       </div>
       <div>
         <CopyPromptButton
           label="Copiar briefing"
-          build={() =>
-            buildBriefingPrompt({
+          build={async () => {
+            // Circunferências e dobras da última avaliação só são buscadas quando
+            // o profissional pede o briefing, evitando 2 consultas extras ao abrir a ficha.
+            const [circs, lastDetail, { buildBriefingPrompt }] = await Promise.all([
+              assessments.length > 0
+                ? qc
+                    .fetchQuery({
+                      queryKey: ['subject-circumferences', subject.id],
+                      queryFn: () => listSubjectCircumferences(subject.id),
+                    })
+                    .catch(() => [])
+                : Promise.resolve([]),
+              lastAssessment
+                ? qc
+                    .fetchQuery({
+                      queryKey: ['assessment', lastAssessment.id],
+                      queryFn: () => getAssessment(lastAssessment.id),
+                    })
+                    .catch(() => null)
+                : Promise.resolve(null),
+              import('../features/prompts/briefing'),
+            ])
+            const byAssessment = groupCircumferencesByAssessment(circs)
+            const points: AssessmentPromptPoint[] = assessments.map((a) => ({
+              assessedAt: a.assessed_at,
+              protocolId: a.protocol_id,
+              engineVersion: a.engine_version,
+              weightKg: a.weight_kg,
+              heightCm: a.height_cm,
+              results: a.results as AssessmentResultSnapshot | null,
+              circumferences: byAssessment.get(a.id) ?? [],
+            }))
+            return buildBriefingPrompt({
               subject: {
                 fullName: subject.full_name,
                 birthDate: subject.birth_date,
@@ -418,14 +442,21 @@ function BriefingSection({ subject }: { subject: SubjectRow }) {
                   }
                 : null,
               points,
-              skinfolds: (lastDetailQuery.data?.skinfolds ?? []).map((sf) => ({
+              skinfolds: (lastDetail?.skinfolds ?? []).map((sf) => ({
                 site: sf.site,
                 readings: [sf.reading_1, sf.reading_2, sf.reading_3].filter(
                   (v): v is number => v != null
                 ),
               })),
+              fitnessTest: lastFitness
+                ? {
+                    testedAt: lastFitness.tested_at,
+                    measures: lastFitness.measures,
+                    notes: lastFitness.notes,
+                  }
+                : null,
             })
-          }
+          }}
           onCopied={() => {
             if (!organization) return
             void logExport({

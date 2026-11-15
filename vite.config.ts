@@ -78,9 +78,6 @@ export default defineConfig({
           // layout de computador (18/10/2026) sem subir o teto de 2 MB.
           "**/Plano-*.js",
           "**/Auditoria-*.js",
-          // Agenda idem (lista e grava no servidor): a auditoria de 23/10/2026
-          // somou ~3 KB às telas pré-cacheadas e o total passou do teto.
-          "**/Agenda-*.js",
           // Onboarding cria a organização e Recuperar senha manda o e-mail:
           // sem internet nenhuma das duas faz nada (13/11/2026).
           "**/Onboarding-*.js",
@@ -88,6 +85,7 @@ export default defineConfig({
           "**/pdfTheme-*.js",
           "**/assessmentPdf-*.js",
           "**/workoutPdf-*.js",
+          "**/fitnessPdf-*.js",
           "**/poseDetect-*.js",
           "**/vision_bundle-*.js",
         ],

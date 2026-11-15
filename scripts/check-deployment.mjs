@@ -104,7 +104,8 @@ for (const path of ['/dashboard', '/a/smoke-token-inexistente', '/t', '/t/', '/t
 // Cloudflare; o que vale é o public/_headers, coberto pelo pagesConfig.test.
 for (const path of ['/avaliacao-fisica', '/avaliacao-postural', '/app-para-personal-trainer',
   '/calculadora-1rm', '/calculadora-percentual-de-gordura', '/modelo-de-anamnese',
-  '/calculadora-imc', '/calculadora-frequencia-cardiaca', '/questionario-par-q', '/modelo-de-ficha-de-treino']) {
+  '/calculadora-imc', '/calculadora-frequencia-cardiaca', '/calculadora-vo2max',
+  '/questionario-par-q', '/modelo-de-ficha-de-treino']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)

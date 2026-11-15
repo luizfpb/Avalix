@@ -22,6 +22,7 @@ const { registerReportFontsFrom } = await import('../src/features/reports/pdfFon
 registerReportFontsFrom(join(process.cwd(), 'public/fonts'))
 const { generateWorkoutPdf } = await import('../src/features/reports/workoutPdf.tsx')
 const { generateAssessmentPdf, generateEvolutionPdf } = await import('../src/features/reports/assessmentPdf.tsx')
+const { generateFitnessPdf } = await import('../src/features/reports/fitnessPdf.tsx')
 
 const identity = {
   orgName: 'Estúdio Corpo & Movimento',
@@ -255,5 +256,28 @@ await save('avaliacao-minima-menor.pdf', generateAssessmentPdf, {
   ...identity, evaluatorName: null, ageYears: 15,
   assessment: minimalAssessment,
   skinfolds: [], circumferences: [], history: [], circumferenceHistory: [],
+})
+await save('testes-fisicos.pdf', generateFitnessPdf, {
+  ...identity,
+  subjectLabel: 'Aluna',
+  sex: 'F',
+  ageYears: 32,
+  testedAt: '2026-10-20',
+  measures: {
+    cooper: { distance_m: 2350 },
+    rockport: { time_s: 855, heart_rate_bpm: 132, weight_kg: 64.5 },
+    push_ups: { reps: 24, knees: true },
+    sit_ups: { reps: 31 },
+    sit_and_reach: { best_cm: 34, feet_mark_cm: 26 },
+    grip: { right_kg: 31.5, left_kg: 29.5 },
+  },
+  notes: 'Dados fictícios para validação visual. Coleta realizada pela manhã, pista coberta, boa disposição.',
+  previous: {
+    cooper: { testedAt: '2026-07-15', value: 37.4, ratingLabel: 'Regular' },
+    push_ups: { testedAt: '2026-07-15', value: 19, ratingLabel: 'Bom' },
+    sit_ups: { testedAt: '2026-07-15', value: 27, ratingLabel: 'Média' },
+    sit_and_reach: { testedAt: '2026-07-15', value: 31, ratingLabel: 'Média' },
+    grip: { testedAt: '2026-07-15', value: 29.5, ratingLabel: 'Acima do corte de força baixa' },
+  },
 })
 console.log(`Amostras ficticias salvas em: ${outDir}`)

@@ -62,6 +62,10 @@
   ! X-Robots-Tag
   Cache-Control: no-cache
 
+/calculadora-vo2max
+  ! X-Robots-Tag
+  Cache-Control: no-cache
+
 /questionario-par-q
   ! X-Robots-Tag
   Cache-Control: no-cache

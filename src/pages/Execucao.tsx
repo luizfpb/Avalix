@@ -329,6 +329,7 @@ export default function Execucao() {
                     key={log.id}
                     log={log}
                     names={names}
+                    exercises={exercisesQuery.data ?? []}
                     planWeeks={plan.weeks}
                     aberto={openLogId === log.id}
                     onAlternar={() => setOpenLogId(openLogId === log.id ? null : log.id)}
@@ -411,6 +412,7 @@ export default function Execucao() {
 function LogRowItem({
   log,
   names,
+  exercises = [],
   planWeeks,
   aberto,
   onAlternar,
@@ -419,6 +421,7 @@ function LogRowItem({
 }: {
   log: WorkoutLogRow
   names: Record<string, string>
+  exercises?: ExerciseRow[]
   planWeeks: number
   aberto: boolean
   onAlternar: () => void
@@ -536,7 +539,10 @@ function LogRowItem({
               weekNumber={log.week_number}
               planWeeks={planWeeks}
               notes={editing.notes}
-              exerciseOptions={Object.entries(names).map(([id, name]) => ({ id, name }))}
+              exerciseOptions={[
+                ...exercises.map((e) => ({ id: e.id, name: e.name, aliases: e.aliases })),
+                ...Object.entries(names).map(([id, name]) => ({ id, name })),
+              ]}
               onSave={saveEdit}
               onCancel={() => setEditing(null)}
             />

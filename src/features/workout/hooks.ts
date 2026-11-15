@@ -110,6 +110,7 @@ export function useCreateWorkoutPlan(subjectId: string | undefined) {
     mutationFn: (input: SaveWorkoutPlanInput) => createWorkoutPlan(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }
@@ -128,6 +129,7 @@ export function useUpdateWorkoutPlan(
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }
@@ -138,6 +140,7 @@ export function useDeleteWorkoutPlan(subjectId: string | undefined) {
     mutationFn: (id: string) => deleteWorkoutPlan(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }
@@ -150,6 +153,7 @@ export function useDuplicateWorkoutPlan() {
     mutationFn: (input: SaveWorkoutPlanInput) => createWorkoutPlan(input),
     onSuccess: (plan) => {
       qc.invalidateQueries({ queryKey: ['workout-plans', plan.subject_id] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }
@@ -213,6 +217,7 @@ export function useCreateWorkoutLog(planId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
       qc.invalidateQueries({ queryKey: ['subject-last-sets'] })
+      qc.invalidateQueries({ queryKey: ['org-log-summary'] })
     },
   })
 }
@@ -257,6 +262,7 @@ export function useDeleteWorkoutLog(planId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['workout-logs', planId] })
       qc.invalidateQueries({ queryKey: ['workout-set-history', planId] })
       qc.invalidateQueries({ queryKey: ['subject-last-sets'] })
+      qc.invalidateQueries({ queryKey: ['org-log-summary'] })
     },
   })
 }
@@ -271,6 +277,7 @@ export function useSetWorkoutPlanStatus(
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workout-plans', subjectId] })
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
+      qc.invalidateQueries({ queryKey: ['org-active-plans'] })
     },
   })
 }

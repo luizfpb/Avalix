@@ -49,6 +49,7 @@ export function useCreateAssessment(subjectId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
       qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
+      qc.invalidateQueries({ queryKey: ['last-assessment-by-subject'] })
     },
   })
 }
@@ -68,6 +69,7 @@ export function useUpdateAssessment(
       qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
       qc.invalidateQueries({ queryKey: ['assessment', assessmentId] })
       qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
+      qc.invalidateQueries({ queryKey: ['last-assessment-by-subject'] })
     },
   })
 }
@@ -79,6 +81,7 @@ export function useDeleteAssessment(subjectId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assessments', subjectId] })
       qc.invalidateQueries({ queryKey: ['subject-circumferences', subjectId] })
+      qc.invalidateQueries({ queryKey: ['last-assessment-by-subject'] })
     },
   })
 }

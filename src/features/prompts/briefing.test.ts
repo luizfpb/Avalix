@@ -67,4 +67,20 @@ describe('buildBriefingPrompt', () => {
     expect(p).toContain('REGRAS DE RIGOR')
     expect(p).toContain('nada de divisão semanal, séries,')
   })
+
+  it('inclui os testes físicos e suas premissas quando registrados', () => {
+    const p = briefing({
+      fitnessTest: {
+        testedAt: '2026-08-22',
+        measures: { cooper: { distance_m: 2450 }, push_ups: { reps: 28, knees: false } },
+        notes: 'Pista plana',
+      },
+    })
+    expect(p).toContain('testes físicos de 22/08/2026')
+    expect(p).toContain('TESTES FÍSICOS DE 22/08/2026')
+    expect(p).toContain('Corrida de 12 minutos (Cooper)')
+    expect(p).toContain('Flexão de braço')
+    expect(p).toContain('Pista plana')
+    expect(p).toContain('PREMISSAS METODOLÓGICAS — TESTES FÍSICOS')
+  })
 })

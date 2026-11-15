@@ -3,11 +3,9 @@ name: banco
 # Suítes pgTAP (supabase/tests) num PostgreSQL 18 descartável criado dentro do
 # runner por scripts/test-db.mjs: aplica o stub do Supabase e todas as
 # migrations, roda os testes e descarta. Não usa segredo nenhum e nunca
-# conecta no banco de produção. Roda em paralelo ao deploy; depois do
-# primeiro verde, vale torná-lo obrigatório (branch protection ou `needs`).
+# conecta no banco de produção. Em push na main o job `pgtap` já é pré-requisito
+# obrigatório do workflow de deploy (`needs: [pgtap]` em deploy.yml).
 on:
-  push:
-    branches: [main]
   pull_request: {}
   workflow_dispatch: {}
 

@@ -26,7 +26,7 @@ export function CopyPromptButton({
   aviso = AVISO_PADRAO,
   onCopied,
 }: {
-  build: () => string
+  build: () => string | Promise<string>
   label?: string
   aviso?: string
   // chamado só quando a cópia deu certo (trilha de auditoria)
@@ -36,13 +36,25 @@ export function CopyPromptButton({
   const [copied, setCopied] = useState(false)
   const [failed, setFailed] = useState(false)
   const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function resolveText(): Promise<string> {
+    const out = build()
+    if (typeof out === 'string') return out
+    setBusy(true)
+    try {
+      return await out
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleCopy() {
-    const t = build()
-    setText(t)
     setFailed(false)
     setCopied(false)
     try {
+      const t = await resolveText()
+      setText(t)
       await navigator.clipboard.writeText(t)
       setCopied(true)
       onCopied?.()
@@ -52,18 +64,34 @@ export function CopyPromptButton({
     }
   }
 
-  function handleToggle() {
-    if (!open) setText(build())
-    setOpen(!open)
+  async function handleToggle() {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    const out = build()
+    if (typeof out === 'string') {
+      setText(out)
+      setOpen(true)
+      return
+    }
+    setBusy(true)
+    try {
+      const t = await out
+      setText(t)
+      setOpen(true)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <div className="space-y-2 rounded-lg border border-border/80 bg-card/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" onClick={handleCopy}>
+        <Button variant="outline" size="sm" onClick={handleCopy} disabled={busy}>
           {copied ? <ClipboardCheck /> : <Copy />} {copied ? 'Copiado!' : label}
         </Button>
-        <Button variant="ghost" size="sm" onClick={handleToggle}>
+        <Button variant="ghost" size="sm" onClick={handleToggle} disabled={busy}>
           {open ? <ChevronUp /> : <ChevronDown />} {open ? 'Ocultar texto' : 'Ver o texto'}
         </Button>
         {text && open ? (

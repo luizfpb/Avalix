@@ -312,6 +312,11 @@ const landing = {
               <p>FC máxima por Tanaka ou 220 − idade e as cinco zonas pela FC de reserva (Karvonen).</p>
               <span class="mais">Calcular zonas →</span>
             </a>
+            <a class="ferramenta" href="/calculadora-vo2max">
+              <h3>Calculadora de VO2máx</h3>
+              <p>Cooper 12 min, Rockport 1 milha e banco de Queens, com a classificação brasileira (Herdy &amp; Caixeta).</p>
+              <span class="mais">Calcular VO2máx →</span>
+            </a>
             <a class="ferramenta" href="/questionario-par-q">
               <h3>Questionário PAR-Q</h3>
               <p>As 7 perguntas de prontidão para atividade física, com sim, não e assinatura. Para imprimir.</p>
@@ -1165,9 +1170,101 @@ const fichaTreino = {
       ${chamada('Troque a ficha de papel pelo celular do aluno', 'No Avalix o aluno abre o treino por link, vê a carga da última vez em cada série e registra o que fez. O registro volta para você.')}`,
 }
 
+const calcVo2 = {
+  arquivo: 'calculadora-vo2max.html',
+  rota: '/calculadora-vo2max',
+  atualizada: TESTES_FISICOS,
+  migalha: 'Calculadora de VO2máx',
+  titulo: 'Calculadora de VO2máx grátis (Cooper, Rockport e Queens) · Avalix',
+  descricao:
+    'Calcule o VO2máx estimado pelo teste de Cooper de 12 minutos, caminhada de 1 milha de Rockport ou banco de Queens de 3 minutos, com a classificação brasileira de Herdy & Caixeta (2016).',
+  scripts: ['/site/calculadora-vo2max.js'],
+  perguntas: [
+    ['Qual protocolo escolher: Cooper, Rockport ou banco de Queens?',
+      'O teste de Cooper (12 minutos) exige esforço máximo contínuo e funciona melhor com alunos habituados a correr. O teste de Rockport (caminhada rápida de 1 milha, 1.609 m) e o banco de Queens (3 minutos de subida e descida no degrau) são submáximos e mais adequados para iniciantes ou quem não corre.'],
+    ['Como funciona a classificação brasileira de Herdy & Caixeta?',
+      'Publicada nos Arquivos Brasileiros de Cardiologia em 2016 a partir de 2.837 testes cardiopulmonares em esteira no Brasil, ela define a média de VO2máx por sexo e faixa etária (15 a 74 anos) e classifica em cinco faixas: muito fraca (abaixo de 50% da média), fraca (50% a 80%), regular (80% a 95%), boa (95% a 105%) e excelente (acima de 105%).'],
+    ['Posso comparar o VO2máx de Cooper com o de Rockport na reavaliação?',
+      'Não diretamente. Cada equação tem erro próprio e responde de forma diferente ao peso corporal e à frequência cardíaca. Para acompanhar a evolução do aluno, repita sempre o mesmo protocolo em condições semelhantes.'],
+  ],
+  corpo: `<header class="cabeca-pagina envoltorio">
+        <h1>Calculadora de VO2máx</h1>
+        <p class="lide">Estime o consumo máximo de oxigênio pelos protocolos de Cooper (12 min), Rockport (1 milha) ou banco de Queens (3 min) e veja a classificação pela referência brasileira.</p>
+      </header>
+
+      <section class="envoltorio">
+        <div class="calculadora">
+          <form class="painel" id="form-vo2" novalidate>
+            <div class="campos">
+              <fieldset class="campo inteiro">
+                <legend>Sexo</legend>
+                <div class="opcoes">
+                  <label><input type="radio" name="sexo" value="F" checked /> Feminino</label>
+                  <label><input type="radio" name="sexo" value="M" /> Masculino</label>
+                </div>
+              </fieldset>
+              <div class="campo inteiro">
+                <label for="protocolo-vo2">Protocolo</label>
+                <select id="protocolo-vo2" name="protocolo">
+                  <option value="cooper">Cooper — corrida ou caminhada de 12 minutos</option>
+                  <option value="rockport">Rockport — caminhada de 1 milha (1.609 m)</option>
+                  <option value="queens">Banco de Queens — degrau por 3 minutos</option>
+                </select>
+              </div>
+              <div class="campo inteiro">
+                <label for="idade-vo2">Idade (anos)</label>
+                <input id="idade-vo2" name="idade" inputmode="numeric" autocomplete="off" value="32" />
+              </div>
+            </div>
+            <div class="campos" id="medidas-vo2"></div>
+          </form>
+          <div class="painel" aria-live="polite">
+            <div class="resultado-calc">
+              <span class="rotulo">VO2máx estimado</span>
+              <span class="valor numero" id="valor-vo2">—</span>
+              <p class="aviso-calc" id="nota-vo2">Preencha as medidas do teste.</p>
+            </div>
+            <table class="tabela" id="detalhe-vo2" hidden>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao">
+        <div class="envoltorio texto">
+          <h2>Como aplicar cada protocolo</h2>
+          <ul>
+            <li><strong>Cooper (12 minutos):</strong> em pista plana ou esteira sem inclinação, o aluno percorre a maior distância possível em 12 minutos. Equação: <code>(distância em metros − 504,9) ÷ 44,73</code>.</li>
+            <li><strong>Rockport (1 milha / 1.609 m):</strong> o aluno caminha 1.609 metros o mais rápido que conseguir, sem correr. Ao cruzar a chegada, registre o tempo total e a frequência cardíaca imediatamente (Kline et al., 1987).</li>
+            <li><strong>Banco de Queens (3 minutos):</strong> banco de 41,3 cm de altura, por 3 minutos em cadência fixa (24 subidas por minuto nos homens, 96 toques do metrônomo; 22 nas mulheres, 88 toques). Ao terminar, conte os batimentos de 5 a 20 segundos após parar e multiplique por 4 (McArdle et al., 1972).</li>
+          </ul>
+          <h2>Tabela de referência brasileira (Herdy &amp; Caixeta, 2016)</h2>
+          <p>Média de referência (faixa <strong>Boa</strong> = 95% a 105% da média) em ml/kg/min por faixa etária:</p>
+          <div class="rolagem">
+            <table class="tabela">
+              <thead><tr><th scope="col">Idade</th><th scope="col">Mulheres (média)</th><th scope="col">Homens (média)</th></tr></thead>
+              <tbody>
+                <tr><td>15 a 24 anos</td><td>38,9</td><td>50,6</td></tr>
+                <tr><td>25 a 34 anos</td><td>38,1</td><td>47,4</td></tr>
+                <tr><td>35 a 44 anos</td><td>34,9</td><td>45,4</td></tr>
+                <tr><td>45 a 54 anos</td><td>31,1</td><td>40,5</td></tr>
+                <tr><td>55 a 64 anos</td><td>28,6</td><td>35,3</td></tr>
+                <tr><td>65 a 74 anos</td><td>25,1</td><td>30,0</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      PERGUNTAS
+
+      ${chamada('Registre os testes físicos e acompanhe a evolução', 'No Avalix você salva Cooper, Rockport, Queens, flexão, abdominal, banco de Wells e dinamometria no histórico do aluno e emite o PDF com a sua marca.')}`,
+}
+
 export const PAGINAS = [
   landing, avaliacaoFisica, avaliacaoPostural, appPersonal,
   calc1rm, calcGordura, modeloAnamnese,
-  calcImc, calcFc, parq, fichaTreino,
+  calcImc, calcFc, calcVo2, parq, fichaTreino,
 ]
   .map((p) => ({ ...p, corpo: p.corpo.replace('PERGUNTAS', p.perguntas?.length && p.rota !== '/' ? perguntasHtml(p.perguntas) : '') }))

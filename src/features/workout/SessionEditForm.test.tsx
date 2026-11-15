@@ -125,6 +125,39 @@ describe('SessionEditForm', () => {
     open()
     expect(screen.queryByLabelText('Semana do mesociclo')).toBeNull()
   })
+
+  it('filtra e adiciona exercício do catálogo por nome ou apelido na correção da sessão', async () => {
+    const onSave = vi.fn(async (_value: SessionEditValues) => {})
+    render(
+      <SessionEditForm
+        sets={series}
+        performedAt="2026-09-08"
+        notes={null}
+        exerciseOptions={[
+          { id: 'x1', name: 'Supino' },
+          { id: 'x2', name: 'Puxada frontal na polia', aliases: ['Pulldown', 'Puxador frente'] },
+          { id: 'x3', name: 'Cadeira extensora', aliases: ['Extensora'] },
+        ]}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />
+    )
+    const editor = within(screen.getByRole('dialog', { name: 'Editar treino' }))
+    fireEvent.change(editor.getByLabelText('Filtrar exercício para adicionar'), {
+      target: { value: 'pulldown' },
+    })
+    expect((editor.getByLabelText('Adicionar exercício') as HTMLSelectElement).value).toBe('x2')
+    fireEvent.click(editor.getByRole('button', { name: 'Adicionar exercício' }))
+    fireEvent.change(editor.getByLabelText('Carga da série 1 de Puxada frontal na polia'), {
+      target: { value: '55' },
+    })
+    fireEvent.change(editor.getByLabelText('Repetições da série 1 de Puxada frontal na polia'), {
+      target: { value: '10' },
+    })
+    fireEvent.click(editor.getByRole('button', { name: 'Salvar correções' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0].sets.map((s) => s.exerciseId)).toEqual(['x1', 'x1', 'x2'])
+  })
 })
 
 // O editor é desmontado pelo pai com o <dialog> aberto, sem passar pelo

@@ -19,3 +19,9 @@ export {
   type SkinfoldReading,
 } from './assessment'
 export { buildBriefingPrompt, type BriefingPromptInput } from './briefing'
+export {
+  buildFitnessPrompt,
+  testesFisicosBlock,
+  type FitnessPromptInput,
+  type FitnessPromptPoint,
+} from './fitness'

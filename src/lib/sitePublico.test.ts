@@ -9,6 +9,8 @@ import {
 } from '../features/assessment/protocols/equations'
 import { siriBodyFatPct } from '../features/assessment/protocols/bodyComposition'
 import { bmiCategory, computeBmi } from '../features/assessment/bmi'
+import { cooperVo2, queensVo2, rockportVo2 } from '../features/fitness/engine'
+import { herdyCutoffs, herdyReferenceMean, rateVo2 } from '../features/fitness/norms'
 
 // Páginas públicas (landing, recursos e ferramentas grátis): HTML estático
 // gerado por scripts/gerar-site.mjs, fora da SPA, para o Google indexar.
@@ -31,6 +33,12 @@ type Calculos = {
   waistHeightRisk: (ratio: number) => string
   hrMax: (ageYears: number, formula?: 'tanaka' | 'fox') => number
   hrZones: (maxHr: number, restHr?: number | null) => { zona: number; de: number; ate: number; min: number; max: number }[]
+  cooperVo2: typeof cooperVo2
+  rockportVo2: typeof rockportVo2
+  queensVo2: typeof queensVo2
+  herdyReferenceMean: typeof herdyReferenceMean
+  herdyCutoffs: typeof herdyCutoffs
+  rateVo2: typeof rateVo2
   lerNumero: (texto: string) => number | null
 }
 
@@ -48,6 +56,7 @@ const PUBLICAS = [
   '/modelo-de-anamnese',
   '/calculadora-imc',
   '/calculadora-frequencia-cardiaca',
+  '/calculadora-vo2max',
   '/questionario-par-q',
   '/modelo-de-ficha-de-treino',
 ]
@@ -216,5 +225,21 @@ describe('fórmulas das ferramentas grátis', () => {
     expect(c.lerNumero(' 80 ')).toBe(80)
     expect(c.lerNumero('')).toBeNull()
     expect(c.lerNumero('abc')).toBeNaN()
+  })
+
+  it('VO2máx (Cooper, Rockport, Queens) e faixas de Herdy & Caixeta iguais ao app', async () => {
+    const c = await importar<Calculos>('public/site/calculos.js')
+    for (const d of [1600, 2200, 2850, 3400]) {
+      expect(c.cooperVo2(d)).toBe(cooperVo2(d))
+    }
+    for (const sexo of ['M', 'F'] as const) {
+      expect(c.rockportVo2(sexo, 38, 74.5, 885, 138)).toBe(rockportVo2(sexo, 38, 74.5, 885, 138))
+      expect(c.queensVo2(sexo, 144)).toBe(queensVo2(sexo, 144))
+      for (const idade of [14, 15, 28, 39, 50, 60, 70, 75]) {
+        expect(c.herdyReferenceMean(sexo, idade)).toBe(herdyReferenceMean(sexo, idade))
+        expect(c.rateVo2(36.5, sexo, idade)).toEqual(rateVo2(36.5, sexo, idade))
+      }
+    }
+    expect(c.herdyCutoffs(47.4)).toEqual(herdyCutoffs(47.4))
   })
 })

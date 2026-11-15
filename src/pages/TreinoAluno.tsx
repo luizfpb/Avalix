@@ -750,7 +750,10 @@ export default function TreinoAluno() {
             ...pacote.history_plans.map((p) => [p.id, p.weeks] as const),
             ...(pacote.plan ? [[pacote.plan.id, pacote.plan.weeks] as const] : []),
           ])}
-          exerciseOptions={pacote.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))}
+          exerciseOptions={[
+            ...pacote.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name })),
+            ...(pacote.catalog ?? []).map((ex) => ({ id: ex.id, name: ex.name, aliases: ex.aliases })),
+          ]}
           onEdited={async () => {
             const epoch = accessEpoch.current
             try {
@@ -2277,7 +2280,7 @@ function Historico({
   planId: string | null
   // Total do mesociclo por plano, para a correção limitar a semana.
   planWeeks: Record<string, number>
-  exerciseOptions: { id: string; name: string }[]
+  exerciseOptions: { id: string; name: string; aliases?: string[] | null }[]
 }) {
   const [sessoes, setSessoes] = useState<StudentHistorySession[] | null>(null)
   const [cursor, setCursor] = useState<StudentHistoryCursor | null>(null)
@@ -2290,7 +2293,7 @@ function Historico({
   const [refreshKey, setRefreshKey] = useState(0)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
   const [openingEdit, setOpeningEdit] = useState<string | null>(null)
-  const [editingOptions, setEditingOptions] = useState<{ id: string; name: string }[]>([])
+  const [editingOptions, setEditingOptions] = useState<{ id: string; name: string; aliases?: string[] | null }[]>([])
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -2343,10 +2346,18 @@ function Historico({
     try {
       if (session.plan_id && session.plan_id !== planId) {
         const cached = await readCachedPlan(scope, session.plan_id)
-        options = cached?.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name })) ?? []
+        options = [
+          ...(cached?.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name })) ?? []),
+          ...exerciseOptions,
+        ]
         try {
           const original = await getPlanForLink(token, session.plan_id)
-          if (original) options = original.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name }))
+          if (original) {
+            options = [
+              ...original.exercises.map((ex) => ({ id: ex.exercise_id, name: ex.name })),
+              ...exerciseOptions,
+            ]
+          }
         } catch (error) {
           if (isInvalidStudentLinkError(error)) throw error
           // Sem rede ainda é possível corrigir as séries já carregadas.

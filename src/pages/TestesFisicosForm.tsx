@@ -1,12 +1,15 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { PageTrail } from '../components/PageTrail'
-import { ConfirmDialog } from '../components/ConfirmDialog'
 import { QueryError } from '../components/QueryError'
 import { RecordMismatch } from '../components/RecordMismatch'
 import { DecimalInput } from '../components/DecimalInput'
+import { UnsavedBadge, UnsavedChangesPrompt } from '../components/UnsavedChanges'
+import { VersionConflictBanner } from '../components/VersionConflict'
 import { useSubjectTrail } from '../lib/subjectTrail'
 import { useUnsavedChanges } from '../lib/unsavedChanges'
+import { clearDraft, useFormDraft } from '../lib/draft'
+import { useBaseVersion } from '../lib/baseVersion'
 import { normalizeDbError } from '../lib/errors'
 import { ageOnDate } from '../lib/age'
 import { controlClass } from '@/lib/ui'
@@ -45,7 +48,7 @@ export default function TestesFisicosForm() {
   ) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
   }
-  if (subjectQuery.isError || consentQuery.isError || testQuery.isError || !subjectQuery.data) {
+  if (subjectQuery.isError || consentQuery.isError || (editing && testQuery.isError) || !subjectQuery.data) {
     return (
       <QueryError
         message="Não foi possível carregar o aluno ou os testes."
@@ -76,7 +79,7 @@ export default function TestesFisicosForm() {
   const lastWeight = assessmentsQuery.data?.[0]?.weight_kg ?? null
   return (
     <FitnessForm
-      key={testQuery.data?.updated_at ?? 'novo'}
+      key={`${subject.id}:${testQuery.data?.id ?? 'novo'}`}
       subjectId={subject.id}
       sex={subject.sex === 'F' ? 'F' : 'M'}
       birthDate={subject.birth_date}
@@ -104,6 +107,7 @@ function FitnessForm({
   const { organization } = useOrganization()
   const createMut = useCreateFitnessTest(subjectId)
   const updateMut = useUpdateFitnessTest(subjectId, existing?.id)
+  const versao = useBaseVersion(existing?.updated_at)
   const [newId] = useState(() => crypto.randomUUID())
 
   const initial = useMemo(
@@ -119,8 +123,24 @@ function FitnessForm({
   const [showErrors, setShowErrors] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const dirty =
-    testedAt !== initial.testedAt || notes !== initial.notes || JSON.stringify(fields) !== JSON.stringify(initial.fields)
+  const draftKey = existing
+    ? `testes:${subjectId}:${existing.id}:${versao.base}`
+    : `testes:${subjectId}`
+  const valorAtual = useMemo(() => ({ testedAt, notes, fields }), [testedAt, notes, fields])
+  const draft = useFormDraft<{ testedAt: string; notes: string; fields: FitnessFields }>(
+    draftKey,
+    valorAtual,
+    (d) => {
+      if (typeof d.testedAt === 'string') setTestedAt(d.testedAt)
+      if (typeof d.notes === 'string') setNotes(d.notes)
+      if (d.fields && typeof d.fields === 'object') {
+        setFields((prev) => ({ ...prev, ...d.fields }))
+      }
+    }
+  )
+
+  const baseline = useRef(JSON.stringify(initial))
+  const dirty = useMemo(() => JSON.stringify(valorAtual) !== baseline.current, [valorAtual])
   const guard = useUnsavedChanges(dirty)
 
   const { measures, errors } = buildMeasures(fields)
@@ -146,8 +166,10 @@ function FitnessForm({
     try {
       const payload = { testedAt, measures, notes: notes.trim() || null }
       const row = existing
-        ? await updateMut.mutateAsync({ input: payload, expectedUpdatedAt: existing.updated_at })
+        ? await updateMut.mutateAsync({ input: payload, expectedUpdatedAt: versao.base ?? existing.updated_at })
         : await createMut.mutateAsync({ ...payload, orgId: organization?.id ?? '', subjectId, id: newId })
+      versao.adopt(row.updated_at)
+      if (draftKey) clearDraft(draftKey)
       guard.allowNext()
       navigate(`/avaliados/${subjectId}/testes/${row.id}`)
     } catch (e) {
@@ -167,6 +189,22 @@ function FitnessForm({
           Preencha só os testes que aplicou. O resultado e a classificação aparecem ao lado de cada um.
         </p>
       </div>
+
+      {versao.conflict ? <VersionConflictBanner what="Estes testes" /> : null}
+
+      {draft.restored ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <span>Rascunho não salvo recuperado. Continue de onde parou.</span>
+          <button
+            type="button"
+            onClick={draft.dismiss}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Fechar aviso de rascunho"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-[minmax(0,12rem)_1fr]">
         <div className="space-y-1.5">
@@ -310,24 +348,17 @@ function FitnessForm({
       ) : null}
       {submitError ? <p role="alert" className="text-sm text-destructive">{submitError}</p> : null}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleSave} disabled={pending}>
           {pending ? 'Salvando...' : 'Salvar testes'}
         </Button>
         <Button variant="outline" asChild>
           <Link to={existing ? `/avaliados/${subjectId}/testes/${existing.id}` : `/avaliados/${subjectId}`}>Cancelar</Link>
         </Button>
+        {dirty ? <UnsavedBadge /> : null}
       </div>
 
-      <ConfirmDialog
-        open={guard.blocked}
-        title="Sair sem salvar?"
-        description="As medidas digitadas nesta tela ainda não foram enviadas e serão perdidas."
-        confirmLabel="Sair sem salvar"
-        cancelLabel="Continuar editando"
-        onConfirm={guard.leave}
-        onCancel={guard.stay}
-      />
+      <UnsavedChangesPrompt guard={guard} what="nestes testes" />
     </div>
   )
 }

@@ -8,12 +8,20 @@ import { ReadOnlyNotice } from '../components/ReadOnlyGate'
 import { useSubjectTrail } from '../lib/subjectTrail'
 import { normalizeDbError } from '../lib/errors'
 import { ageOnDate } from '../lib/age'
+import { subjectTermLabels } from '../lib/subjectTerm'
 import { Button } from '@/components/ui/button'
+import { useOrganization } from '../features/organization/context'
+import { loadOrgLogoDataUrl } from '../features/organization/logo'
+import { useAuth } from '../features/auth/context'
 import { useSubject } from '../features/subjects/hooks'
 import { useDeleteFitnessTest, useFitnessTest, useFitnessTests } from '../features/fitness/hooks'
 import { parseMeasures, TEST_LABELS } from '../features/fitness/measures'
 import { computeFitness, formatResultValue, type FitnessResult } from '../features/fitness/engine'
 import { previousResults, type Previous } from '../features/fitness/history'
+import { CopyPromptButton } from '../features/prompts/CopyPromptButton'
+import { buildFitnessPrompt } from '../features/prompts/fitness'
+import { downloadBlob } from '../features/reports/download'
+import { logExport } from '../features/reports/audit'
 import type { Sex } from '../features/assessment/protocols'
 
 function formatDate(iso: string): string {
@@ -31,11 +39,15 @@ export default function TestesFisicosDetalhe() {
   const { id, testId } = useParams()
   const trail = useSubjectTrail(id)
   const navigate = useNavigate()
+  const { organization } = useOrganization()
+  const { user } = useAuth()
   const subjectQuery = useSubject(id)
   const testQuery = useFitnessTest(testId)
   const listQuery = useFitnessTests(id)
   const deleteMut = useDeleteFitnessTest(id)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   if (subjectQuery.isPending || testQuery.isPending || listQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -71,6 +83,52 @@ export default function TestesFisicosDetalhe() {
     }
   }
 
+  async function handlePdf() {
+    if (!test) return
+    setPdfBusy(true)
+    setPdfError(null)
+    try {
+      const [{ generateFitnessPdf }, { listProfileNames }, logoUrl] = await Promise.all([
+        import('../features/reports/fitnessPdf'),
+        import('../features/reports/audit'),
+        loadOrgLogoDataUrl(organization?.logo_path),
+      ])
+      const evaluatorName = test.evaluator_id
+        ? await listProfileNames([test.evaluator_id])
+            .then((names) => names[test.evaluator_id] || null)
+            .catch(() => null)
+        : null
+      const blob = await generateFitnessPdf({
+        orgName: organization?.name ?? '',
+        subjectName: subject.full_name,
+        subjectLabel: subjectTermLabels(organization?.subject_term).singularCap,
+        evaluatorName,
+        logoUrl,
+        sex,
+        ageYears: age,
+        testedAt: test.tested_at,
+        measures: test.measures,
+        notes: test.notes,
+        previous,
+      })
+      downloadBlob(blob, `testes-fisicos-${test.tested_at}.pdf`)
+      if (organization && user) {
+        void logExport({
+          orgId: organization.id,
+          userId: user.id,
+          action: 'PDF_REPORT',
+          tableName: 'assessments',
+          rowId: null,
+          subjectId: subject.id,
+        })
+      }
+    } catch {
+      setPdfError('Não foi possível gerar o PDF dos testes físicos. Tente novamente.')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   return (
     <div className="max-w-4xl space-y-6">
       <div>
@@ -83,6 +141,9 @@ export default function TestesFisicosDetalhe() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => void handlePdf()} disabled={pdfBusy || results.length === 0}>
+          {pdfBusy ? 'Gerando PDF...' : 'Baixar PDF'}
+        </Button>
         <Button asChild variant="outline" size="sm">
           <Link to={`/avaliados/${subject.id}/testes/${test.id}/editar`}>Editar</Link>
         </Button>
@@ -90,6 +151,9 @@ export default function TestesFisicosDetalhe() {
           {deleteMut.isPending ? 'Excluindo...' : 'Excluir'}
         </Button>
       </div>
+      {pdfError ? (
+        <p role="alert" className="text-sm text-destructive">{pdfError}</p>
+      ) : null}
       {deleteMut.error ? (
         <p role="alert" className="text-sm text-destructive">{normalizeDbError(deleteMut.error)}</p>
       ) : null}
@@ -109,6 +173,46 @@ export default function TestesFisicosDetalhe() {
         <section className="space-y-1">
           <h2 className="text-base font-semibold">Observações</h2>
           <p className="whitespace-pre-wrap text-sm">{test.notes}</p>
+        </section>
+      ) : null}
+
+      {results.length > 0 ? (
+        <section className="space-y-2">
+          <div>
+            <h2 className="text-base font-semibold">Parecer assistido por IA</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Gera um prompt estruturado com os resultados, classificações e premissas metodológicas desta bateria.
+            </p>
+          </div>
+          <CopyPromptButton
+            label="Copiar prompt de parecer"
+            build={() =>
+              buildFitnessPrompt({
+                subject: {
+                  fullName: subject.full_name,
+                  birthDate: subject.birth_date,
+                  sex: subject.sex,
+                },
+                point: {
+                  testedAt: test.tested_at,
+                  measures: test.measures,
+                  notes: test.notes,
+                  previous,
+                },
+              })
+            }
+            onCopied={() => {
+              if (!organization) return
+              void logExport({
+                orgId: organization.id,
+                userId: user?.id,
+                action: 'AI_SUMMARY',
+                tableName: 'assessments',
+                rowId: null,
+                subjectId: subject.id,
+              })
+            }}
+          />
         </section>
       ) : null}
 

@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useReturnFocus } from '../../lib/useReturnFocus'
 import { SetRowFields } from './SetRowFields'
 import { updateLogRow, validateLogRows, type LogRow } from './logRows'
+import { searchExercises } from './exerciseSearch'
 
 export type EditableSessionSet = {
   exerciseId: string
@@ -55,7 +56,7 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
   notes: string | null
   onSave: (value: SessionEditValues) => Promise<void>
   onCancel: () => void
-  exerciseOptions?: { id: string; name: string }[]
+  exerciseOptions?: { id: string; name: string; aliases?: string[] | null }[]
 }) {
   const id = useId()
   const dialog = useRef<HTMLDialogElement>(null)
@@ -68,6 +69,7 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
   const [error, setError] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [choice, setChoice] = useState('')
+  const [search, setSearch] = useState('')
   const maxSets = Math.max(60, sets.length)
   const maxNotes = Math.max(600, notes?.length ?? 0)
   // A semana já gravada continua válida mesmo se o plano encolheu depois.
@@ -76,6 +78,7 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
   const available = [...new Map(exerciseOptions.map((ex) => [ex.id, ex])).values()]
     .filter((ex) => !exercises.some((existing) => existing.id === ex.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  const filteredAvailable = searchExercises(available, search).map((hit) => hit.exercise)
 
   // o pai desmonta o editor aberto, sem o close() que devolveria o foco
   useReturnFocus(true)
@@ -202,17 +205,34 @@ export function SessionEditForm({ sets, performedAt, weekNumber = null, planWeek
             {available.length > 0 ? (
               <div className="space-y-1.5 rounded-md border border-dashed p-2.5">
                 <Label htmlFor={`${id}-exercise`}>Adicionar exercício</Label>
+                <Input
+                  id={`${id}-exercise-search`}
+                  type="search"
+                  value={search}
+                  placeholder="Filtrar por nome ou apelido..."
+                  aria-label="Filtrar exercício para adicionar"
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setSearch(next)
+                    const matches = searchExercises(available, next).map((hit) => hit.exercise)
+                    if (matches.length === 1) setChoice(matches[0].id)
+                    else if (choice && !matches.some((m) => m.id === choice)) setChoice('')
+                  }}
+                />
                 <select id={`${id}-exercise`} value={choice} className="h-10 w-full rounded-md border bg-background px-2 text-base md:text-sm"
                   onChange={(event) => setChoice(event.target.value)}>
-                  <option value="">Escolher exercício...</option>
-                  {available.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                  <option value="">
+                    {filteredAvailable.length === 0 ? 'Nenhum exercício encontrado' : 'Escolher exercício...'}
+                  </option>
+                  {filteredAvailable.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
                 </select>
                 <Button type="button" variant="outline" size="sm" disabled={!choice || exercises.reduce((sum, e) => sum + e.rows.length, 0) >= maxSets}
                   onClick={() => {
                     const chosen = available.find((ex) => ex.id === choice)
                     if (!chosen) return
-                    setExercises((previous) => [...previous, { ...chosen, rows: [{ key: crypto.randomUUID(), weight: '', reps: '', rir: '', rest: '', failure: false }] }])
+                    setExercises((previous) => [...previous, { id: chosen.id, name: chosen.name, rows: [{ key: crypto.randomUUID(), weight: '', reps: '', rir: '', rest: '', failure: false }] }])
                     setChoice('')
+                    setSearch('')
                     setDirty(true)
                   }}><Plus className="size-3" aria-hidden="true" /> Adicionar exercício</Button>
               </div>

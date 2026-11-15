@@ -62,6 +62,7 @@ export async function listFitnessTests(subjectId: string): Promise<FitnessTestRo
       .eq('subject_id', subjectId)
       .order('tested_at', { ascending: false })
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, from + pageSize - 1)
     if (error) throw error
     rows.push(...(data ?? []))

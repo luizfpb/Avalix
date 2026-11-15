@@ -40,6 +40,7 @@ const FORBIDDEN_PRECACHE = [
   /pdfTheme-/,
   /assessmentPdf-/,
   /workoutPdf-/,
+  /fitnessPdf-/,
   /poseDetect-/,
   /vision_bundle-/,
 ]

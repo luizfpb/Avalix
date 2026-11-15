@@ -3,6 +3,7 @@
 //   Dobras e US Navy: src/features/assessment/protocols/equations.ts
 //   Siri: src/features/assessment/protocols/bodyComposition.ts
 //   IMC e faixas da OMS: src/features/assessment/bmi.ts e adultReference.ts
+//   VO2máx e faixas de Herdy: src/features/fitness/engine.ts e norms.ts
 // src/lib/sitePublico.test.ts confere este arquivo contra os módulos do app,
 // então mudar uma fórmula lá sem mudar aqui reprova o teste.
 //
@@ -132,6 +133,66 @@ export function usNavyBodyFatPct(sex, heightCm, neckCm, trunkCm, hipCm) {
     return 495 / (1.0324 - 0.19077 * Math.log10(trunkCm - neckCm) + 0.15456 * Math.log10(heightCm)) - 450
   }
   return 495 / (1.29579 - 0.35004 * Math.log10(trunkCm + hipCm - neckCm) + 0.221 * Math.log10(heightCm)) - 450
+}
+
+export function cooperVo2(distanceM) {
+  return (distanceM - 504.9) / 44.73
+}
+
+export function rockportVo2(sex, ageYears, weightKg, timeS, hrBpm) {
+  const weightLb = weightKg * 2.20462
+  const minutes = timeS / 60
+  return (
+    132.853 -
+    0.0769 * weightLb -
+    0.3877 * ageYears +
+    6.315 * (sex === 'M' ? 1 : 0) -
+    3.2649 * minutes -
+    0.1565 * hrBpm
+  )
+}
+
+export function queensVo2(sex, hrBpm) {
+  return sex === 'M' ? 111.33 - 0.42 * hrBpm : 65.81 - 0.1847 * hrBpm
+}
+
+const HERDY_SOURCE = 'Herdy e Caixeta, Arq Bras Cardiol, 2016'
+const HERDY_AGES = [
+  [15, 24],
+  [25, 34],
+  [35, 44],
+  [45, 54],
+  [55, 64],
+  [65, 74],
+]
+const HERDY_MEAN = {
+  M: [50.6, 47.4, 45.4, 40.5, 35.3, 30.0],
+  F: [38.9, 38.1, 34.9, 31.1, 28.6, 25.1],
+}
+const HERDY_LABELS = ['Muito fraca', 'Fraca', 'Regular', 'Boa', 'Excelente']
+const round2 = (v) => Math.round(v * 100) / 100
+
+export function herdyReferenceMean(sex, ageYears) {
+  const i = HERDY_AGES.findIndex(([a, b]) => ageYears >= a && ageYears <= b)
+  return i === -1 ? null : HERDY_MEAN[sex]?.[i] ?? null
+}
+
+export function herdyCutoffs(mean) {
+  return {
+    low: round2(mean * 0.5),
+    fair: round2(mean * 0.8),
+    good: round2(mean * 0.95),
+    excellent: round2(mean * 1.05),
+  }
+}
+
+export function rateVo2(vo2, sex, ageYears) {
+  const mean = herdyReferenceMean(sex, ageYears)
+  if (mean == null) return null
+  const c = herdyCutoffs(mean)
+  const v = round2(vo2)
+  const level = v < c.low ? 0 : v <= c.fair ? 1 : v <= c.good ? 2 : v <= c.excellent ? 3 : 4
+  return { label: HERDY_LABELS[level], level, levels: 5, source: HERDY_SOURCE }
 }
 
 // Número digitado no formato brasileiro ("72,5") ou com ponto.

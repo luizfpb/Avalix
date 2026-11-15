@@ -22,6 +22,11 @@ import {
   type AssessmentPromptPoint,
   type SkinfoldReading,
 } from './assessment'
+import {
+  PREMISSAS_TESTES_FISICOS,
+  testesFisicosBlock,
+  type FitnessPromptPoint,
+} from './fitness'
 import { fmtDate, joinBlocks } from './format'
 import type { PromptSubject } from './identity'
 import { FECHAMENTO, PAPEL, REGRAS_DE_RIGOR } from './guardrails'
@@ -32,6 +37,7 @@ export type BriefingPromptInput = {
   // ordem cronológica ascendente; pode vir vazia
   points: AssessmentPromptPoint[]
   skinfolds?: SkinfoldReading[]
+  fitnessTest?: FitnessPromptPoint | null
 }
 
 const PREMISSAS_CRUZAMENTO = `PREMISSAS PARA O CRUZAMENTO (aplicar)
@@ -86,9 +92,9 @@ Responda nesta ordem, com estes títulos:
 8. O que este material não permite concluir`
 
 export function buildBriefingPrompt(input: BriefingPromptInput): string {
-  const { subject, anamnese, points, skinfolds } = input
+  const { subject, anamnese, points, skinfolds, fitnessTest } = input
   const ultima = points.length > 0 ? points[points.length - 1] : null
-  const referencia = ultima?.assessedAt ?? anamnese?.assessedAt ?? ''
+  const referencia = ultima?.assessedAt ?? fitnessTest?.testedAt ?? anamnese?.assessedAt ?? ''
 
   const materialParts = [
     anamnese ? `anamnese de ${fmtDate(anamnese.assessedAt)}` : 'nenhuma anamnese registrada',
@@ -97,7 +103,9 @@ export function buildBriefingPrompt(input: BriefingPromptInput): string {
       : points.length === 1
         ? `1 avaliação física (${fmtDate(points[0].assessedAt)})`
         : `${points.length} avaliações físicas (${fmtDate(points[0].assessedAt)} a ${fmtDate(points[points.length - 1].assessedAt)})`,
+    ...(fitnessTest ? [`testes físicos de ${fmtDate(fitnessTest.testedAt)}`] : []),
   ]
+  const blocoTestes = fitnessTest ? testesFisicosBlock(fitnessTest, subject) : null
 
   return joinBlocks([
     PAPEL,
@@ -113,9 +121,11 @@ export function buildBriefingPrompt(input: BriefingPromptInput): string {
     // tabela repetiria o bloco de resultado acima e sugeriria evolução onde
     // não há.
     points.length > 1 ? serieBlock(points) : null,
+    blocoTestes,
     // As premissas de método só fazem sentido quando há número medido no
     // material; num briefing sem avaliação seriam regras sobre nada.
     points.length > 0 ? PREMISSAS_METODOLOGICAS : null,
+    blocoTestes ? PREMISSAS_TESTES_FISICOS : null,
     PREMISSAS_CRUZAMENTO,
     TAREFA_BRIEFING,
     REGRAS_DE_RIGOR,
