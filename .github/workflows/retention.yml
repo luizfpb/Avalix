@@ -31,12 +31,39 @@ jobs:
           call_rpc() {
             local name="$1"
             local body="$2"
-            curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 60 \
-              -X POST "${SUPABASE_URL%/}/rest/v1/rpc/$name" \
-              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H 'Content-Type: application/json' \
-              --data "$body"
+            local attempt code curl_rc tmp
+            local delays=(5 15 30)
+            tmp=$(mktemp)
+
+            for attempt in 1 2 3 4; do
+              curl_rc=0
+              code=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \
+                -o "$tmp" -w '%{http_code}' \
+                -X POST "${SUPABASE_URL%/}/rest/v1/rpc/$name" \
+                -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+                -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+                -H 'Content-Type: application/json' \
+                --data "$body") || curl_rc=$?
+
+              if [ "$curl_rc" -eq 0 ] && [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+                cat "$tmp"
+                rm -f "$tmp"
+                return 0
+              fi
+
+              # Retenta apenas falhas de transporte ou 408/429/5xx/52x; 401/403/404 falham na hora.
+              if [ "$attempt" -lt 4 ] && { [ "$curl_rc" -ne 0 ] || [[ "$code" =~ ^(408|429|500|502|503|504|520|522|524)$ ]]; }; then
+                local wait_s="${delays[$((attempt - 1))]}"
+                echo "Aviso: $name falhou na tentativa $attempt/4 (curl=$curl_rc, HTTP $code); tentando novamente em ${wait_s}s..." >&2
+                sleep "$wait_s"
+                continue
+              fi
+
+              echo "Erro: $name falhou (curl=$curl_rc, HTTP $code)" >&2
+              cat "$tmp" >&2
+              rm -f "$tmp"
+              return 1
+            done
           }
 
           for _ in $(seq 1 20); do

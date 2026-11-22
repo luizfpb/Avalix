@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
+import { withRetry } from './lib/retry.mjs'
 
 const url = process.env.SUPABASE_URL?.replace(/\/$/, '')
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -37,13 +38,15 @@ function safeDestination(bucket, objectPath) {
 async function listDirectory(bucket, prefix) {
   const rows = []
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    const { data, error } = await supabase.storage.from(bucket).list(prefix, {
-      limit: PAGE_SIZE,
-      offset,
-      sortBy: { column: 'name', order: 'asc' },
+    const page = await withRetry(`list ${bucket}/${prefix || '(raiz)'} (offset ${offset})`, async () => {
+      const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+        limit: PAGE_SIZE,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      })
+      if (error) throw error
+      return data ?? []
     })
-    if (error) throw error
-    const page = data ?? []
     rows.push(...page)
     if (page.length < PAGE_SIZE) break
   }
@@ -71,19 +74,25 @@ async function backupDirectory(bucket, prefix = '') {
       continue
     }
 
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .download(objectPath, {}, { cache: 'no-store' })
-    if (error) throw error
-    const bytes = Buffer.from(await data.arrayBuffer())
-    // download() pode devolver corpo truncado sem setar error (proxy/conexão
-    // cortada). O tamanho da origem vem no list(); um mismatch é backup corrompido.
     const expectedSize = item.metadata?.size
-    if (typeof expectedSize === 'number' && expectedSize !== bytes.byteLength) {
-      throw new Error(
-        `Download truncado de ${bucket}/${objectPath}: ${bytes.byteLength} de ${expectedSize} bytes`
-      )
-    }
+    const bytes = await withRetry(`download ${bucket}/${objectPath}`, async () => {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .download(objectPath, {}, { cache: 'no-store' })
+      if (error) throw error
+      const buffer = Buffer.from(await data.arrayBuffer())
+      // download() pode devolver corpo truncado sem setar error (proxy/conexão
+      // cortada). O tamanho da origem vem no list(); um mismatch é backup corrompido
+      // e merece retry antes de abortar.
+      if (typeof expectedSize === 'number' && expectedSize !== buffer.byteLength) {
+        const err = new Error(
+          `Download truncado de ${bucket}/${objectPath}: ${buffer.byteLength} de ${expectedSize} bytes`
+        )
+        err.transient = true
+        throw err
+      }
+      return buffer
+    })
     const destination = safeDestination(bucket, objectPath)
     await mkdir(path.dirname(destination), { recursive: true })
     await writeFile(destination, bytes)

@@ -34,12 +34,24 @@ jobs:
             echo '(repo > Settings > Secrets and variables > Actions).'
             exit 1
           fi
-          code=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
-            "${SUPABASE_URL%/}/rest/v1/organizations?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}")
-          echo "HTTP $code"
-          # 401/403/404 agora falham: secret inválido não pode parecer saudável.
-          case "$code" in
-            2*) echo 'ok: projeto respondeu e a chave foi aceita' ;;
-            *) echo "falha: sem resposta do servidor (HTTP $code)"; exit 1 ;;
-          esac
+          delays=(5 15 30)
+          for attempt in 1 2 3 4; do
+            curl_rc=0
+            code=$(curl --silent --show-error --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' \
+              "${SUPABASE_URL%/}/rest/v1/organizations?select=id&limit=1" \
+              -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}") || curl_rc=$?
+            echo "HTTP $code (tentativa $attempt/4, curl=$curl_rc)"
+            # 401/403/404 falham na hora: secret inválido não pode parecer saudável.
+            if [ "$curl_rc" -eq 0 ] && [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+              echo 'ok: projeto respondeu e a chave foi aceita'
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ] && { [ "$curl_rc" -ne 0 ] || [[ "$code" =~ ^(408|429|500|502|503|504|520|522|524)$ ]]; }; then
+              wait_s="${delays[$((attempt - 1))]}"
+              echo "Aviso: falha transitória; tentando novamente em ${wait_s}s..."
+              sleep "$wait_s"
+              continue
+            fi
+            echo "falha: sem resposta do servidor (curl=$curl_rc, HTTP $code)"
+            exit 1
+          done
