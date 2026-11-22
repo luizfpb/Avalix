@@ -14,6 +14,11 @@ pt-BR; commits sem cara de IA; acentuação e pontuação corretas).
 
 ## Fluxo de trabalho
 
+- Entrega de alterações (git): como a IA nunca opera git de escrita, ao
+  finalizar qualquer entrega que altere arquivos, mandar **sempre todos os
+  comandos de commit e push** (`git add`, `git commit`, `git push`), em
+  **sintaxe `cmd`**, **linha a linha** (um comando por linha, prontos para
+  copiar e executar).
 - Validação padrão de toda entrega: `npm run lint` → `npm run test`
   (vitest) → `npm run build` (tsc + vite). Tudo verde antes de entregar.
   Migration nova ou mudança em RPC: também `npm run test:db` (pgTAP num
