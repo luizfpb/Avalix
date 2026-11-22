@@ -75,10 +75,11 @@ select is(
   'outra organização não exclui o modelo');
 
 -- 4) Org em modo só leitura não consegue criar novo modelo
-update public.organizations
-   set trial_ends_at = now() - interval '1 day',
-       subscription_status = 'canceled'
- where id = '60000000-0000-0000-0000-000000000002';
+update public.org_subscriptions
+   set status = 'trial',
+       trial_ends_at = now() - interval '1 day',
+       current_period_end = null
+ where org_id = '60000000-0000-0000-0000-000000000002';
 
 select pg_temp.act('60000000-0000-0000-0000-000000000001', 'aal2');
 set local role authenticated;

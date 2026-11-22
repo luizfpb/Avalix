@@ -27,8 +27,17 @@ insert into public.org_members(org_id, user_id, role) values
  ('61000000-0000-0000-0000-000000000002', '61000000-0000-0000-0000-000000000001', 'owner');
 insert into public.subjects(id, org_id, full_name, birth_date, sex) values
  ('61000000-0000-0000-0000-000000000003', '61000000-0000-0000-0000-000000000002', 'Aluno 0061', '1992-05-10', 'M');
-insert into public.consents(org_id, subject_id, version, accepted_at) values
- ('61000000-0000-0000-0000-000000000002', '61000000-0000-0000-0000-000000000003', '1.1', now());
+insert into public.consent_records
+  (org_id, subject_id, consent_version, consent_text_sha256, signer_kind, signer_name, collected_by)
+values (
+  '61000000-0000-0000-0000-000000000002',
+  '61000000-0000-0000-0000-000000000003',
+  app.canonical_consent_version(),
+  encode(sha256(convert_to(app.canonical_consent_text('Org pgTAP 0061'), 'UTF8')), 'hex'),
+  'titular',
+  'Aluno 0061',
+  '61000000-0000-0000-0000-000000000001'
+);
 
 insert into public.assessments(id, org_id, subject_id, evaluator_id, assessed_at, weight_kg, height_cm, notes, results) values
  ('61000000-0000-0000-0000-000000000020', '61000000-0000-0000-0000-000000000002', '61000000-0000-0000-0000-000000000003',
