@@ -44,7 +44,7 @@ insert into public.assessments(id, org_id, subject_id, evaluator_id, assessed_at
   '61000000-0000-0000-0000-000000000001', current_date - 60, 82.0, 178, 'Nota clinica privada',
   '{"bodyFatPct":21.5,"leanMassKg":64.4}'::jsonb),
  ('61000000-0000-0000-0000-000000000021', '61000000-0000-0000-0000-000000000002', '61000000-0000-0000-0000-000000000003',
-  current_date - 5, 79.2, 178, 'Outra nota privada',
+  '61000000-0000-0000-0000-000000000001', current_date - 5, 79.2, 178, 'Outra nota privada',
   '{"bodyFatPct":18.4,"leanMassKg":64.6}'::jsonb);
 
 insert into public.exercises(id, org_id, name, primary_muscle, equipment, movement_pattern, aliases) values
