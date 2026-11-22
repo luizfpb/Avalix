@@ -7,19 +7,25 @@
   font-family: "Manrope";
   font-weight: 700;
   font-display: swap;
-  src: url("/fonts/manrope-700.ttf") format("truetype");
+  src:
+    url("/fonts/manrope-700.woff2") format("woff2"),
+    url("/fonts/manrope-700.ttf") format("truetype");
 }
 @font-face {
   font-family: "Inter";
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/inter-400.ttf") format("truetype");
+  src:
+    url("/fonts/inter-400.woff2") format("woff2"),
+    url("/fonts/inter-400.ttf") format("truetype");
 }
 @font-face {
   font-family: "Inter";
   font-weight: 600;
   font-display: swap;
-  src: url("/fonts/inter-600.ttf") format("truetype");
+  src:
+    url("/fonts/inter-600.woff2") format("woff2"),
+    url("/fonts/inter-600.ttf") format("truetype");
 }
 
 :root {
@@ -1037,5 +1043,46 @@ fieldset.campo {
     border-radius: 3px;
     vertical-align: -2px;
     margin-right: 8px;
+  }
+}
+
+.previas-pdf {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.previa-cartao {
+  margin: 0;
+  background: var(--folha);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.previa-cartao img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #ffffff;
+  border-bottom: 1px solid var(--linha);
+}
+
+.previa-cartao figcaption {
+  padding: 14px 18px;
+  font-size: 0.92rem;
+  color: var(--texto-2);
+}
+
+.previa-cartao figcaption strong {
+  color: var(--grafite);
+}
+
+@media (max-width: 720px) {
+  .previas-pdf {
+    grid-template-columns: 1fr;
   }
 }

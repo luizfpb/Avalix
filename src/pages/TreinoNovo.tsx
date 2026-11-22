@@ -25,7 +25,9 @@ import {
   useExercises,
   useUpdateWorkoutPlan,
   useWorkoutPlan,
+  useWorkoutTemplates,
 } from '../features/workout/hooks'
+import { templateToEditorPlan } from '../features/workout/templatesApi'
 import type { ExerciseRow } from '../features/workout/api'
 import {
   emptyEditorPlan,
@@ -219,6 +221,8 @@ function Builder({
   const updateMut = useUpdateWorkoutPlan(subjectId, planId, versao.base)
   const mut = isEdit ? updateMut : createMut
   const anamneseQ = useAnamneses(subjectId)
+  const templatesQ = useWorkoutTemplates(!isEdit ? orgId : undefined)
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
 
   const [plan, setPlan] = useState<EditorPlan>(initial)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -838,6 +842,40 @@ function Builder({
       ) : null}
 
       <AnamneseFlag subjectId={subjectId} />
+
+      {!isEdit && (templatesQ.data?.length ?? 0) > 0 ? (
+        <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1 space-y-1">
+            <Label htmlFor="workout-template-select">Começar de um modelo da biblioteca</Label>
+            <select
+              id="workout-template-select"
+              className={controlClass}
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+            >
+              <option value="">Escolha um modelo salvo...</option>
+              {(templatesQ.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.payload?.days?.length ?? 0} divisões · {t.weeks} sem.)
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!selectedTemplateId}
+            onClick={() => {
+              const tpl = (templatesQ.data ?? []).find((t) => t.id === selectedTemplateId)
+              if (!tpl) return
+              setPlan(templateToEditorPlan(tpl, newKey, newGroupKey))
+            }}
+          >
+            Aplicar modelo
+          </Button>
+        </div>
+      ) : null}
 
       {totalCautions > 0 || posturalNotes.length > 0 ? (
         <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">

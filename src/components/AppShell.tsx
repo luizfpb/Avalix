@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { NavLink, Link, Outlet, useLocation } from 'react-router'
-import { Calculator, CalendarDays, CreditCard, Dumbbell, LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
+import { Bookmark, Calculator, CalendarDays, CreditCard, Dumbbell, LayoutDashboard, LogOut, Settings, Users, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
@@ -18,6 +18,7 @@ type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean }
 const toolItems: NavItem[] = [
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/exercicios', label: 'Exercícios', icon: Dumbbell },
+  { to: '/modelos-treino', label: 'Modelos de treino', icon: Bookmark },
   { to: '/ferramentas/1rm', label: 'Calculadora 1RM', icon: Calculator },
 ]
 

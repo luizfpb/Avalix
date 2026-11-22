@@ -93,6 +93,7 @@ import {
 import { SetRowFields } from '../features/workout/SetRowFields'
 import { RestTimerBar, type RestTimer } from '../features/workout/RestTimerBar'
 import { SessionEditForm, type SessionEditValues } from '../features/workout/SessionEditForm'
+import { StudentEvolutionTab } from '../features/workout/StudentEvolutionTab'
 import {
   currentWeek,
   sessionsPerWeek,
@@ -242,7 +243,7 @@ function capturarTokenUmaVez(): string | null {
   return tokenCapturado
 }
 
-type Aba = 'treino' | 'historico' | 'anteriores'
+type Aba = 'treino' | 'historico' | 'evolucao' | 'anteriores'
 
 // Treino concluído nesta página que o pacote ainda não conhece (ver
 // TreinoDoDia). Mora na página, e não na tela do treino: trocar para o
@@ -696,6 +697,7 @@ export default function TreinoAluno() {
           [
             ['treino', 'Treino'],
             ['historico', 'Histórico'],
+            ['evolucao', 'Evolução'],
             ['anteriores', 'Anteriores'],
           ] as const
         ).map(([id, rotulo]) => (
@@ -770,6 +772,10 @@ export default function TreinoAluno() {
               // atualizada na próxima conexão sem desfazer esse sucesso.
             }
           }} />
+      ) : null}
+
+      {aba === 'evolucao' ? (
+        <StudentEvolutionTab evolution={pacote.evolution} />
       ) : null}
 
       {aba === 'anteriores' ? (

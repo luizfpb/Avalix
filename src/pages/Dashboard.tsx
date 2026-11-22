@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Sparkles, UserPlus } from 'lucide-react'
+import { MessageCircle, Sparkles, UserPlus } from 'lucide-react'
 import { useAuth } from '../features/auth/context'
 import { useOrganization } from '../features/organization/context'
 import { useSubjects } from '../features/subjects/hooks'
+import { getSubject } from '../features/subjects/api'
 import { normalizeDbError } from '../lib/errors'
+import { buildWhatsAppHref } from '../lib/phone'
 import { usePendingIntakes } from '../features/anamnesis/intakeHooks'
 import { useUpcomingAppointments } from '../features/appointments/hooks'
 import { useLastAssessmentBySubject } from '../features/assessment/hooks'
@@ -123,6 +125,22 @@ export default function Dashboard() {
     [subjects, lastAssessQ.data, plansQ.data, logsQ.data, now]
   )
   const attentionRows = rows.filter((row) => row.attention > 0)
+
+  async function handleOpenWhatsApp(row: CarteiraRow) {
+    const firstName = row.name.trim().split(/\s+/)[0] || row.name
+    const msg = row.reassessDue
+      ? `Olá, ${firstName}! Já está na hora de fazermos sua reavaliação física para acompanhar a sua evolução. Qual dia e horário ficam bons para você?`
+      : `Olá, ${firstName}! Tudo bem? Vi aqui que seus últimos treinos ficaram sem registro. Precisa de algum ajuste no plano?`
+    let phone: string | null | undefined = null
+    try {
+      const full = await getSubject(row.subjectId)
+      phone = full?.phone
+    } catch {
+      // fallback sem número: o WhatsApp abre com a mensagem pronta para escolher o contato
+    }
+    const href = buildWhatsAppHref(phone, msg) ?? `https://wa.me/?text=${encodeURIComponent(msg)}`
+    window.open(href, '_blank', 'noopener,noreferrer')
+  }
   // O painel mostra os primeiros e dizia quantos faltavam, sem caminho nenhum
   // para eles: quem precisava agir tinha de voltar à lista geral e procurar de
   // novo quem já estava sinalizado aqui. A lista já está toda em memória.
@@ -332,13 +350,26 @@ export default function Dashboard() {
                             </span>
                           </span>
                         </Link>
-                        {row.planId ? (
-                          <Button asChild variant="outline" size="sm">
-                            <Link to={`/avaliados/${row.subjectId}/treinos/${row.planId}/execucao`}>
-                              Execução
-                            </Link>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Enviar mensagem no WhatsApp para ${row.name}`}
+                            title="Enviar mensagem pronta no WhatsApp"
+                            onClick={() => void handleOpenWhatsApp(row)}
+                          >
+                            <MessageCircle />
+                            <span className="hidden sm:inline">WhatsApp</span>
                           </Button>
-                        ) : null}
+                          {row.planId ? (
+                            <Button asChild variant="outline" size="sm">
+                              <Link to={`/avaliados/${row.subjectId}/treinos/${row.planId}/execucao`}>
+                                Execução
+                              </Link>
+                            </Button>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>

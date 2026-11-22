@@ -94,6 +94,18 @@ function rodape() {
           </ul>
         </div>
         <div>
+          <h2>Guias e comparativos</h2>
+          <ul>
+            <li><a href="/guia-avaliacao-fisica">Como fazer avaliação física</a></li>
+            <li><a href="/guia-pollock-7-dobras">Pollock 7 dobras</a></li>
+            <li><a href="/guia-volume-semanal-treino">Volume semanal de treino</a></li>
+            <li><a href="/guia-avaliacao-postural">Avaliação postural com fotos</a></li>
+            <li><a href="/guia-tabela-vo2max">Tabela de VO2máx (Herdy)</a></li>
+            <li><a href="/comparativo-app-personal-trainer">Avalix vs MFIT e planilhas</a></li>
+            <li><a href="/alternativa-sanny-physical-test">Alternativa ao Sanny</a></li>
+          </ul>
+        </div>
+        <div>
           <h2>Avalix</h2>
           <ul>
             <li><a href="/cadastro">Testar 14 dias grátis</a></li>
@@ -113,6 +125,26 @@ function migalha(p) {
       </nav>`
 }
 
+function ogImageDe(p) {
+  if (p.ogImage) return `${SITE.origem}${p.ogImage}`
+  if (p.rota === '/avaliacao-fisica') return `${SITE.origem}/og-avaliacao.png`
+  if (p.rota === '/avaliacao-postural') return `${SITE.origem}/og-postural.png`
+  if (p.rota === '/app-para-personal-trainer') return `${SITE.origem}/og-treino.png`
+  if (p.rota.startsWith('/calculadora-')) return `${SITE.origem}/og-calculadoras.png`
+  if (
+    p.rota.startsWith('/modelo-de-') ||
+    p.rota.startsWith('/questionario-') ||
+    p.rota.startsWith('/planilha-')
+  ) {
+    return `${SITE.origem}/og-modelos.png`
+  }
+  if (p.rota.startsWith('/guia-')) return `${SITE.origem}/og-guias.png`
+  if (p.rota.startsWith('/comparativo-') || p.rota.startsWith('/alternativa-')) {
+    return `${SITE.origem}/og-comparativo.png`
+  }
+  return `${SITE.origem}/og-avalix.png`
+}
+
 function dadosEstruturados(p) {
   const blocos = []
   if (p.rota !== '/') {
@@ -123,6 +155,31 @@ function dadosEstruturados(p) {
         { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE.origem}/` },
         { '@type': 'ListItem', position: 2, name: p.migalha, item: urlDe(p) },
       ],
+    })
+  }
+  if (p.tipoArtigo) {
+    blocos.push({
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: p.migalha ?? p.titulo,
+      description: p.descricao,
+      inLanguage: 'pt-BR',
+      dateModified: p.atualizada,
+      mainEntityOfPage: urlDe(p),
+      image: ogImageDe(p),
+      author: {
+        '@type': 'Organization',
+        name: 'Avalix',
+        url: `${SITE.origem}/`,
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Avalix',
+        logo: {
+          '@type': 'ImageObject',
+          url: `${SITE.origem}/pwa-512.png`,
+        },
+      },
     })
   }
   if (
@@ -167,6 +224,8 @@ function dadosEstruturados(p) {
 
 function montarPagina(p) {
   const canonica = urlDe(p)
+  const ogImage = ogImageDe(p)
+  const tituloSocial = p.tituloSocial ?? p.titulo
   return `<!doctype html>
 <html lang="pt-BR">
   <head>
@@ -180,18 +239,23 @@ function montarPagina(p) {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preload" href="/fonts/manrope-700.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/fonts/manrope-700.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/site/site.css" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="${p.tipoArtigo ? 'article' : 'website'}" />
     <meta property="og:site_name" content="Avalix" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:url" content="${canonica}" />
-    <meta property="og:title" content="${esc(p.tituloSocial ?? p.titulo)}" />
+    <meta property="og:title" content="${esc(tituloSocial)}" />
     <meta property="og:description" content="${esc(p.descricao)}" />
-    <meta property="og:image" content="${SITE.origem}/og-avalix.png" />
+    <meta property="og:image" content="${ogImage}" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${esc(tituloSocial)}" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${esc(tituloSocial)}" />
+    <meta name="twitter:description" content="${esc(p.descricao)}" />
+    <meta name="twitter:image" content="${ogImage}" />
     ${dadosEstruturados(p)}
   </head>
   <body>

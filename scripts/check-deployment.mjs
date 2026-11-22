@@ -106,7 +106,9 @@ for (const path of ['/avaliacao-fisica', '/avaliacao-postural', '/app-para-perso
   '/calculadora-1rm', '/calculadora-percentual-de-gordura', '/modelo-de-anamnese',
   '/calculadora-imc', '/calculadora-frequencia-cardiaca', '/calculadora-vo2max',
   '/calculadora-tmb', '/questionario-par-q', '/modelo-de-ficha-de-treino',
-  '/planilha-de-avaliacao-fisica']) {
+  '/planilha-de-avaliacao-fisica', '/guia-avaliacao-fisica', '/guia-pollock-7-dobras',
+  '/guia-volume-semanal-treino', '/guia-avaliacao-postural', '/guia-tabela-vo2max',
+  '/comparativo-app-personal-trainer', '/alternativa-sanny-physical-test']) {
   const response = await request(path)
   expectStatus(response, 200, path)
   expectHeader(response, 'content-type', /^text\/html\b/i, path)

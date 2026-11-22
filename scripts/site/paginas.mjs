@@ -1,5 +1,6 @@
 // Conteúdo das páginas públicas. Quem monta o HTML é scripts/gerar-site.mjs.
 // Preços: os mesmos de billing_plans (migration 0050). Mudou lá, muda aqui.
+import { CATALOGO_GUIAS, criarGuiasEComparativos } from './guias.mjs'
 
 export const SITE = {
   origem: 'https://avalixfit.com.br',
@@ -278,6 +279,14 @@ const landing = {
       inLanguage: 'pt-BR',
       description:
         'Software de avaliação física e postural, testes físicos, anamnese e prescrição de treino para profissionais de Educação Física.',
+      screenshot: `${SITE.origem}/site/preview-laudo-avaliacao.png`,
+      featureList: [
+        'Avaliação física por dobras cutâneas (JP7, JP3, Durnin-Womersley) e US Navy',
+        'Testes físicos de VO2máx (Herdy & Caixeta), flexão, sentar e alcançar e preensão manual',
+        'Avaliação postural por foto com detecção de pontos no navegador',
+        'Prescrição de treino por mesociclo com modelos reutilizáveis e link offline para o aluno',
+        'Laudos em PDF com a marca do profissional e conformidade LGPD',
+      ],
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: 'BRL',
@@ -293,6 +302,14 @@ const landing = {
       url: `${SITE.origem}/`,
       logo: `${SITE.origem}/pwa-512.png`,
       email: SITE.email,
+      description:
+        'Plataforma brasileira de avaliação física, avaliação postural e prescrição de treino para personal trainers e estúdios.',
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: SITE.email,
+        availableLanguage: ['Portuguese'],
+      },
     },
   ],
   corpo: `<section class="hero">
@@ -360,6 +377,25 @@ const landing = {
         </div>
       </section>
 
+      <section class="secao" id="laudos" aria-labelledby="laudos-titulo">
+        <div class="envoltorio">
+          <div class="cabeca-secao">
+            <h2 id="laudos-titulo">Como chega para o seu aluno</h2>
+            <p class="lide">Exemplo real dos PDFs gerados pelo Avalix, com a logo e o nome do seu estúdio ou atendimento.</p>
+          </div>
+          <div class="previas-pdf">
+            <figure class="previa-cartao">
+              <img src="/site/preview-laudo-avaliacao.png" alt="Exemplo real de laudo de avaliação física em PDF gerado pelo Avalix, com composição corporal, IMC e circunferências" loading="lazy" width="909" height="1285" />
+              <figcaption><strong>Laudo de avaliação física (PDF)</strong> — composição corporal, faixas de referência e tabela completa de medidas.</figcaption>
+            </figure>
+            <figure class="previa-cartao">
+              <img src="/site/preview-laudo-treino.png" alt="Exemplo real de ficha de treino em PDF gerado pelo Avalix, organizada por divisão com séries, repetições e descanso" loading="lazy" width="909" height="1285" />
+              <figcaption><strong>Ficha de treino (PDF)</strong> — divisões organizadas com séries, repetições, RIR e descanso, além do link interativo no celular.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section class="secao" id="ferramentas" aria-labelledby="ferramentas-titulo">
         <div class="envoltorio">
           <div class="cabeca-secao">
@@ -368,6 +404,22 @@ const landing = {
           </div>
           <div class="ferramentas">
             ${Object.keys(CATALOGO_FERRAMENTAS).map(cartaoFerramenta).join('\n            ')}
+          </div>
+        </div>
+      </section>
+
+      <section class="secao" id="guias" aria-labelledby="guias-titulo">
+        <div class="envoltorio">
+          <div class="cabeca-secao">
+            <h2 id="guias-titulo">Guias práticos e comparativos</h2>
+            <p class="lide">Protocolos de avaliação, volume semanal e comparações diretas para o dia a dia do personal.</p>
+          </div>
+          <div class="ferramentas">
+            ${Object.entries(CATALOGO_GUIAS).map(([rota, g]) => `<a class="ferramenta" href="${rota}">
+              <h3>${g.titulo}</h3>
+              <p>${g.desc}</p>
+              <span class="mais">${g.acao}</span>
+            </a>`).join('\n            ')}
           </div>
         </div>
       </section>
@@ -1560,9 +1612,12 @@ const planilhaAvaliacao = {
       ${chamada('Troque a planilha pelo laudo pronto em PDF', 'No Avalix você digita as medidas uma vez no celular, o percentual de gordura e o VO2máx saem na hora com a comparação da última avaliação, e o PDF sai com a sua marca.')}`,
 }
 
+const GUIAS_E_COMPARATIVOS = criarGuiasEComparativos({ chamada, relacionadasHtml })
+
 export const PAGINAS = [
   landing, avaliacaoFisica, avaliacaoPostural, appPersonal,
   calc1rm, calcGordura, modeloAnamnese,
   calcImc, calcFc, calcVo2, calcTmb, parq, fichaTreino, planilhaAvaliacao,
+  ...GUIAS_E_COMPARATIVOS,
 ]
   .map((p) => ({ ...p, corpo: p.corpo.replace('PERGUNTAS', p.perguntas?.length && p.rota !== '/' ? perguntasHtml(p.perguntas) : '') }))

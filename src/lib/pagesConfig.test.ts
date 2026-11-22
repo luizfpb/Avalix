@@ -33,6 +33,7 @@ describe('configuracao do Cloudflare Pages', () => {
       ['/agenda', '/', '200'],
       ['/carteira', '/', '200'],
       ['/exercicios', '/', '200'],
+      ['/modelos-treino', '/', '200'],
       ['/termos', '/', '200'],
       ['/a/*', '/', '200'],
       ['/avaliados/*', '/', '200'],

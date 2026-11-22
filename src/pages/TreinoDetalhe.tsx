@@ -2,17 +2,19 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { PageTrail } from '../components/PageTrail'
 import { useSubjectTrail } from '../lib/subjectTrail'
-import { Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
+import { Bookmark, Pencil, Trash2, Copy, Share2, ClipboardList } from 'lucide-react'
 import { useOrganization } from '../features/organization/context'
 import { useAuth } from '../features/auth/context'
 import { useSubject, useSubjects } from '../features/subjects/hooks'
 import {
+  useCreateWorkoutTemplate,
   useDeleteWorkoutPlan,
   useDuplicateWorkoutPlan,
   useExercises,
   useSetWorkoutPlanStatus,
   useWorkoutPlan,
 } from '../features/workout/hooks'
+import { editorPlanToTemplatePayload } from '../features/workout/templatesApi'
 import { useAssessments } from '../features/assessment/hooks'
 import { useSessions } from '../features/posture/hooks'
 import type { WorkoutExerciseRow, WorkoutPlanDetail } from '../features/workout/api'
@@ -102,6 +104,10 @@ export default function TreinoDetalhe() {
   // PDF gerado que o navegador não deixou compartilhar no mesmo toque.
   const [pdfPronto, setPdfPronto] = useState<File | null>(null)
   const [showDup, setShowDup] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateSaved, setTemplateSaved] = useState(false)
+  const createTemplateMut = useCreateWorkoutTemplate(organization?.id)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -427,6 +433,17 @@ export default function TreinoDetalhe() {
           <Button variant="outline" size="sm" onClick={() => setShowDup((s) => !s)}>
             <Copy /> Duplicar
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setTemplateName(plan.name)
+              setTemplateSaved(false)
+              setShowSaveTemplate((s) => !s)
+            }}
+          >
+            <Bookmark /> Salvar como modelo
+          </Button>
           <Button variant="outline" size="sm" aria-expanded={showShare} onClick={() => setShowShare((s) => !s)}>
             <Share2 /> Compartilhar
           </Button>
@@ -464,6 +481,63 @@ export default function TreinoDetalhe() {
           defaultName={`Cópia de ${plan.name}`}
           onClose={() => setShowDup(false)}
         />
+      ) : null}
+
+      {showSaveTemplate ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Salvar na biblioteca de modelos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="template-name">Nome do modelo</Label>
+              <Input
+                id="template-name"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Ex.: Hipertrofia AB Iniciante"
+              />
+            </div>
+            {createTemplateMut.error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {normalizeDbError(createTemplateMut.error)}
+              </p>
+            ) : null}
+            {templateSaved ? (
+              <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">
+                Modelo salvo. Você pode aplicá-lo ao criar novos treinos ou gerenciar em{' '}
+                <Link to="/modelos-treino" className="underline">
+                  Modelos de treino
+                </Link>
+                .
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={createTemplateMut.isPending || !templateName.trim() || !organization?.id}
+                onClick={async () => {
+                  if (!organization?.id || !templateName.trim()) return
+                  const editor = planDetailToEditor(query.data)
+                  await createTemplateMut.mutateAsync({
+                    orgId: organization.id,
+                    name: templateName.trim(),
+                    goal: editor.goal,
+                    weeks: editor.weeks,
+                    notes: editor.notes,
+                    payload: editorPlanToTemplatePayload(editor),
+                  })
+                  setTemplateSaved(true)
+                }}
+              >
+                {createTemplateMut.isPending ? 'Salvando...' : 'Salvar modelo'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowSaveTemplate(false)}>
+                Fechar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {showShare ? (

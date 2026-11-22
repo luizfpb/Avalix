@@ -21,6 +21,7 @@
 /agenda               /   200
 /carteira            /   200
 /exercicios          /   200
+/modelos-treino      /   200
 /termos              /   200
 
 # O Pages exige redirects estaticos antes dos dinamicos.

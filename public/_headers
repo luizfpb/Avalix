@@ -32,55 +32,86 @@
 
 /avaliacao-fisica
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /avaliacao-postural
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /app-para-personal-trainer
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-1rm
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-percentual-de-gordura
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /modelo-de-anamnese
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-imc
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-frequencia-cardiaca
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-vo2max
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /calculadora-tmb
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /questionario-par-q
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /modelo-de-ficha-de-treino
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /planilha-de-avaliacao-fisica
   ! X-Robots-Tag
-  Cache-Control: no-cache
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/guia-avaliacao-fisica
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/guia-pollock-7-dobras
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/guia-volume-semanal-treino
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/guia-avaliacao-postural
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/guia-tabela-vo2max
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/comparativo-app-personal-trainer
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/alternativa-sanny-physical-test
+  ! X-Robots-Tag
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
 
 /robots.txt
   ! X-Robots-Tag
@@ -160,6 +191,10 @@
   Cloudflare-CDN-Cache-Control: no-store
 
 /exercicios
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  Cloudflare-CDN-Cache-Control: no-store
+
+/modelos-treino
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Cloudflare-CDN-Cache-Control: no-store
 

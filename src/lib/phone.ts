@@ -19,3 +19,19 @@ export function formatPhone(raw: string | null | undefined): string | null {
   }
   return typed
 }
+
+// Monta link wa.me direto para o telefone do aluno (quando válido), com
+// mensagem pré-preenchida. Retorna null se não houver número utilizável.
+export function buildWhatsAppHref(
+  raw: string | null | undefined,
+  message: string
+): string | null {
+  const typed = raw?.trim()
+  if (!typed) return null
+  let digits = typed.replace(/\D/g, '')
+  if (digits.length < 10) return null
+  if (!typed.startsWith('+') && (digits.length === 10 || digits.length === 11)) {
+    digits = `55${digits}`
+  }
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+}

@@ -96,6 +96,28 @@ export type StudentHistoryPlan = {
   sessions: number
 }
 
+export type StudentPr = {
+  exercise_id: string
+  exercise_name: string
+  best_weight_kg: number
+  reps: number | null
+  performed_at: string
+}
+
+export type StudentAssessmentPoint = {
+  assessed_at: string
+  weight_kg: number | null
+  body_fat_pct: number | null
+  lean_mass_kg: number | null
+}
+
+export type StudentEvolution = {
+  sessions_30d: number
+  sessions_total: number
+  prs: StudentPr[]
+  assessments: StudentAssessmentPoint[]
+}
+
 export type StudentWorkout = {
   org_name: string
   subject_first_name: string
@@ -117,6 +139,9 @@ export type StudentWorkout = {
   // da prescrição. Opcional: pacote guardado no aparelho antes da 0056 não
   // tem o campo, e a tela cai nos exercícios das outras divisões do plano.
   catalog?: StudentCatalogExercise[]
+  // Resumo de evolução do aluno (0061). Opcional para manter compatibilidade
+  // com pacotes guardados no aparelho antes da 0061.
+  evolution?: StudentEvolution | null
 }
 
 export type StudentCatalogExercise = {

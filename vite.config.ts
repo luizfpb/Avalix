@@ -57,9 +57,11 @@ export default defineConfig({
         // poseDetect/vision_bundle (MediaPipe) idem: só baixam quando o
         // recurso é usado e o modelo/wasm vêm de CDN — fora do precache.
         globIgnores: [
-          // og-avalix.png só é lido por crawler de preview de link (WhatsApp e
-          // afins), nunca pelo app: 20 KB que não fazem falta na instalação.
-          "og-avalix.png",
+          // og-*.png só são lidos por crawlers de preview de link (WhatsApp e
+          // afins), nunca pelo app: fora do pré-cache para instalação leve.
+          "og-*.png",
+          // Fontes WOFF2 usadas apenas pelas páginas públicas (site.css).
+          "fonts/*.woff2",
           // Páginas públicas (scripts/gerar-site.mjs): são para quem chega pelo
           // Google, sempre online. Fora do pré-cache para não pesar na
           // instalação do app.
@@ -70,6 +72,9 @@ export default defineConfig({
           "modelo-de-*.html",
           "questionario-*.html",
           "planilha-*.html",
+          "guia-*.html",
+          "comparativo-*.html",
+          "alternativa-*.html",
           "site/**",
           // Termos de Uso: texto lido online (cadastro, assinatura); não
           // precisa ocupar a instalação de quem usa o app no dia a dia.

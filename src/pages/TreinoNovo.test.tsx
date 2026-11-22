@@ -54,6 +54,7 @@ vi.mock('../features/workout/hooks', () => ({
   }),
   useWorkoutPlan: () => planoMock(),
   useWorkoutPlans: () => ({ data: [] }),
+  useWorkoutTemplates: () => ({ data: [], isPending: false, isError: false }),
   useCreateWorkoutPlan: () => ({ mutateAsync: criarMock, isPending: false }),
   useUpdateWorkoutPlan: () => ({ mutateAsync: atualizarMock, isPending: false }),
   useCreateCustomExercise: () => ({ mutateAsync: vi.fn(), isPending: false }),

@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  listWorkoutTemplates,
+  createWorkoutTemplate,
+  deleteWorkoutTemplate,
+} from './templatesApi'
+import {
   createCustomExercise,
   createWorkoutLog,
   extendWorkoutPlanWeeks,
@@ -290,6 +295,36 @@ export function useExtendWorkoutPlanWeeks(planId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['workout-plan', planId] })
       qc.invalidateQueries({ queryKey: ['workout-plans'] })
       qc.invalidateQueries({ queryKey: ['org-active-plans'] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------- modelos de treino
+
+export function useWorkoutTemplates(orgId: string | undefined) {
+  return useQuery({
+    queryKey: ['workout-templates', orgId],
+    queryFn: () => listWorkoutTemplates(orgId as string),
+    enabled: !!orgId,
+  })
+}
+
+export function useCreateWorkoutTemplate(orgId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: createWorkoutTemplate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-templates', orgId] })
+    },
+  })
+}
+
+export function useDeleteWorkoutTemplate(orgId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteWorkoutTemplate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-templates', orgId] })
     },
   })
 }

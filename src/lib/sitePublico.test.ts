@@ -65,6 +65,13 @@ const PUBLICAS = [
   '/questionario-par-q',
   '/modelo-de-ficha-de-treino',
   '/planilha-de-avaliacao-fisica',
+  '/guia-avaliacao-fisica',
+  '/guia-pollock-7-dobras',
+  '/guia-volume-semanal-treino',
+  '/guia-avaliacao-postural',
+  '/guia-tabela-vo2max',
+  '/comparativo-app-personal-trainer',
+  '/alternativa-sanny-physical-test',
 ]
 
 function blocosDeHeaders(texto: string) {
